@@ -1,0 +1,130 @@
+/* Sidebar.css */
+.sidebar {
+  position: fixed;
+  top: 64px;
+  left: -240px;
+  width: 240px;
+  height: calc(100vh - 64px);
+  background-color: white;
+  border-right: 1px solid #e2e8f0;
+  z-index: 99;
+  transition: left 0.2s ease;
+  overflow-y: auto;
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+.sidebar-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-nav > ul > li {
+  margin: 0;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 0.875rem 1.5rem;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.nav-link:hover {
+  background-color: #f1f5f9;
+}
+
+.nav-link.active {
+  color: #4f46e5;
+}
+
+.nav-link.has-subitems.active {
+  background-color: #f1f5f9;
+}
+
+.nav-link.has-subitems.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: #4f46e5;
+}
+
+.nav-icon {
+  font-size: 1.125rem;
+  width: 24px;
+  text-align: center;
+}
+
+.nav-label {
+  flex: 1;
+  text-align: left;
+}
+
+.expand-icon {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.submenu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease-out;
+}
+
+.submenu.open {
+  max-height: 500px;
+  transition: max-height 0.25s ease-in;
+}
+
+.sub-link {
+  padding-left: 3.5rem !important;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.sub-link.active {
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+/* Desktop behavior */
+@media (min-width: 768px) {
+  .sidebar {
+    left: 0;
+    position: sticky;
+    height: calc(100vh - 64px);
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+}
+
+/* Focus styles for accessibility */
+.nav-link:focus,
+.sub-link:focus {
+  outline: 2px solid #4f46e5;
+  outline-offset: -2px;
+  z-index: 1;
+}

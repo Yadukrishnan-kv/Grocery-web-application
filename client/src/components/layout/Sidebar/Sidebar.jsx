@@ -1,0 +1,228 @@
+// Sidebar.jsx
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '../../../context/PermissionContext'
+import './Sidebar.css';
+
+// Permission mapping for menu items
+const MENU_PERMISSIONS = {
+  'Dashboard': 'menu.dashboard',
+  'Users': 'menu.users',
+  'UserList': 'menu.users.list',
+  'RolePermission': 'menu.users.roles',
+  'Products': 'menu.products',
+  'Category': 'menu.products.category',
+  'SubCategory': 'menu.products.subcategory',
+  'AddProducts': 'menu.products.add',
+  'Customers': 'menu.customers',
+  'CustomerList': 'menu.customers.list',
+  'Sales': 'menu.sales',
+  'Orders': 'menu.sales.orders',
+  'OrdersReport': 'menu.sales.reports',
+  'Deliveries': 'menu.deliveries',
+  'OrderArrived': 'menu.deliveries.arrived',
+  'AcceptedOrders': 'menu.deliveries.accepted',
+  'DeliveredOrders': 'menu.deliveries.delivered',
+  'CancelledOrders': 'menu.deliveries.cancelled',
+  'Settings': 'menu.settings'
+};
+
+const navItems = [
+  { id: 'Dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+  { 
+    id: 'Users', 
+    label: 'Users', 
+    icon: '👥',
+    subItems: [
+      { id: 'UserList', label: 'User', path: '/userlist' },
+      { id: 'RolePermission', label: 'Role Permission', path: '/roles' }
+    ]
+  },
+  { 
+    id: 'Products', 
+    label: 'Products', 
+    icon: '📦',
+    subItems: [
+      { id: 'Category', label: 'Category', path: '/category/list' },
+      { id: 'SubCategory', label: 'Sub Category', path: '/subcategory/list' },
+      { id: 'AddProducts', label: 'Add Products', path: '/product/list' }
+    ]
+  },
+  { 
+    id: 'Customers', 
+    label: 'Customers', 
+    icon: '👥',
+    subItems: [
+      { id: 'CustomerList', label: 'Customers', path: '/customer/list' }
+    ]
+  },
+  { 
+    id: 'Sales', 
+    label: 'Sales', 
+    icon: '📋',
+    subItems: [
+      { id: 'Orders', label: 'Orders', path: '/order/list' },
+      { id: 'OrdersReport', label: 'Orders Report', path: '/ordersreports/list' }
+    ]
+  },
+  { 
+    id: 'Deliveries', 
+    label: 'Deliveries', 
+    icon: '🚚',
+    subItems: [
+      { id: 'OrderArrived', label: 'Order arrived', path: '/Orderarrived/list' },
+      { id: 'AcceptedOrders', label: 'Accepted Orders', path: '/AccepetdOrders/list' },
+      { id: 'DeliveredOrders', label: 'Delivered Orders', path: '/DeliveredOrders/list' },
+      { id: 'CancelledOrders', label: 'Cancelled Orders', path: '/CancelledOrders/list' }
+    ]
+  },
+  { id: 'Settings', label: 'Settings', icon: '⚙️', path: '/settings' }
+];
+
+const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
+  const [expandedItems, setExpandedItems] = useState({});
+  const navigate = useNavigate();
+  const { hasPermission, loading } = usePermissions();
+
+  // Filter nav items based on permissions AND hide Deliveries for Admin
+  const filteredNavItems = useMemo(() => {
+    if (loading) return [];
+    
+    let itemsToFilter = [...navItems];
+    
+    // Hide Deliveries menu for Admin users
+    if (user && user.role === 'Admin') {
+      itemsToFilter = itemsToFilter.filter(item => item.id !== 'Deliveries');
+    }
+    
+    return itemsToFilter.filter(item => {
+      const itemPermission = MENU_PERMISSIONS[item.id];
+      
+      // If no permission required, show it
+      if (!itemPermission) return true;
+      
+      // Check main item permission
+      if (!hasPermission(itemPermission)) return false;
+      
+      // If has subitems, filter them too
+      if (item.subItems) {
+        const filteredSubItems = item.subItems.filter(subItem => {
+          const subPermission = MENU_PERMISSIONS[subItem.id];
+          return !subPermission || hasPermission(subPermission);
+        });
+        
+        // Only show parent if it has visible children
+        return filteredSubItems.length > 0;
+      }
+      
+      return true;
+    }).map(item => {
+      // Also filter subitems
+      if (item.subItems) {
+        return {
+          ...item,
+          subItems: item.subItems.filter(subItem => {
+            const subPermission = MENU_PERMISSIONS[subItem.id];
+            return !subPermission || hasPermission(subPermission);
+          })
+        };
+      }
+      return item;
+    });
+  }, [hasPermission, loading, user]);
+
+  const toggleExpand = (itemId) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
+  };
+
+  const handleItemClick = (item, hasSubItems) => {
+    if (hasSubItems) {
+      toggleExpand(item.id);
+    } else {
+      onSetActiveItem(item.id);
+      navigate(item.path);
+      if (window.innerWidth < 768) {
+        onClose();
+      }
+    }
+  };
+
+  const handleSubItemClick = (subItem) => {
+    onSetActiveItem(subItem.id);
+    navigate(subItem.path);
+    if (window.innerWidth < 768) {
+      onClose();
+    }
+  };
+
+  if (loading) {
+    return (
+      <aside id="sidebar" className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <div className="sidebar-loading">Loading...</div>
+      </aside>
+    );
+  }
+
+  return (
+    <aside 
+      id="sidebar"
+      className={`sidebar ${isOpen ? 'open' : ''}`}
+      aria-hidden={!isOpen}
+    >
+      <nav className="sidebar-nav" aria-label="Main navigation">
+        <ul>
+          {filteredNavItems.map((item) => {
+            const hasSubItems = item.subItems && item.subItems.length > 0;
+            const isExpanded = expandedItems[item.id];
+            const isActive = activeItem === item.id || 
+              (hasSubItems && item.subItems.some(sub => sub.id === activeItem));
+            
+            return (
+              <li key={item.id}>
+                <button
+                  className={`nav-link ${isActive ? 'active' : ''} ${hasSubItems ? 'has-subitems' : ''}`}
+                  onClick={() => handleItemClick(item, hasSubItems)}
+                  aria-expanded={hasSubItems ? isExpanded : undefined}
+                  aria-controls={hasSubItems ? `submenu-${item.id}` : undefined}
+                >
+                  <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+                  <span className="nav-label">{item.label}</span>
+                  {hasSubItems && (
+                    <span className="expand-icon" aria-hidden="true">
+                      {isExpanded ? '▼' : '▶'}
+                    </span>
+                  )}
+                </button>
+                
+                {hasSubItems && (
+                  <ul 
+                    id={`submenu-${item.id}`}
+                    className={`submenu ${isExpanded ? 'open' : ''}`}
+                    aria-hidden={!isExpanded}
+                  >
+                    {item.subItems.map((subItem) => (
+                      <li key={subItem.id}>
+                        <button
+                          className={`nav-link sub-link ${activeItem === subItem.id ? 'active' : ''}`}
+                          onClick={() => handleSubItemClick(subItem)}
+                          aria-current={activeItem === subItem.id ? 'page' : undefined}
+                        >
+                          <span className="nav-label">{subItem.label}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </aside>
+  );
+};
+
+export default Sidebar;

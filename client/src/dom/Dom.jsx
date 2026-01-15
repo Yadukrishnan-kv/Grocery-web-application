@@ -1,0 +1,70 @@
+import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Login from "../pages/Auth/Login";
+import DashboardLayout from "../pages/Dashboard/DashboardLayout";
+import User from "../pages/Users/User";
+import UserTable from "../pages/Users/UserTable";
+import CreateCategory from "../pages/Products/CreateCategory/CreateCategory";
+import CategoryList from "../pages/Products/CategoryList/CategoryList";
+import CreateSubCategory from "../pages/Products/CreateSubCategory/CreateSubCategory";
+import SubCategoryList from "../pages/Products/SubCategoryList/SubCategoryList";
+import CreateProduct from "../pages/Products/CreateProduct/CreateProduct";
+import ProductList from "../pages/Products/ProductList/ProductList";
+import RolePermissions from "../pages/Roles/RolePermissions";
+import RoleList from "../pages/Roles/RoleList";
+import { PermissionProvider } from "../context/PermissionContext";
+import CreateRole from "../pages/Roles/CreateRole";
+import CreateCustomer from "../pages/Customer/CreateCustomer/CreateCustomer";
+import CustomerList from "../pages/Customer/CustomerList/CustomerList";
+import CreateOrder from "../pages/Sales/Orders/CreateOrder/CreateOrder";
+import OrderList from "../pages/Sales/Orders/OrderList/OrderList";
+import OrderArrivedList from "../pages/DeliveryPartner/OrderArrivedList/OrderArrivedList";
+import AcceptedOrdersList from "../pages/DeliveryPartner/AcceptedOrdersList/AcceptedOrdersList";
+import DeliveredOrdersList from "../pages/DeliveryPartner/DeliveredOrdersList/DeliveredOrdersList";
+import CancelledOrdersList from "../pages/DeliveryPartner/CancelledOrdersList/CancelledOrdersList";
+function Dom() {
+  return (
+    <div>
+      <PermissionProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/dashboard" element={<DashboardLayout />} />
+            <Route path="/user/create" element={<User />} />
+            <Route path="/userlist" element={<UserTable />} />
+            <Route path="/category/create" element={<CreateCategory />} />
+            <Route path="/category/list" element={<CategoryList />} />
+            <Route path="/category/edit/:id" element={<CreateCategory />} />
+            <Route path="/subcategory/create" element={<CreateSubCategory />} />
+            <Route path="/subcategory/list" element={<SubCategoryList />} />
+            <Route
+              path="/subcategory/edit/:id"
+              element={<CreateSubCategory />}
+            />
+            <Route path="/product/create" element={<CreateProduct />} />
+            <Route path="/product/list" element={<ProductList />} />
+            <Route path="/product/edit/:id" element={<CreateProduct />} />
+            <Route path="/roles" element={<RoleList />} />
+            <Route path="/roles/create" element={<CreateRole />} />
+
+            <Route path="/roles/edit/:id" element={<RolePermissions />} />
+            <Route path="/customer/create" element={<CreateCustomer />} />
+            <Route path="/customer/list" element={<CustomerList />} />
+
+            <Route path="/order/create" element={<CreateOrder />} />
+            <Route path="/order/list" element={<OrderList />} />
+            <Route path="/order/edit/:id" element={<CreateOrder />} />
+
+            <Route path="/Orderarrived/list" element={<OrderArrivedList />} />
+            <Route path="/AccepetdOrders/list" element={<AcceptedOrdersList />} />
+            <Route path="/deliveredorders/list" element={<DeliveredOrdersList />} />
+            <Route path="/cancelledorders/list" element={<CancelledOrdersList />} />
+          </Routes>
+        </BrowserRouter>
+      </PermissionProvider>
+    </div>
+  );
+}
+
+export default Dom;

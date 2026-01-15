@@ -1,0 +1,144 @@
+/* DeliveredOrdersList.css */
+.delivered-orders-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+}
+
+.main-content {
+  margin-top: 64px;
+  margin-left: 0;
+  padding: 1.5rem;
+  transition: margin-left 0.2s ease;
+  overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+  .main-content.sidebar-open {
+    margin-left: 240px;
+  }
+}
+
+.table-container {
+  width: 100%;
+}
+
+.table-container h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 1.5rem;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+  font-size: 1.1rem;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  background: white;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1100px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 1rem 1.25rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.data-table th {
+  background-color: #f8fafc;
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.data-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.data-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.no-data {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-not-delivered {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-partially-delivered {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-fully-delivered {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.deliver-button {
+  background-color: #38bdf8;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.deliver-button:hover:not(:disabled) {
+  background-color: #0ea5e9;
+}
+
+.deliver-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.delivered-text {
+  color: #166534;
+  font-weight: 500;
+  font-style: italic;
+}
+
+@media (max-width: 767px) {
+  .data-table th,
+  .data-table td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.875rem;
+  }
+}
