@@ -1,0 +1,171 @@
+/* CustomerOrderStatus.css */
+.customer-order-status-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+}
+
+.main-content {
+  margin-top: 64px;
+  margin-left: 0;
+  padding: 1.5rem;
+  transition: margin-left 0.2s ease;
+  overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+  .main-content.sidebar-open {
+    margin-left: 240px;
+  }
+}
+
+.order-details-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  padding: 2rem;
+}
+
+.order-details-container h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.order-info {
+  margin-bottom: 2rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-weight: 600;
+  color: #374151;
+  flex: 0 0 200px;
+}
+
+.value {
+  color: #1f2937;
+  flex: 1;
+  text-align: right;
+}
+
+.status-value {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-delivered {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-cancelled {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.assignment-status {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.assignment-pending_assignment {
+  background-color: #e0e7ff;
+  color: #4338ca;
+}
+
+.assignment-assigned {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.assignment-accepted {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.assignment-rejected {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.assignment-cancelled {
+  background-color: #fecaca;
+  color: #dc2626;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.back-button {
+  background-color: #64748b;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.back-button:hover {
+  background-color: #475569;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+  font-size: 1.1rem;
+}
+
+.error {
+  text-align: center;
+  padding: 2rem;
+  color: #ef4444;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 600px) {
+  .info-row {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .label {
+    flex: none;
+    text-align: left;
+  }
+  
+  .value {
+    text-align: left;
+  }
+}

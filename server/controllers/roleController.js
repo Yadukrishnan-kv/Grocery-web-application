@@ -36,11 +36,7 @@ const updateRolePermissions = async (req, res) => {
   try {
     const { permissions } = req.body;
 
-    // Optional: Validate permissions are from allowed list
-    // const validPermissions = Object.values(MENU_PERMISSIONS);
-    // if (!permissions.every(p => validPermissions.includes(p))) {
-    //   return res.status(400).json({ message: "Invalid permissions" });
-    // }
+    
 
     const role = await Role.findByIdAndUpdate(
       req.params.id,
@@ -65,7 +61,6 @@ const deleteRole = async (req, res) => {
   }
 };
 
-// controllers/roleController.js
 // controllers/roleController.js
 const getPermissions = async (req, res) => {
   try {
@@ -110,6 +105,25 @@ const getPermissions = async (req, res) => {
       } else if (permission === "menu.deliveries") {
         expandedPermissions.push("menu.deliveries.arrived", "menu.deliveries.accepted", "menu.deliveries.delivered", "menu.deliveries.cancelled");
       }
+      else if (permission === "menu.customer.orders") {
+        expandedPermissions.push("menu.customer.orders");
+      }
+      else if (permission === "menu.customer.order.status") {
+        expandedPermissions.push("menu.customer.order.status");
+      }
+      else if (permission === "menu.customer.order.reports") {
+        expandedPermissions.push("menu.customer.order.reports");
+      }
+      else if (permission === "menu.customer.bill.statement") {
+        expandedPermissions.push("menu.customer.bill.statement");
+      }
+      else if (permission === "menu.customer.credit.limit") {
+        expandedPermissions.push("menu.customer.credit.limit");
+      }
+      
+      
+
+      
     });
     
     // Remove duplicates

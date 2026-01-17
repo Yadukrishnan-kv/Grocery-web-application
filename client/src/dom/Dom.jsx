@@ -22,6 +22,15 @@ import OrderArrivedList from "../pages/DeliveryPartner/OrderArrivedList/OrderArr
 import AcceptedOrdersList from "../pages/DeliveryPartner/AcceptedOrdersList/AcceptedOrdersList";
 import DeliveredOrdersList from "../pages/DeliveryPartner/DeliveredOrdersList/DeliveredOrdersList";
 import CancelledOrdersList from "../pages/DeliveryPartner/CancelledOrdersList/CancelledOrdersList";
+import OrderReports from "../pages/Sales/OrderReports/OrderReports";
+import CustomerOrdersList from "../pages/Customer/CustomerOrdersList/CustomerOrdersList";
+import CreateCustomerOrder from "../pages/Customer/CreateCustomerOrder/CreateCustomerOrder";
+import CustomerOrderStatus from "../pages/Customer/CustomerOrderStatus/CustomerOrderStatus";
+import CustomerOrderReports from "../pages/Customer/CustomerOrderReports/CustomerOrderReports";
+import CustomerBillStatement from "../pages/Customer/CustomerBillStatement/CustomerBillStatement";
+import CustomerCreditLimit from "../pages/Customer/CustomerCreditLimit/CustomerCreditLimit";
+import Profile from "../pages/Profile/Profile";
+import ChangePassword from "../pages/Profile/ChangePassword";
 function Dom() {
   return (
     <div>
@@ -55,11 +64,23 @@ function Dom() {
             <Route path="/order/create" element={<CreateOrder />} />
             <Route path="/order/list" element={<OrderList />} />
             <Route path="/order/edit/:id" element={<CreateOrder />} />
+            <Route path="/OrderReports/list" element={<OrderReports />} />
 
             <Route path="/Orderarrived/list" element={<OrderArrivedList />} />
             <Route path="/AccepetdOrders/list" element={<AcceptedOrdersList />} />
             <Route path="/deliveredorders/list" element={<DeliveredOrdersList />} />
             <Route path="/cancelledorders/list" element={<CancelledOrdersList />} />
+
+
+            <Route path="/customer/orders" element={<CustomerOrdersList />} />
+          <Route path="/customer/create-order" element={<CreateCustomerOrder />} />
+          <Route path="/customer/order-status/:id" element={<CustomerOrderStatus />} />
+          <Route path="/customer/order-reports" element={<CustomerOrderReports />} />
+          <Route path="/customer/bill-statement" element={<CustomerBillStatement />} />
+          <Route path="/customer/credit-limit" element={<CustomerCreditLimit />} />
+
+          <Route path="/profile" element={<Profile />} />
+<Route path="/change-password" element={<ChangePassword />} />
           </Routes>
         </BrowserRouter>
       </PermissionProvider>

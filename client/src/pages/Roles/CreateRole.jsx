@@ -37,14 +37,18 @@ const CreateRole = () => {
     }
   }, [backendUrl]);
 
-  // Simplified permission groups - only main menus
-  const MAIN_MENUS = {
+  // Individual menu permissions (not grouped)
+  const MENU_PERMISSIONS = {
     Dashboard: "menu.dashboard",
     Users: "menu.users",
     Products: "menu.products", 
     Customers: "menu.customers",
     Sales: "menu.sales",
     Deliveries: "menu.deliveries",
+    CustomerOrders: "menu.customer.orders",
+    CustomerOrderReports: "menu.customer.order.reports",
+    CustomerBillStatement: "menu.customer.bill.statement",
+    CustomerCreditLimit: "menu.customer.credit.limit",
     Settings: "menu.settings"
   };
 
@@ -122,9 +126,9 @@ const CreateRole = () => {
             <div className="permissions-section">
               <h2>Menu Permissions</h2>
               <p className="permission-instruction">
-                Select main menus to grant full access to all submenus under each menu.
+                Select menus to grant access to specific features.
               </p>
-              {Object.entries(MAIN_MENUS).map(([menuName, permission]) => (
+              {Object.entries(MENU_PERMISSIONS).map(([menuName, permission]) => (
                 <div key={menuName} className="permission-group">
                   <label className="menu-checkbox">
                     <input

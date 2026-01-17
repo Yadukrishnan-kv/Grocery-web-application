@@ -124,9 +124,50 @@ const payBill = async (req, res) => {
   }
 };
 
+const getCustomerBills = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "Customer") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const bills = await Bill.find({ customer: req.user._id })
+      .sort({ cycleEnd: -1 });
+
+    res.json(bills);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getCustomerBillById = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "Customer") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const bill = await Bill.findById(req.params.id)
+      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit billingType")
+      .populate("orders", "product orderedQuantity totalAmount orderDate status");
+
+    if (!bill || bill.customer.toString() !== req.user._id.toString()) {
+      return res.status(404).json({ message: "Bill not found" });
+    }
+
+    // Check if overdue
+    if (bill.status === "pending" && new Date() > bill.dueDate) {
+      bill.status = "overdue";
+      await bill.save();
+    }
+
+    res.json(bill);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   generateBill,
   getAllBills,
   getBillById,
-  payBill,
+  payBill,getCustomerBills,getCustomerBillById
 };

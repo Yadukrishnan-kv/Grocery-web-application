@@ -24,6 +24,10 @@ const MENU_PERMISSIONS = {
   'AcceptedOrders': 'menu.deliveries.accepted',
   'DeliveredOrders': 'menu.deliveries.delivered',
   'CancelledOrders': 'menu.deliveries.cancelled',
+  'CustomerOrders': 'menu.customer.orders',
+  'CustomerOrderReports': 'menu.customer.order.reports',
+  'CustomerBillStatement': 'menu.customer.bill.statement',
+  'CustomerCreditLimit': 'menu.customer.credit.limit',
   'Settings': 'menu.settings'
 };
 
@@ -62,7 +66,7 @@ const navItems = [
     icon: '📋',
     subItems: [
       { id: 'Orders', label: 'Orders', path: '/order/list' },
-      { id: 'OrdersReport', label: 'Orders Report', path: '/ordersreports/list' }
+      { id: 'OrdersReport', label: 'Orders Report', path: '/OrderReports/list' }
     ]
   },
   { 
@@ -76,6 +80,39 @@ const navItems = [
       { id: 'CancelledOrders', label: 'Cancelled Orders', path: '/CancelledOrders/list' }
     ]
   },
+  {
+    id: 'CustomerOrders',
+    label: 'Orders',
+    icon: '📦',
+    subItems: [
+      { id: 'CustomerOrdersList', label: 'View Orders', path: '/customer/orders' }
+    ]
+  },
+  
+  {
+    id: 'CustomerOrderReports',
+    label: 'Order Reports',
+    icon: '📈',
+    subItems: [
+      { id: 'CustomerOrderReports', label: 'Reports', path: '/customer/order-reports' }
+    ]
+  },
+  {
+    id: 'CustomerBillStatement',
+    label: 'Bill Statement',
+    icon: '🧾',
+    subItems: [
+      { id: 'CustomerBillStatement', label: 'View Bills', path: '/customer/bill-statement' }
+    ]
+  },
+  {
+    id: 'CustomerCreditLimit',
+    label: 'Credit Limit',
+    icon: '💳',
+    subItems: [
+      { id: 'CustomerCreditLimit', label: 'Credit Info', path: '/customer/credit-limit' }
+    ]
+  },
   { id: 'Settings', label: 'Settings', icon: '⚙️', path: '/settings' }
 ];
 
@@ -86,50 +123,57 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
 
   // Filter nav items based on permissions AND hide Deliveries for Admin
   const filteredNavItems = useMemo(() => {
-    if (loading) return [];
+  if (loading) return [];
+  
+  let itemsToFilter = [...navItems];
+  
+  // Hide Deliveries and Customer Dashboard menus for Admin users
+  if (user && user.role === 'Admin') {
+    itemsToFilter = itemsToFilter.filter(item => 
+      item.id !== 'Deliveries' && 
+      item.id !== 'CustomerOrders' &&
+      item.id !== 'CustomerOrderStatus' &&
+      item.id !== 'CustomerOrderReports' &&
+      item.id !== 'CustomerBillStatement' &&
+      item.id !== 'CustomerCreditLimit'
+    );
+  }
+  
+  return itemsToFilter.filter(item => {
+    const itemPermission = MENU_PERMISSIONS[item.id];
     
-    let itemsToFilter = [...navItems];
+    // If no permission required, show it
+    if (!itemPermission) return true;
     
-    // Hide Deliveries menu for Admin users
-    if (user && user.role === 'Admin') {
-      itemsToFilter = itemsToFilter.filter(item => item.id !== 'Deliveries');
+    // Check main item permission
+    if (!hasPermission(itemPermission)) return false;
+    
+    // If has subitems, filter them too
+    if (item.subItems) {
+      const filteredSubItems = item.subItems.filter(subItem => {
+        const subPermission = MENU_PERMISSIONS[subItem.id];
+        return !subPermission || hasPermission(subPermission);
+      });
+      
+      // Only show parent if it has visible children
+      return filteredSubItems.length > 0;
     }
     
-    return itemsToFilter.filter(item => {
-      const itemPermission = MENU_PERMISSIONS[item.id];
-      
-      // If no permission required, show it
-      if (!itemPermission) return true;
-      
-      // Check main item permission
-      if (!hasPermission(itemPermission)) return false;
-      
-      // If has subitems, filter them too
-      if (item.subItems) {
-        const filteredSubItems = item.subItems.filter(subItem => {
+    return true;
+  }).map(item => {
+    // Also filter subitems
+    if (item.subItems) {
+      return {
+        ...item,
+        subItems: item.subItems.filter(subItem => {
           const subPermission = MENU_PERMISSIONS[subItem.id];
           return !subPermission || hasPermission(subPermission);
-        });
-        
-        // Only show parent if it has visible children
-        return filteredSubItems.length > 0;
-      }
-      
-      return true;
-    }).map(item => {
-      // Also filter subitems
-      if (item.subItems) {
-        return {
-          ...item,
-          subItems: item.subItems.filter(subItem => {
-            const subPermission = MENU_PERMISSIONS[subItem.id];
-            return !subPermission || hasPermission(subPermission);
-          })
-        };
-      }
-      return item;
-    });
-  }, [hasPermission, loading, user]);
+        })
+      };
+    }
+    return item;
+  });
+}, [hasPermission, loading, user]);
 
   const toggleExpand = (itemId) => {
     setExpandedItems(prev => ({

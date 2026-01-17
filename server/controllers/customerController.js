@@ -32,23 +32,30 @@ const createCustomer = async (req, res) => {
       return res.status(400).json({ message: "Invalid credit limit value" });
     }
 
-    // 2. Check for duplicate customer
+    // 2. Check duplicates
     const existingCustomer = await Customer.findOne({ email: email.trim().toLowerCase() });
     if (existingCustomer) {
-      return res.status(400).json({
-        message: "A customer with this email already exists",
-      });
+      return res.status(400).json({ message: "A customer with this email already exists" });
     }
 
-    // 3. Check for duplicate user/login
     const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({
-        message: "This email is already registered as a user account",
-      });
+      return res.status(400).json({ message: "This email is already registered as a user account" });
     }
 
-    // 4. Create Customer document
+    // 3. Create USER first (so we can get user._id)
+    const defaultPassword = process.env.NODE_ENV === "production" 
+      ? crypto.randomBytes(10).toString("hex") 
+      : "customer123";
+
+    const user = await User.create({
+      username: name.trim(),
+      email: email.trim().toLowerCase(),
+      password: defaultPassword,          // plain → will be hashed by pre-save hook
+      role: "Customer",
+    });
+
+    // 4. Now create CUSTOMER and link it to the user
     const customer = await Customer.create({
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -57,38 +64,10 @@ const createCustomer = async (req, res) => {
       pincode: pincode.trim(),
       creditLimit: parsedCreditLimit,
       billingType,
-      // balanceCreditLimit is automatically set by schema default function
+      user: user._id,                      // ← now safe to use user._id
     });
 
-    // 5. Create corresponding User (login) account
-    // For development/testing - fixed password
-    // In production: generate random password & send via email
-    const isProduction = process.env.NODE_ENV === "production";
-
-    let passwordForUser;
-    let passwordMessage = "";
-
-    if (isProduction) {
-      // Production: random temporary password (recommended)
-      passwordForUser = crypto.randomBytes(10).toString("hex");
-      passwordMessage = "Login credentials have been prepared (temporary password sent via email)";
-      // TODO: Implement email sending here
-      // await sendWelcomeEmail(customer.email, customer.name, passwordForUser);
-    } else {
-      // Development/testing only - fixed password
-      passwordForUser = "customer123";
-      passwordMessage = "Development mode: temporary password is 'customer123'";
-    }
-
-    const user = await User.create({
-      username: name.trim(),
-      email: email.trim().toLowerCase(),
-      password: passwordForUser, // ← plain text → will be hashed by pre-save hook
-      role: "Customer",
-    });
-
-    // 6. Final response
-    // IMPORTANT: NEVER send real password in production response!
+    // 5. Response (never expose password in production)
     const responseData = {
       message: "Customer and login account created successfully",
       customer: {
@@ -103,14 +82,16 @@ const createCustomer = async (req, res) => {
         billingType: customer.billingType,
         createdAt: customer.createdAt,
       },
-      note: passwordMessage,
+      note: process.env.NODE_ENV === "production"
+        ? "Login credentials prepared (temporary password sent via email)"
+        : "Development mode: temporary password is 'customer123'",
     };
 
-    // Only include temporary password info in development mode
-    if (!isProduction) {
+    // Only show temp password in development (REMOVE in production!)
+    if (process.env.NODE_ENV !== "production") {
       responseData.defaultLoginInfo = {
         email: user.email,
-        temporaryPassword: passwordForUser,
+        temporaryPassword: defaultPassword,
         note: "Please change your password immediately after first login",
       };
     }
@@ -119,13 +100,9 @@ const createCustomer = async (req, res) => {
   } catch (error) {
     console.error("Customer creation error:", error);
 
-    // Handle mongoose validation errors more gracefully
     if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((err) => err.message);
-      return res.status(400).json({
-        message: "Validation failed",
-        errors,
-      });
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ message: "Validation failed", errors });
     }
 
     res.status(500).json({
@@ -223,10 +200,31 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
+const getMyCustomerProfile = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "Customer") {
+      return res.status(403).json({ message: "Access denied - Customers only" });
+    }
+
+    // Find Customer where user field matches logged-in User _id
+    const customer = await Customer.findOne({ user: req.user._id })
+      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType');
+
+    if (!customer) {
+      return res.status(404).json({ message: "Customer profile not found" });
+    }
+
+    res.json(customer);
+  } catch (error) {
+    console.error("Get my customer profile error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   createCustomer,
   getAllCustomers,
   getCustomerById,
   updateCustomer,
-  deleteCustomer
+  deleteCustomer,getMyCustomerProfile
 };

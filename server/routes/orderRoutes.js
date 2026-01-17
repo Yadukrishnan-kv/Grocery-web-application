@@ -15,11 +15,10 @@ const {
   assignOrderToDeliveryMan,
   getMyAssignedOrders,
   acceptAssignedOrder,
-  rejectAssignedOrder,
+  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders
 } = require("../controllers/orderController");
 
-// Public routes (if any)
-// router.post("/createorder", createOrder);
+
 
 // Protected routes - ADD AUTH MIDDLEWARE
 router.use(protect); // This applies auth middleware to all routes below
@@ -37,5 +36,9 @@ router.post("/assign/:id", assignOrderToDeliveryMan);
 router.get("/my-assigned-orders", getMyAssignedOrders);
 router.post("/accept/:id", acceptAssignedOrder);
 router.post("/reject/:id", rejectAssignedOrder);
+router.get("/admin-delivered-orders", getDeliveredOrdersForAdmin);
+router.get("/customerorders", getCustomerOrders);
+router.get("/customerorder/:id", getCustomerOrderById);
+router.get("/my-orders", getMyOrders);
 
 module.exports = router;
