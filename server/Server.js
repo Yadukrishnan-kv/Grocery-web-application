@@ -1,45 +1,44 @@
-const express =require('express');
-const dotenv=require('dotenv');
+const express = require('express');
+const dotenv = require('dotenv');
 const cors = require('cors');
+const path = require('path');
 const connectDB = require('./config/db');
 
 dotenv.config();
 connectDB();
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-const authRoutes = require("./routes/authRoutes");
-app.use("/api/auth", authRoutes);
-const userRoutes = require("./routes/userRoutes");
-app.use("/api/users", userRoutes);
-const roleRoutes = require("./routes/roleRoutes");
-app.use("/api/roles", roleRoutes);
-const categoryRoutes = require("./routes/categoryRoutes");
-app.use("/api/categories", categoryRoutes);
-const subCategoryRoutes = require("./routes/subCategoryRoutes");
-app.use("/api/subcategories", subCategoryRoutes);
-const productRoutes = require("./routes/productRoutes");
-app.use("/api/products", productRoutes);
-const customerRoutes = require("./routes/customerRoutes");
-app.use("/api/customers", customerRoutes);
-const orderRoutes = require("./routes/orderRoutes");
-app.use("/api/orders", orderRoutes);
-const billRoutes = require("./routes/billRoutes");
-app.use("/api/bills", billRoutes);
+// Serve React build (production)
+app.use(express.static(path.join(__dirname, 'build')));
 
-app.get('/api/ping',(res,req)=>{
-    res.send("Server is running up fine");
-})
+// API Routes (keep your exact routes)
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/roles', require('./routes/roleRoutes'));
+app.use('/api/categories', require('./routes/categoryRoutes'));
+app.use('/api/subcategories', require('./routes/subCategoryRoutes'));
+app.use('/api/products', require('./routes/productRoutes'));
+app.use('/api/customers', require('./routes/customerRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/bills', require('./routes/billRoutes'));
 
-const port = process.env.PORT ;
-app.listen(port, (err) => {
-  if (err) {
-    console.error("Server failed to start:", err);
-    process.exit(1);
-  }
-  console.log(`Server is running on port ${port}`);
+// Health check
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ message: 'Server is running fine 🚀' });
 });
 
+// Serve React for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
