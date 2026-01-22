@@ -149,7 +149,7 @@ const CreateCategory = () => {
   }, [navigate, backendUrl]);
 
   if (loading) {
-    return <div className="loading">Loading user information...</div>;
+    return <div className="category-loading">Loading user information...</div>;
   }
 
   if (!user) {
@@ -170,16 +170,16 @@ const CreateCategory = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="form-card">
+      <main className={`category-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="category-form-card">
           <h1>{isEdit ? 'Edit Category' : 'Create New Category'}</h1>
           {isSuccess && (
-            <div className="success-message" role="alert">
+            <div className="category-success-message" role="alert">
               {isEdit ? 'Category updated successfully!' : 'Category created successfully!'}
             </div>
           )}
           <form onSubmit={handleSubmit} noValidate>
-            <div className="form-group">
+            <div className="category-form-group">
               <label htmlFor="CategoryName">Category Name</label>
               <input
                 id="CategoryName"
@@ -191,21 +191,21 @@ const CreateCategory = () => {
                 aria-describedby={errors.CategoryName ? "categoryname-error" : undefined}
               />
               {errors.CategoryName && (
-                <p id="categoryname-error" className="error-text" role="alert">
+                <p id="categoryname-error" className="category-error-text" role="alert">
                   {errors.CategoryName}
                 </p>
               )}
             </div>
 
             {errors.submit && (
-              <div className="error-banner" role="alert">
+              <div className="category-error-banner" role="alert">
                 {errors.submit}
               </div>
             )}
 
             <button
               type="submit"
-              className="submit-button"
+              className="category-submit-button"
               disabled={isLoading}
               aria-busy={isLoading}
             >

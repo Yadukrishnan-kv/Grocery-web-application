@@ -119,7 +119,7 @@ const CreateRole = () => {
                 value={roleName}
                 onChange={(e) => setRoleName(e.target.value)}
                 required
-                placeholder="e.g., Delivery Partner"
+                
               />
             </div>
 

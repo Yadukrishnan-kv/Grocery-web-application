@@ -86,54 +86,57 @@ const RoleList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="roles-container">
-          <div className="table-header">
-            <h2>Role Management</h2>
-            <Link to="/roles/create" className="create-button">
-              Create Role
-            </Link>
-          </div>
+   
+<main className={`roles-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+  <div className="roles-container-wrapper">
+    <div className="roles-container">
+      <div className="roles-table-header">
+        <h2>Role Management</h2>
+        <Link to="/roles/create" className="roles-create-button">
+          Create Role
+        </Link>
+      </div>
 
-          {loading ? (
-            <div className="loading">Loading roles...</div>
-          ) : (
-            <div className="roles-table">
-              <div className="table-header-row">
-                <div>Role Name</div>
-                <div>Permissions</div>
-                <div>Actions</div>
+      {loading ? (
+        <div className="roles-loading">Loading roles...</div>
+      ) : (
+        <div className="roles-table">
+          <div className="roles-table-header-row">
+            <div>Role Name</div>
+            <div>Permissions</div>
+            <div>Actions</div>
+          </div>
+          
+          {roles.map(role => (
+            <div key={role._id} className="roles-table-row">
+              <div className="roles-role-name">{role.name}</div>
+              <div className="roles-permissions-cell">
+                <span className="roles-permission-count">
+                  {role.permissions?.length || 0} permissions
+                </span>
               </div>
-              
-              {roles.map(role => (
-                <div key={role._id} className="table-row">
-                  <div className="role-name">{role.name}</div>
-                  <div className="permissions-cell">
-                    <span className="permission-count">
-                      {role.permissions?.length || 0} permissions
-                    </span>
-                  </div>
-                  <div className="actions-cell">
-                    <Link 
-                      to={`/roles/edit/${role._id}`} 
-                      className="edit-button"
-                    >
-                      Edit Permissions
-                    </Link>
-                    <button 
-                      onClick={() => handleDelete(role._id, role.name)}
-                      className="delete-button"
-                      disabled={role.name === 'Admin' || role.name === 'superadmin'}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <div className="roles-actions-cell">
+                <Link 
+                  to={`/roles/edit/${role._id}`} 
+                  className="roles-edit-button"
+                >
+                  Edit Permissions
+                </Link>
+                <button 
+                  onClick={() => handleDelete(role._id, role.name)}
+                  className="roles-delete-button"
+                  disabled={role.name === 'Admin' || role.name === 'superadmin'}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-          )}
+          ))}
         </div>
-      </main>
+      )}
+    </div>
+  </div>
+</main>
     </div>
   );
 };

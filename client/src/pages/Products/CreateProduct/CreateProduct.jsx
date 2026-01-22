@@ -24,7 +24,7 @@ const CreateProduct = () => {
   const [productId, setProductId] = useState(null);
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
-  
+
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
   const location = useLocation();
@@ -134,8 +134,6 @@ const CreateProduct = () => {
         });
         setIsEdit(true);
         setProductId(id);
-        // Note: We don't call fetchSubCategoriesByCategory here anymore
-        // It will be handled by the useEffect below when CategoryName changes
       } else {
         navigate('/product/list');
       }
@@ -228,7 +226,7 @@ const CreateProduct = () => {
   }, [navigate, backendUrl]);
 
   if (loading) {
-    return <div className="loading">Loading user information...</div>;
+    return <div className="product-loading">Loading user information...</div>;
   }
 
   if (!user) {
@@ -249,16 +247,16 @@ const CreateProduct = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="form-card">
+      <main className={`product-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="product-form-card">
           <h1>{isEdit ? 'Edit Product' : 'Create New Product'}</h1>
           {isSuccess && (
-            <div className="success-message" role="alert">
+            <div className="product-success-message" role="alert">
               {isEdit ? 'Product updated successfully!' : 'Product created successfully!'}
             </div>
           )}
           <form onSubmit={handleSubmit} noValidate>
-            <div className="form-group">
+            <div className="product-form-group">
               <label htmlFor="productName">Product Name</label>
               <input
                 id="productName"
@@ -268,16 +266,17 @@ const CreateProduct = () => {
                 onChange={handleChange}
                 aria-invalid={!!errors.productName}
                 aria-describedby={errors.productName ? "productname-error" : undefined}
+                className="product-input"
               />
               {errors.productName && (
-                <p id="productname-error" className="error-text" role="alert">
+                <p id="productname-error" className="product-error-text" role="alert">
                   {errors.productName}
                 </p>
               )}
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
+            <div className="product-form-row">
+              <div className="product-form-group">
                 <label htmlFor="CategoryName">Category</label>
                 <select
                   id="CategoryName"
@@ -286,6 +285,7 @@ const CreateProduct = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.CategoryName}
                   aria-describedby={errors.CategoryName ? "categoryname-error" : undefined}
+                  className="product-select"
                 >
                   <option value="">Select a category</option>
                   {categories.map(category => (
@@ -295,13 +295,13 @@ const CreateProduct = () => {
                   ))}
                 </select>
                 {errors.CategoryName && (
-                  <p id="categoryname-error" className="error-text" role="alert">
+                  <p id="categoryname-error" className="product-error-text" role="alert">
                     {errors.CategoryName}
                   </p>
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="product-form-group">
                 <label htmlFor="subCategoryName">Sub-Category</label>
                 <select
                   id="subCategoryName"
@@ -311,6 +311,7 @@ const CreateProduct = () => {
                   disabled={!formData.CategoryName}
                   aria-invalid={!!errors.subCategoryName}
                   aria-describedby={errors.subCategoryName ? "subcategoryname-error" : undefined}
+                  className="product-select"
                 >
                   <option value="">Select a sub-category</option>
                   {subCategories.map(subCategory => (
@@ -320,15 +321,15 @@ const CreateProduct = () => {
                   ))}
                 </select>
                 {errors.subCategoryName && (
-                  <p id="subcategoryname-error" className="error-text" role="alert">
+                  <p id="subcategoryname-error" className="product-error-text" role="alert">
                     {errors.subCategoryName}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
+            <div className="product-form-row">
+              <div className="product-form-group">
                 <label htmlFor="price">Price ($)</label>
                 <input
                   id="price"
@@ -340,15 +341,16 @@ const CreateProduct = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.price}
                   aria-describedby={errors.price ? "price-error" : undefined}
+                  className="product-input"
                 />
                 {errors.price && (
-                  <p id="price-error" className="error-text" role="alert">
+                  <p id="price-error" className="product-error-text" role="alert">
                     {errors.price}
                   </p>
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="product-form-group">
                 <label htmlFor="quantity">Quantity</label>
                 <input
                   id="quantity"
@@ -359,9 +361,10 @@ const CreateProduct = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.quantity}
                   aria-describedby={errors.quantity ? "quantity-error" : undefined}
+                  className="product-input"
                 />
                 {errors.quantity && (
-                  <p id="quantity-error" className="error-text" role="alert">
+                  <p id="quantity-error" className="product-error-text" role="alert">
                     {errors.quantity}
                   </p>
                 )}
@@ -369,14 +372,14 @@ const CreateProduct = () => {
             </div>
 
             {errors.submit && (
-              <div className="error-banner" role="alert">
+              <div className="product-error-banner" role="alert">
                 {errors.submit}
               </div>
             )}
 
             <button
               type="submit"
-              className="submit-button"
+              className="product-submit-button"
               disabled={isLoading}
               aria-busy={isLoading}
             >

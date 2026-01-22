@@ -1,217 +1,262 @@
-/* src/pages/Sales/Orders/OrderReports.css */
+/* OrderReports.css — Consistent premium SaaS design (matches UserTable) */
+
 .order-reports-layout {
   display: flex;
   min-height: 100vh;
   background-color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-.main-content {
-  margin-top: 64px;
-  margin-left: 0;
+.order-reports-main-content {
+  flex: 1;
   padding: 1.5rem;
-  transition: margin-left 0.2s ease;
+  transition: margin-left 0.2s cubic-bezier(0.23, 1, 0.32, 1);
   overflow-y: auto;
+  margin-top: 64px;
 }
 
 @media (min-width: 768px) {
-  .main-content.sidebar-open {
+  .order-reports-main-content.sidebar-open {
     margin-left: 240px;
   }
 }
 
-.table-container {
-  width: 100%;
+.order-reports-container-wrapper {
+  width: 98%;
+  max-width: 1600px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
 }
 
-.table-header {
+.order-reports-container {
+  padding: 2rem;
+}
+
+.order-reports-header-section {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
 }
 
-.table-header h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0;
+.order-reports-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
-.refresh-button {
-  background-color: #4f46e5;
+.order-reports-refresh-button {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
   color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  padding: 0.625rem 1.25rem;
   border: none;
-  font-weight: 500;
+  border-radius: 8px;
+  font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.15);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.refresh-button:hover:not(:disabled) {
-  background-color: #4338ca;
+.order-reports-refresh-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(79, 70, 229, 0.25);
+  background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
 }
 
-.refresh-button:disabled {
-  opacity: 0.7;
+.order-reports-refresh-button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-.loading {
+.order-reports-loading {
   text-align: center;
-  padding: 2rem;
+  padding: 3rem 2rem;
   color: #64748b;
-  font-size: 1.1rem;
+  font-size: 1.125rem;
+  font-weight: 500;
 }
 
-.table-wrapper {
+.order-reports-no-data {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 1rem;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.order-reports-table-wrapper {
   overflow-x: auto;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
   background: white;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
 }
 
-.data-table {
+.order-reports-data-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 1200px;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1400px;
 }
 
-.data-table th,
-.data-table td {
-  padding: 1rem 1.25rem;
+.order-reports-data-table th,
+.order-reports-data-table td {
+  padding: 1.25rem 1.5rem;
   text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.data-table th {
-  background-color: #f8fafc;
+.order-reports-data-table th {
+  background: linear-gradient(90deg, #f8fafc, #f1f5f9);
   font-weight: 600;
   color: #334155;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.data-table tbody tr {
-  transition: background-color 0.2s;
+.order-reports-data-table tbody tr {
+  transition: all 0.2s ease;
 }
 
-.data-table tbody tr:hover {
+.order-reports-data-table tbody tr:hover {
   background-color: #f8fafc;
+  transform: translateY(-1px);
 }
 
-.data-table tbody tr:last-child td {
+.order-reports-data-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.no-data {
-  text-align: center;
-  padding: 2rem;
-  color: #64748b;
-  font-style: italic;
-}
-
-.status-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
+/* Status badge (only Delivered shown) */
+.order-reports-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
   text-transform: capitalize;
+  letter-spacing: 0.025em;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.status-delivered {
-  background-color: #dcfce7;
+.order-reports-status-delivered {
+  background: #dcfce7;
   color: #166534;
 }
 
-.action-buttons {
+/* Action buttons container */
+.order-reports-action-buttons {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.invoice-button {
-  padding: 0.5rem 0.75rem;
+/* Invoice buttons */
+.order-reports-invoice-button {
+  padding: 0.5rem 1rem;
   border: none;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   white-space: nowrap;
 }
 
-.invoice-button.delivered {
-  background-color: #bbf7d0;
+.order-reports-invoice-button.delivered {
+  background: #bbf7d0;
   color: #166534;
 }
 
-.invoice-button.delivered:hover:not(:disabled) {
-  background-color: #a3e635;
+.order-reports-invoice-button.delivered:hover:not(:disabled) {
+  background: #86efac;
+  transform: translateY(-1px);
 }
 
-.invoice-button.pending {
-  background-color: #dbeafe;
+.order-reports-invoice-button.pending {
+  background: #dbeafe;
   color: #1d4ed8;
 }
 
-.invoice-button.pending:hover:not(:disabled) {
-  background-color: #bfdbfe;
+.order-reports-invoice-button.pending:hover:not(:disabled) {
+  background: #bfdbfe;
+  transform: translateY(-1px);
 }
 
-.invoice-button:disabled {
-  opacity: 0.7;
+.order-reports-invoice-button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
 }
 
-.refresh-order-button {
-  width: 28px;
-  height: 28px;
+/* Refresh order button (icon) */
+.order-reports-refresh-order-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   border: none;
-  border-radius: 4px;
-  background-color: #f1f5f9;
+  background: #f1f5f9;
   color: #475569;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  transition: background-color 0.2s;
+  font-size: 1rem;
+  transition: all 0.2s ease;
 }
 
-.refresh-order-button:hover {
-  background-color: #e2e8f0;
+.order-reports-refresh-order-button:hover {
+  background: #e2e8f0;
+  transform: scale(1.08);
 }
 
 @media (max-width: 767px) {
-  .table-header {
-    flex-direction: column;
-    align-items: stretch;
+  .order-reports-container-wrapper {
+    border-radius: 12px;
   }
   
-  .refresh-button {
-    align-self: flex-end;
-    width: fit-content;
+  .order-reports-container {
+    padding: 1.5rem;
   }
   
-  .data-table th,
-  .data-table td {
-    padding: 0.75rem 0.5rem;
+  .order-reports-page-title {
+    font-size: 1.5rem;
+  }
+  
+  .order-reports-data-table th,
+  .order-reports-data-table td {
+    padding: 0.875rem 1rem;
     font-size: 0.875rem;
   }
   
-  .action-buttons {
+  .order-reports-action-buttons {
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
   
-  .invoice-button {
+  .order-reports-invoice-button {
     width: 100%;
     justify-content: center;
   }

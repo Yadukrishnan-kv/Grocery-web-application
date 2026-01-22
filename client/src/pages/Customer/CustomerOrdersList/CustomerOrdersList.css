@@ -1,168 +1,186 @@
-/* CustomerOrdersList.css */
+/* CustomerOrdersList.css — Consistent premium SaaS design (matches UserTable) */
+
 .customer-orders-layout {
   display: flex;
   min-height: 100vh;
   background-color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-.main-content {
-  margin-top: 64px;
-  margin-left: 0;
+.customer-orders-main-content {
+  flex: 1;
   padding: 1.5rem;
-  transition: margin-left 0.2s ease;
+  transition: margin-left 0.2s cubic-bezier(0.23, 1, 0.32, 1);
   overflow-y: auto;
+  margin-top: 64px;
 }
 
 @media (min-width: 768px) {
-  .main-content.sidebar-open {
+  .customer-orders-main-content.sidebar-open {
     margin-left: 240px;
   }
 }
 
-.table-container {
-  width: 100%;
+.customer-orders-container-wrapper {
+  width: 98%;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
 }
 
-.table-header {
+.customer-orders-container {
+  padding: 2rem;
+}
+
+.customer-orders-header-section {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
 }
 
-.table-header h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0;
+.customer-orders-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
-.create-button {
-  background-color: #4f46e5;
+.customer-orders-create-button {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
   color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  padding: 0.625rem 1.25rem;
   border: none;
-  font-weight: 500;
+  border-radius: 8px;
+  font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.15);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.create-button:hover {
-  background-color: #4338ca;
+.customer-orders-create-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(79, 70, 229, 0.25);
+  background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
 }
 
-.loading {
+.customer-orders-loading {
   text-align: center;
-  padding: 2rem;
+  padding: 3rem 2rem;
   color: #64748b;
-  font-size: 1.1rem;
+  font-size: 1.125rem;
+  font-weight: 500;
 }
 
-.table-wrapper {
+.customer-orders-no-data {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 1rem;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.customer-orders-table-wrapper {
   overflow-x: auto;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
   background: white;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
 }
 
-.data-table {
+/* No horizontal scrollbar on desktop - table fits full width */
+.customer-orders-data-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   min-width: 900px;
+  table-layout: auto;
 }
 
-.data-table th,
-.data-table td {
-  padding: 1rem 1.25rem;
+.customer-orders-data-table th,
+.customer-orders-data-table td {
+  padding: 1.25rem 1.5rem;
   text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
 }
 
-.data-table th {
-  background-color: #f8fafc;
+.customer-orders-data-table th {
+  background: linear-gradient(90deg, #f8fafc, #f1f5f9);
   font-weight: 600;
   color: #334155;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.data-table tbody tr {
-  transition: background-color 0.2s;
+.customer-orders-data-table tbody tr {
+  transition: all 0.2s ease;
 }
 
-.data-table tbody tr:hover {
+.customer-orders-data-table tbody tr:hover {
   background-color: #f8fafc;
+  transform: translateY(-1px);
 }
 
-.data-table tbody tr:last-child td {
+.customer-orders-data-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.no-data {
-  text-align: center;
-  padding: 2rem;
-  color: #64748b;
-  font-style: italic;
-}
-
-.status-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
+/* Status badges */
+.customer-orders-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
   text-transform: capitalize;
+  letter-spacing: 0.025em;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.status-pending {
-  background-color: #fef3c7;
-  color: #92400e;
-}
-
-.status-delivered {
-  background-color: #dcfce7;
-  color: #166534;
-}
-
-.status-cancelled {
-  background-color: #fee2e2;
-  color: #b91c1c;
-}
-
-.view-button {
-  background-color: #dbeafe;
-  color: #1d4ed8;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.view-button:hover {
-  background-color: #bfdbfe;
-}
+.customer-orders-status-pending   { background: #fef3c7; color: #92400e; }
+.customer-orders-status-delivered { background: #dcfce7; color: #166534; }
+.customer-orders-status-cancelled { background: #fee2e2; color: #b91c1c; }
 
 @media (max-width: 767px) {
-  .table-header {
-    flex-direction: column;
-    align-items: stretch;
+  .customer-orders-container-wrapper {
+    border-radius: 12px;
   }
   
-  .create-button {
-    align-self: flex-end;
-    width: fit-content;
+  .customer-orders-container {
+    padding: 1.5rem;
   }
   
-  .data-table th,
-  .data-table td {
-    padding: 0.75rem 0.5rem;
+  .customer-orders-page-title {
+    font-size: 1.5rem;
+  }
+  
+  .customer-orders-data-table th,
+  .customer-orders-data-table td {
+    padding: 0.875rem 1rem;
     font-size: 0.875rem;
+  }
+  
+  .customer-orders-create-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
   }
 }

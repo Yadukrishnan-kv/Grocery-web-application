@@ -1,4 +1,4 @@
-// CategoryList.jsx
+// src/pages/Category/CategoryList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
@@ -15,7 +15,6 @@ const CategoryList = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
-  // Fetch current user for header
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -35,7 +34,6 @@ const CategoryList = () => {
     }
   }, [backendUrl]);
 
-  // Wrap fetchCategories in useCallback
   const fetchCategories = useCallback(async () => {
     try {
       const response = await fetch(`${backendUrl}/api/categories/getallcategories`, {
@@ -53,12 +51,12 @@ const CategoryList = () => {
     } finally {
       setLoading(false);
     }
-  }, [backendUrl]); // Add backendUrl as dependency
+  }, [backendUrl]);
 
   useEffect(() => {
     fetchCurrentUser();
     fetchCategories();
-  }, [fetchCurrentUser, fetchCategories]); // Include both functions in dependencies
+  }, [fetchCurrentUser, fetchCategories]);
 
   const handleDelete = async (id, categoryName) => {
     if (window.confirm(`Are you sure you want to delete category "${categoryName}"?`)) {
@@ -81,7 +79,7 @@ const CategoryList = () => {
   };
 
   if (!user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="category-list-loading">Loading...</div>;
   }
 
   return (
@@ -98,65 +96,67 @@ const CategoryList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <div className="table-header">
-            <h2>Category Management</h2>
-            <Link to="/category/create" className="create-button">
-              Create Category
-            </Link>
-          </div>
-          
-          {loading ? (
-            <div className="loading">Loading categories...</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">No</th>
-                    <th scope="col">Category Name</th>
-                    <th scope="col">Edit</th>
-                    <th scope="col">Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.length > 0 ? (
-                    categories.map((category, index) => (
-                      <tr key={category._id}>
-                        <td>{index + 1}</td>
-                        <td>{category.CategoryName}</td>
-                        <td>
-                          <Link
-                            to={`/category/create?edit=${category._id}`}
-                            className="icon-button edit-button"
-                            aria-label={`Edit category ${category.CategoryName}`}
-                          >
-                            ✎
-                          </Link>
-                        </td>
-                        <td>
-                          <button
-                            className="icon-button delete-button"
-                            onClick={() => handleDelete(category._id, category.CategoryName)}
-                            aria-label={`Delete category ${category.CategoryName}`}
-                          >
-                            🗑️
-                          </button>
+      <main className={`category-list-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="category-list-container-wrapper">
+          <div className="category-list-container">
+            <div className="category-list-header-section">
+              <h2 className="category-list-page-title">Category Management</h2>
+              <Link to="/category/create" className="category-list-create-button">
+                Create Category
+              </Link>
+            </div>
+            
+            {loading ? (
+              <div className="category-list-loading">Loading categories...</div>
+            ) : (
+              <div className="category-list-table-wrapper">
+                <table className="category-list-data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">No</th>
+                      <th scope="col">Category Name</th>
+                      <th scope="col">Edit</th>
+                      <th scope="col">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.length > 0 ? (
+                      categories.map((category, index) => (
+                        <tr key={category._id}>
+                          <td>{index + 1}</td>
+                          <td>{category.CategoryName}</td>
+                          <td>
+                            <Link
+                              to={`/category/create?edit=${category._id}`}
+                              className="category-list-icon-button category-list-edit-button"
+                              aria-label={`Edit category ${category.CategoryName}`}
+                            >
+                              ✎
+                            </Link>
+                          </td>
+                          <td>
+                            <button
+                              className="category-list-icon-button category-list-delete-button"
+                              onClick={() => handleDelete(category._id, category.CategoryName)}
+                              aria-label={`Delete category ${category.CategoryName}`}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="category-list-no-data">
+                          No categories found
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="no-data">
-                        No categories found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

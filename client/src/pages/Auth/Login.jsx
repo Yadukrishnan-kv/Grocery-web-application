@@ -1,8 +1,9 @@
-// Login.jsx
+// Login.jsx (Redesigned)
 import React, { useState } from 'react';
 import './Login.css';
 
 const Login = () => {
+  // ... (all existing state and logic remains unchanged)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -14,6 +15,7 @@ const Login = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
+  // ... (all validation and handler functions remain unchanged)
   const validateField = (name, value) => {
     switch (name) {
       case 'email':
@@ -98,9 +100,10 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        <div className="login-header">
+        <div className="brand-header">
+          <div className="logo">🔒</div>
           <h1>Welcome back</h1>
-          <p>Please enter your details to sign in</p>
+          <p>Sign in to continue your journey</p>
         </div>
 
         {apiError && (
@@ -111,20 +114,21 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              placeholder="Email address"
-              autoComplete="email"
-              autoFocus
-              aria-invalid={!!errors.email}
-              aria-describedby={errors.email ? "email-error" : undefined}
-            />
+            <label htmlFor="email">Email address</label>
+            <div className="input-wrapper">
+              <input
+                id="email"
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                autoComplete="email"
+                autoFocus
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? "email-error" : undefined}
+              />
+            </div>
             {errors.email && (
               <p id="email-error" className="error-text" role="alert">
                 {errors.email}
@@ -134,7 +138,7 @@ const Login = () => {
 
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <div className="password-wrapper">
+            <div className="input-wrapper">
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
@@ -152,7 +156,7 @@ const Login = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? 'Hide' : 'Show'}
+                {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
             {errors.password && (
@@ -184,9 +188,10 @@ const Login = () => {
         </form>
 
         <div className="signup-link">
-          Don't have an account? <a href="/register">Sign up</a>
         </div>
       </div>
+      
+      
     </div>
   );
 };

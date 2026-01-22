@@ -1,144 +1,187 @@
-/* DeliveredOrdersList.css */
+/* DeliveredOrdersList.css — Consistent premium SaaS design */
+
 .delivered-orders-layout {
   display: flex;
   min-height: 100vh;
   background-color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-.main-content {
-  margin-top: 64px;
-  margin-left: 0;
+.delivered-orders-main-content {
+  flex: 1;
   padding: 1.5rem;
-  transition: margin-left 0.2s ease;
+  transition: margin-left 0.2s cubic-bezier(0.23, 1, 0.32, 1);
   overflow-y: auto;
+  margin-top: 64px;
 }
 
 @media (min-width: 768px) {
-  .main-content.sidebar-open {
+  .delivered-orders-main-content.sidebar-open {
     margin-left: 240px;
   }
 }
 
-.table-container {
-  width: 100%;
+.delivered-orders-container-wrapper {
+  width: 98%;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
 }
 
-.table-container h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 1.5rem;
-}
-
-.loading {
-  text-align: center;
+.delivered-orders-container {
   padding: 2rem;
-  color: #64748b;
-  font-size: 1.1rem;
 }
 
-.table-wrapper {
+.delivered-orders-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 2rem;
+  letter-spacing: -0.02em;
+}
+
+.delivered-orders-loading {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #64748b;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.delivered-orders-no-data {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 1rem;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.delivered-orders-table-wrapper {
   overflow-x: auto;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
   background: white;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
 }
 
-.data-table {
+.delivered-orders-data-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 1100px;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1200px;
+  table-layout: auto;
 }
 
-.data-table th,
-.data-table td {
-  padding: 1rem 1.25rem;
+.delivered-orders-data-table th,
+.delivered-orders-data-table td {
+  padding: 1.25rem 1.5rem;
   text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
 }
 
-.data-table th {
-  background-color: #f8fafc;
+.delivered-orders-data-table th {
+  background: linear-gradient(90deg, #f8fafc, #f1f5f9);
   font-weight: 600;
   color: #334155;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.data-table tbody tr {
-  transition: background-color 0.2s;
+.delivered-orders-data-table tbody tr {
+  transition: all 0.2s ease;
 }
 
-.data-table tbody tr:hover {
+.delivered-orders-data-table tbody tr:hover {
   background-color: #f8fafc;
+  transform: translateY(-1px);
 }
 
-.data-table tbody tr:last-child td {
+.delivered-orders-data-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.no-data {
-  text-align: center;
-  padding: 2rem;
-  color: #64748b;
-  font-style: italic;
-}
-
-.status-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
+/* Status badges */
+.delivered-orders-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
   text-transform: capitalize;
+  letter-spacing: 0.025em;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.status-not-delivered {
-  background-color: #fef3c7;
-  color: #92400e;
-}
+.delivered-orders-status-not-delivered       { background: #fef3c7; color: #92400e; }
+.delivered-orders-status-partially-delivered { background: #dbeafe; color: #1d4ed8; }
+.delivered-orders-status-fully-delivered     { background: #dcfce7; color: #166534; }
 
-.status-partially-delivered {
-  background-color: #dbeafe;
-  color: #1d4ed8;
-}
-
-.status-fully-delivered {
-  background-color: #dcfce7;
-  color: #166534;
-}
-
-.deliver-button {
-  background-color: #38bdf8;
+/* Deliver button */
+.delivered-orders-deliver-button {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
+  padding: 0.625rem 1.25rem;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2);
 }
 
-.deliver-button:hover:not(:disabled) {
-  background-color: #0ea5e9;
+.delivered-orders-deliver-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
 }
 
-.deliver-button:disabled {
-  opacity: 0.7;
+.delivered-orders-deliver-button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-.delivered-text {
+.delivered-orders-delivered-text {
   color: #166534;
-  font-weight: 500;
+  font-weight: 600;
   font-style: italic;
 }
 
 @media (max-width: 767px) {
-  .data-table th,
-  .data-table td {
-    padding: 0.75rem 0.5rem;
+  .delivered-orders-container-wrapper {
+    border-radius: 12px;
+  }
+  
+  .delivered-orders-container {
+    padding: 1.5rem;
+  }
+  
+  .delivered-orders-page-title {
+    font-size: 1.5rem;
+  }
+  
+  .delivered-orders-data-table th,
+  .delivered-orders-data-table td {
+    padding: 0.875rem 1rem;
     font-size: 0.875rem;
+  }
+  
+  .delivered-orders-deliver-button {
+    width: 100%;
+    padding: 0.6rem;
   }
 }

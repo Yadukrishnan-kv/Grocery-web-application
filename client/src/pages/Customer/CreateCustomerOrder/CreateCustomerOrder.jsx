@@ -125,7 +125,6 @@ const CreateCustomerOrder = () => {
     }
   };
 
-  // Combined effect to manage loading state properly
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -144,7 +143,7 @@ const CreateCustomerOrder = () => {
   }, [fetchCurrentUser, fetchProducts]);
 
   if (loading || !user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="create-customer-order-loading">Loading...</div>;
   }
 
   return (
@@ -161,16 +160,16 @@ const CreateCustomerOrder = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="form-card">
+      <main className={`create-customer-order-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="create-customer-order-form-card">
           <h1>Create New Order</h1>
           {isSuccess && (
-            <div className="success-message" role="alert">
+            <div className="create-customer-order-success-message" role="alert">
               Order created successfully!
             </div>
           )}
           <form onSubmit={handleSubmit} noValidate>
-            <div className="form-group">
+            <div className="create-customer-order-form-group">
               <label htmlFor="productId">Product</label>
               <select
                 id="productId"
@@ -179,6 +178,7 @@ const CreateCustomerOrder = () => {
                 onChange={handleChange}
                 aria-invalid={!!errors.productId}
                 aria-describedby={errors.productId ? "productid-error" : undefined}
+                className="create-customer-order-select"
               >
                 <option value="">Select a product</option>
                 {products.map(product => (
@@ -188,14 +188,14 @@ const CreateCustomerOrder = () => {
                 ))}
               </select>
               {errors.productId && (
-                <p id="productid-error" className="error-text" role="alert">
+                <p id="productid-error" className="create-customer-order-error-text" role="alert">
                   {errors.productId}
                 </p>
               )}
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
+            <div className="create-customer-order-form-row">
+              <div className="create-customer-order-form-group">
                 <label htmlFor="orderedQuantity">Ordered Quantity</label>
                 <input
                   id="orderedQuantity"
@@ -206,15 +206,16 @@ const CreateCustomerOrder = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.orderedQuantity}
                   aria-describedby={errors.orderedQuantity ? "orderedquantity-error" : undefined}
+                  className="create-customer-order-input"
                 />
                 {errors.orderedQuantity && (
-                  <p id="orderedquantity-error" className="error-text" role="alert">
+                  <p id="orderedquantity-error" className="create-customer-order-error-text" role="alert">
                     {errors.orderedQuantity}
                   </p>
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="create-customer-order-form-group">
                 <label htmlFor="payment">Payment Method</label>
                 <select
                   id="payment"
@@ -223,12 +224,13 @@ const CreateCustomerOrder = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.payment}
                   aria-describedby={errors.payment ? "payment-error" : undefined}
+                  className="create-customer-order-select"
                 >
                   <option value="credit">Credit</option>
                   <option value="cash">Cash</option>
                 </select>
                 {errors.payment && (
-                  <p id="payment-error" className="error-text" role="alert">
+                  <p id="payment-error" className="create-customer-order-error-text" role="alert">
                     {errors.payment}
                   </p>
                 )}
@@ -236,14 +238,14 @@ const CreateCustomerOrder = () => {
             </div>
 
             {errors.submit && (
-              <div className="error-banner" role="alert">
+              <div className="create-customer-order-error-banner" role="alert">
                 {errors.submit}
               </div>
             )}
 
             <button
               type="submit"
-              className="submit-button"
+              className="create-customer-order-submit-button"
               disabled={isLoading}
               aria-busy={isLoading}
             >

@@ -60,10 +60,7 @@ const Header = ({ sidebarOpen, onToggleSidebar, user }) => {
     closePopup();
   };
 
-  const handleChangePasswordClick = () => {
-    navigate('/change-password');
-    closePopup();
-  };
+  
 
   if (!user) return null;
 
@@ -126,13 +123,7 @@ const Header = ({ sidebarOpen, onToggleSidebar, user }) => {
               >
                 Profile
               </button>
-              <button 
-                className="popup-menu-item"
-                onClick={handleChangePasswordClick}
-                role="menuitem"
-              >
-                Change Password
-              </button>
+             
               <button 
                 className="popup-menu-item logout-item"
                 onClick={handleLogout}

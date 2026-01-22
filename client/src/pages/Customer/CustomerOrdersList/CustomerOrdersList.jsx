@@ -4,8 +4,6 @@ import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CustomerOrdersList.css';
 import axios from 'axios';
-// REMOVE useParams - not needed for list page
-// import { useParams } from 'react-router-dom';
 
 const CustomerOrdersList = () => {
   const [orders, setOrders] = useState([]);
@@ -14,9 +12,6 @@ const CustomerOrdersList = () => {
   const [activeItem, setActiveItem] = useState('Orders');
   const [user, setUser] = useState(null);
   
-  // REMOVE this line - no ID needed for list page
-  // const { id } = useParams();
-
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -38,11 +33,9 @@ const CustomerOrdersList = () => {
     }
   }, [backendUrl]);
 
-  // FIX: Fetch all customer orders (no ID needed)
   const fetchCustomerOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      // Use the correct endpoint for customer orders list
       const response = await axios.get(`${backendUrl}/api/orders/customerorders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -65,7 +58,7 @@ const CustomerOrdersList = () => {
   };
 
   if (!user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="customer-orders-loading">Loading...</div>;
   }
 
   return (
@@ -82,65 +75,66 @@ const CustomerOrdersList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <div className="table-header">
-            <h2>My Orders</h2>
-            <button 
-              className="create-button"
-              onClick={handleCreateOrder}
-            >
-              Create Order
-            </button>
-          </div>
-          
-          {loading ? (
-            <div className="loading">Loading orders...</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">No</th>
-                    <th scope="col">Product</th>
-                    <th scope="col">Ordered Qty</th>
-                    <th scope="col">Delivered Qty</th>
-                    <th scope="col">Price</th>
-                    <th scope="col">Total Amount</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Order Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.length > 0 ? (
-                    orders.map((order, index) => (
-                      <tr key={order._id}>
-                        <td>{index + 1}</td>
-                        <td>{order.product?.productName || 'N/A'}</td>
-                        <td>{order.orderedQuantity}</td>
-                        <td>{order.deliveredQuantity}</td>
-                        <td>${order.price.toFixed(2)}</td>
-                        <td>${order.totalAmount.toFixed(2)}</td>
-                        <td>
-                          <span className={`status-badge status-${order.status}`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                        
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="9" className="no-data">
-                        No orders found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+      <main className={`customer-orders-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="customer-orders-container-wrapper">
+          <div className="customer-orders-container">
+            <div className="customer-orders-header-section">
+              <h2 className="customer-orders-page-title">My Orders</h2>
+              <button 
+                className="customer-orders-create-button"
+                onClick={handleCreateOrder}
+              >
+                Create Order
+              </button>
             </div>
-          )}
+            
+            {loading ? (
+              <div className="customer-orders-loading">Loading orders...</div>
+            ) : (
+              <div className="customer-orders-table-wrapper">
+                <table className="customer-orders-data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">No</th>
+                      <th scope="col">Product</th>
+                      <th scope="col">Ordered Qty</th>
+                      <th scope="col">Delivered Qty</th>
+                      <th scope="col">Price</th>
+                      <th scope="col">Total Amount</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Order Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.length > 0 ? (
+                      orders.map((order, index) => (
+                        <tr key={order._id}>
+                          <td>{index + 1}</td>
+                          <td>{order.product?.productName || 'N/A'}</td>
+                          <td>{order.orderedQuantity}</td>
+                          <td>{order.deliveredQuantity}</td>
+                          <td>${order.price.toFixed(2)}</td>
+                          <td>${order.totalAmount.toFixed(2)}</td>
+                          <td>
+                            <span className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || 'pending'}`}>
+                              {order.status || 'Pending'}
+                            </span>
+                          </td>
+                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="8" className="customer-orders-no-data">
+                          No orders found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

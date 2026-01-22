@@ -16,7 +16,6 @@ const CustomerCreditLimit = () => {
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
 
-  // Fetch logged-in user
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -36,7 +35,6 @@ const CustomerCreditLimit = () => {
     }
   }, [backendUrl, navigate]);
 
-  // Fetch customer's own credit profile (using new endpoint)
   const fetchMyCreditDetails = useCallback(async () => {
     if (!user) return;
 
@@ -65,11 +63,11 @@ const CustomerCreditLimit = () => {
   }, [user, fetchMyCreditDetails]);
 
   if (loading) {
-    return <div className="loading">Loading your credit details...</div>;
+    return <div className="customer-credit-loading">Loading your credit details...</div>;
   }
 
   if (!customer) {
-    return <div className="error">Your customer profile not found. Contact support.</div>;
+    return <div className="customer-credit-error">Your customer profile not found. Contact support.</div>;
   }
 
   const usedCredit = customer.creditLimit - customer.balanceCreditLimit;
@@ -92,60 +90,62 @@ const CustomerCreditLimit = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="credit-details-container">
-          <h2>My Credit Limit</h2>
+      <main className={`customer-credit-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="customer-credit-container-wrapper">
+          <div className="customer-credit-container">
+            <h2 className="customer-credit-page-title">My Credit Limit</h2>
 
-          <div className="credit-summary">
-            <div className="credit-card">
-              <h3>Total Credit Limit</h3>
-              <p className="amount">₹{customer.creditLimit.toFixed(2)}</p>
-            </div>
+            <div className="customer-credit-summary">
+              <div className="customer-credit-card">
+                <h3>Total Credit Limit</h3>
+                <p className="customer-credit-amount">₹{customer.creditLimit.toFixed(2)}</p>
+              </div>
 
-            <div className="credit-card">
-              <h3>Available Credit</h3>
-              <p className="amount available">₹{availableCredit.toFixed(2)}</p>
-            </div>
+              <div className="customer-credit-card">
+                <h3>Available Credit</h3>
+                <p className="customer-credit-amount customer-credit-available">₹{availableCredit.toFixed(2)}</p>
+              </div>
 
-            <div className="credit-card">
-              <h3>Used Credit</h3>
-              <p className="amount used">₹{usedCredit.toFixed(2)}</p>
-            </div>
+              <div className="customer-credit-card">
+                <h3>Used Credit</h3>
+                <p className="customer-credit-amount customer-credit-used">₹{usedCredit.toFixed(2)}</p>
+              </div>
 
-            <div className="credit-card">
-              <h3>Credit Utilization</h3>
-              <p className="utilization">{creditUtilization}%</p>
-              <div className="utilization-bar">
-                <div
-                  className="utilization-fill"
-                  style={{
-                    width: `${Math.min(creditUtilization, 100)}%`,
-                    background: creditUtilization > 80 ? '#ef4444' : creditUtilization > 50 ? '#f59e0b' : '#10b981',
-                  }}
-                ></div>
+              <div className="customer-credit-card">
+                <h3>Credit Utilization</h3>
+                <p className="customer-credit-utilization">{creditUtilization}%</p>
+                <div className="customer-credit-utilization-bar">
+                  <div
+                    className="customer-credit-utilization-fill"
+                    style={{
+                      width: `${Math.min(creditUtilization, 100)}%`,
+                      background: creditUtilization > 80 ? '#ef4444' : creditUtilization > 50 ? '#f59e0b' : '#10b981',
+                    }}
+                  ></div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="billing-info">
-            <h3>Billing Information</h3>
-            <div className="info-row">
-              <span className="label">Billing Type:</span>
-              <span className="value">
-                {customer.billingType === 'creditcard' ? 'Credit Card (30-day cycle)' : 'Immediate Payment'}
-              </span>
-            </div>
-            <div className="info-row">
-              <span className="label">Email:</span>
-              <span className="value">{customer.email}</span>
-            </div>
-            <div className="info-row">
-              <span className="label">Phone:</span>
-              <span className="value">{customer.phoneNumber}</span>
-            </div>
-            <div className="info-row">
-              <span className="label">Address:</span>
-              <span className="value">{customer.address}, {customer.pincode}</span>
+            <div className="customer-credit-billing-info">
+              <h3>Billing Information</h3>
+              <div className="customer-credit-info-row">
+                <span className="customer-credit-label">Billing Type:</span>
+                <span className="customer-credit-value">
+                  {customer.billingType === 'creditcard' ? 'Credit Card (30-day cycle)' : 'Immediate Payment'}
+                </span>
+              </div>
+              <div className="customer-credit-info-row">
+                <span className="customer-credit-label">Email:</span>
+                <span className="customer-credit-value">{customer.email}</span>
+              </div>
+              <div className="customer-credit-info-row">
+                <span className="customer-credit-label">Phone:</span>
+                <span className="customer-credit-value">{customer.phoneNumber}</span>
+              </div>
+              <div className="customer-credit-info-row">
+                <span className="customer-credit-label">Address:</span>
+                <span className="customer-credit-value">{customer.address}, {customer.pincode}</span>
+              </div>
             </div>
           </div>
         </div>

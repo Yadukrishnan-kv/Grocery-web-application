@@ -5,10 +5,11 @@
   left: -240px;
   width: 240px;
   height: calc(100vh - 64px);
-  background-color: white;
+  background: linear-gradient(to bottom, #ffffff 0%, #fafbff 100%);
   border-right: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
   z-index: 99;
-  transition: left 0.2s ease;
+  transition: left 0.2s cubic-bezier(0.23, 1, 0.32, 1);
   overflow-y: auto;
 }
 
@@ -39,20 +40,24 @@
   font-weight: 500;
   color: #475569;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.15s ease;
   position: relative;
+  border-radius: 0 32px 32px 0;
 }
 
 .nav-link:hover {
-  background-color: #f1f5f9;
+  background-color: #f8fafc;
+  color: #334155;
 }
 
 .nav-link.active {
   color: #4f46e5;
+  background-color: #f0f5ff;
+  font-weight: 600;
 }
 
 .nav-link.has-subitems.active {
-  background-color: #f1f5f9;
+  background-color: #f0f5ff;
 }
 
 .nav-link.has-subitems.active::before {
@@ -63,23 +68,38 @@
   bottom: 0;
   width: 3px;
   background-color: #4f46e5;
+  border-radius: 0 2px 2px 0;
 }
 
 .nav-icon {
   font-size: 1.125rem;
   width: 24px;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.nav-link:hover .nav-icon {
+  transform: scale(1.1);
 }
 
 .nav-label {
   flex: 1;
   text-align: left;
+  letter-spacing: -0.01em;
+  font-weight: 700;
 }
 
 .expand-icon {
   font-size: 0.75rem;
   color: #94a3b8;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.nav-link[aria-expanded="true"] .expand-icon {
+  transform: rotate(90deg);
 }
 
 .submenu {
@@ -88,12 +108,13 @@
   margin: 0;
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.2s ease-out;
+  transition: max-height 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  
 }
 
 .submenu.open {
   max-height: 500px;
-  transition: max-height 0.25s ease-in;
+  transition: max-height 0.25s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .sub-link {
@@ -101,11 +122,19 @@
   font-size: 0.875rem;
   font-weight: 400;
   color: #64748b;
+  border-radius: 0 24px 24px 0;
 }
+
+.sub-link:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
 
 .sub-link.active {
   color: #4f46e5;
   font-weight: 500;
+  background-color: #f0f5ff;
 }
 
 /* Desktop behavior */
@@ -127,4 +156,5 @@
   outline: 2px solid #4f46e5;
   outline-offset: -2px;
   z-index: 1;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }

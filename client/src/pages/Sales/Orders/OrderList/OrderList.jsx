@@ -1,4 +1,4 @@
-// OrderList.jsx
+// src/pages/Order/OrderList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../../components/layout/Header/Header';
@@ -16,7 +16,6 @@ const OrderList = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
-  // Fetch current user for header
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -57,7 +56,6 @@ const OrderList = () => {
       const response = await axios.get(`${backendUrl}/api/users/getAllUsers`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Filter users with role "Delivery partner"
       const partners = response.data.filter(user => user.role === "Delivery Man");
       setDeliveryPartners(partners);
     } catch (error) {
@@ -104,7 +102,7 @@ const OrderList = () => {
   };
 
   if (!user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="order-list-loading">Loading...</div>;
   }
 
   return (
@@ -121,112 +119,114 @@ const OrderList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <div className="table-header">
-            <h2>Order Management</h2>
-            <Link to="/order/create" className="create-button">
-              Create Order
-            </Link>
-          </div>
-          
-          {loading ? (
-            <div className="loading">Loading orders...</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">No</th>
-                    <th scope="col">Customer</th>
-                    <th scope="col">Product</th>
-                    <th scope="col">Ordered Qty</th>
-                    <th scope="col">Delivered Qty</th>
-                    <th scope="col">Price</th>
-                    <th scope="col">Total Amount</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Payment</th>
-                    <th scope="col">Order Date</th>
-                    <th scope="col">Delivery Partner</th>
-                    <th scope="col">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.length > 0 ? (
-                    orders.map((order, index) => (
-                      <tr key={order._id}>
-                        <td>{index + 1}</td>
-                        <td>{order.customer?.name || 'N/A'}</td>
-                        <td>{order.product?.productName || 'N/A'}</td>
-                        <td>{order.orderedQuantity}</td>
-                        <td>{order.deliveredQuantity}</td>
-                        <td>${order.price.toFixed(2)}</td>
-                        <td>${order.totalAmount.toFixed(2)}</td>
-                        <td>
-                          <span className={`status-badge status-${order.status}`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        <td>{order.payment}</td>
-                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                        <td>
-                          {order.assignmentStatus === "pending_assignment" ? (
-                            <select
-                              className="delivery-partner-select"
-                              onChange={(e) => {
-                                const selectedId = e.target.value;
-                                if (selectedId) {
-                                  handleAssignDeliveryPartner(order._id, selectedId);
-                                }
-                              }}
-                              defaultValue=""
-                            >
-                              <option value="">Assign Delivery Partner</option>
-                              {deliveryPartners.map(partner => (
-                                <option key={partner._id} value={partner._id}>
-                                  {partner.username}
-                                </option>
-                              ))}
-                            </select>
-                          ) : order.assignedTo ? (
-                            <span className="assigned-partner">
-                              {order.assignedTo.username || 'Assigned'}
+      <main className={`order-list-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="order-list-container-wrapper">
+          <div className="order-list-container">
+            <div className="order-list-header-section">
+              <h2 className="order-list-page-title">Order Management</h2>
+              <Link to="/order/create" className="order-list-create-button">
+                Create Order
+              </Link>
+            </div>
+            
+            {loading ? (
+              <div className="order-list-loading">Loading orders...</div>
+            ) : (
+              <div className="order-list-table-wrapper">
+                <table className="order-list-data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">No</th>
+                      <th scope="col">Customer</th>
+                      <th scope="col">Product</th>
+                      <th scope="col">Ordered Qty</th>
+                      <th scope="col">Delivered Qty</th>
+                      <th scope="col">Price</th>
+                      <th scope="col">Total Amount</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Payment</th>
+                      <th scope="col">Order Date</th>
+                      <th scope="col">Delivery Partner</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.length > 0 ? (
+                      orders.map((order, index) => (
+                        <tr key={order._id}>
+                          <td>{index + 1}</td>
+                          <td>{order.customer?.name || 'N/A'}</td>
+                          <td>{order.product?.productName || 'N/A'}</td>
+                          <td>{order.orderedQuantity}</td>
+                          <td>{order.deliveredQuantity}</td>
+                          <td>${order.price.toFixed(2)}</td>
+                          <td>${order.totalAmount.toFixed(2)}</td>
+                          <td>
+                            <span className={`order-list-status-badge order-list-status-${order.status?.toLowerCase() || 'pending'}`}>
+                              {order.status || 'Pending'}
                             </span>
-                          ) : (
-                            <span className="not-assigned">Not Assigned</span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="action-buttons">
-                            <Link
-                              to={`/order/create?edit=${order._id}`}
-                              className="icon-button edit-button"
-                              aria-label={`Edit order ${order._id}`}
-                            >
-                              ✎
-                            </Link>
-                            <button
-                              className="icon-button delete-button"
-                              onClick={() => handleDelete(order._id, order._id)}
-                              aria-label={`Delete order ${order._id}`}
-                            >
-                              🗑️
-                            </button>
-                          </div>
+                          </td>
+                          <td>{order.payment}</td>
+                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                          <td>
+                            {order.assignmentStatus === "pending_assignment" ? (
+                              <select
+                                className="order-list-delivery-partner-select"
+                                onChange={(e) => {
+                                  const selectedId = e.target.value;
+                                  if (selectedId) {
+                                    handleAssignDeliveryPartner(order._id, selectedId);
+                                  }
+                                }}
+                                defaultValue=""
+                              >
+                                <option value="">Assign Delivery Partner</option>
+                                {deliveryPartners.map(partner => (
+                                  <option key={partner._id} value={partner._id}>
+                                    {partner.username}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : order.assignedTo ? (
+                              <span className="order-list-assigned-partner">
+                                {order.assignedTo.username || 'Assigned'}
+                              </span>
+                            ) : (
+                              <span className="order-list-not-assigned">Not Assigned</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="order-list-action-buttons">
+                              <Link
+                                to={`/order/create?edit=${order._id}`}
+                                className="order-list-icon-button order-list-edit-button"
+                                aria-label={`Edit order ${order._id}`}
+                              >
+                                ✎
+                              </Link>
+                              <button
+                                className="order-list-icon-button order-list-delete-button"
+                                onClick={() => handleDelete(order._id, order._id)}
+                                aria-label={`Delete order ${order._id}`}
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="12" className="order-list-no-data">
+                          No orders found
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="12" className="no-data">
-                        No orders found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

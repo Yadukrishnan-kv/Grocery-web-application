@@ -1,4 +1,3 @@
-// SubCategoryList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
@@ -11,11 +10,10 @@ const SubCategoryList = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState('Products');
-  const [user, setUser] = useState(null); // Add user state
+  const [user, setUser] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
-  // Fetch current user for header
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -35,7 +33,6 @@ const SubCategoryList = () => {
     }
   }, [backendUrl]);
 
-  // Wrap fetchSubCategories in useCallback
   const fetchSubCategories = useCallback(async () => {
     try {
       const response = await fetch(`${backendUrl}/api/subcategories/getallsubcategories`, {
@@ -81,7 +78,7 @@ const SubCategoryList = () => {
   };
 
   if (!user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="subcategory-list-loading">Loading...</div>;
   }
 
   return (
@@ -89,7 +86,7 @@ const SubCategoryList = () => {
       <Header 
         sidebarOpen={sidebarOpen} 
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
-        user={user} // Pass user to Header
+        user={user}
       />
       <Sidebar 
         isOpen={sidebarOpen} 
@@ -98,67 +95,69 @@ const SubCategoryList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <div className="table-header">
-            <h2>Sub-Category Management</h2>
-            <Link to="/subcategory/create" className="create-button">
-              Create Sub-Category
-            </Link>
-          </div>
-          
-          {loading ? (
-            <div className="loading">Loading sub-categories...</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">No</th>
-                    <th scope="col">Category Name</th>
-                    <th scope="col">Sub-Category Name</th>
-                    <th scope="col">Edit</th>
-                    <th scope="col">Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subCategories.length > 0 ? (
-                    subCategories.map((subCategory, index) => (
-                      <tr key={subCategory._id}>
-                        <td>{index + 1}</td>
-                        <td>{subCategory.CategoryName}</td>
-                        <td>{subCategory.subCategoryName}</td>
-                        <td>
-                          <Link
-                            to={`/subcategory/create?edit=${subCategory._id}`}
-                            className="icon-button edit-button"
-                            aria-label={`Edit sub-category ${subCategory.subCategoryName}`}
-                          >
-                            ✎
-                          </Link>
-                        </td>
-                        <td>
-                          <button
-                            className="icon-button delete-button"
-                            onClick={() => handleDelete(subCategory._id, subCategory.subCategoryName)}
-                            aria-label={`Delete sub-category ${subCategory.subCategoryName}`}
-                          >
-                            🗑️
-                          </button>
+      <main className={`subcategory-list-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="subcategory-list-container-wrapper">
+          <div className="subcategory-list-container">
+            <div className="subcategory-list-header-section">
+              <h2 className="subcategory-list-page-title">Sub-Category Management</h2>
+              <Link to="/subcategory/create" className="subcategory-list-create-button">
+                Create Sub-Category
+              </Link>
+            </div>
+            
+            {loading ? (
+              <div className="subcategory-list-loading">Loading sub-categories...</div>
+            ) : (
+              <div className="subcategory-list-table-wrapper">
+                <table className="subcategory-list-data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">No</th>
+                      <th scope="col">Category Name</th>
+                      <th scope="col">Sub-Category Name</th>
+                      <th scope="col">Edit</th>
+                      <th scope="col">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subCategories.length > 0 ? (
+                      subCategories.map((subCategory, index) => (
+                        <tr key={subCategory._id}>
+                          <td>{index + 1}</td>
+                          <td>{subCategory.CategoryName}</td>
+                          <td>{subCategory.subCategoryName}</td>
+                          <td>
+                            <Link
+                              to={`/subcategory/create?edit=${subCategory._id}`}
+                              className="subcategory-list-icon-button subcategory-list-edit-button"
+                              aria-label={`Edit sub-category ${subCategory.subCategoryName}`}
+                            >
+                              ✎
+                            </Link>
+                          </td>
+                          <td>
+                            <button
+                              className="subcategory-list-icon-button subcategory-list-delete-button"
+                              onClick={() => handleDelete(subCategory._id, subCategory.subCategoryName)}
+                              aria-label={`Delete sub-category ${subCategory.subCategoryName}`}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="subcategory-list-no-data">
+                          No sub-categories found
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="5" className="no-data">
-                        No sub-categories found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

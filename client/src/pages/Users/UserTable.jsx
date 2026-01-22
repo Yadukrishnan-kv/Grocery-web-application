@@ -47,27 +47,31 @@ const UserTable = () => {
 
   // Fetch all users for table
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setTableLoading(true);
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${backendUrl}/api/users/getAllUsers`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+  const fetchUsers = async () => {
+    try {
+      setTableLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${backendUrl}/api/users/getAllUsers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-        console.log("Fetched users:", res.data); // ← Debug: Check if admin is here!
+      // Filter out Admin and superadmin users
+      const filteredUsers = res.data.filter(
+        user => user.role !== 'Admin' && user.role !== 'superadmin'
+      );
 
-        setUsers(res.data);
-      } catch (err) {
-        console.error("Error fetching users:", err);
-        setError("Failed to load users. Please try again.");
-      } finally {
-        setTableLoading(false);
-      }
-    };
+      console.log("Fetched & filtered users:", filteredUsers);
+      setUsers(filteredUsers);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      setError("Failed to load users. Please try again.");
+    } finally {
+      setTableLoading(false);
+    }
+  };
 
-    fetchUsers();
-  }, [backendUrl]);
+  fetchUsers();
+}, [backendUrl]);
 
   const handleDelete = async (id, username, role) => {
     if (isProtectedRole(role)) {
@@ -104,7 +108,7 @@ const UserTable = () => {
   }
 
   return (
-    <div className="user-list-layout">
+    <div className="user-table-layout">
       <Header
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -117,72 +121,78 @@ const UserTable = () => {
         onClose={() => setSidebarOpen(false)}
         user={currentUser}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <div className="table-header">
-            <h2>User Management</h2>
-            <Link to="/user/create" className="create-button">
-              Create User
-            </Link>
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          {tableLoading ? (
-            <div className="loading">Loading users...</div>
-          ) : users.length === 0 ? (
-            <div className="no-data">No users found</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Edit</th>
-                    <th>Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user, index) => (
-                    <tr key={user._id}>
-                      <td>{index + 1}</td>
-                      <td>{user.username}</td>
-                      <td>{user.email}</td>
-                      <td>{user.role}</td>
-                      <td>
-                        <Link
-                          to={`/user/create?edit=${user._id}`}
-                          className="icon-button edit-button"
-                          aria-label={`Edit user ${user.username}`}
-                        >
-                          ✎
-                        </Link>
-                      </td>
-                      <td>
-                        <button
-                          className={`icon-button delete-button ${
-                            isProtectedRole(user.role) ? 'disabled' : ''
-                          }`}
-                          onClick={() => handleDelete(user._id, user.username, user.role)}
-                          disabled={isProtectedRole(user.role)}
-                          aria-label={
-                            isProtectedRole(user.role)
-                              ? `Cannot delete protected user ${user.username}`
-                              : `Delete user ${user.username}`
-                          }
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <main className={`user-table-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="user-table-container-wrapper">
+          <div className="user-table-container">
+            <div className="user-table-header-section">
+              <h2 className="user-table-page-title">User Management</h2>
+              <Link to="/user/create" className="user-table-create-button">
+                Create User
+              </Link>
             </div>
-          )}
+
+            {error && <div className="user-table-error-message">{error}</div>}
+
+            {tableLoading ? (
+              <div className="user-table-loading">Loading users...</div>
+            ) : users.length === 0 ? (
+              <div className="user-table-no-data">No users found</div>
+            ) : (
+              <div className="user-table-wrapper">
+                <table className="user-table-data-table">
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Edit</th>
+                      <th>Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user, index) => (
+                      <tr key={user._id}>
+                        <td>{index + 1}</td>
+                        <td>{user.username}</td>
+                        <td>{user.email}</td>
+                        <td>
+                          <span className={`user-table-role-badge user-table-role-${user.role.toLowerCase().replace(/\s+/g, '-')}`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td>
+                          <Link
+                            to={`/user/create?edit=${user._id}`}
+                            className="user-table-icon-button user-table-edit-button"
+                            aria-label={`Edit user ${user.username}`}
+                          >
+                            ✎
+                          </Link>
+                        </td>
+                        <td>
+                          <button
+                            className={`user-table-icon-button user-table-delete-button ${
+                              isProtectedRole(user.role) ? 'disabled' : ''
+                            }`}
+                            onClick={() => handleDelete(user._id, user.username, user.role)}
+                            disabled={isProtectedRole(user.role)}
+                            aria-label={
+                              isProtectedRole(user.role)
+                                ? `Cannot delete protected user ${user.username}`
+                                : `Delete user ${user.username}`
+                            }
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

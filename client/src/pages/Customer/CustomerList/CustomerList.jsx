@@ -1,4 +1,4 @@
-// CustomerList.jsx
+// src/pages/Customer/CustomerList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
@@ -15,7 +15,6 @@ const CustomerList = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
-  // Fetch current user for header
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -23,7 +22,7 @@ const CustomerList = () => {
         window.location.href = '/login';
         return;
       }
-      
+     
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -71,96 +70,98 @@ const CustomerList = () => {
   };
 
   if (!user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="customer-list-loading">Loading...</div>;
   }
 
   return (
     <div className="customer-list-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem={activeItem} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem={activeItem}
         onSetActiveItem={setActiveItem}
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <div className="table-header">
-            <h2>Customer Management</h2>
-            <Link to="/customer/create" className="create-button">
-              Create Customer
-            </Link>
-          </div>
-          
-          {loading ? (
-            <div className="loading">Loading customers...</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">No</th>
-                    <th scope="col">Name</th>
-                    <th scope="col">Email</th>
-                    <th scope="col">Phone</th>
-                    <th scope="col">Address</th>
-                    <th scope="col">Pincode</th>
-                    <th scope="col">Credit Limit</th>
-                    <th scope="col">Balance</th>
-                    <th scope="col">Billing Type</th>
-                    <th scope="col">Edit</th>
-                    <th scope="col">Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.length > 0 ? (
-                    customers.map((customer, index) => (
-                      <tr key={customer._id}>
-                        <td>{index + 1}</td>
-                        <td>{customer.name}</td>
-                        <td>{customer.email}</td>
-                        <td>{customer.phoneNumber}</td>
-                        <td>{customer.address}</td>
-                        <td>{customer.pincode}</td>
-                        <td>${customer.creditLimit.toFixed(2)}</td>
-                        <td>${customer.balanceCreditLimit.toFixed(2)}</td>
-                        <td>{customer.billingType}</td>
-                        <td>
-                          <Link
-                            to={`/customer/create?edit=${customer._id}`}
-                            className="icon-button edit-button"
-                            aria-label={`Edit customer ${customer.name}`}
-                          >
-                            ✎
-                          </Link>
-                        </td>
-                        <td>
-                          <button
-                            className="icon-button delete-button"
-                            onClick={() => handleDelete(customer._id, customer.name)}
-                            aria-label={`Delete customer ${customer.name}`}
-                          >
-                            🗑️
-                          </button>
+      <main className={`customer-list-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="customer-list-container-wrapper">
+          <div className="customer-list-container">
+            <div className="customer-list-header-section">
+              <h2 className="customer-list-page-title">Customer Management</h2>
+              <Link to="/customer/create" className="customer-list-create-button">
+                Create Customer
+              </Link>
+            </div>
+           
+            {loading ? (
+              <div className="customer-list-loading">Loading customers...</div>
+            ) : (
+              <div className="customer-list-table-wrapper">
+                <table className="customer-list-data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">No</th>
+                      <th scope="col">Name</th>
+                      <th scope="col">Email</th>
+                      <th scope="col">Phone</th>
+                      <th scope="col">Address</th>
+                      <th scope="col">Pincode</th>
+                      <th scope="col">Credit Limit</th>
+                      <th scope="col">Balance</th>
+                      <th scope="col">Billing Type</th>
+                      <th scope="col">Edit</th>
+                      <th scope="col">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.length > 0 ? (
+                      customers.map((customer, index) => (
+                        <tr key={customer._id}>
+                          <td>{index + 1}</td>
+                          <td>{customer.name}</td>
+                          <td>{customer.email}</td>
+                          <td>{customer.phoneNumber}</td>
+                          <td>{customer.address}</td>
+                          <td>{customer.pincode}</td>
+                          <td>${customer.creditLimit.toFixed(2)}</td>
+                          <td>${customer.balanceCreditLimit.toFixed(2)}</td>
+                          <td>{customer.billingType}</td>
+                          <td>
+                            <Link
+                              to={`/customer/create?edit=${customer._id}`}
+                              className="customer-list-icon-button customer-list-edit-button"
+                              aria-label={`Edit customer ${customer.name}`}
+                            >
+                              ✎
+                            </Link>
+                          </td>
+                          <td>
+                            <button
+                              className="customer-list-icon-button customer-list-delete-button"
+                              onClick={() => handleDelete(customer._id, customer.name)}
+                              aria-label={`Delete customer ${customer.name}`}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="11" className="customer-list-no-data">
+                          No customers found
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="11" className="no-data">
-                        No customers found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

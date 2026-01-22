@@ -16,7 +16,6 @@ const CustomerOrderReports = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
-  // Fetch current logged-in user
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -36,7 +35,6 @@ const CustomerOrderReports = () => {
     }
   }, [backendUrl]);
 
-  // Fetch only this customer's orders
   const fetchMyOrders = useCallback(async () => {
     try {
       setLoading(true);
@@ -58,7 +56,6 @@ const CustomerOrderReports = () => {
     fetchMyOrders();
   }, [fetchCurrentUser, fetchMyOrders]);
 
-  // Download Delivered Invoice (same as admin, but for customer)
   const downloadDeliveredInvoice = async (orderId) => {
     setDownloadingOrderId(orderId);
     try {
@@ -91,7 +88,6 @@ const CustomerOrderReports = () => {
     }
   };
 
-  // Download Pending Invoice
   const downloadPendingInvoice = async (orderId) => {
     setDownloadingOrderId(orderId);
     try {
@@ -125,7 +121,7 @@ const CustomerOrderReports = () => {
   };
 
   if (!user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="customer-reports-loading">Loading...</div>;
   }
 
   return (
@@ -142,97 +138,99 @@ const CustomerOrderReports = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <div className="table-header">
-            <h2>My Order Reports</h2>
-            <button
-              className="refresh-button"
-              onClick={fetchMyOrders}
-              disabled={loading}
-            >
-              {loading ? 'Refreshing...' : 'Refresh My Orders'}
-            </button>
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          {loading ? (
-            <div className="loading">Loading your orders...</div>
-          ) : orders.length === 0 ? (
-            <div className="no-data">No orders found</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Product</th>
-                    <th>Ordered Qty</th>
-                    <th>Delivered Qty</th>
-                    <th>Pending Qty</th>
-                    <th>Price</th>
-                    <th>Total Amount</th>
-                    <th>Status</th>
-                    <th>Order Date</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order, index) => {
-                    const pendingQty = order.orderedQuantity - order.deliveredQuantity;
-                    const hasDelivered = order.deliveredQuantity > 0;
-                    const hasPending = pendingQty > 0;
-
-                    return (
-                      <tr key={order._id}>
-                        <td>{index + 1}</td>
-                        <td>{order.product?.productName || 'N/A'}</td>
-                        <td>{order.orderedQuantity}</td>
-                        <td>{order.deliveredQuantity}</td>
-                        <td>{pendingQty}</td>
-                        <td>₹{order.price.toFixed(2)}</td>
-                        <td>₹{order.totalAmount.toFixed(2)}</td>
-                        <td>
-                          <span className={`status-badge status-${order.status}`}>
-                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                          </span>
-                        </td>
-                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                        <td>
-                          <div className="action-buttons">
-                            {hasDelivered && (
-                              <button
-                                className="invoice-button delivered"
-                                onClick={() => downloadDeliveredInvoice(order._id)}
-                                disabled={downloadingOrderId === order._id}
-                              >
-                                {downloadingOrderId === order._id
-                                  ? 'Downloading...'
-                                  : 'Delivered Invoice'}
-                              </button>
-                            )}
-
-                            {hasPending && (
-                              <button
-                                className="invoice-button pending"
-                                onClick={() => downloadPendingInvoice(order._id)}
-                                disabled={downloadingOrderId === order._id}
-                              >
-                                {downloadingOrderId === order._id
-                                  ? 'Downloading...'
-                                  : 'Pending Invoice'}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+      <main className={`customer-reports-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="customer-reports-container-wrapper">
+          <div className="customer-reports-container">
+            <div className="customer-reports-header-section">
+              <h2 className="customer-reports-page-title">My Order Reports</h2>
+              <button
+                className="customer-reports-refresh-button"
+                onClick={fetchMyOrders}
+                disabled={loading}
+              >
+                {loading ? 'Refreshing...' : 'Refresh My Orders'}
+              </button>
             </div>
-          )}
+
+            {error && <div className="customer-reports-error-message">{error}</div>}
+
+            {loading ? (
+              <div className="customer-reports-loading">Loading your orders...</div>
+            ) : orders.length === 0 ? (
+              <div className="customer-reports-no-data">No orders found</div>
+            ) : (
+              <div className="customer-reports-table-wrapper">
+                <table className="customer-reports-data-table">
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Product</th>
+                      <th>Ordered Qty</th>
+                      <th>Delivered Qty</th>
+                      <th>Pending Qty</th>
+                      <th>Price</th>
+                      <th>Total Amount</th>
+                      <th>Status</th>
+                      <th>Order Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((order, index) => {
+                      const pendingQty = order.orderedQuantity - order.deliveredQuantity;
+                      const hasDelivered = order.deliveredQuantity > 0;
+                      const hasPending = pendingQty > 0;
+
+                      return (
+                        <tr key={order._id}>
+                          <td>{index + 1}</td>
+                          <td>{order.product?.productName || 'N/A'}</td>
+                          <td>{order.orderedQuantity}</td>
+                          <td>{order.deliveredQuantity}</td>
+                          <td>{pendingQty}</td>
+                          <td>₹{order.price.toFixed(2)}</td>
+                          <td>₹{order.totalAmount.toFixed(2)}</td>
+                          <td>
+                            <span className={`customer-reports-status-badge customer-reports-status-${order.status?.toLowerCase() || 'pending'}`}>
+                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                            </span>
+                          </td>
+                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                          <td>
+                            <div className="customer-reports-action-buttons">
+                              {hasDelivered && (
+                                <button
+                                  className="customer-reports-invoice-button delivered"
+                                  onClick={() => downloadDeliveredInvoice(order._id)}
+                                  disabled={downloadingOrderId === order._id}
+                                >
+                                  {downloadingOrderId === order._id
+                                    ? 'Downloading...'
+                                    : 'Delivered Invoice'}
+                                </button>
+                              )}
+
+                              {hasPending && (
+                                <button
+                                  className="customer-reports-invoice-button pending"
+                                  onClick={() => downloadPendingInvoice(order._id)}
+                                  disabled={downloadingOrderId === order._id}
+                                >
+                                  {downloadingOrderId === order._id
+                                    ? 'Downloading...'
+                                    : 'Pending Invoice'}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

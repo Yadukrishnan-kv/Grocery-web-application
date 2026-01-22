@@ -74,7 +74,7 @@ const CustomerBillStatement = () => {
   };
 
   if (!user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="customer-bills-loading">Loading...</div>;
   }
 
   return (
@@ -91,67 +91,71 @@ const CustomerBillStatement = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <h2>Bill Statements</h2>
-          
-          {loading ? (
-            <div className="loading">Loading bills...</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">No</th>
-                    <th scope="col">Cycle Start</th>
-                    <th scope="col">Cycle End</th>
-                    <th scope="col">Total Used</th>
-                    <th scope="col">Amount Due</th>
-                    <th scope="col">Due Date</th>
-                    <th scope="col">Paid Amount</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bills.length > 0 ? (
-                    bills.map((bill, index) => (
-                      <tr key={bill._id}>
-                        <td>{index + 1}</td>
-                        <td>{new Date(bill.cycleStart).toLocaleDateString()}</td>
-                        <td>{new Date(bill.cycleEnd).toLocaleDateString()}</td>
-                        <td>${bill.totalUsed.toFixed(2)}</td>
-                        <td>${bill.amountDue.toFixed(2)}</td>
-                        <td>{new Date(bill.dueDate).toLocaleDateString()}</td>
-                        <td>${bill.paidAmount.toFixed(2)}</td>
-                        <td>
-                          <span className={`status-badge status-${bill.status}`}>
-                            {bill.status}
-                          </span>
-                        </td>
-                        <td>
-                          {bill.status !== 'paid' && (
-                            <button
-                              className="pay-button"
-                              onClick={() => handlePayBill(bill._id, bill.amountDue)}
-                            >
-                              Pay Bill
-                            </button>
-                          )}
+      <main className={`customer-bills-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="customer-bills-container-wrapper">
+          <div className="customer-bills-container">
+            <div className="customer-bills-header-section">
+              <h2 className="customer-bills-page-title">Bill Statements</h2>
+            </div>
+            
+            {loading ? (
+              <div className="customer-bills-loading">Loading bills...</div>
+            ) : (
+              <div className="customer-bills-table-wrapper">
+                <table className="customer-bills-data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">No</th>
+                      <th scope="col">Cycle Start</th>
+                      <th scope="col">Cycle End</th>
+                      <th scope="col">Total Used</th>
+                      <th scope="col">Amount Due</th>
+                      <th scope="col">Due Date</th>
+                      <th scope="col">Paid Amount</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bills.length > 0 ? (
+                      bills.map((bill, index) => (
+                        <tr key={bill._id}>
+                          <td>{index + 1}</td>
+                          <td>{new Date(bill.cycleStart).toLocaleDateString()}</td>
+                          <td>{new Date(bill.cycleEnd).toLocaleDateString()}</td>
+                          <td>${bill.totalUsed.toFixed(2)}</td>
+                          <td>${bill.amountDue.toFixed(2)}</td>
+                          <td>{new Date(bill.dueDate).toLocaleDateString()}</td>
+                          <td>${bill.paidAmount.toFixed(2)}</td>
+                          <td>
+                            <span className={`customer-bills-status-badge customer-bills-status-${bill.status?.toLowerCase() || 'pending'}`}>
+                              {bill.status?.charAt(0).toUpperCase() + bill.status?.slice(1) || 'Pending'}
+                            </span>
+                          </td>
+                          <td>
+                            {bill.status !== 'paid' && (
+                              <button
+                                className="customer-bills-pay-button"
+                                onClick={() => handlePayBill(bill._id, bill.amountDue)}
+                              >
+                                Pay Bill
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="9" className="customer-bills-no-data">
+                          No bills found
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="9" className="no-data">
-                        No bills found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

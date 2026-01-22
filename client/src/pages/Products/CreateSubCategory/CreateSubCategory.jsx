@@ -20,7 +20,7 @@ const CreateSubCategory = () => {
   const [isEdit, setIsEdit] = useState(false);
   const [subCategoryId, setSubCategoryId] = useState(null);
   const [categories, setCategories] = useState([]);
-  
+
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
   const location = useLocation();
@@ -66,7 +66,7 @@ const CreateSubCategory = () => {
     try {
       const token = localStorage.getItem('token');
       const config = {
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         }
@@ -105,7 +105,7 @@ const CreateSubCategory = () => {
 
       const subCategories = response.data;
       const subCategoryToEdit = subCategories.find(sc => sc._id === id);
-      
+
       if (subCategoryToEdit) {
         setFormData({
           CategoryName: subCategoryToEdit.CategoryName,
@@ -141,7 +141,7 @@ const CreateSubCategory = () => {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const editId = searchParams.get('edit');
-    
+
     if (editId) {
       fetchSubCategoryData(editId);
     }
@@ -174,7 +174,7 @@ const CreateSubCategory = () => {
   }, [navigate, backendUrl]);
 
   if (loading) {
-    return <div className="loading">Loading user information...</div>;
+    return <div className="subcategory-loading">Loading user information...</div>;
   }
 
   if (!user) {
@@ -183,28 +183,28 @@ const CreateSubCategory = () => {
 
   return (
     <div className="subcategory-form-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem="Products" 
-        onSetActiveItem={() => {}} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem="Products"
+        onSetActiveItem={() => {}}
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="form-card">
+      <main className={`subcategory-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="subcategory-form-card">
           <h1>{isEdit ? 'Edit Sub-Category' : 'Create New Sub-Category'}</h1>
           {isSuccess && (
-            <div className="success-message" role="alert">
+            <div className="subcategory-success-message" role="alert">
               {isEdit ? 'Sub-category updated successfully!' : 'Sub-category created successfully!'}
             </div>
           )}
           <form onSubmit={handleSubmit} noValidate>
-            <div className="form-group">
+            <div className="subcategory-form-group">
               <label htmlFor="CategoryName">Category Name</label>
               <select
                 id="CategoryName"
@@ -213,6 +213,7 @@ const CreateSubCategory = () => {
                 onChange={handleChange}
                 aria-invalid={!!errors.CategoryName}
                 aria-describedby={errors.CategoryName ? "categoryname-error" : undefined}
+                className="subcategory-select"
               >
                 <option value="">Select a category</option>
                 {categories.map(category => (
@@ -222,13 +223,13 @@ const CreateSubCategory = () => {
                 ))}
               </select>
               {errors.CategoryName && (
-                <p id="categoryname-error" className="error-text" role="alert">
+                <p id="categoryname-error" className="subcategory-error-text" role="alert">
                   {errors.CategoryName}
                 </p>
               )}
             </div>
 
-            <div className="form-group">
+            <div className="subcategory-form-group">
               <label htmlFor="subCategoryName">Sub-Category Name</label>
               <input
                 id="subCategoryName"
@@ -238,23 +239,24 @@ const CreateSubCategory = () => {
                 onChange={handleChange}
                 aria-invalid={!!errors.subCategoryName}
                 aria-describedby={errors.subCategoryName ? "subcategoryname-error" : undefined}
+                className="subcategory-input"
               />
               {errors.subCategoryName && (
-                <p id="subcategoryname-error" className="error-text" role="alert">
+                <p id="subcategoryname-error" className="subcategory-error-text" role="alert">
                   {errors.subCategoryName}
                 </p>
               )}
             </div>
 
             {errors.submit && (
-              <div className="error-banner" role="alert">
+              <div className="subcategory-error-banner" role="alert">
                 {errors.submit}
               </div>
             )}
 
             <button
               type="submit"
-              className="submit-button"
+              className="subcategory-submit-button"
               disabled={isLoading}
               aria-busy={isLoading}
             >

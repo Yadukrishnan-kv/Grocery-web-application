@@ -24,7 +24,7 @@ const CreateCustomer = () => {
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
   const [customerId, setCustomerId] = useState(null);
-  
+
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
   const location = useLocation();
@@ -78,75 +78,75 @@ const CreateCustomer = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsSuccess(false);
+    e.preventDefault();
+    setIsSuccess(false);
 
-  if (!validateForm()) return;
+    if (!validateForm()) return;
 
-  setIsLoading(true);
+    setIsLoading(true);
 
-  try {
-    const token = localStorage.getItem('token');
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    };
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      };
 
-    const submitData = {
-      name: formData.name.trim(),
-      email: formData.email.trim().toLowerCase(),
-      phoneNumber: formData.phoneNumber.trim(),
-      address: formData.address.trim(),
-      pincode: formData.pincode.trim(),
-      creditLimit: parseFloat(formData.creditLimit),
-      billingType: formData.billingType
-    };
+      const submitData = {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phoneNumber: formData.phoneNumber.trim(),
+        address: formData.address.trim(),
+        pincode: formData.pincode.trim(),
+        creditLimit: parseFloat(formData.creditLimit),
+        billingType: formData.billingType
+      };
 
-    let response;
+      let response;
 
-    if (isEdit) {
-      response = await axios.put(
-        `${backendUrl}/api/customers/updatecustomer/${customerId}`,
-        submitData,
-        config
-      );
-    } else {
-      response = await axios.post(
-        `${backendUrl}/api/customers/createcustomer`,
-        submitData,
-        config
-      );
-    }
-
-    setIsSuccess(true);
-
-    // Show helpful message about login credentials (only on create)
-    if (!isEdit) {
-      const { defaultLoginInfo } = response.data;
-      if (defaultLoginInfo) {
-        alert(
-          `Customer created!\n\n` +
-          `Login credentials created automatically:\n` +
-          `Email: ${defaultLoginInfo.email}\n` +
-          `Temporary Password: ${defaultLoginInfo.temporaryPassword}\n\n` +
-          `${defaultLoginInfo.note}\n\n` +
-          `Redirecting to customer list...`
+      if (isEdit) {
+        response = await axios.put(
+          `${backendUrl}/api/customers/updatecustomer/${customerId}`,
+          submitData,
+          config
+        );
+      } else {
+        response = await axios.post(
+          `${backendUrl}/api/customers/createcustomer`,
+          submitData,
+          config
         );
       }
-    }
 
-    setTimeout(() => {
-      navigate('/customer/list');
-    }, 1500);
-  } catch (err) {
-    const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
-    setErrors({ submit: errorMessage });
-  } finally {
-    setIsLoading(false);
-  }
-};
+      setIsSuccess(true);
+
+      // Show helpful message about login credentials (only on create)
+      if (!isEdit) {
+        const { defaultLoginInfo } = response.data;
+        if (defaultLoginInfo) {
+          alert(
+            `Customer created!\n\n` +
+            `Login credentials created automatically:\n` +
+            `Email: ${defaultLoginInfo.email}\n` +
+            `Temporary Password: ${defaultLoginInfo.temporaryPassword}\n\n` +
+            `${defaultLoginInfo.note}\n\n` +
+            `Redirecting to customer list...`
+          );
+        }
+      }
+
+      setTimeout(() => {
+        navigate('/customer/list');
+      }, 1500);
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
+      setErrors({ submit: errorMessage });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const fetchCustomerData = useCallback(async (id) => {
     try {
@@ -173,7 +173,6 @@ const CreateCustomer = () => {
     }
   }, [backendUrl, navigate]);
 
-  // Fetch current user for header
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -199,7 +198,7 @@ const CreateCustomer = () => {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const editId = searchParams.get('edit');
-    
+
     if (editId) {
       fetchCustomerData(editId);
     }
@@ -210,7 +209,7 @@ const CreateCustomer = () => {
   }, [fetchCurrentUser]);
 
   if (loading) {
-    return <div className="loading">Loading user information...</div>;
+    return <div className="customer-loading">Loading user information...</div>;
   }
 
   if (!user) {
@@ -219,29 +218,29 @@ const CreateCustomer = () => {
 
   return (
     <div className="customer-form-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem="Customers" 
-        onSetActiveItem={() => {}} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem="Customers"
+        onSetActiveItem={() => {}}
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="form-card">
+      <main className={`customer-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="customer-form-card">
           <h1>{isEdit ? 'Edit Customer' : 'Create New Customer'}</h1>
           {isSuccess && (
-            <div className="success-message" role="alert">
+            <div className="customer-success-message" role="alert">
               {isEdit ? 'Customer updated successfully!' : 'Customer created successfully!'}
             </div>
           )}
           <form onSubmit={handleSubmit} noValidate>
-            <div className="form-row">
-              <div className="form-group">
+            <div className="customer-form-row">
+              <div className="customer-form-group">
                 <label htmlFor="name">Customer Name</label>
                 <input
                   id="name"
@@ -251,15 +250,16 @@ const CreateCustomer = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.name}
                   aria-describedby={errors.name ? "name-error" : undefined}
+                  className="customer-input"
                 />
                 {errors.name && (
-                  <p id="name-error" className="error-text" role="alert">
+                  <p id="name-error" className="customer-error-text" role="alert">
                     {errors.name}
                   </p>
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="customer-form-group">
                 <label htmlFor="email">Email</label>
                 <input
                   id="email"
@@ -269,17 +269,18 @@ const CreateCustomer = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.email}
                   aria-describedby={errors.email ? "email-error" : undefined}
+                  className="customer-input"
                 />
                 {errors.email && (
-                  <p id="email-error" className="error-text" role="alert">
+                  <p id="email-error" className="customer-error-text" role="alert">
                     {errors.email}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
+            <div className="customer-form-row">
+              <div className="customer-form-group">
                 <label htmlFor="phoneNumber">Phone Number</label>
                 <input
                   id="phoneNumber"
@@ -289,15 +290,16 @@ const CreateCustomer = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.phoneNumber}
                   aria-describedby={errors.phoneNumber ? "phonenumber-error" : undefined}
+                  className="customer-input"
                 />
                 {errors.phoneNumber && (
-                  <p id="phonenumber-error" className="error-text" role="alert">
+                  <p id="phonenumber-error" className="customer-error-text" role="alert">
                     {errors.phoneNumber}
                   </p>
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="customer-form-group">
                 <label htmlFor="pincode">Pincode</label>
                 <input
                   id="pincode"
@@ -307,16 +309,17 @@ const CreateCustomer = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.pincode}
                   aria-describedby={errors.pincode ? "pincode-error" : undefined}
+                  className="customer-input"
                 />
                 {errors.pincode && (
-                  <p id="pincode-error" className="error-text" role="alert">
+                  <p id="pincode-error" className="customer-error-text" role="alert">
                     {errors.pincode}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="form-group">
+            <div className="customer-form-group">
               <label htmlFor="address">Address</label>
               <textarea
                 id="address"
@@ -326,16 +329,17 @@ const CreateCustomer = () => {
                 rows="3"
                 aria-invalid={!!errors.address}
                 aria-describedby={errors.address ? "address-error" : undefined}
+                className="customer-textarea"
               />
               {errors.address && (
-                <p id="address-error" className="error-text" role="alert">
+                <p id="address-error" className="customer-error-text" role="alert">
                   {errors.address}
                 </p>
               )}
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
+            <div className="customer-form-row">
+              <div className="customer-form-group">
                 <label htmlFor="creditLimit">Credit Limit ($)</label>
                 <input
                   id="creditLimit"
@@ -347,15 +351,16 @@ const CreateCustomer = () => {
                   onChange={handleChange}
                   aria-invalid={!!errors.creditLimit}
                   aria-describedby={errors.creditLimit ? "creditlimit-error" : undefined}
+                  className="customer-input"
                 />
                 {errors.creditLimit && (
-                  <p id="creditlimit-error" className="error-text" role="alert">
+                  <p id="creditlimit-error" className="customer-error-text" role="alert">
                     {errors.creditLimit}
                   </p>
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="customer-form-group">
                 <label htmlFor="billingType">Billing Type</label>
                 <select
                   id="billingType"
@@ -363,6 +368,7 @@ const CreateCustomer = () => {
                   value={formData.billingType}
                   onChange={handleChange}
                   aria-invalid={false}
+                  className="customer-select"
                 >
                   <option value="creditcard">Credit Card</option>
                   <option value="immediate">Immediate</option>
@@ -371,14 +377,14 @@ const CreateCustomer = () => {
             </div>
 
             {errors.submit && (
-              <div className="error-banner" role="alert">
+              <div className="customer-error-banner" role="alert">
                 {errors.submit}
               </div>
             )}
 
             <button
               type="submit"
-              className="submit-button"
+              className="customer-submit-button"
               disabled={isLoading}
               aria-busy={isLoading}
             >

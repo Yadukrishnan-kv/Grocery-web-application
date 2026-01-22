@@ -1,34 +1,33 @@
 /* CreateCustomer.css */
+
 .customer-form-layout {
   display: flex;
   min-height: 100vh;
   background-color: #f8fafc;
 }
 
-.main-content {
-  margin-top: 64px;
-  margin-left: 0;
+.customer-main-content {
   padding: 1.5rem;
   transition: margin-left 0.2s ease;
   overflow-y: auto;
+  margin-top: 50px;
 }
 
 @media (min-width: 768px) {
-  .main-content.sidebar-open {
+  .customer-main-content.sidebar-open {
     margin-left: 240px;
   }
 }
 
-.form-card {
-  max-width: 600px;
+.customer-form-card {
+  width: 800px;
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   padding: 2rem;
-  margin: 0 auto;
 }
 
-.form-card h1 {
+.customer-form-card h1 {
   font-size: 1.5rem;
   font-weight: 700;
   color: #1e293b;
@@ -36,7 +35,7 @@
   text-align: center;
 }
 
-.success-message {
+.customer-success-message {
   background-color: #dcfce7;
   color: #166534;
   padding: 0.75rem;
@@ -47,24 +46,21 @@
   text-align: center;
 }
 
-.form-group {
+.customer-form-group {
   margin-bottom: 1.25rem;
 }
 
-.form-row {
+.customer-form-row {
   display: flex;
   gap: 1rem;
   margin-bottom: 1.25rem;
 }
 
-@media (max-width: 600px) {
-  .form-row {
-    flex-direction: column;
-    gap: 1.25rem;
-  }
+.customer-form-row .customer-form-group {
+  flex: 1;
 }
 
-.form-group label {
+.customer-form-group label {
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
@@ -72,10 +68,10 @@
   color: #374151;
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
-  width: 100%;
+.customer-input,
+.customer-select,
+.customer-textarea {
+  width: 95%;
   padding: 0.75rem;
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -85,22 +81,36 @@
   transition: border-color 0.2s;
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+.customer-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 0.65em;
+  padding-right: 2rem;
+}
+
+.customer-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.customer-input:focus,
+.customer-select:focus,
+.customer-textarea:focus {
   outline: none;
   border-color: #4f46e5;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
-.error-text {
+.customer-error-text {
   color: #ef4444;
   font-size: 0.875rem;
   margin-top: 0.25rem;
   min-height: 1.25rem;
 }
 
-.error-banner {
+.customer-error-banner {
   background-color: #fee2e2;
   color: #b91c1c;
   padding: 0.75rem;
@@ -110,8 +120,8 @@
   border: 1px solid #fecaca;
 }
 
-.submit-button {
-  width: 100%;
+.customer-submit-button {
+  width: 30%;
   padding: 0.75rem;
   background-color: #4f46e5;
   color: white;
@@ -123,29 +133,76 @@
   transition: background-color 0.2s;
 }
 
-.submit-button:hover:not(:disabled) {
+.customer-submit-button:hover:not(:disabled) {
   background-color: #4338ca;
 }
 
-.submit-button:focus {
+.customer-submit-button:focus {
   outline: 2px solid #4f46e5;
   outline-offset: 2px;
 }
 
-.submit-button:disabled {
+.customer-submit-button:disabled {
   background-color: #a5b4fc;
   cursor: not-allowed;
 }
 
-.loading {
+.customer-loading {
   text-align: center;
   padding: 2rem;
   color: #64748b;
   font-size: 1.1rem;
 }
 
-@media (max-width: 480px) {
-  .form-card {
+/* Mobile / small tablet */
+@media (max-width: 768px) {
+  .customer-main-content {
+    padding: 1.25rem;
+  }
+
+  .customer-form-card {
     padding: 1.5rem;
+    max-width: 90%;
+    margin-top: 20px;
+  }
+
+  .customer-form-card h1 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .customer-form-row {
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .customer-submit-button {
+    width: 200px;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 480px) {
+  .customer-main-content {
+    padding: 1rem;
+  }
+
+  .customer-form-card {
+    padding: 1.25rem;
+  }
+
+  .customer-form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .customer-form-group label {
+    font-size: 0.9rem;
+  }
+
+  .customer-input,
+  .customer-select,
+  .customer-textarea {
+    padding: 0.75rem 0.9rem;
+    font-size: 0.95rem;
   }
 }

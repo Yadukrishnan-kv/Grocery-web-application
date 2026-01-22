@@ -13,12 +13,17 @@ const Profile = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem] = useState('Profile');
   const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ username: '', email: '' });
+  const [editForm, setEditForm] = useState({
+    username: '',
+    email: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: ''
+  });
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
 
-  // Fetch full profile
   const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
@@ -36,6 +41,9 @@ const Profile = () => {
       setEditForm({
         username: res.data.username || '',
         email: res.data.email || '',
+        currentPassword: '',
+        newPassword: '',
+        confirmNewPassword: ''
       });
     } catch (err) {
       console.error("Profile fetch error:", err);
@@ -56,16 +64,54 @@ const Profile = () => {
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
+
+    // Client-side password validation (only if attempting to change password)
+    if (editForm.newPassword || editForm.confirmNewPassword || editForm.currentPassword) {
+      if (!editForm.currentPassword) {
+        alert("Current password is required to change password");
+        return;
+      }
+      if (editForm.newPassword.length < 6) {
+        alert("New password must be at least 6 characters");
+        return;
+      }
+      if (editForm.newPassword !== editForm.confirmNewPassword) {
+        alert("New password and confirm password do not match");
+        return;
+      }
+    }
+
     try {
       const token = localStorage.getItem('token');
+
+      // Prepare payload — send password fields only if user wants to change password
+      const payload = {
+        username: editForm.username,
+        email: editForm.email
+      };
+
+      if (editForm.newPassword) {
+        payload.currentPassword = editForm.currentPassword;
+        payload.newPassword = editForm.newPassword;
+      }
+
       const res = await axios.put(
         `${backendUrl}/api/users/my-profile`,
-        editForm,
+        payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       setProfile(res.data.user);
       setIsEditing(false);
+
+      // Reset password fields after success
+      setEditForm(prev => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmNewPassword: ''
+      }));
+
       alert("Profile updated successfully!");
     } catch (err) {
       alert(err.response?.data?.message || "Failed to update profile");
@@ -88,8 +134,7 @@ const Profile = () => {
         activeItem={activeItem}
         onSetActiveItem={() => {}}
         onClose={() => setSidebarOpen(false)}
-                user={profile}
-
+        user={profile}
       />
       <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="profile-container">
@@ -102,11 +147,11 @@ const Profile = () => {
               </div>
               <div className="profile-info">
                 <h2>{profile.username}</h2>
-                <p className="role-badge">{profile.role}</p>
+                <span className="role-badge">{profile.role}</span>
               </div>
               {!isEditing && (
                 <button className="edit-btn" onClick={() => setIsEditing(true)}>
-                  Edit Profile ✎
+                  Edit Profile
                 </button>
               )}
             </div>
@@ -114,8 +159,9 @@ const Profile = () => {
             {isEditing ? (
               <form onSubmit={handleUpdateProfile} className="edit-form">
                 <div className="form-group">
-                  <label>Username</label>
+                  <label htmlFor="username">Username</label>
                   <input
+                    id="username"
                     type="text"
                     name="username"
                     value={editForm.username}
@@ -125,13 +171,51 @@ const Profile = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Email</label>
+                  <label htmlFor="email">Email</label>
                   <input
+                    id="email"
                     type="email"
                     name="email"
                     value={editForm.email}
                     onChange={handleEditChange}
                     required
+                  />
+                </div>
+
+                
+                <div className="form-group">
+                  <label htmlFor="currentPassword">Current Password</label>
+                  <input
+                    id="currentPassword"
+                    type="password"
+                    name="currentPassword"
+                    value={editForm.currentPassword}
+                    onChange={handleEditChange}
+                    placeholder="Required if changing password"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="newPassword">New Password</label>
+                  <input
+                    id="newPassword"
+                    type="password"
+                    name="newPassword"
+                    value={editForm.newPassword}
+                    onChange={handleEditChange}
+                    placeholder="Minimum 6 characters"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="confirmNewPassword">Confirm New Password</label>
+                  <input
+                    id="confirmNewPassword"
+                    type="password"
+                    name="confirmNewPassword"
+                    value={editForm.confirmNewPassword}
+                    onChange={handleEditChange}
+                    placeholder="Re-type new password"
                   />
                 </div>
 
@@ -142,7 +226,15 @@ const Profile = () => {
                   <button
                     type="button"
                     className="cancel-btn"
-                    onClick={() => setIsEditing(false)}
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditForm(prev => ({
+                        ...prev,
+                        currentPassword: '',
+                        newPassword: '',
+                        confirmNewPassword: ''
+                      }));
+                    }}
                   >
                     Cancel
                   </button>
@@ -151,36 +243,36 @@ const Profile = () => {
             ) : (
               <div className="profile-details">
                 <div className="detail-row">
-                  <span className="label">Email:</span>
-                  <span>{profile.email}</span>
+                  <span className="label">Email</span>
+                  <span className="value">{profile.email}</span>
                 </div>
 
                 {profile.customerDetails && (
                   <>
-                    <h3>Customer Details</h3>
+                    <h3>Customer Information</h3>
                     <div className="detail-row">
-                      <span className="label">Phone Number:</span>
-                      <span>{profile.customerDetails.phoneNumber || 'N/A'}</span>
+                      <span className="label">Phone Number</span>
+                      <span className="value">{profile.customerDetails.phoneNumber || 'N/A'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="label">Address:</span>
-                      <span>{profile.customerDetails.address || 'N/A'}</span>
+                      <span className="label">Address</span>
+                      <span className="value">{profile.customerDetails.address || 'N/A'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="label">Pincode:</span>
-                      <span>{profile.customerDetails.pincode || 'N/A'}</span>
+                      <span className="label">Pincode</span>
+                      <span className="value">{profile.customerDetails.pincode || 'N/A'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="label">Total Credit Limit:</span>
-                      <span>₹{profile.customerDetails.creditLimit?.toFixed(2) || 'N/A'}</span>
+                      <span className="label">Credit Limit</span>
+                      <span className="value">₹{profile.customerDetails.creditLimit?.toFixed(2) || 'N/A'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="label">Available Credit:</span>
-                      <span>₹{profile.customerDetails.balanceCreditLimit?.toFixed(2) || 'N/A'}</span>
+                      <span className="label">Available Credit</span>
+                      <span className="value">₹{profile.customerDetails.balanceCreditLimit?.toFixed(2) || 'N/A'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="label">Billing Type:</span>
-                      <span>
+                      <span className="label">Billing Type</span>
+                      <span className="value">
                         {profile.customerDetails.billingType === 'creditcard'
                           ? 'Credit Card (30-day cycle)'
                           : 'Immediate Payment'}
@@ -190,15 +282,6 @@ const Profile = () => {
                 )}
               </div>
             )}
-          </div>
-
-          <div className="action-buttons">
-            <button
-              className="change-password-btn"
-              onClick={() => navigate('/change-password')}
-            >
-              Change Password
-            </button>
           </div>
         </div>
       </main>

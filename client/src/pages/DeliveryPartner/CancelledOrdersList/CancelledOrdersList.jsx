@@ -1,4 +1,3 @@
-// CancelledOrdersList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
@@ -9,7 +8,7 @@ const CancelledOrdersList = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState('Cancelled Orders');
+  const [activeItem, setActiveItem] = useState('Cancelled Orders'); // fixed typo
   const [user, setUser] = useState(null);
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
 
@@ -40,7 +39,6 @@ const CancelledOrdersList = () => {
       const response = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Filter orders that can be cancelled (accepted orders)
       const cancellableOrders = response.data.filter(order => 
         order.assignmentStatus === "accepted"
       );
@@ -79,7 +77,7 @@ const CancelledOrdersList = () => {
   };
 
   if (!user) {
-    return <div className="loading">Loading...</div>;
+    return <div className="cancelled-orders-loading">Loading...</div>;
   }
 
   return (
@@ -96,62 +94,64 @@ const CancelledOrdersList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="table-container">
-          <h2>Cancel Orders</h2>
-          
-          {loading ? (
-            <div className="loading">Loading orders...</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">No</th>
-                    <th scope="col">Customer</th>
-                    <th scope="col">Product</th>
-                    <th scope="col">Ordered Qty</th>
-                    <th scope="col">Delivered Qty</th>
-                    <th scope="col">Price</th>
-                    <th scope="col">Total Amount</th>
-                    <th scope="col">Order Date</th>
-                    <th scope="col">Cancel Order</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.length > 0 ? (
-                    orders.map((order, index) => (
-                      <tr key={order._id}>
-                        <td>{index + 1}</td>
-                        <td>{order.customer?.name || 'N/A'}</td>
-                        <td>{order.product?.productName || 'N/A'}</td>
-                        <td>{order.orderedQuantity}</td>
-                        <td>{order.deliveredQuantity}</td>
-                        <td>${order.price.toFixed(2)}</td>
-                        <td>${order.totalAmount.toFixed(2)}</td>
-                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                        <td>
-                          <button
-                            className="cancel-button"
-                            onClick={() => handleCancelOrder(order._id)}
-                            disabled={cancellingOrderId === order._id}
-                          >
-                            {cancellingOrderId === order._id ? 'Cancelling...' : 'Cancel'}
-                          </button>
+      <main className={`cancelled-orders-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="cancelled-orders-container-wrapper">
+          <div className="cancelled-orders-container">
+            <h2 className="cancelled-orders-page-title">Cancel Orders</h2>
+            
+            {loading ? (
+              <div className="cancelled-orders-loading">Loading orders...</div>
+            ) : (
+              <div className="cancelled-orders-table-wrapper">
+                <table className="cancelled-orders-data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">No</th>
+                      <th scope="col">Customer</th>
+                      <th scope="col">Product</th>
+                      <th scope="col">Ordered Qty</th>
+                      <th scope="col">Delivered Qty</th>
+                      <th scope="col">Price</th>
+                      <th scope="col">Total Amount</th>
+                      <th scope="col">Order Date</th>
+                      <th scope="col">Cancel Order</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.length > 0 ? (
+                      orders.map((order, index) => (
+                        <tr key={order._id}>
+                          <td>{index + 1}</td>
+                          <td>{order.customer?.name || 'N/A'}</td>
+                          <td>{order.product?.productName || 'N/A'}</td>
+                          <td>{order.orderedQuantity}</td>
+                          <td>{order.deliveredQuantity}</td>
+                          <td>${order.price.toFixed(2)}</td>
+                          <td>${order.totalAmount.toFixed(2)}</td>
+                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                          <td>
+                            <button
+                              className="cancelled-orders-cancel-button"
+                              onClick={() => handleCancelOrder(order._id)}
+                              disabled={cancellingOrderId === order._id}
+                            >
+                              {cancellingOrderId === order._id ? 'Cancelling...' : 'Cancel'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="9" className="cancelled-orders-no-data">
+                          No orders available for cancellation
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="9" className="no-data">
-                        No orders available for cancellation
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
