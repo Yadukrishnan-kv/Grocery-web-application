@@ -13,10 +13,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Serve React build (production)
+// Serve React build files (static assets like js, css, images)
 app.use(express.static(path.join(__dirname, 'build')));
 
-// API Routes (keep your exact routes)
+// Your API routes (these MUST come BEFORE the catch-all)
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
@@ -27,14 +27,19 @@ app.use('/api/customers', require('./routes/customerRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/bills', require('./routes/billRoutes'));
 
-// Health check
+// Health check endpoint
 app.get('/api/ping', (req, res) => {
   res.status(200).json({ message: 'Server is running fine 🚀' });
 });
 
-// Serve React for all other routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+// Catch-all route: Serve React app for all non-API routes (MUST BE LAST!)
+app.get(/^(?!\/api).*$/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'), (err) => {
+    if (err) {
+      console.error('Error sending index.html:', err);
+      res.status(500).send('Server error');
+    }
+  });
 });
 
 const PORT = process.env.PORT || 5000;
