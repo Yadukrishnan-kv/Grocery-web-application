@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import './Login.css';
 
 const Login = () => {
-  // ... (all existing state and logic remains unchanged)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -15,7 +14,6 @@ const Login = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
-  // ... (all validation and handler functions remain unchanged)
   const validateField = (name, value) => {
     switch (name) {
       case 'email':
@@ -47,7 +45,9 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault();  // ← This MUST be the first line to block default GET submit
+    e.stopPropagation(); // ← Extra safety
+
     setApiError('');
 
     const newErrors = {};
@@ -68,6 +68,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
+      // Use RELATIVE URL (best practice – auto uses current protocol HTTPS)
       const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -112,7 +113,8 @@ const Login = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate>
+        {/* ADD method="POST" here – tells browser to use POST */}
+        <form onSubmit={handleSubmit} method="POST" noValidate>
           <div className="form-group">
             <label htmlFor="email">Email address</label>
             <div className="input-wrapper">
@@ -190,8 +192,6 @@ const Login = () => {
         <div className="signup-link">
         </div>
       </div>
-      
-      
     </div>
   );
 };
