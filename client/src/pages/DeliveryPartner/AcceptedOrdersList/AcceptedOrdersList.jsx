@@ -90,6 +90,7 @@ const AcceptedOrdersList = () => {
                       <th scope="col">Delivered Qty</th>
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
+                      <th scope="col">Remarks</th>
                       <th scope="col">Order Date</th>
                       <th scope="col">Accepted At</th>
                     </tr>
@@ -105,6 +106,7 @@ const AcceptedOrdersList = () => {
                           <td>{order.deliveredQuantity}</td>
                           <td>${order.price.toFixed(2)}</td>
                           <td>${order.totalAmount.toFixed(2)}</td>
+                          <td>{order.remarks || '-'}</td>
                           <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                           <td>{order.acceptedAt ? new Date(order.acceptedAt).toLocaleDateString() : 'N/A'}</td>
                         </tr>

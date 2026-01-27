@@ -69,7 +69,8 @@
 }
 
 .create-customer-order-input,
-.create-customer-order-select {
+.create-customer-order-select,
+.create-customer-order-textarea {
   width: 95%;
   padding: 0.75rem;
   border: 1px solid #d1d5db;
@@ -78,6 +79,13 @@
   color: #1f2937;
   box-sizing: border-box;
   transition: border-color 0.2s;
+}
+
+.create-customer-order-textarea {
+  resize: vertical;
+  min-height: 90px;
+  max-height: 180px;
+  line-height: 1.5;
 }
 
 .create-customer-order-select {
@@ -90,7 +98,8 @@
 }
 
 .create-customer-order-input:focus,
-.create-customer-order-select:focus {
+.create-customer-order-select:focus,
+.create-customer-order-textarea:focus {
   outline: none;
   border-color: #4f46e5;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
@@ -147,6 +156,18 @@
   font-size: 1.1rem;
 }
 
+/* ──────────────────────────────────────────────── */
+/*                  Responsive Design                */
+/* ──────────────────────────────────────────────── */
+
+/* Tablet & small desktop */
+@media (max-width: 1024px) {
+  .create-customer-order-form-card {
+    width: 90%;
+    max-width: 720px;
+  }
+}
+
 /* Mobile / small tablet */
 @media (max-width: 768px) {
   .create-customer-order-main-content {
@@ -154,8 +175,9 @@
   }
 
   .create-customer-order-form-card {
-    padding: 1.5rem;
-    max-width: 90%;
+    padding: 1.75rem;
+    width: 100%;
+    max-width: none;
     margin-top: 20px;
   }
 
@@ -169,8 +191,16 @@
     gap: 1.25rem;
   }
 
+  .create-customer-order-input,
+  .create-customer-order-select,
+  .create-customer-order-textarea {
+    width: 100%;
+  }
+
   .create-customer-order-submit-button {
     width: 200px;
+    margin: 1rem auto 0;
+    display: block;
   }
 }
 
@@ -193,8 +223,13 @@
   }
 
   .create-customer-order-input,
-  .create-customer-order-select {
+  .create-customer-order-select,
+  .create-customer-order-textarea {
     padding: 0.75rem 0.9rem;
     font-size: 0.95rem;
+  }
+
+  .create-customer-order-submit-button {
+    width: 100%;
   }
 }

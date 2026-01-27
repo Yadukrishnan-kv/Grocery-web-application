@@ -10,7 +10,8 @@ const CreateCustomerOrder = () => {
   const [formData, setFormData] = useState({
     productId: '',
     orderedQuantity: '',
-    payment: 'credit'
+    payment: 'credit',
+    remarks: ''   // ← New field added
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +29,7 @@ const CreateCustomerOrder = () => {
         window.location.href = '/login';
         return;
       }
-      
+
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -67,6 +68,8 @@ const CreateCustomerOrder = () => {
       newErrors.payment = 'Payment method is required';
     }
 
+    // remarks is optional → no validation needed
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -97,7 +100,7 @@ const CreateCustomerOrder = () => {
     try {
       const token = localStorage.getItem('token');
       const config = {
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         }
@@ -110,7 +113,8 @@ const CreateCustomerOrder = () => {
         customerId,
         productId: formData.productId,
         orderedQuantity: parseInt(formData.orderedQuantity),
-        payment: formData.payment
+        payment: formData.payment,
+        remarks: formData.remarks.trim()   // ← New field sent to backend
       }, config);
 
       setIsSuccess(true);
@@ -148,15 +152,15 @@ const CreateCustomerOrder = () => {
 
   return (
     <div className="create-customer-order-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem="Orders" 
-        onSetActiveItem={() => {}} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem="Orders"
+        onSetActiveItem={() => {}}
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
@@ -235,6 +239,20 @@ const CreateCustomerOrder = () => {
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* New Remarks field */}
+            <div className="create-customer-order-form-group">
+              <label htmlFor="remarks">Remarks / Special Instructions (optional)</label>
+              <textarea
+                id="remarks"
+                name="remarks"
+                value={formData.remarks}
+                onChange={handleChange}
+                rows="3"
+                placeholder="Any special notes, delivery instructions, etc..."
+                className="create-customer-order-textarea"
+              />
             </div>
 
             {errors.submit && (

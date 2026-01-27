@@ -220,11 +220,32 @@ const getMyCustomerProfile = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+const createCustomerProfile = async (req, res) => {
+  try {
+    const { name, phoneNumber, address, pincode } = req.body;
+    const existing = await Customer.findOne({ user: req.user._id });
+    if (existing) return res.status(400).json({ message: 'Profile already exists' });
+
+    const customer = await Customer.create({
+      user: req.user._id,
+      name,
+      phoneNumber,
+      address,
+      pincode,
+      creditLimit: 0,
+      usedCredit: 0,
+    });
+
+    res.status(201).json(customer);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 module.exports = {
   createCustomer,
   getAllCustomers,
   getCustomerById,
   updateCustomer,
-  deleteCustomer,getMyCustomerProfile
+  deleteCustomer,getMyCustomerProfile,createCustomerProfile
 };

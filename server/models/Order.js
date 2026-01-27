@@ -64,6 +64,12 @@ const orderSchema = new Schema(
       type: Date,
       default: null,
     },
+    remarks: { 
+      type: String,
+      trim: true,
+      default: '',
+      
+    }
   },
   { timestamps: true }
 );

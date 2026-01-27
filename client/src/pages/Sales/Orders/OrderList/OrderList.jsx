@@ -145,6 +145,8 @@ const OrderList = () => {
                       <th scope="col">Total Amount</th>
                       <th scope="col">Status</th>
                       <th scope="col">Payment</th>
+                      <th scope="col">Remarks</th>
+
                       <th scope="col">Order Date</th>
                       <th scope="col">Delivery Partner</th>
                       <th scope="col">Actions</th>
@@ -167,6 +169,7 @@ const OrderList = () => {
                             </span>
                           </td>
                           <td>{order.payment}</td>
+                          <td>{order.remarks || '-'}</td>
                           <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                           <td>
                             {order.assignmentStatus === "pending_assignment" ? (

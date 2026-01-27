@@ -1,4 +1,3 @@
-// CreateOrder.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../../../components/layout/Header/Header';
 import Sidebar from '../../../../components/layout/Sidebar/Sidebar';
@@ -12,7 +11,8 @@ const CreateOrder = () => {
     customerId: '',
     productId: '',
     orderedQuantity: '',
-    payment: 'credit'
+    payment: 'credit',
+    remarks: ''  // New field
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -45,6 +45,9 @@ const CreateOrder = () => {
     if (!formData.payment) {
       newErrors.payment = 'Payment method is required';
     }
+
+    // Remarks is optional — no validation required here
+    // If you want remarks mandatory: if (!formData.remarks.trim()) newErrors.remarks = 'Remarks are required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -86,12 +89,12 @@ const CreateOrder = () => {
         customerId: formData.customerId,
         productId: formData.productId,
         orderedQuantity: parseInt(formData.orderedQuantity),
-        payment: formData.payment
+        payment: formData.payment,
+        remarks: formData.remarks.trim()  // Send remarks to backend
       };
 
       if (isEdit) {
         // Note: Order updates are complex due to inventory/credit adjustments
-        // For simplicity, we'll only allow creating new orders
         alert('Order updates are not supported. Please create a new order.');
         return;
       } else {
@@ -122,7 +125,8 @@ const CreateOrder = () => {
         customerId: order.customer?._id || '',
         productId: order.product?._id || '',
         orderedQuantity: order.orderedQuantity.toString(),
-        payment: order.payment
+        payment: order.payment,
+        remarks: order.remarks || ''  // Load existing remarks if editing
       });
       setIsEdit(true);
     } catch (error) {
@@ -317,6 +321,20 @@ const CreateOrder = () => {
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* New Remarks / Comments Field */}
+            <div className="order-form-group">
+              <label htmlFor="remarks">Remarks / Comments (Optional)</label>
+              <textarea
+                id="remarks"
+                name="remarks"
+                rows="4"
+                value={formData.remarks}
+                onChange={handleChange}
+                placeholder="Add any special instructions, delivery notes, or additional comments..."
+                className="order-textarea"
+              />
             </div>
 
             {errors.submit && (

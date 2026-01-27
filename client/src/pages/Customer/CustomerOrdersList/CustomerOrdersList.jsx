@@ -101,6 +101,8 @@ const CustomerOrdersList = () => {
                       <th scope="col">Delivered Qty</th>
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
+                      <th scope="col">Remarks</th>
+
                       <th scope="col">Status</th>
                       <th scope="col">Order Date</th>
                     </tr>
@@ -115,6 +117,7 @@ const CustomerOrdersList = () => {
                           <td>{order.deliveredQuantity}</td>
                           <td>${order.price.toFixed(2)}</td>
                           <td>${order.totalAmount.toFixed(2)}</td>
+                          <td>{order.remarks || '-'}</td>
                           <td>
                             <span className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || 'pending'}`}>
                               {order.status || 'Pending'}

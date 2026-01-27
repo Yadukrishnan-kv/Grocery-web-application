@@ -6,7 +6,7 @@ const PDFDocument = require('pdfkit');
 
 const createOrder = async (req, res) => {
   try {
-    let { customerId, productId, orderedQuantity, payment } = req.body;
+    let { customerId, productId, orderedQuantity, payment,remarks } = req.body;
 
     // If user is Customer → auto-set customerId from their profile
     if (req.user.role === "Customer") {
@@ -62,6 +62,7 @@ const createOrder = async (req, res) => {
       price,
       totalAmount,
       payment,
+      remarks: remarks || ''
     });
 
     res.status(201).json(order);
