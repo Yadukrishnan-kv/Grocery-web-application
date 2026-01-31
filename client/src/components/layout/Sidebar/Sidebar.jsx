@@ -28,7 +28,8 @@ const MENU_PERMISSIONS = {
   'CustomerOrderReports': 'menu.customer.order.reports',
   'CustomerBillStatement': 'menu.customer.bill.statement',
   'CustomerCreditLimit': 'menu.customer.credit.limit',
-  'Settings': 'menu.settings'
+  'Settings': 'menu.settings',
+  'CompanySettings': 'menu.settings.company',
 };
 
 const navItems = [
@@ -113,7 +114,11 @@ const navItems = [
       { id: 'CustomerCreditLimit', label: 'Credit Info', path: '/customer/credit-limit' }
     ]
   },
-  { id: 'Settings', label: 'Settings', icon: '⚙️', path: '/settings' }
+  { id: 'Settings', label: 'Settings', icon: '⚙️', 
+    subItems: [
+      { id: 'CompanySettings', label: 'Company Settings', path: '/company-settings' }
+    ]
+   }
 ];
 
 const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {

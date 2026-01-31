@@ -26,6 +26,7 @@ app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/customers', require('./routes/customerRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/bills', require('./routes/billRoutes'));
+app.use('/api/settings', require('./routes/settingsRoutes'));
 
 // Health check endpoint
 app.get('/api/ping', (req, res) => {

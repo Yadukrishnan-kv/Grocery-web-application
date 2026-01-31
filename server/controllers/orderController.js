@@ -2,6 +2,10 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Customer = require("../models/Customer");
 const User = require("../models/User");
+const CompanySettings = require("../models/CompanySettings");
+const InvoiceCounter = require('../models/InvoiceCounter');
+
+
 const PDFDocument = require('pdfkit');
 
 const createOrder = async (req, res) => {
@@ -240,6 +244,16 @@ const cancelOrder = async (req, res) => {
 
 
 
+
+// Helper to get or initialize counter
+const getOrInitCounter = async () => {
+  let counter = await InvoiceCounter.findOne();
+  if (!counter) {
+    counter = await InvoiceCounter.create({ deliveredCount: 0, pendingCount: 0 });
+  }
+  return counter;
+};
+
 const getDeliveredInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
@@ -249,25 +263,43 @@ const getDeliveredInvoice = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-    
+
     if (order.deliveredQuantity === 0) {
       return res.status(400).json({ message: "No delivered quantity" });
     }
 
+    const counter = await getOrInitCounter();
+
+    // Generate number ONLY if not already set for this order
+    if (!order.deliveredInvoiceNumber) {
+      counter.deliveredCount += 1;
+      await counter.save();
+
+      order.deliveredInvoiceNumber = `DEL-${counter.deliveredCount}`;
+      order.firstDeliveredInvoiceDate = new Date();
+      await order.save();
+
+      console.log(`First delivered invoice generated for order ${order._id}: ${order.deliveredInvoiceNumber}`);
+    }
+
+    const invoiceNo = order.deliveredInvoiceNumber;
+
     const filename = `delivered-invoice-${order._id.toString().slice(-8)}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    
+
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
     doc.pipe(res);
-    
-    generateStyledInvoicePDF(doc, order, 'DELIVERED INVOICE');
+
+    await generateStyledInvoicePDF(doc, order, 'DELIVERED INVOICE', invoiceNo);
+
     doc.end();
-    
+
+    console.log(`Delivered invoice served: ${invoiceNo} for order ${order._id}`);
   } catch (error) {
     console.error('Error generating delivered invoice:', error);
     if (!res.headersSent) {
-      res.status(500).json({ message: "Server error" });
+      res.status(500).json({ message: "Server error", error: error.message });
     }
   }
 };
@@ -281,52 +313,84 @@ const getPendingInvoice = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-    
+
     const remaining = order.orderedQuantity - order.deliveredQuantity;
     if (remaining === 0) {
       return res.status(400).json({ message: "No pending quantity" });
     }
 
+    const counter = await getOrInitCounter();
+
+    // Generate number ONLY if not already set for this order
+    if (!order.pendingInvoiceNumber) {
+      counter.pendingCount += 1;
+      await counter.save();
+
+      order.pendingInvoiceNumber = `PEN-${counter.pendingCount}`;
+      order.firstPendingInvoiceDate = new Date();
+      await order.save();
+
+      console.log(`First pending invoice generated for order ${order._id}: ${order.pendingInvoiceNumber}`);
+    }
+
+    const invoiceNo = order.pendingInvoiceNumber;
+
     const filename = `pending-invoice-${order._id.toString().slice(-8)}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    
+
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
     doc.pipe(res);
-    
+
     const pendingOrder = {
       ...order.toObject(),
       orderedQuantity: remaining,
       deliveredQuantity: 0,
       totalAmount: remaining * order.price
     };
-    
-    generateStyledInvoicePDF(doc, pendingOrder, 'PENDING INVOICE');
+
+    await generateStyledInvoicePDF(doc, pendingOrder, 'PENDING INVOICE', invoiceNo);
+
     doc.end();
-    
+
+    console.log(`Pending invoice served: ${invoiceNo} for order ${order._id}`);
   } catch (error) {
     console.error('Error generating pending invoice:', error);
     if (!res.headersSent) {
-      res.status(500).json({ message: "Server error" });
+      res.status(500).json({ message: "Server error", error: error.message });
     }
   }
 };
 
-const generateStyledInvoicePDF = (doc, order, invoiceType) => {
-  const { 
-    _id: orderId, 
-    customer, 
-    product, 
-    orderedQuantity, 
-    price, 
-    totalAmount, 
-    payment, 
-    orderDate 
+
+
+// Make this function async since it awaits DB query
+const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
+  // Fetch company settings - MUST exist
+  const company = await CompanySettings.findOne();
+
+  // No fallback / defaults — throw meaningful error if missing
+  if (!company) {
+    throw new Error(
+      "Company invoice settings not configured. " +
+      "Please go to Admin → Settings → Company Invoice Settings and fill in the details first."
+    );
+  }
+
+  const {
+    _id: orderId,
+    customer,
+    product,
+    orderedQuantity,
+    price,
+    totalAmount,
+    payment,
+    orderDate
   } = order;
 
-  // Page dimensions
-  const pageWidth = 595.28; // A4 width in points
-  const pageHeight = 841.89; // A4 height in points
+  // Page dimensions (A4)
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
   const margin = 50;
   const contentWidth = pageWidth - (margin * 2);
 
@@ -338,61 +402,58 @@ const generateStyledInvoicePDF = (doc, order, invoiceType) => {
     year: 'numeric'
   });
 
-  const invoiceNumber = `${invoiceType.includes('DELIVERED') ? 'DEL' : 'PEN'}-${orderId.toString().slice(-6)}`;
-
   // Set base font
   doc.fontSize(12).font('Helvetica').fillColor('#000000');
 
   // Header section
   const headerY = margin;
-  
-  // Company name (left side)
+
+  // Company name (left side) — dynamic
   doc.fontSize(22).font('Helvetica-Bold')
-     .text('INGOUDECOMPANY', margin, headerY);
-  
+     .text(company.companyName || 'INGOUDE COMPANY', margin, headerY);
+
   // Invoice title (left side, below company name)
   doc.fontSize(36).font('Helvetica-Bold').fillColor('#b0123b')
      .text(invoiceType.includes('DELIVERED') ? 'DELIVERED INVOICE' : 'PENDING INVOICE', margin, headerY + 40);
-  
+
   // Invoice number and date (right side)
   const invoiceInfoX = pageWidth - margin - 200;
   doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000')
-     .text(`NO: ${invoiceNumber}`, invoiceInfoX, headerY)
+     .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
      .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
-  
+
   // Bill To and From sections
   const infoY = headerY + 120;
   const billToX = margin;
   const fromX = pageWidth - margin - 250;
-  
+
   // Bill To
   doc.fontSize(14).font('Helvetica-Bold')
      .text('Bill To:', billToX, infoY);
   doc.fontSize(12).font('Helvetica')
-     .text(customer.name, billToX, infoY + 25)
-     .text(customer.phoneNumber, billToX, infoY + 45)
-     .text(customer.address, billToX, infoY + 65)
-     .text(`Pincode: ${customer.pincode}`, billToX, infoY + 85);
-  
-  // From (Company info)
+     .text(customer.name || 'N/A', billToX, infoY + 25)
+     .text(customer.phoneNumber || 'N/A', billToX, infoY + 45)
+     .text(customer.address || 'N/A', billToX, infoY + 65)
+     .text(`Pincode: ${customer.pincode || 'N/A'}`, billToX, infoY + 85);
+
+  // From (Company info) — all dynamic
   doc.fontSize(14).font('Helvetica-Bold')
      .text('From:', fromX, infoY);
   doc.fontSize(12).font('Helvetica')
-     .text('INGOUDECOMPANY', fromX, infoY + 25)
-     .text('+123-456-7890', fromX, infoY + 45)
-     .text('123 Anywhere St., Any City', fromX, infoY + 65);
-  
+     .text(company.companyName || 'INGOUDE COMPANY', fromX, infoY + 25)
+     .text(company.companyPhone || 'N/A', fromX, infoY + 45)
+     .text(company.companyAddress || 'N/A', fromX, infoY + 65);
+
   // Table section
   const tableY = infoY + 130;
   const rowHeight = 40;
-  
-  // Column positions (based on your CSS layout)
+
   const descCol = margin;
   const qtyCol = margin + 300;
   const priceCol = margin + 370;
   const totalCol = margin + 440;
-  
-  // Table header
+
+  // Table header (red background)
   doc.rect(margin - 10, tableY - 5, contentWidth + 20, rowHeight)
      .fillColor('#b0123b').fill();
   doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold')
@@ -400,55 +461,54 @@ const generateStyledInvoicePDF = (doc, order, invoiceType) => {
      .text('Qty', qtyCol, tableY + 10, { width: 70, align: 'center' })
      .text('Price', priceCol, tableY + 10, { width: 70, align: 'center' })
      .text('Total', totalCol, tableY + 10, { width: 70, align: 'center' });
-  
+
   // Table data row
   const dataY = tableY + rowHeight;
   doc.fillColor('#000000').fontSize(12).font('Helvetica')
-     .text(product.productName, descCol, dataY + 10)
+     .text(product.productName || 'N/A', descCol, dataY + 10)
      .text(orderedQuantity.toString(), qtyCol, dataY + 10, { width: 70, align: 'center' })
      .text(`$${price.toFixed(2)}`, priceCol, dataY + 10, { width: 70, align: 'center' })
      .text(`$${totalAmount.toFixed(2)}`, totalCol, dataY + 10, { width: 70, align: 'center' });
-  
+
   // Table bottom border
   doc.strokeColor('#dddddd').lineWidth(1)
      .moveTo(margin - 10, dataY + rowHeight)
      .lineTo(margin - 10 + contentWidth + 20, dataY + rowHeight)
      .stroke();
-  
+
   // Subtotal section (right aligned)
   const subtotalY = dataY + 80;
   const subtotalWidth = 200;
   const subtotalX = pageWidth - margin - subtotalWidth;
-  
+
   doc.rect(subtotalX, subtotalY, subtotalWidth, 35)
      .fillColor('#222222').fill();
   doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold')
      .text('Sub Total', subtotalX + 15, subtotalY + 12)
      .text(`$${totalAmount.toFixed(2)}`, subtotalX + subtotalWidth - 20, subtotalY + 12, { align: 'right' });
-  
+
   // Footer section
   const footerY = subtotalY + 80;
-  
-  // Payment Information (left side)
+
+  // Payment Information (left side) — dynamic
   doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
      .text('Payment Information:', margin, footerY);
   doc.fontSize(12).font('Helvetica')
-     .text('Bank: Name Bank', margin, footerY + 25)
-     .text('No Bank: 123-456-7890', margin, footerY + 45)
+     .text(`Bank: ${company.bankName || 'N/A'}`, margin, footerY + 25)
+     .text(`Account: ${company.bankAccountNumber || 'N/A'}`, margin, footerY + 45)
      .text(`Payment Method: ${payment.charAt(0).toUpperCase() + payment.slice(1)}`, margin, footerY + 65)
      .text(`Order ID: ${orderId.toString()}`, margin, footerY + 85);
-  
+
   // Thank You message (right side)
   const thankYouX = pageWidth - margin - 200;
   doc.fontSize(36).font('Helvetica-Bold').fillColor('#000000')
      .text('Thank You!', thankYouX, footerY, { width: 200, align: 'right' });
-  
+
   // System-generated note at bottom
   const bottomY = footerY + 150;
   doc.fontSize(10).font('Helvetica-Oblique').fillColor('#666666')
      .text('This is a system-generated invoice', margin, bottomY);
 };
-
 
 
 
@@ -574,10 +634,10 @@ const rejectAssignedOrder = async (req, res) => {
 
 const getDeliveredOrdersForAdmin = async (req, res) => {
   try {
-    // Admin can view all delivered orders
+    // Show ALL orders that have ANY delivered quantity (partial or full)
     const orders = await Order.find({ 
-      status: "delivered",
-      deliveredQuantity: { $gt: 0 }
+      deliveredQuantity: { $gt: 0 }  // ← This is the key change!
+      // Removed status: "delivered" filter so partial deliveries are included
     })
       .populate("customer", "name email phoneNumber address pincode")
       .populate("product", "productName price")
@@ -586,6 +646,7 @@ const getDeliveredOrdersForAdmin = async (req, res) => {
 
     res.json(orders);
   } catch (error) {
+    console.error("Error fetching delivered orders for admin:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

@@ -31,6 +31,7 @@ import CustomerBillStatement from "../pages/Customer/CustomerBillStatement/Custo
 import CustomerCreditLimit from "../pages/Customer/CustomerCreditLimit/CustomerCreditLimit";
 import Profile from "../pages/Profile/Profile";
 import ChangePassword from "../pages/Profile/ChangePassword";
+import CompanySettings from "../pages/Settings/CompanySettings/CompanySettings";
 function Dom() {
   return (
     <div>
@@ -40,6 +41,8 @@ function Dom() {
             <Route path="/" element={<Login />} />
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<DashboardLayout />} />
+            <Route path="/company-settings" element={<CompanySettings />} />
+
             <Route path="/user/create" element={<User />} />
             <Route path="/userlist" element={<UserTable />} />
             <Route path="/category/create" element={<CreateCategory />} />
@@ -67,20 +70,43 @@ function Dom() {
             <Route path="/OrderReports/list" element={<OrderReports />} />
 
             <Route path="/Orderarrived/list" element={<OrderArrivedList />} />
-            <Route path="/AccepetdOrders/list" element={<AcceptedOrdersList />} />
-            <Route path="/deliveredorders/list" element={<DeliveredOrdersList />} />
-            <Route path="/cancelledorders/list" element={<CancelledOrdersList />} />
-
+            <Route
+              path="/AccepetdOrders/list"
+              element={<AcceptedOrdersList />}
+            />
+            <Route
+              path="/deliveredorders/list"
+              element={<DeliveredOrdersList />}
+            />
+            <Route
+              path="/cancelledorders/list"
+              element={<CancelledOrdersList />}
+            />
 
             <Route path="/customer/orders" element={<CustomerOrdersList />} />
-          <Route path="/customer/create-order" element={<CreateCustomerOrder />} />
-          <Route path="/customer/order-status/:id" element={<CustomerOrderStatus />} />
-          <Route path="/customer/order-reports" element={<CustomerOrderReports />} />
-          <Route path="/customer/bill-statement" element={<CustomerBillStatement />} />
-          <Route path="/customer/credit-limit" element={<CustomerCreditLimit />} />
+            <Route
+              path="/customer/create-order"
+              element={<CreateCustomerOrder />}
+            />
+            <Route
+              path="/customer/order-status/:id"
+              element={<CustomerOrderStatus />}
+            />
+            <Route
+              path="/customer/order-reports"
+              element={<CustomerOrderReports />}
+            />
+            <Route
+              path="/customer/bill-statement"
+              element={<CustomerBillStatement />}
+            />
+            <Route
+              path="/customer/credit-limit"
+              element={<CustomerCreditLimit />}
+            />
 
-          <Route path="/profile" element={<Profile />} />
-<Route path="/change-password" element={<ChangePassword />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/change-password" element={<ChangePassword />} />
           </Routes>
         </BrowserRouter>
       </PermissionProvider>

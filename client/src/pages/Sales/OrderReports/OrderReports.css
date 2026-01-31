@@ -261,3 +261,17 @@
     justify-content: center;
   }
 }
+.order-reports-status-partially-delivered {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.order-reports-status-fully-delivered {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.order-reports-status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}

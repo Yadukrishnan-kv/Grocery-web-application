@@ -69,7 +69,16 @@ const orderSchema = new Schema(
       trim: true,
       default: '',
       
-    }
+    },
+    deliveredInvoiceNumber: {
+    type: String,
+    default: null  // will be set on first delivered invoice
+  },
+
+  pendingInvoiceNumber: {
+    type: String,
+    default: null  // will be set on first pending invoice
+  },
   },
   { timestamps: true }
 );

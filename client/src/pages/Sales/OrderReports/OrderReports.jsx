@@ -1,4 +1,3 @@
-// src/pages/Sales/Orders/OrderReports.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
@@ -9,7 +8,7 @@ const OrderReports = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState('Orders Report');
+  const [activeItem, setActiveItem] = useState('Order Reports');
   const [user, setUser] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
 
@@ -34,6 +33,7 @@ const OrderReports = () => {
     }
   }, [backendUrl]);
 
+  // Updated: Now fetches ALL orders with deliveredQuantity > 0 (partial or full)
   const fetchDeliveredOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -42,7 +42,7 @@ const OrderReports = () => {
       });
       setOrders(response.data);
     } catch (error) {
-      console.error('Error fetching delivered orders:', error);
+      console.error('Error fetching orders with delivery:', error);
       alert('Failed to load orders');
     } finally {
       setLoading(false);
@@ -166,90 +166,95 @@ const OrderReports = () => {
             </div>
             
             {loading ? (
-              <div className="order-reports-loading">Loading delivered orders...</div>
+              <div className="order-reports-loading">Loading orders...</div>
+            ) : orders.length === 0 ? (
+              <div className="order-reports-no-data">
+                No orders with delivered quantity found
+              </div>
             ) : (
               <div className="order-reports-table-wrapper">
                 <table className="order-reports-data-table">
                   <thead>
                     <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Customer</th>
-                      <th scope="col">Product</th>
-                      <th scope="col">Ordered Qty</th>
-                      <th scope="col">Delivered Qty</th>
-                      <th scope="col">Pending Qty</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Total Amount</th>
-                      <th scope="col">Delivery Partner</th>
-                      <th scope="col">Order Date</th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Actions</th>
+                      <th>No</th>
+                      <th>Customer</th>
+                      <th>Product</th>
+                      <th>Ordered Qty</th>
+                      <th>Delivered Qty</th>
+                      <th>Pending Qty</th>
+                      <th>Price</th>
+                      <th>Total Amount</th>
+                      <th>Delivery Partner</th>
+                      <th>Order Date</th>
+                      <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.length > 0 ? (
-                      orders.map((order, index) => {
-                        const pendingQty = order.orderedQuantity - order.deliveredQuantity;
-                        const isFullyDelivered = pendingQty === 0;
-                        
-                        return (
-                          <tr key={order._id}>
-                            <td>{index + 1}</td>
-                            <td>{order.customer?.name || 'N/A'}</td>
-                            <td>{order.product?.productName || 'N/A'}</td>
-                            <td>{order.orderedQuantity}</td>
-                            <td>{order.deliveredQuantity}</td>
-                            <td>{pendingQty}</td>
-                            <td>${order.price.toFixed(2)}</td>
-                            <td>${order.totalAmount.toFixed(2)}</td>
-                            <td>{order.assignedTo?.username || 'Not assigned'}</td>
-                            <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                            <td>
-                              <span className={`order-reports-status-badge order-reports-status-delivered`}>
-                                Delivered
-                              </span>
-                            </td>
-                            <td>
-                              <div className="order-reports-action-buttons">
+                    {orders.map((order, index) => {
+                      const pendingQty = order.orderedQuantity - order.deliveredQuantity;
+                      const isPartiallyDelivered = order.deliveredQuantity > 0 && pendingQty > 0;
+                      const isFullyDelivered = pendingQty === 0;
+
+                      return (
+                        <tr key={order._id}>
+                          <td>{index + 1}</td>
+                          <td>{order.customer?.name || 'N/A'}</td>
+                          <td>{order.product?.productName || 'N/A'}</td>
+                          <td>{order.orderedQuantity}</td>
+                          <td>{order.deliveredQuantity}</td>
+                          <td>{pendingQty}</td>
+                          <td>₹{order.price.toFixed(2)}</td>
+                          <td>₹{order.totalAmount.toFixed(2)}</td>
+                          <td>{order.assignedTo?.username || 'Not assigned'}</td>
+                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                          <td>
+                            <span className={`order-reports-status-badge ${
+                              isFullyDelivered 
+                                ? 'order-reports-status-fully-delivered' 
+                                : isPartiallyDelivered 
+                                  ? 'order-reports-status-partially-delivered' 
+                                  : 'order-reports-status-pending'
+                            }`}>
+                              {isFullyDelivered ? 'Fully Delivered' : isPartiallyDelivered ? 'Partially Delivered' : 'Pending'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="order-reports-action-buttons">
+                              {/* Delivered Invoice - show if any qty delivered */}
+                              {order.deliveredQuantity > 0 && (
                                 <button
                                   className="order-reports-invoice-button delivered"
                                   onClick={() => downloadDeliveredInvoice(order._id)}
                                   disabled={downloadingOrderId === order._id}
                                 >
-                                  {downloadingOrderId === order._id && 
-                                   order.deliveredQuantity > 0 ? 'Downloading...' : 'Delivered Invoice'}
+                                  {downloadingOrderId === order._id ? 'Downloading...' : 'Delivered Invoice'}
                                 </button>
-                                
-                                {!isFullyDelivered && (
-                                  <button
-                                    className="order-reports-invoice-button pending"
-                                    onClick={() => downloadPendingInvoice(order._id)}
-                                    disabled={downloadingOrderId === order._id}
-                                  >
-                                    {downloadingOrderId === order._id && 
-                                     pendingQty > 0 ? 'Downloading...' : 'Pending Invoice'}
-                                  </button>
-                                )}
-                                
+                              )}
+
+                              {/* Pending Invoice - show if any qty pending */}
+                              {pendingQty > 0 && (
                                 <button
-                                  className="order-reports-refresh-order-button"
-                                  onClick={() => refreshOrderData(order._id)}
-                                  title="Refresh order data"
+                                  className="order-reports-invoice-button pending"
+                                  onClick={() => downloadPendingInvoice(order._id)}
+                                  disabled={downloadingOrderId === order._id}
                                 >
-                                  🔄
+                                  {downloadingOrderId === order._id ? 'Downloading...' : 'Pending Invoice'}
                                 </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="12" className="order-reports-no-data">
-                          No delivered orders found
-                        </td>
-                      </tr>
-                    )}
+                              )}
+
+                              <button
+                                className="order-reports-refresh-order-button"
+                                onClick={() => refreshOrderData(order._id)}
+                                title="Refresh order data"
+                              >
+                                🔄
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
