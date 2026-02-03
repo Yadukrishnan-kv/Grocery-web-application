@@ -10,6 +10,7 @@
     "axios": "^1.13.2",
     "bootstrap": "^5.3.8",
     "cors": "^2.8.5",
+    "dirham-symbol": "^4.0.4",
     "dotenv": "^17.2.3",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.562.0",

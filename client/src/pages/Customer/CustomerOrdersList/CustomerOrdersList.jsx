@@ -98,7 +98,7 @@ const CustomerOrdersList = () => {
                       <th scope="col">No</th>
                       <th scope="col">Product</th>
                       <th scope="col">Ordered Qty</th>
-                      <th scope="col">Delivered Qty</th>
+                     
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
                       <th scope="col">Remarks</th>
@@ -114,7 +114,7 @@ const CustomerOrdersList = () => {
                           <td>{index + 1}</td>
                           <td>{order.product?.productName || 'N/A'}</td>
                           <td>{order.orderedQuantity}</td>
-                          <td>{order.deliveredQuantity}</td>
+                        
                           <td>${order.price.toFixed(2)}</td>
                           <td>${order.totalAmount.toFixed(2)}</td>
                           <td>{order.remarks || '-'}</td>

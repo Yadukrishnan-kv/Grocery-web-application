@@ -49,8 +49,8 @@ const customerSchema = new Schema(
     },
     billingType: {
       type: String,
-      enum: ["creditcard", "immediate"],
-      default: "creditcard",
+      enum: ["Credit limit", "Cash"],
+      default: "Credit limit",
       required: true,
     },
   },

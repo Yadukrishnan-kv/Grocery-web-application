@@ -12,7 +12,7 @@ const createCustomer = async (req, res) => {
       address,
       pincode,
       creditLimit,
-      billingType = "creditcard",
+      billingType = "Credit limit",
     } = req.body;
 
     // 1. Basic validation

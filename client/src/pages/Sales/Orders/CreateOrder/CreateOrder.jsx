@@ -12,7 +12,7 @@ const CreateOrder = () => {
     productId: '',
     orderedQuantity: '',
     payment: 'credit',
-    remarks: ''  // New field
+    remarks: ''
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +22,7 @@ const CreateOrder = () => {
   const [isEdit, setIsEdit] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [selectedProductUnit, setSelectedProductUnit] = useState(''); // Track selected product's unit
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -46,9 +47,6 @@ const CreateOrder = () => {
       newErrors.payment = 'Payment method is required';
     }
 
-    // Remarks is optional — no validation required here
-    // If you want remarks mandatory: if (!formData.remarks.trim()) newErrors.remarks = 'Remarks are required';
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -65,6 +63,12 @@ const CreateOrder = () => {
         ...prev,
         [name]: ''
       }));
+    }
+
+    // Update selected unit when product changes
+    if (name === 'productId') {
+      const selected = products.find(p => p._id === value);
+      setSelectedProductUnit(selected ? selected.unit : '');
     }
   };
 
@@ -90,11 +94,10 @@ const CreateOrder = () => {
         productId: formData.productId,
         orderedQuantity: parseInt(formData.orderedQuantity),
         payment: formData.payment,
-        remarks: formData.remarks.trim()  // Send remarks to backend
+        remarks: formData.remarks.trim()
       };
 
       if (isEdit) {
-        // Note: Order updates are complex due to inventory/credit adjustments
         alert('Order updates are not supported. Please create a new order.');
         return;
       } else {
@@ -126,14 +129,19 @@ const CreateOrder = () => {
         productId: order.product?._id || '',
         orderedQuantity: order.orderedQuantity.toString(),
         payment: order.payment,
-        remarks: order.remarks || ''  // Load existing remarks if editing
+        remarks: order.remarks || ''
       });
+
+      // Set unit from selected product
+      const selectedProduct = products.find(p => p._id === order.product?._id);
+      setSelectedProductUnit(selectedProduct ? selectedProduct.unit : '');
+
       setIsEdit(true);
     } catch (error) {
       console.error("Failed to fetch order data", error);
       navigate('/order/list');
     }
-  }, [backendUrl, navigate]);
+  }, [backendUrl, navigate, products]);
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -269,7 +277,7 @@ const CreateOrder = () => {
                 <option value="">Select a product</option>
                 {products.map(product => (
                   <option key={product._id} value={product._id}>
-                    {product.productName} - ₹{product.price.toFixed(2)} (Qty: {product.quantity})
+                    {product.productName} - AED {product.price.toFixed(2)} / {product.unit} 
                   </option>
                 ))}
               </select>
@@ -278,11 +286,19 @@ const CreateOrder = () => {
                   {errors.productId}
                 </p>
               )}
+              {/* Show selected unit */}
+              {selectedProductUnit && (
+                <small className="order-help-text">
+                  Selected unit: {selectedProductUnit}
+                </small>
+              )}
             </div>
 
             <div className="order-form-row">
               <div className="order-form-group">
-                <label htmlFor="orderedQuantity">Quantity</label>
+                <label htmlFor="orderedQuantity">
+                  Quantity {selectedProductUnit ? `(in ${selectedProductUnit})` : ''}
+                </label>
                 <input
                   id="orderedQuantity"
                   name="orderedQuantity"
@@ -293,11 +309,17 @@ const CreateOrder = () => {
                   aria-invalid={!!errors.orderedQuantity}
                   aria-describedby={errors.orderedQuantity ? "orderedquantity-error" : undefined}
                   className="order-input"
+                  placeholder={selectedProductUnit ? `e.g., 10 (for 10 ${selectedProductUnit})` : 'Enter quantity'}
                 />
                 {errors.orderedQuantity && (
                   <p id="orderedquantity-error" className="order-error-text" role="alert">
                     {errors.orderedQuantity}
                   </p>
+                )}
+                {selectedProductUnit && (
+                  <small className="order-help-text">
+                    Enter how many {selectedProductUnit} you want to order
+                  </small>
                 )}
               </div>
 
@@ -323,7 +345,6 @@ const CreateOrder = () => {
               </div>
             </div>
 
-            {/* New Remarks / Comments Field */}
             <div className="order-form-group">
               <label htmlFor="remarks">Remarks / Comments (Optional)</label>
               <textarea

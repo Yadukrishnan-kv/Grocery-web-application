@@ -1,4 +1,4 @@
-/* ProductList.css — Consistent premium design (matches UserTable) */
+/* ProductList.css — Exact match to OrderList.css styling */
 
 .product-list-layout {
   display: flex;
@@ -23,7 +23,7 @@
 
 .product-list-container-wrapper {
   width: 98%;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   background: white;
   border-radius: 16px;
@@ -185,6 +185,121 @@
   transform: scale(1.05);
 }
 
+/* ===== SEARCH & FILTER CONTROLS (Exact match to OrderList) ===== */
+.product-list-controls-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.product-list-search-container {
+  position: relative;
+  min-width: 240px;
+  flex: 1;
+  max-width: 320px;
+}
+
+.product-list-search-input {
+  width: 70%;
+  padding: 0.75rem 1.25rem 0.75rem 2.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #374151;
+  background-color: white;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.069.077.113.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.85rem center;
+  background-size: 1rem;
+}
+
+.product-list-search-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background-color: #f9fafb;
+}
+
+.product-list-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.product-list-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.125rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  line-height: 1;
+}
+
+.product-list-search-clear:hover {
+  color: #1e293b;
+  background-color: #f1f5f9;
+}
+
+.product-list-search-clear:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Category Filter */
+.product-list-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.product-list-filter-label {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.product-list-category-filter {
+  padding: 0.75rem 1.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: white;
+  font-size: 0.875rem;
+  min-width: 180px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding-right: 2.25rem;
+}
+
+.product-list-category-filter:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.product-list-category-filter option {
+  color: #374151;
+  background-color: white;
+}
+
+/* Responsive adjustments */
 @media (max-width: 767px) {
   .product-list-container-wrapper {
     border-radius: 12px;
@@ -210,8 +325,20 @@
     font-size: 12px;
   }
   
-  .product-list-create-button {
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
+
+  
+  
+  
+  .product-list-search-container,
+  .product-list-filter-group {
+    width: 100%;
+  }
+  
+  .product-list-search-input {
+    width: 80%;
+  }
+  
+  .product-list-category-filter {
+    width: 100%;
   }
 }

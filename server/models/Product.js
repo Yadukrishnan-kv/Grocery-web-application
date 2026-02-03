@@ -28,6 +28,31 @@ const productSchema = new Schema(
       min: 0,
       default: 0,
     },
+    unit: {
+      type: String,
+      enum: [
+        'kg',
+        'gram',
+        'liter',
+        'ml',
+        'piece',
+        'box',
+        'pack',
+        'bottle',
+        'can',
+        'dozen',
+        'set',
+        'pair',
+        'roll',
+        'bag',
+        'jar',
+        'tin',
+        'carton',
+        'bundle'
+      ],
+      required: [true, "Unit is required"],
+      trim: true,
+    },
   },
   { timestamps: true }
 );

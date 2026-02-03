@@ -87,7 +87,6 @@ const AcceptedOrdersList = () => {
                       <th scope="col">Customer</th>
                       <th scope="col">Product</th>
                       <th scope="col">Ordered Qty</th>
-                      <th scope="col">Delivered Qty</th>
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
                       <th scope="col">Remarks</th>
@@ -103,7 +102,6 @@ const AcceptedOrdersList = () => {
                           <td>{order.customer?.name || 'N/A'}</td>
                           <td>{order.product?.productName || 'N/A'}</td>
                           <td>{order.orderedQuantity}</td>
-                          <td>{order.deliveredQuantity}</td>
                           <td>${order.price.toFixed(2)}</td>
                           <td>${order.totalAmount.toFixed(2)}</td>
                           <td>{order.remarks || '-'}</td>

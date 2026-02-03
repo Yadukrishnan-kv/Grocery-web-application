@@ -2,14 +2,15 @@ const Product = require("../models/Product");
 
 const createProduct = async (req, res) => {
   try {
-    const { productName, CategoryName, subCategoryName, price, quantity } = req.body;
+    const { productName, CategoryName, subCategoryName, price, quantity, unit } = req.body;
 
     const product = await Product.create({
       productName,
       CategoryName,
       subCategoryName,
       price,
-      quantity
+      quantity,
+      unit
     });
 
     res.status(201).json(product);
@@ -43,7 +44,7 @@ const getProductById = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const updateData = {};
-    const allowedFields = ["productName", "CategoryName", "subCategoryName", "price", "quantity"];
+    const allowedFields = ["productName", "CategoryName", "subCategoryName", "price", "quantity", "unit"];
     
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {

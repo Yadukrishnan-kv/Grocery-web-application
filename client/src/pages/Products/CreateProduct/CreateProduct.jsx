@@ -1,19 +1,20 @@
 // CreateProduct.jsx
-import React, { useEffect, useState, useCallback } from 'react';
-import Header from '../../../components/layout/Header/Header';
-import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import './CreateProduct.css';
-import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import React, { useEffect, useState, useCallback } from "react";
+import Header from "../../../components/layout/Header/Header";
+import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+import "./CreateProduct.css";
+import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
 
 const CreateProduct = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [formData, setFormData] = useState({
-    productName: '',
-    CategoryName: '',
-    subCategoryName: '',
-    price: '',
-    quantity: ''
+    productName: "",
+    CategoryName: "",
+    subCategoryName: "",
+    unit: "",
+    quantity: "",
+    price: "",
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -33,23 +34,35 @@ const CreateProduct = () => {
     const newErrors = {};
 
     if (!formData.productName.trim()) {
-      newErrors.productName = 'Product name is required';
+      newErrors.productName = "Product name is required";
     }
 
     if (!formData.CategoryName) {
-      newErrors.CategoryName = 'Category is required';
+      newErrors.CategoryName = "Category is required";
     }
 
     if (!formData.subCategoryName) {
-      newErrors.subCategoryName = 'Sub-category is required';
+      newErrors.subCategoryName = "Sub-category is required";
     }
 
-    if (!formData.price || isNaN(formData.price) || parseFloat(formData.price) <= 0) {
-      newErrors.price = 'Valid price is required';
+    if (!formData.unit) {
+      newErrors.unit = "Unit is required";
     }
 
-    if (!formData.quantity || isNaN(formData.quantity) || parseInt(formData.quantity) < 0) {
-      newErrors.quantity = 'Valid quantity is required';
+    if (
+      !formData.quantity ||
+      isNaN(formData.quantity) ||
+      parseInt(formData.quantity) < 0
+    ) {
+      newErrors.quantity = "Valid quantity is required";
+    }
+
+    if (
+      !formData.price ||
+      isNaN(formData.price) ||
+      parseFloat(formData.price) <= 0
+    ) {
+      newErrors.price = "Valid price is required";
     }
 
     setErrors(newErrors);
@@ -58,15 +71,15 @@ const CreateProduct = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
 
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        [name]: ''
+        [name]: "",
       }));
     }
   };
@@ -80,143 +93,172 @@ const CreateProduct = () => {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const config = {
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       };
 
       const submitData = {
         productName: formData.productName,
         CategoryName: formData.CategoryName,
         subCategoryName: formData.subCategoryName,
+        unit: formData.unit,
+        quantity: parseInt(formData.quantity),
         price: parseFloat(formData.price),
-        quantity: parseInt(formData.quantity)
       };
 
       if (isEdit) {
-        await axios.put(`${backendUrl}/api/products/updateproduct/${productId}`, submitData, config);
+        await axios.put(
+          `${backendUrl}/api/products/updateproduct/${productId}`,
+          submitData,
+          config,
+        );
       } else {
-        await axios.post(`${backendUrl}/api/products/createproduct`, submitData, config);
+        await axios.post(
+          `${backendUrl}/api/products/createproduct`,
+          submitData,
+          config,
+        );
       }
 
       setIsSuccess(true);
       setTimeout(() => {
-        navigate('/product/list');
+        navigate("/product/list");
       }, 1500);
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
+      const errorMessage =
+        err.response?.data?.message ||
+        "Something went wrong. Please try again.";
       setErrors({ submit: errorMessage });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchProductData = useCallback(async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/products/getallproducts`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  const fetchProductData = useCallback(
+    async (id) => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${backendUrl}/api/products/getallproducts`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
 
-      const products = response.data;
-      const productToEdit = products.find(p => p._id === id);
-      
-      if (productToEdit) {
-        setFormData({
-          productName: productToEdit.productName,
-          CategoryName: productToEdit.CategoryName,
-          subCategoryName: productToEdit.subCategoryName,
-          price: productToEdit.price.toString(),
-          quantity: productToEdit.quantity.toString()
-        });
-        setIsEdit(true);
-        setProductId(id);
-      } else {
-        navigate('/product/list');
+        const products = response.data;
+        const productToEdit = products.find((p) => p._id === id);
+
+        if (productToEdit) {
+          setFormData({
+            productName: productToEdit.productName || "",
+            CategoryName: productToEdit.CategoryName || "",
+            subCategoryName: productToEdit.subCategoryName || "",
+            unit: productToEdit.unit || "",
+            quantity: productToEdit.quantity?.toString() || "",
+            price: productToEdit.price?.toString() || "",
+          });
+          setIsEdit(true);
+          setProductId(id);
+        } else {
+          navigate("/product/list");
+        }
+      } catch (error) {
+        console.error("Failed to fetch product data", error);
+        navigate("/product/list");
       }
-    } catch (error) {
-      console.error("Failed to fetch product data", error);
-      navigate('/product/list');
-    }
-  }, [backendUrl, navigate]);
+    },
+    [backendUrl, navigate],
+  );
 
   const fetchCategories = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/categories/getallcategories`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/categories/getallcategories`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setCategories(response.data);
     } catch (error) {
       console.error("Failed to fetch categories", error);
     }
   }, [backendUrl]);
 
-  const fetchSubCategoriesByCategory = useCallback(async (categoryName) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/subcategories/getallsubcategories`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const filteredSubCategories = response.data.filter(sc => sc.CategoryName === categoryName);
-      setSubCategories(filteredSubCategories);
-      
-      // If current subcategory is not in the new list, clear it
-      if (formData.subCategoryName && !filteredSubCategories.some(sc => sc.subCategoryName === formData.subCategoryName)) {
-        setFormData(prev => ({ ...prev, subCategoryName: '' }));
-      }
-    } catch (error) {
-      console.error("Failed to fetch sub-categories", error);
-    }
-  }, [backendUrl, formData.subCategoryName]);
+  const fetchSubCategoriesByCategory = useCallback(
+    async (categoryName) => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${backendUrl}/api/subcategories/getallsubcategories`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        const filteredSubCategories = response.data.filter(
+          (sc) => sc.CategoryName === categoryName,
+        );
+        setSubCategories(filteredSubCategories);
 
-  // Fetch categories on mount
+        if (
+          formData.subCategoryName &&
+          !filteredSubCategories.some(
+            (sc) => sc.subCategoryName === formData.subCategoryName,
+          )
+        ) {
+          setFormData((prev) => ({ ...prev, subCategoryName: "" }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch sub-categories", error);
+      }
+    },
+    [backendUrl, formData.subCategoryName],
+  );
+
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
 
-  // Fetch product data when edit parameter changes
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const editId = searchParams.get('edit');
-    
+    const editId = searchParams.get("edit");
+
     if (editId) {
       fetchProductData(editId);
     }
   }, [location.search, fetchProductData]);
 
-  // Fetch subcategories when category changes
   useEffect(() => {
     if (formData.CategoryName) {
       fetchSubCategoriesByCategory(formData.CategoryName);
     } else {
       setSubCategories([]);
-      setFormData(prev => ({ ...prev, subCategoryName: '' }));
+      setFormData((prev) => ({ ...prev, subCategoryName: "" }));
     }
   }, [formData.CategoryName, fetchSubCategoriesByCategory]);
 
-  // Fetch current user
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem("token");
         if (!token) {
-          navigate('/login');
+          navigate("/login");
           return;
         }
 
         const response = await axios.get(`${backendUrl}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         setUser(response.data.user || response.data);
       } catch (error) {
         console.error("Failed to load user", error);
-        localStorage.removeItem('token');
-        navigate('/login');
+        localStorage.removeItem("token");
+        navigate("/login");
       } finally {
         setLoading(false);
       }
@@ -235,27 +277,32 @@ const CreateProduct = () => {
 
   return (
     <div className="product-form-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem="Products" 
-        onSetActiveItem={() => {}} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem="Products"
+        onSetActiveItem={() => {}}
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`product-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`product-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="product-form-card">
-          <h1>{isEdit ? 'Edit Product' : 'Create New Product'}</h1>
+          <h1>{isEdit ? "Edit Product" : "Create New Product"}</h1>
           {isSuccess && (
             <div className="product-success-message" role="alert">
-              {isEdit ? 'Product updated successfully!' : 'Product created successfully!'}
+              {isEdit
+                ? "Product updated successfully!"
+                : "Product created successfully!"}
             </div>
           )}
           <form onSubmit={handleSubmit} noValidate>
+            {/* 1. Product Name */}
             <div className="product-form-group">
               <label htmlFor="productName">Product Name</label>
               <input
@@ -265,110 +312,174 @@ const CreateProduct = () => {
                 value={formData.productName}
                 onChange={handleChange}
                 aria-invalid={!!errors.productName}
-                aria-describedby={errors.productName ? "productname-error" : undefined}
+                aria-describedby={
+                  errors.productName ? "productname-error" : undefined
+                }
                 className="product-input"
               />
               {errors.productName && (
-                <p id="productname-error" className="product-error-text" role="alert">
+                <p
+                  id="productname-error"
+                  className="product-error-text"
+                  role="alert"
+                >
                   {errors.productName}
                 </p>
               )}
             </div>
 
-            <div className="product-form-row">
-              <div className="product-form-group">
-                <label htmlFor="CategoryName">Category</label>
-                <select
-                  id="CategoryName"
-                  name="CategoryName"
-                  value={formData.CategoryName}
-                  onChange={handleChange}
-                  aria-invalid={!!errors.CategoryName}
-                  aria-describedby={errors.CategoryName ? "categoryname-error" : undefined}
-                  className="product-select"
+            {/* 2. Category */}
+            <div className="product-form-group">
+              <label htmlFor="CategoryName">Category</label>
+              <select
+                id="CategoryName"
+                name="CategoryName"
+                value={formData.CategoryName}
+                onChange={handleChange}
+                aria-invalid={!!errors.CategoryName}
+                aria-describedby={
+                  errors.CategoryName ? "categoryname-error" : undefined
+                }
+                className="product-select"
+              >
+                <option value="">Select a category</option>
+                {categories.map((category) => (
+                  <option key={category._id} value={category.CategoryName}>
+                    {category.CategoryName}
+                  </option>
+                ))}
+              </select>
+              {errors.CategoryName && (
+                <p
+                  id="categoryname-error"
+                  className="product-error-text"
+                  role="alert"
                 >
-                  <option value="">Select a category</option>
-                  {categories.map(category => (
-                    <option key={category._id} value={category.CategoryName}>
-                      {category.CategoryName}
-                    </option>
-                  ))}
-                </select>
-                {errors.CategoryName && (
-                  <p id="categoryname-error" className="product-error-text" role="alert">
-                    {errors.CategoryName}
-                  </p>
-                )}
-              </div>
-
-              <div className="product-form-group">
-                <label htmlFor="subCategoryName">Sub-Category</label>
-                <select
-                  id="subCategoryName"
-                  name="subCategoryName"
-                  value={formData.subCategoryName}
-                  onChange={handleChange}
-                  disabled={!formData.CategoryName}
-                  aria-invalid={!!errors.subCategoryName}
-                  aria-describedby={errors.subCategoryName ? "subcategoryname-error" : undefined}
-                  className="product-select"
-                >
-                  <option value="">Select a sub-category</option>
-                  {subCategories.map(subCategory => (
-                    <option key={subCategory._id} value={subCategory.subCategoryName}>
-                      {subCategory.subCategoryName}
-                    </option>
-                  ))}
-                </select>
-                {errors.subCategoryName && (
-                  <p id="subcategoryname-error" className="product-error-text" role="alert">
-                    {errors.subCategoryName}
-                  </p>
-                )}
-              </div>
+                  {errors.CategoryName}
+                </p>
+              )}
             </div>
 
-            <div className="product-form-row">
-              <div className="product-form-group">
-                <label htmlFor="price">Price ($)</label>
-                <input
-                  id="price"
-                  name="price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.price}
-                  onChange={handleChange}
-                  aria-invalid={!!errors.price}
-                  aria-describedby={errors.price ? "price-error" : undefined}
-                  className="product-input"
-                />
-                {errors.price && (
-                  <p id="price-error" className="product-error-text" role="alert">
-                    {errors.price}
-                  </p>
-                )}
-              </div>
+            {/* 3. Sub-Category */}
+            <div className="product-form-group">
+              <label htmlFor="subCategoryName">Sub-Category</label>
+              <select
+                id="subCategoryName"
+                name="subCategoryName"
+                value={formData.subCategoryName}
+                onChange={handleChange}
+                disabled={!formData.CategoryName}
+                aria-invalid={!!errors.subCategoryName}
+                aria-describedby={
+                  errors.subCategoryName ? "subcategoryname-error" : undefined
+                }
+                className="product-select"
+              >
+                <option value="">Select a sub-category</option>
+                {subCategories.map((subCategory) => (
+                  <option
+                    key={subCategory._id}
+                    value={subCategory.subCategoryName}
+                  >
+                    {subCategory.subCategoryName}
+                  </option>
+                ))}
+              </select>
+              {errors.subCategoryName && (
+                <p
+                  id="subcategoryname-error"
+                  className="product-error-text"
+                  role="alert"
+                >
+                  {errors.subCategoryName}
+                </p>
+              )}
+            </div>
+            <div className="product-form-group">
+              <label htmlFor="quantity">
+                Quantity {formData.unit ? `(in ${formData.unit})` : ""}
+              </label>
+              <input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="0"
+                value={formData.quantity}
+                onChange={handleChange}
+                aria-invalid={!!errors.quantity}
+                aria-describedby={
+                  errors.quantity ? "quantity-error" : undefined
+                }
+                className="product-input"
+                placeholder={
+                  formData.unit
+                    ? `e.g., 10 (for 10 ${formData.unit})`
+                    : "Enter quantity"
+                }
+              />
+            </div>
 
-              <div className="product-form-group">
-                <label htmlFor="quantity">Quantity</label>
-                <input
-                  id="quantity"
-                  name="quantity"
-                  type="number"
-                  min="0"
-                  value={formData.quantity}
-                  onChange={handleChange}
-                  aria-invalid={!!errors.quantity}
-                  aria-describedby={errors.quantity ? "quantity-error" : undefined}
-                  className="product-input"
-                />
-                {errors.quantity && (
-                  <p id="quantity-error" className="product-error-text" role="alert">
-                    {errors.quantity}
-                  </p>
-                )}
-              </div>
+            {/* 4. Unit */}
+            <div className="product-form-group">
+              <label htmlFor="unit">Unit</label>
+              <select
+                id="unit"
+                name="unit"
+                value={formData.unit}
+                onChange={handleChange}
+                aria-invalid={!!errors.unit}
+                aria-describedby={errors.unit ? "unit-error" : undefined}
+                className="product-select"
+              >
+                <option value="">Select unit</option>
+                <option value="kg">kg</option>
+                <option value="gram">gram</option>
+                <option value="liter">liter</option>
+                <option value="ml">ml</option>
+                <option value="piece">piece</option>
+                <option value="box">box</option>
+                <option value="pack">pack</option>
+                <option value="bottle">bottle</option>
+                <option value="can">can</option>
+                <option value="dozen">dozen</option>
+                <option value="set">set</option>
+                <option value="pair">pair</option>
+                <option value="roll">roll</option>
+                <option value="bag">bag</option>
+                <option value="jar">jar</option>
+                <option value="tin">tin</option>
+                <option value="carton">carton</option>
+                <option value="bundle">bundle</option>
+              </select>
+              {errors.unit && (
+                <p id="unit-error" className="product-error-text" role="alert">
+                  {errors.unit}
+                </p>
+              )}
+            </div>
+
+            {/* 5. Quantity (with dynamic label) */}
+
+            {/* 6. Price */}
+            <div className="product-form-group">
+              <label htmlFor="price">Price (AED)</label>
+              <input
+                id="price"
+                name="price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.price}
+                onChange={handleChange}
+                aria-invalid={!!errors.price}
+                aria-describedby={errors.price ? "price-error" : undefined}
+                className="product-input"
+              />
+              {errors.price && (
+                <p id="price-error" className="product-error-text" role="alert">
+                  {errors.price}
+                </p>
+              )}
             </div>
 
             {errors.submit && (
@@ -383,7 +494,13 @@ const CreateProduct = () => {
               disabled={isLoading}
               aria-busy={isLoading}
             >
-              {isLoading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Product' : 'Create Product')}
+              {isLoading
+                ? isEdit
+                  ? "Updating..."
+                  : "Creating..."
+                : isEdit
+                  ? "Update Product"
+                  : "Create Product"}
             </button>
           </form>
         </div>

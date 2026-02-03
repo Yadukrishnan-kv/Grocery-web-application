@@ -10,29 +10,25 @@ const PDFDocument = require('pdfkit');
 
 const createOrder = async (req, res) => {
   try {
-    let { customerId, productId, orderedQuantity, payment,remarks } = req.body;
+    let { customerId, productId, orderedQuantity, payment, remarks } = req.body;
 
-    // If user is Customer → auto-set customerId from their profile
+    // Auto-set customerId for Customer role
     if (req.user.role === "Customer") {
-      // Find the Customer profile linked to this logged-in User
       const customerProfile = await Customer.findOne({ user: req.user._id });
       if (!customerProfile) {
         return res.status(404).json({ message: "Your customer profile not found. Contact admin." });
       }
-      customerId = customerProfile._id; // ← Auto-assign!
-    }
-    // For Admin → customerId must come from request body
-    else if (!customerId) {
+      customerId = customerProfile._id;
+    } else if (!customerId) {
       return res.status(400).json({ message: "Customer ID is required for admin-created orders" });
     }
 
-    // Now fetch customer using the (possibly auto-set) customerId
     const customer = await Customer.findById(customerId);
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    // Fetch product
+    // Fetch product (including unit)
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
@@ -58,7 +54,7 @@ const createOrder = async (req, res) => {
     product.quantity -= orderedQuantity;
     await product.save();
 
-    // Create the order
+    // Create order with unit from product
     const order = await Order.create({
       customer: customerId,
       product: productId,
@@ -66,7 +62,8 @@ const createOrder = async (req, res) => {
       price,
       totalAmount,
       payment,
-      remarks: remarks || ''
+      remarks: remarks || '',
+      unit: product.unit  // ← NEW: Save product's unit
     });
 
     res.status(201).json(order);
@@ -80,6 +77,7 @@ const getAllOrders = async (req, res) => {
     const orders = await Order.find()
       .populate("customer", "name email phoneNumber address pincode")
       .populate("product", "productName price")
+      .populate("assignedTo", "username")
       .sort({ orderDate: -1 });
     res.json(orders);
   } catch (error) {
@@ -525,7 +523,6 @@ const assignOrderToDeliveryMan = async (req, res) => {
       return res.status(400).json({ message: "Order is not available for assignment" });
     }
 
-    // Check if user exists and is deliveryman
     const deliveryMan = await User.findOne({ _id: deliveryManId, role: "Delivery Man" });
     if (!deliveryMan) {
       return res.status(400).json({ message: "Valid delivery man not found" });
@@ -537,9 +534,15 @@ const assignOrderToDeliveryMan = async (req, res) => {
 
     await order.save();
 
+    // Return populated order
+    const updatedOrder = await Order.findById(order._id)
+      .populate("customer", "name email phoneNumber address pincode")
+      .populate("product", "productName price")
+      .populate("assignedTo", "username");
+
     res.json({
       message: "Order assigned successfully",
-      order,
+      order: updatedOrder
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });

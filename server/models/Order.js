@@ -12,6 +12,11 @@ const orderSchema = new Schema(
       ref: "Product",
       required: [true, "Product is required"],
     },
+    unit: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     orderedQuantity: {
       type: Number,
       required: [true, "Ordered quantity is required"],

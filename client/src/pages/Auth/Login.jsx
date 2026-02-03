@@ -1,10 +1,10 @@
-// Login.jsx (Redesigned)
+// Login.jsx (Updated for username OR email login)
 import React, { useState } from 'react';
 import './Login.css';
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    email: '',
+    identifier: '', // Changed from 'email' → can be username or email
     password: ''
   });
   const [errors, setErrors] = useState({});
@@ -16,9 +16,8 @@ const Login = () => {
 
   const validateField = (name, value) => {
     switch (name) {
-      case 'email':
-        if (!value.trim()) return 'Email is required';
-        if (!/\S+@\S+\.\S+/.test(value)) return 'Please enter a valid email';
+      case 'identifier':
+        if (!value.trim()) return 'Username or Email is required';
         return '';
       case 'password':
         if (!value) return 'Password is required';
@@ -45,8 +44,8 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();  // ← This MUST be the first line to block default GET submit
-    e.stopPropagation(); // ← Extra safety
+    e.preventDefault();
+    e.stopPropagation();
 
     setApiError('');
 
@@ -68,13 +67,12 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Use RELATIVE URL (best practice – auto uses current protocol HTTPS)
       const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData) // sends { identifier, password }
       });
 
       const data = await response.json();
@@ -113,27 +111,26 @@ const Login = () => {
           </div>
         )}
 
-        {/* ADD method="POST" here – tells browser to use POST */}
         <form onSubmit={handleSubmit} method="POST" noValidate>
           <div className="form-group">
-            <label htmlFor="email">Email address</label>
+            <label htmlFor="identifier">Username or Email</label>
             <div className="input-wrapper">
               <input
-                id="email"
-                type="email"
-                name="email"
-                value={formData.email}
+                id="identifier"
+                type="text"
+                name="identifier"
+                value={formData.identifier}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                autoComplete="email"
+                autoComplete="username email"
                 autoFocus
-                aria-invalid={!!errors.email}
-                aria-describedby={errors.email ? "email-error" : undefined}
+                aria-invalid={!!errors.identifier}
+                aria-describedby={errors.identifier ? "identifier-error" : undefined}
               />
             </div>
-            {errors.email && (
-              <p id="email-error" className="error-text" role="alert">
-                {errors.email}
+            {errors.identifier && (
+              <p id="identifier-error" className="error-text" role="alert">
+                {errors.identifier}
               </p>
             )}
           </div>
@@ -190,6 +187,7 @@ const Login = () => {
         </form>
 
         <div className="signup-link">
+          {/* Add signup link if needed */}
         </div>
       </div>
     </div>

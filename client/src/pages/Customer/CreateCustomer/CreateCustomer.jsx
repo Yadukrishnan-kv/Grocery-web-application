@@ -15,7 +15,7 @@ const CreateCustomer = () => {
     address: '',
     pincode: '',
     creditLimit: '',
-    billingType: 'creditcard'
+    billingType: 'Credit limit'
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -361,19 +361,18 @@ const CreateCustomer = () => {
               </div>
 
               <div className="customer-form-group">
-                <label htmlFor="billingType">Billing Type</label>
-                <select
-                  id="billingType"
-                  name="billingType"
-                  value={formData.billingType}
-                  onChange={handleChange}
-                  aria-invalid={false}
-                  className="customer-select"
-                >
-                  <option value="creditcard">Credit Card</option>
-                  <option value="immediate">Immediate</option>
-                </select>
-              </div>
+  <label htmlFor="billingType">Billing Type</label>
+  <select
+    id="billingType"
+    name="billingType"
+    value={formData.billingType}
+    onChange={handleChange}
+    className="customer-select"
+  >
+    <option value="Credit limit">Credit Limit</option>
+    <option value="Cash">Cash</option>
+  </select>
+</div>
             </div>
 
             {errors.submit && (

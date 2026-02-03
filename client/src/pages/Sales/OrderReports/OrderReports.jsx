@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// src/pages/Sales/Orders/OrderReports.jsx
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './OrderReports.css';
@@ -11,6 +12,11 @@ const OrderReports = () => {
   const [activeItem, setActiveItem] = useState('Order Reports');
   const [user, setUser] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
+
+  // New filter states
+  const [searchTerm, setSearchTerm] = useState(''); // Customer name search
+  const [fromDate, setFromDate] = useState('');     // YYYY-MM-DD
+  const [toDate, setToDate] = useState('');         // YYYY-MM-DD
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -33,7 +39,6 @@ const OrderReports = () => {
     }
   }, [backendUrl]);
 
-  // Updated: Now fetches ALL orders with deliveredQuantity > 0 (partial or full)
   const fetchDeliveredOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -53,6 +58,34 @@ const OrderReports = () => {
     fetchCurrentUser();
     fetchDeliveredOrders();
   }, [fetchCurrentUser, fetchDeliveredOrders]);
+
+  // Filtered orders using useMemo (efficient)
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      // Customer name search
+      const matchesSearch = !searchTerm.trim() || 
+        (order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase().trim()));
+
+      // Date range filter
+      let matchesDate = true;
+      const orderDate = new Date(order.orderDate);
+      orderDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+      if (fromDate) {
+        const start = new Date(fromDate);
+        start.setHours(0, 0, 0, 0);
+        matchesDate = matchesDate && orderDate >= start;
+      }
+
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999); // End of day
+        matchesDate = matchesDate && orderDate <= end;
+      }
+
+      return matchesSearch && matchesDate;
+    });
+  }, [orders, searchTerm, fromDate, toDate]);
 
   const downloadDeliveredInvoice = async (orderId) => {
     setDownloadingOrderId(orderId);
@@ -133,6 +166,13 @@ const OrderReports = () => {
     }
   };
 
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFromDate('');
+    setToDate('');
+  };
+
   if (!user) {
     return <div className="order-reports-loading">Loading...</div>;
   }
@@ -156,20 +196,78 @@ const OrderReports = () => {
           <div className="order-reports-container">
             <div className="order-reports-header-section">
               <h2 className="order-reports-page-title">Order Reports</h2>
-              <button 
-                className="order-reports-refresh-button"
-                onClick={fetchDeliveredOrders}
-                disabled={loading}
-              >
-                {loading ? 'Refreshing...' : 'Refresh Data'}
-              </button>
+
+              {/* Controls: Date filters → Search → Reset → Refresh */}
+              <div className="order-reports-controls-group">
+                {/* From Date */}
+                <div className="order-reports-date-group">
+                  {/* <label htmlFor="fromDate" className="order-reports-filter-label">From Date</label> */}
+                  <input
+                    type="date"
+                    id="fromDate"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="order-reports-date-input"
+                  />
+                </div>
+
+                {/* To Date */}
+                <div className="order-reports-date-group">
+                  {/* <label htmlFor="toDate" className="order-reports-filter-label">To Date</label> */}
+                  <input
+                    type="date"
+                    id="toDate"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="order-reports-date-input"
+                  />
+                </div>
+
+                {/* Search by Customer */}
+                <div className="order-reports-search-container">
+                  <input
+                    type="text"
+                    className="order-reports-search-input"
+                    placeholder="Search by customer name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <button
+                      className="order-reports-search-clear"
+                      onClick={() => setSearchTerm('')}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* Reset Filters */}
+                <button
+                  className="order-reports-reset-button"
+                  onClick={resetFilters}
+                >
+                  Reset Filters
+                </button>
+
+                {/* Refresh Data */}
+                <button 
+                  className="order-reports-refresh-button"
+                  onClick={fetchDeliveredOrders}
+                  disabled={loading}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh Data'}
+                </button>
+              </div>
             </div>
             
             {loading ? (
               <div className="order-reports-loading">Loading orders...</div>
-            ) : orders.length === 0 ? (
+            ) : filteredOrders.length === 0 ? (
               <div className="order-reports-no-data">
-                No orders with delivered quantity found
+                No orders found
+                {(fromDate || toDate || searchTerm) ? ' matching your filters' : ''}
               </div>
             ) : (
               <div className="order-reports-table-wrapper">
@@ -179,9 +277,9 @@ const OrderReports = () => {
                       <th>No</th>
                       <th>Customer</th>
                       <th>Product</th>
-                      <th>Ordered Qty</th>
-                      <th>Delivered Qty</th>
-                      <th>Pending Qty</th>
+                      <th>Ordered Qty (in unit)</th>
+                      <th>Delivered Qty (in unit)</th>
+                      <th>Pending Qty (in unit)</th>
                       <th>Price</th>
                       <th>Total Amount</th>
                       <th>Delivery Partner</th>
@@ -191,7 +289,7 @@ const OrderReports = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((order, index) => {
+                    {filteredOrders.map((order, index) => {
                       const pendingQty = order.orderedQuantity - order.deliveredQuantity;
                       const isPartiallyDelivered = order.deliveredQuantity > 0 && pendingQty > 0;
                       const isFullyDelivered = pendingQty === 0;
@@ -201,11 +299,11 @@ const OrderReports = () => {
                           <td>{index + 1}</td>
                           <td>{order.customer?.name || 'N/A'}</td>
                           <td>{order.product?.productName || 'N/A'}</td>
-                          <td>{order.orderedQuantity}</td>
-                          <td>{order.deliveredQuantity}</td>
-                          <td>{pendingQty}</td>
-                          <td>₹{order.price.toFixed(2)}</td>
-                          <td>₹{order.totalAmount.toFixed(2)}</td>
+                          <td>{order.orderedQuantity} {order.unit || ''}</td>
+                          <td>{order.deliveredQuantity} {order.unit || ''}</td>
+                          <td>{pendingQty} {order.unit || ''}</td>
+                          <td>AED{order.price.toFixed(2)}</td>
+                          <td>AED{order.totalAmount.toFixed(2)}</td>
                           <td>{order.assignedTo?.username || 'Not assigned'}</td>
                           <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                           <td>
@@ -221,7 +319,6 @@ const OrderReports = () => {
                           </td>
                           <td>
                             <div className="order-reports-action-buttons">
-                              {/* Delivered Invoice - show if any qty delivered */}
                               {order.deliveredQuantity > 0 && (
                                 <button
                                   className="order-reports-invoice-button delivered"
@@ -232,7 +329,6 @@ const OrderReports = () => {
                                 </button>
                               )}
 
-                              {/* Pending Invoice - show if any qty pending */}
                               {pendingQty > 0 && (
                                 <button
                                   className="order-reports-invoice-button pending"

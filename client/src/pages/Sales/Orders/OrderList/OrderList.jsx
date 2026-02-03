@@ -1,5 +1,5 @@
 // src/pages/Order/OrderList.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../../components/layout/Header/Header';
 import Sidebar from '../../../../components/layout/Sidebar/Sidebar';
@@ -7,12 +7,14 @@ import './OrderList.css';
 import axios from 'axios';
 
 const OrderList = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState('Orders');
   const [user, setUser] = useState(null);
   const [deliveryPartners, setDeliveryPartners] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -69,6 +71,20 @@ const OrderList = () => {
     fetchDeliveryPartners();
   }, [fetchCurrentUser, fetchOrders, fetchDeliveryPartners]);
 
+  // Filter orders based on search term and status
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      const matchesSearch = !searchTerm.trim() || 
+        (order.customer?.name && 
+         order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = statusFilter === 'all' || 
+        (order.status && order.status.toLowerCase() === statusFilter.toLowerCase());
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [orders, searchTerm, statusFilter]);
+
   const handleDelete = async (id, orderId) => {
     if (window.confirm(`Are you sure you want to delete order "${orderId}"?`)) {
       try {
@@ -101,6 +117,11 @@ const OrderList = () => {
     }
   };
 
+  // Clear search
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
   if (!user) {
     return <div className="order-list-loading">Loading...</div>;
   }
@@ -124,9 +145,49 @@ const OrderList = () => {
           <div className="order-list-container">
             <div className="order-list-header-section">
               <h2 className="order-list-page-title">Order Management</h2>
-              <Link to="/order/create" className="order-list-create-button">
-                Create Order
-              </Link>
+
+              {/* Controls: Filter first → then Search → then Create */}
+              <div className="order-list-controls-group">
+              <label htmlFor="categoryFilter" className="subcategory-list-filter-label">
+                    Filter by Order Status:
+                  </label>                <select
+                  className="order-list-status-filter"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  aria-label="Filter orders by status"
+                >
+                  <option value="all">All </option>
+                  <option value="pending">Pending</option>
+                  <option value="delivered">delivered</option>
+                  <option value="cancelled">cancelled</option>
+                </select>
+
+                {/* Search Bar (second) */}
+                <div className="order-list-search-container">
+                  <input
+                    type="text"
+                    className="order-list-search-input"
+                    placeholder="Search by customer..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label="Search orders by customer name"
+                  />
+                  {searchTerm && (
+                    <button
+                      className="order-list-search-clear"
+                      onClick={clearSearch}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* Create Button (last) */}
+                <Link to="/order/create" className="order-list-create-button">
+                  Create Order
+                </Link>
+              </div>
             </div>
             
             {loading ? (
@@ -140,37 +201,38 @@ const OrderList = () => {
                       <th scope="col">Customer</th>
                       <th scope="col">Product</th>
                       <th scope="col">Ordered Qty</th>
-                      <th scope="col">Delivered Qty</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Total Amount</th>
+                      <th scope="col">Price (AED)</th>
+                      <th scope="col">Total Amount (AED)</th>
                       <th scope="col">Status</th>
                       <th scope="col">Payment</th>
                       <th scope="col">Remarks</th>
-
                       <th scope="col">Order Date</th>
                       <th scope="col">Delivery Partner</th>
                       <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.length > 0 ? (
-                      orders.map((order, index) => (
+                    {filteredOrders.length > 0 ? (
+                      filteredOrders.map((order, index) => (
                         <tr key={order._id}>
                           <td>{index + 1}</td>
                           <td>{order.customer?.name || 'N/A'}</td>
                           <td>{order.product?.productName || 'N/A'}</td>
-                          <td>{order.orderedQuantity}</td>
-                          <td>{order.deliveredQuantity}</td>
-                          <td>${order.price.toFixed(2)}</td>
-                          <td>${order.totalAmount.toFixed(2)}</td>
+                          <td>
+                            {order.orderedQuantity} {order.unit || ''}
+                          </td>
+                          <td>{order.price?.toFixed(2) || '0.00'}</td>
+                          <td>{order.totalAmount?.toFixed(2) || '0.00'}</td>
                           <td>
                             <span className={`order-list-status-badge order-list-status-${order.status?.toLowerCase() || 'pending'}`}>
                               {order.status || 'Pending'}
                             </span>
                           </td>
-                          <td>{order.payment}</td>
-                          <td>{order.remarks || '-'}</td>
-                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                          <td>{order.payment || 'N/A'}</td>
+                          <td title={order.remarks || ''}>
+                            {order.remarks ? order.remarks.substring(0, 30) + (order.remarks.length > 30 ? '...' : '') : '-'}
+                          </td>
+                          <td>{order.orderDate ? new Date(order.orderDate).toLocaleDateString() : 'N/A'}</td>
                           <td>
                             {order.assignmentStatus === "pending_assignment" ? (
                               <select
@@ -221,7 +283,9 @@ const OrderList = () => {
                     ) : (
                       <tr>
                         <td colSpan="12" className="order-list-no-data">
-                          No orders found
+                          {orders.length === 0 
+                            ? 'No orders found' 
+                            : 'No orders match your filters'}
                         </td>
                       </tr>
                     )}

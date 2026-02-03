@@ -41,11 +41,22 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, password } = req.body; // 'identifier' can be username or email
 
-    const user = await User.findOne({ email }).select("+password");
+    if (!identifier || !password) {
+      return res.status(400).json({ message: "Identifier and password are required" });
+    }
+
+    // Find user by username OR email
+    const user = await User.findOne({
+      $or: [
+        { email: identifier.toLowerCase() },
+        { username: identifier }
+      ]
+    }).select("+password");
+
     if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid username/email or password" });
     }
 
     const token = generateToken(user._id, user.role);
@@ -61,7 +72,7 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Login error:", error);
     res.status(500).json({ message: "Server error during login" });
   }
 };

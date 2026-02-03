@@ -1,6 +1,6 @@
 // src/pages/Users/UserTable.jsx
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './UserTable.css';
@@ -8,46 +8,41 @@ import axios from 'axios';
 
 const UserTable = () => {
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]); // ← NEW: dynamic roles from API
   const [tableLoading, setTableLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState('Users');
   const [currentUser, setCurrentUser] = useState(null);
   const [userLoading, setUserLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
-  const navigate = useNavigate();
 
-  // Fetch current logged-in user (for header)
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-
-        const res = await axios.get(`${backendUrl}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        setCurrentUser(res.data.user || res.data);
-      } catch (err) {
-        console.error("Failed to load current user", err);
-        localStorage.removeItem('token');
-        navigate('/login');
-      } finally {
-        setUserLoading(false);
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/login';
+        return;
       }
-    };
+      
+      const res = await axios.get(`${backendUrl}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    fetchCurrentUser();
-  }, [navigate, backendUrl]);
+      setCurrentUser(res.data.user || res.data);
+    } catch (err) {
+      console.error("Failed to load current user", err);
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    } finally {
+      setUserLoading(false);
+    }
+  }, [backendUrl]);
 
-  // Fetch all users for table
-  useEffect(() => {
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setTableLoading(true);
       const token = localStorage.getItem('token');
@@ -55,12 +50,17 @@ const UserTable = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Filter out Admin and superadmin users
+      // Filter out Admin and superadmin (as in original)
       const filteredUsers = res.data.filter(
         user => user.role !== 'Admin' && user.role !== 'superadmin'
       );
 
-      console.log("Fetched & filtered users:", filteredUsers);
+      // Extract unique roles dynamically
+      const uniqueRoles = [...new Set(
+        filteredUsers.map(user => user.role).filter(role => role)
+      )].sort();
+
+      setRoles(uniqueRoles);
       setUsers(filteredUsers);
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -68,13 +68,29 @@ const UserTable = () => {
     } finally {
       setTableLoading(false);
     }
-  };
+  }, [backendUrl]);
 
-  fetchUsers();
-}, [backendUrl]);
+  useEffect(() => {
+    fetchCurrentUser();
+    fetchUsers();
+  }, [fetchCurrentUser, fetchUsers]);
+
+  // Filter users based on search term and role
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      const matchesSearch = !searchTerm.trim() || 
+        (user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         user.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesRole = roleFilter === 'all' || 
+        (user.role && user.role.toLowerCase() === roleFilter.toLowerCase());
+      
+      return matchesSearch && matchesRole;
+    });
+  }, [users, searchTerm, roleFilter]);
 
   const handleDelete = async (id, username, role) => {
-    if (isProtectedRole(role)) {
+    if (role === 'Admin' || role === 'superadmin') {
       alert(`Cannot delete protected role: ${role}`);
       return;
     }
@@ -86,8 +102,8 @@ const UserTable = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        // Refresh table after delete
-        setUsers((prev) => prev.filter((u) => u._id !== id));
+        // Refresh table
+        fetchUsers();
       } catch (err) {
         console.error("Delete error:", err);
         alert("Failed to delete user. Please try again.");
@@ -95,12 +111,12 @@ const UserTable = () => {
     }
   };
 
-  const isProtectedRole = (role) => {
-    return role === 'Admin' || role === 'superadmin';
+  const clearSearch = () => {
+    setSearchTerm('');
   };
 
   if (userLoading) {
-    return <div className="loading">Loading user information...</div>;
+    return <div className="user-table-loading">Loading user information...</div>;
   }
 
   if (!currentUser) {
@@ -126,17 +142,67 @@ const UserTable = () => {
           <div className="user-table-container">
             <div className="user-table-header-section">
               <h2 className="user-table-page-title">User Management</h2>
-              <Link to="/user/create" className="user-table-create-button">
-                Create User
-              </Link>
+
+              {/* Exact same controls group as OrderList */}
+              <div className="user-table-controls-group">
+                {/* Filter first */}
+                <div className="user-table-filter-group">
+                  <label htmlFor="roleFilter" className="user-table-filter-label">
+                    Filter by Role:
+                  </label>
+                  <select
+                    id="roleFilter"
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className="user-table-role-filter"
+                  >
+                    <option value="all">All Roles</option>
+                    {roles.map(role => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Search bar (second) */}
+                <div className="user-table-search-container">
+                  <input
+                    type="text"
+                    className="user-table-search-input"
+                    placeholder="Search by username or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label="Search users by username or email"
+                  />
+                  {searchTerm && (
+                    <button
+                      className="user-table-search-clear"
+                      onClick={clearSearch}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* Create Button (last) */}
+                <Link to="/user/create" className="user-table-create-button">
+                  Create User
+                </Link>
+              </div>
             </div>
 
             {error && <div className="user-table-error-message">{error}</div>}
 
             {tableLoading ? (
               <div className="user-table-loading">Loading users...</div>
-            ) : users.length === 0 ? (
-              <div className="user-table-no-data">No users found</div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="user-table-no-data">
+                No users found
+                {roleFilter !== 'all' ? ` with role "${roleFilter}"` : ''}
+                {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
+              </div>
             ) : (
               <div className="user-table-wrapper">
                 <table className="user-table-data-table">
@@ -151,7 +217,7 @@ const UserTable = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((user, index) => (
+                    {filteredUsers.map((user, index) => (
                       <tr key={user._id}>
                         <td>{index + 1}</td>
                         <td>{user.username}</td>
@@ -173,12 +239,12 @@ const UserTable = () => {
                         <td>
                           <button
                             className={`user-table-icon-button user-table-delete-button ${
-                              isProtectedRole(user.role) ? 'disabled' : ''
+                              user.role === 'Admin' || user.role === 'superadmin' ? 'disabled' : ''
                             }`}
                             onClick={() => handleDelete(user._id, user.username, user.role)}
-                            disabled={isProtectedRole(user.role)}
+                            disabled={user.role === 'Admin' || user.role === 'superadmin'}
                             aria-label={
-                              isProtectedRole(user.role)
+                              user.role === 'Admin' || user.role === 'superadmin'
                                 ? `Cannot delete protected user ${user.username}`
                                 : `Delete user ${user.username}`
                             }

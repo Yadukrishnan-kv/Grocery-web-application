@@ -15,6 +15,9 @@ const DeliveredOrdersList = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
+  // Units that allow decimals (fractional)
+  const fractionalUnits = ['kg', 'gram', 'liter', 'ml', 'meter', 'cm', 'inch'];
+
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -57,28 +60,47 @@ const DeliveredOrdersList = () => {
     fetchAllAcceptedOrders();
   }, [fetchCurrentUser, fetchAllAcceptedOrders]);
 
-  const handleDeliverOrder = async (orderId, orderedQuantity, deliveredQuantity) => {
+  const handleDeliverOrder = async (orderId, orderedQuantity, deliveredQuantity, unit) => {
     const remaining = orderedQuantity - deliveredQuantity;
-    const quantity = prompt(`Enter quantity to deliver (Max: ${remaining}):`);
     
-    if (quantity && !isNaN(quantity) && parseInt(quantity) > 0 && parseInt(quantity) <= remaining) {
-      setDeliveringOrderId(orderId);
-      try {
-        const token = localStorage.getItem('token');
-        await axios.post(
-          `${backendUrl}/api/orders/deliverorder/${orderId}`,
-          { quantity: parseInt(quantity) },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        fetchAllAcceptedOrders();
-      } catch (error) {
-        console.error('Error delivering order:', error);
-        alert('Failed to deliver order. Please try again.');
-      } finally {
-        setDeliveringOrderId(null);
-      }
-    } else {
-      alert('Please enter a valid quantity.');
+    // Check if unit allows decimals
+    const allowDecimal = fractionalUnits.includes(unit?.toLowerCase());
+    
+    const promptMessage = allowDecimal
+      ? `Enter quantity to deliver (Max: ${remaining.toFixed(2)} ${unit}):`
+      : `Enter quantity to deliver (Max: ${Math.floor(remaining)} ${unit}):`;
+
+    const quantityStr = prompt(promptMessage);
+    
+    if (!quantityStr) return; // User canceled
+
+    const quantity = parseFloat(quantityStr);
+    
+    if (isNaN(quantity) || quantity <= 0 || quantity > remaining) {
+      alert(`Please enter a valid quantity (max ${remaining.toFixed(allowDecimal ? 2 : 0)} ${unit}).`);
+      return;
+    }
+
+    // For non-decimal units, enforce whole numbers
+    if (!allowDecimal && !Number.isInteger(quantity)) {
+      alert(`For ${unit} units, only whole numbers are allowed.`);
+      return;
+    }
+
+    setDeliveringOrderId(orderId);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${backendUrl}/api/orders/deliverorder/${orderId}`,
+        { quantity },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchAllAcceptedOrders();
+    } catch (error) {
+      console.error('Error delivering order:', error);
+      alert('Failed to deliver order. Please try again.');
+    } finally {
+      setDeliveringOrderId(null);
     }
   };
 
@@ -121,9 +143,9 @@ const DeliveredOrdersList = () => {
                       <th scope="col">No</th>
                       <th scope="col">Customer</th>
                       <th scope="col">Product</th>
-                      <th scope="col">Ordered Qty</th>
-                      <th scope="col">Delivered Qty</th>
-                      <th scope="col">Remaining Qty</th>
+                      <th scope="col">Ordered Qty (in unit)</th>
+                      <th scope="col">Delivered Qty (in unit)</th>
+                      <th scope="col">Remaining Qty (in unit)</th>
                       <th scope="col">Delivery Status</th>
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
@@ -139,23 +161,28 @@ const DeliveredOrdersList = () => {
                           <td>{index + 1}</td>
                           <td>{order.customer?.name || 'N/A'}</td>
                           <td>{order.product?.productName || 'N/A'}</td>
-                          <td>{order.orderedQuantity}</td>
-                          <td>{order.deliveredQuantity}</td>
-                          <td>{order.orderedQuantity - order.deliveredQuantity}</td>
+                          <td>{order.orderedQuantity} {order.unit || ''}</td>
+                          <td>{order.deliveredQuantity} {order.unit || ''}</td>
+                          <td>{(order.orderedQuantity - order.deliveredQuantity).toFixed(2)} {order.unit || ''}</td>
                           <td>
                             <span className={`delivered-orders-status-badge delivered-orders-status-${getDeliveryStatus(order).toLowerCase().replace(' ', '-')}`}>
                               {getDeliveryStatus(order)}
                             </span>
                           </td>
-                          <td>${order.price.toFixed(2)}</td>
-                          <td>${order.totalAmount.toFixed(2)}</td>
+                          <td>AED{order.price.toFixed(2)}</td>
+                          <td>AED{order.totalAmount.toFixed(2)}</td>
                           <td>{order.remarks || '-'}</td>
                           <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                           <td>
                             {order.deliveredQuantity < order.orderedQuantity ? (
                               <button
                                 className="delivered-orders-deliver-button"
-                                onClick={() => handleDeliverOrder(order._id, order.orderedQuantity, order.deliveredQuantity)}
+                                onClick={() => handleDeliverOrder(
+                                  order._id, 
+                                  order.orderedQuantity, 
+                                  order.deliveredQuantity,
+                                  order.unit  // Pass unit for validation
+                                )}
                                 disabled={deliveringOrderId === order._id}
                               >
                                 {deliveringOrderId === order._id ? 'Delivering...' : 'Deliver'}
@@ -168,7 +195,7 @@ const DeliveredOrdersList = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="11" className="delivered-orders-no-data">
+                        <td colSpan="12" className="delivered-orders-no-data">
                           No accepted orders found
                         </td>
                       </tr>
