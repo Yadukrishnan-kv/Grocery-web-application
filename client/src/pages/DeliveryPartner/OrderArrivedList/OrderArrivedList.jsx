@@ -1,5 +1,5 @@
 // src/pages/Delivery/OrderArrivedList.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './OrderArrivedList.css';
@@ -12,6 +12,9 @@ const OrderArrivedList = () => {
   const [activeItem, setActiveItem] = useState('Order arrived');
   const [user, setUser] = useState(null);
   const [acceptingOrderId, setAcceptingOrderId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -97,6 +100,42 @@ const OrderArrivedList = () => {
     }
   };
 
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFromDate('');
+    setToDate('');
+  };
+
+  // Filter orders: Search by customer + Date range
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      // Search by customer name
+      const matchesSearch = !searchTerm.trim() || 
+        (order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      // Date range filter
+      let matchesDate = true;
+      if (fromDate || toDate) {
+        const orderDate = new Date(order.orderDate);
+        orderDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+        if (fromDate) {
+          const start = new Date(fromDate);
+          start.setHours(0, 0, 0, 0);
+          if (orderDate < start) matchesDate = false;
+        }
+
+        if (toDate) {
+          const end = new Date(toDate);
+          end.setHours(23, 59, 59, 999); // End of day
+          if (orderDate > end) matchesDate = false;
+        }
+      }
+
+      return matchesSearch && matchesDate;
+    });
+  }, [orders, searchTerm, fromDate, toDate]);
+
   if (!user) {
     return <div className="order-arrived-loading">Loading...</div>;
   }
@@ -120,8 +159,75 @@ const OrderArrivedList = () => {
           <div className="order-arrived-container">
             <h2 className="order-arrived-page-title">Order Arrived</h2>
             
+            {/* Controls: Date From → Date To → Search → Clear → (no create button here) */}
+            <div className="order-arrived-controls-group">
+              {/* From Date */}
+              <div className="order-arrived-date-filter">
+                <label htmlFor="fromDate" className="order-arrived-filter-label">
+                  From Date:
+                </label>
+                <input
+                  type="date"
+                  id="fromDate"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="order-arrived-date-input"
+                />
+              </div>
+
+              {/* To Date */}
+              <div className="order-arrived-date-filter">
+                <label htmlFor="toDate" className="order-arrived-filter-label">
+                  To Date:
+                </label>
+                <input
+                  type="date"
+                  id="toDate"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="order-arrived-date-input"
+                />
+              </div>
+
+              {/* Search bar */}
+              <div className="order-arrived-search-container">
+                <input
+                  type="text"
+                  className="order-arrived-search-input"
+                  placeholder="Search by customer name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  aria-label="Search orders by customer name"
+                />
+                {searchTerm && (
+                  <button
+                    className="order-arrived-search-clear"
+                    onClick={() => setSearchTerm('')}
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Clear Filters Button */}
+              {(searchTerm || fromDate || toDate) && (
+                <button
+                  className="order-arrived-clear-button"
+                  onClick={clearFilters}
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
             {loading ? (
               <div className="order-arrived-loading">Loading orders...</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="order-arrived-no-data">
+                No assigned orders found
+                {(searchTerm || fromDate || toDate) ? ' matching your filters' : ''}
+              </div>
             ) : (
               <div className="order-arrived-table-wrapper">
                 <table className="order-arrived-data-table">
@@ -139,35 +245,27 @@ const OrderArrivedList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.length > 0 ? (
-                      orders.map((order, index) => (
-                        <tr key={order._id}>
-                          <td>{index + 1}</td>
-                          <td>{order.customer?.name || 'N/A'}</td>
-                          <td>{order.product?.productName || 'N/A'}</td>
-                          <td>{order.orderedQuantity}</td>
-                          <td>${order.price.toFixed(2)}</td>
-                          <td>${order.totalAmount.toFixed(2)}</td>
-                          <td>{order.remarks || '-'}</td>
-                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                          <td>
-                            <button
-                              className="order-arrived-accept-button"
-                              onClick={() => handleAcceptOrder(order._id)}
-                              disabled={acceptingOrderId === order._id}
-                            >
-                              {acceptingOrderId === order._id ? 'Accepting...' : 'Accept'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="8" className="order-arrived-no-data">
-                          No assigned orders found
+                    {filteredOrders.map((order, index) => (
+                      <tr key={order._id}>
+                        <td>{index + 1}</td>
+                        <td>{order.customer?.name || 'N/A'}</td>
+                        <td>{order.product?.productName || 'N/A'}</td>
+                        <td>{order.orderedQuantity} {order.unit || ''}</td>
+                        <td>AED{order.price?.toFixed(2) || '0.00'}</td>
+                        <td>AED{order.totalAmount?.toFixed(2) || '0.00'}</td>
+                        <td>{order.remarks || '-'}</td>
+                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                        <td>
+                          <button
+                            className="order-arrived-accept-button"
+                            onClick={() => handleAcceptOrder(order._id)}
+                            disabled={acceptingOrderId === order._id}
+                          >
+                            {acceptingOrderId === order._id ? 'Accepting...' : 'Accept'}
+                          </button>
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>

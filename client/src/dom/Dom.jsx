@@ -32,6 +32,9 @@ import CustomerCreditLimit from "../pages/Customer/CustomerCreditLimit/CustomerC
 import Profile from "../pages/Profile/Profile";
 import ChangePassword from "../pages/Profile/ChangePassword";
 import CompanySettings from "../pages/Settings/CompanySettings/CompanySettings";
+import CreateCustomerRequest from "../pages/Salesmanpages/CreateCustomerRequest/CreateCustomerRequest";
+import MyCustomerRequests from "../pages/Salesmanpages/MyCustomerRequests/MyCustomerRequests";
+import PendingCustomerRequests from "../pages/Customer/PendingCustomerRequests/PendingCustomerRequests";
 function Dom() {
   return (
     <div>
@@ -107,6 +110,19 @@ function Dom() {
 
             <Route path="/profile" element={<Profile />} />
             <Route path="/change-password" element={<ChangePassword />} />
+
+            <Route
+              path="/sales/customer-requests/create"
+              element={<CreateCustomerRequest />}
+            />
+            <Route
+              path="/sales/customer-requests/my"
+              element={<MyCustomerRequests />}
+            />
+            <Route
+              path="/admin/customer-requests/pending"
+              element={<PendingCustomerRequests />}
+            />
           </Routes>
         </BrowserRouter>
       </PermissionProvider>

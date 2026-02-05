@@ -161,3 +161,128 @@
     padding: 0.6rem;
   }
 }
+
+/* ===== CONTROLS GROUP ===== */
+.order-arrived-controls-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.order-arrived-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.order-arrived-filter-label {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.order-arrived-date-input {
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  background: white;
+}
+
+.order-arrived-date-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Search */
+.order-arrived-search-container {
+  position: relative;
+  min-width: 240px;
+  flex: 1;
+  max-width: 320px;
+}
+
+.order-arrived-search-input {
+  width: 70%;
+  padding: 0.75rem 1.25rem 0.75rem 2.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #374151;
+  background-color: white;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.069.077.113.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.85rem center;
+  background-size: 1rem;
+}
+
+.order-arrived-search-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.order-arrived-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.order-arrived-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.125rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.order-arrived-search-clear:hover {
+  color: #1e293b;
+  background-color: #f1f5f9;
+}
+
+/* Clear Filters Button */
+.order-arrived-clear-button {
+  background: #ef4444;
+  color: white;
+  padding: 0.625rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.order-arrived-clear-button:hover {
+  background: #dc2626;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+ 
+  
+  .order-arrived-date-filter,
+  .order-arrived-search-container {
+    width: 100%;
+  }
+  
+  .order-arrived-search-input {
+    width: 80%;
+  }
+}

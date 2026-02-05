@@ -23,7 +23,11 @@ const ALL_PERMISSIONS = [
   "menu.products.subcategory",
   "menu.products.add",
   "menu.orders",
-  "menu.settings"
+  "menu.settings",
+  "menu.customer.requests",
+  "menu.customer.requests.create",
+  "menu.customer.requests.my"
+  
 ];
 
 export const PermissionProvider = ({ children }) => {

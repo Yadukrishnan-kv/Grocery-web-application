@@ -1,5 +1,7 @@
 const Customer = require("../models/Customer");
 const User = require("../models/User");
+const CustomerRequest = require("../models/CustomerRequest");
+
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
@@ -242,10 +244,201 @@ const createCustomerProfile = async (req, res) => {
   }
 };
 
+
+
+// Salesman creates request
+const createCustomerRequest = async (req, res) => {
+  try {
+    if (req.user.role !== "Sales man") {
+      return res.status(403).json({ message: "Only salesmen can create customer requests" });
+    }
+
+    const {
+      name,
+      email,
+      phoneNumber,
+      address,
+      pincode,
+      creditLimit,
+      billingType = "Credit limit",
+    } = req.body;
+
+    // Validation (same as direct create)
+    if (
+      !name?.trim() ||
+      !email?.trim() ||
+      !phoneNumber?.trim() ||
+      !address?.trim() ||
+      !pincode?.trim() ||
+      !creditLimit
+    ) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const parsedCreditLimit = parseFloat(creditLimit);
+    if (isNaN(parsedCreditLimit) || parsedCreditLimit < 0) {
+      return res.status(400).json({ message: "Invalid credit limit value" });
+    }
+
+    // Check if email already exists in customers or requests
+    const existingCustomer = await Customer.findOne({ email: email.trim().toLowerCase() });
+    const existingRequest = await CustomerRequest.findOne({
+      email: email.trim().toLowerCase(),
+      status: { $in: ["pending", "accepted"] }
+    });
+    if (existingCustomer || existingRequest) {
+      return res.status(400).json({ message: "Email already in use or pending request" });
+    }
+
+    const request = await CustomerRequest.create({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phoneNumber: phoneNumber.trim(),
+      address: address.trim(),
+      pincode: pincode.trim(),
+      creditLimit: parsedCreditLimit,
+      billingType,
+      salesman: req.user._id,
+    });
+
+    res.status(201).json({
+      message: "Customer creation request submitted successfully",
+      request
+    });
+  } catch (error) {
+    console.error("Customer request creation error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Salesman gets their own requests
+const getMyCustomerRequests = async (req, res) => {
+  try {
+    if (req.user.role !== "Sales man") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const requests = await CustomerRequest.find({ salesman: req.user._id })
+      .sort({ createdAt: -1 });
+
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Admin gets pending requests
+const getPendingCustomerRequests = async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Access denied - Admin only" });
+    }
+
+    const requests = await CustomerRequest.find({ status: "pending" })
+      .populate("salesman", "username email")
+      .sort({ createdAt: -1 });
+
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Admin accepts request (creates Customer + User)
+const acceptCustomerRequest = async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Access denied - Admin only" });
+    }
+
+    const request = await CustomerRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    if (request.status !== "pending") {
+      return res.status(400).json({ message: "Request already processed" });
+    }
+
+    // Create User
+    const defaultPassword = crypto.randomBytes(10).toString("hex");
+
+    const user = await User.create({
+      username: request.name.trim(),
+      email: request.email,
+      password: defaultPassword,
+      role: "Customer",
+    });
+
+    // Create Customer
+    const customer = await Customer.create({
+      user: user._id,
+      name: request.name,
+      email: request.email,
+      phoneNumber: request.phoneNumber,
+      address: request.address,
+      pincode: request.pincode,
+      creditLimit: request.creditLimit,
+      balanceCreditLimit: request.creditLimit,
+      billingType: request.billingType,
+    });
+
+    // Update request to accepted
+    request.status = "accepted";
+    await request.save();
+
+    res.json({
+      message: "Request accepted - Customer created",
+      customer,
+      note: `Login credentials: Email ${user.email}, Temp Password: ${defaultPassword} (change immediately)`
+    });
+  } catch (error) {
+    console.error("Accept request error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Admin rejects request
+const rejectCustomerRequest = async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Access denied - Admin only" });
+    }
+
+    const { rejectionReason } = req.body;
+
+    const request = await CustomerRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    if (request.status !== "pending") {
+      return res.status(400).json({ message: "Request already processed" });
+    }
+
+    request.status = "rejected";
+    request.rejectionReason = rejectionReason || "No reason provided";
+    await request.save();
+
+    res.json({ message: "Request rejected successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
 module.exports = {
   createCustomer,
   getAllCustomers,
   getCustomerById,
   updateCustomer,
-  deleteCustomer,getMyCustomerProfile,createCustomerProfile
+  deleteCustomer,
+  getMyCustomerProfile,
+  createCustomerProfile,
+  createCustomerRequest,
+  getMyCustomerRequests,
+  getPendingCustomerRequests,
+  acceptCustomerRequest,
+  rejectCustomerRequest
 };

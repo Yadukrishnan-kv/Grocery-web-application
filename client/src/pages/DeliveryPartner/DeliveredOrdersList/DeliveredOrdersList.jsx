@@ -1,5 +1,5 @@
 // src/pages/Delivery/DeliveredOrdersList.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './DeliveredOrdersList.css';
@@ -12,6 +12,8 @@ const DeliveredOrdersList = () => {
   const [activeItem, setActiveItem] = useState('Delivered Orders');
   const [user, setUser] = useState(null);
   const [deliveringOrderId, setDeliveringOrderId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -110,6 +112,23 @@ const DeliveredOrdersList = () => {
     return 'Fully Delivered';
   };
 
+  // Filter orders based on search term and status
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      const matchesSearch = !searchTerm.trim() || 
+        (order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = statusFilter === 'all' || 
+        getDeliveryStatus(order).toLowerCase().replace(' ', '-') === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [orders, searchTerm, statusFilter]);
+
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
   if (!user) {
     return <div className="delivered-orders-loading">Loading...</div>;
   }
@@ -133,8 +152,56 @@ const DeliveredOrdersList = () => {
           <div className="delivered-orders-container">
             <h2 className="delivered-orders-page-title">Deliver Orders</h2>
             
+            {/* Exact same controls group as OrderList */}
+            <div className="delivered-orders-controls-group">
+              {/* Filter first */}
+              <div className="delivered-orders-filter-group">
+                <label htmlFor="statusFilter" className="delivered-orders-filter-label">
+                  Filter by Status:
+                </label>
+                <select
+                  id="statusFilter"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="delivered-orders-status-filter"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="not-delivered">Not Delivered</option>
+                  <option value="partially-delivered">Partially Delivered</option>
+                  <option value="fully-delivered">Fully Delivered</option>
+                </select>
+              </div>
+
+              {/* Search bar (second) */}
+              <div className="delivered-orders-search-container">
+                <input
+                  type="text"
+                  className="delivered-orders-search-input"
+                  placeholder="Search by customer name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  aria-label="Search orders by customer name"
+                />
+                {searchTerm && (
+                  <button
+                    className="delivered-orders-search-clear"
+                    onClick={clearSearch}
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+
             {loading ? (
               <div className="delivered-orders-loading">Loading orders...</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="delivered-orders-no-data">
+                No orders found
+                {statusFilter !== 'all' ? ` with status "${statusFilter.replace('-', ' ')}"` : ''}
+                {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
+              </div>
             ) : (
               <div className="delivered-orders-table-wrapper">
                 <table className="delivered-orders-data-table">
@@ -155,51 +222,43 @@ const DeliveredOrdersList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.length > 0 ? (
-                      orders.map((order, index) => (
-                        <tr key={order._id}>
-                          <td>{index + 1}</td>
-                          <td>{order.customer?.name || 'N/A'}</td>
-                          <td>{order.product?.productName || 'N/A'}</td>
-                          <td>{order.orderedQuantity} {order.unit || ''}</td>
-                          <td>{order.deliveredQuantity} {order.unit || ''}</td>
-                          <td>{(order.orderedQuantity - order.deliveredQuantity).toFixed(2)} {order.unit || ''}</td>
-                          <td>
-                            <span className={`delivered-orders-status-badge delivered-orders-status-${getDeliveryStatus(order).toLowerCase().replace(' ', '-')}`}>
-                              {getDeliveryStatus(order)}
-                            </span>
-                          </td>
-                          <td>AED{order.price.toFixed(2)}</td>
-                          <td>AED{order.totalAmount.toFixed(2)}</td>
-                          <td>{order.remarks || '-'}</td>
-                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                          <td>
-                            {order.deliveredQuantity < order.orderedQuantity ? (
-                              <button
-                                className="delivered-orders-deliver-button"
-                                onClick={() => handleDeliverOrder(
-                                  order._id, 
-                                  order.orderedQuantity, 
-                                  order.deliveredQuantity,
-                                  order.unit  // Pass unit for validation
-                                )}
-                                disabled={deliveringOrderId === order._id}
-                              >
-                                {deliveringOrderId === order._id ? 'Delivering...' : 'Deliver'}
-                              </button>
-                            ) : (
-                              <span className="delivered-orders-delivered-text">Completed</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="12" className="delivered-orders-no-data">
-                          No accepted orders found
+                    {filteredOrders.map((order, index) => (
+                      <tr key={order._id}>
+                        <td>{index + 1}</td>
+                        <td>{order.customer?.name || 'N/A'}</td>
+                        <td>{order.product?.productName || 'N/A'}</td>
+                        <td>{order.orderedQuantity} {order.unit || ''}</td>
+                        <td>{order.deliveredQuantity} {order.unit || ''}</td>
+                        <td>{(order.orderedQuantity - order.deliveredQuantity).toFixed(2)} {order.unit || ''}</td>
+                        <td>
+                          <span className={`delivered-orders-status-badge delivered-orders-status-${getDeliveryStatus(order).toLowerCase().replace(' ', '-')}`}>
+                            {getDeliveryStatus(order)}
+                          </span>
+                        </td>
+                        <td>AED{order.price.toFixed(2)}</td>
+                        <td>AED{order.totalAmount.toFixed(2)}</td>
+                        <td>{order.remarks || '-'}</td>
+                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                        <td>
+                          {order.deliveredQuantity < order.orderedQuantity ? (
+                            <button
+                              className="delivered-orders-deliver-button"
+                              onClick={() => handleDeliverOrder(
+                                order._id, 
+                                order.orderedQuantity, 
+                                order.deliveredQuantity,
+                                order.unit
+                              )}
+                              disabled={deliveringOrderId === order._id}
+                            >
+                              {deliveringOrderId === order._id ? 'Delivering...' : 'Deliver'}
+                            </button>
+                          ) : (
+                            <span className="delivered-orders-delivered-text">Completed</span>
+                          )}
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>

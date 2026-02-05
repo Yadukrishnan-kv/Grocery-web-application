@@ -1,5 +1,5 @@
 // src/pages/Customer/CustomerList.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
@@ -12,6 +12,7 @@ const CustomerList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState('Customers');
   const [user, setUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -22,7 +23,7 @@ const CustomerList = () => {
         window.location.href = '/login';
         return;
       }
-     
+      
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -69,6 +70,24 @@ const CustomerList = () => {
     }
   };
 
+  // Clear search
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
+  // Filter customers based on search term (Name or Email)
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(customer => {
+      if (!searchTerm.trim()) return true;
+      
+      const query = searchTerm.toLowerCase().trim();
+      return (
+        customer.name?.toLowerCase().includes(query) ||
+        customer.email?.toLowerCase().includes(query)
+      );
+    });
+  }, [customers, searchTerm]);
+
   if (!user) {
     return <div className="customer-list-loading">Loading...</div>;
   }
@@ -92,13 +111,44 @@ const CustomerList = () => {
           <div className="customer-list-container">
             <div className="customer-list-header-section">
               <h2 className="customer-list-page-title">Customer Management</h2>
-              <Link to="/customer/create" className="customer-list-create-button">
-                Create Customer
-              </Link>
+
+              {/* Exact same controls group as OrderList */}
+              <div className="customer-list-controls-group">
+                {/* Search bar */}
+                <div className="customer-list-search-container">
+                  <input
+                    type="text"
+                    className="customer-list-search-input"
+                    placeholder="Search by name or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label="Search customers by name or email"
+                  />
+                  {searchTerm && (
+                    <button
+                      className="customer-list-search-clear"
+                      onClick={clearSearch}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* Create Button */}
+                <Link to="/customer/create" className="customer-list-create-button">
+                  Create Customer
+                </Link>
+              </div>
             </div>
-           
+
             {loading ? (
               <div className="customer-list-loading">Loading customers...</div>
+            ) : filteredCustomers.length === 0 ? (
+              <div className="customer-list-no-data">
+                No customers found
+                {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
+              </div>
             ) : (
               <div className="customer-list-table-wrapper">
                 <table className="customer-list-data-table">
@@ -118,45 +168,37 @@ const CustomerList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {customers.length > 0 ? (
-                      customers.map((customer, index) => (
-                        <tr key={customer._id}>
-                          <td>{index + 1}</td>
-                          <td>{customer.name}</td>
-                          <td>{customer.email}</td>
-                          <td>{customer.phoneNumber}</td>
-                          <td>{customer.address}</td>
-                          <td>{customer.pincode}</td>
-                          <td>${customer.creditLimit.toFixed(2)}</td>
-                          <td>${customer.balanceCreditLimit.toFixed(2)}</td>
-                          <td>{customer.billingType}</td>
-                          <td>
-                            <Link
-                              to={`/customer/create?edit=${customer._id}`}
-                              className="customer-list-icon-button customer-list-edit-button"
-                              aria-label={`Edit customer ${customer.name}`}
-                            >
-                              ✎
-                            </Link>
-                          </td>
-                          <td>
-                            <button
-                              className="customer-list-icon-button customer-list-delete-button"
-                              onClick={() => handleDelete(customer._id, customer.name)}
-                              aria-label={`Delete customer ${customer.name}`}
-                            >
-                              🗑️
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="11" className="customer-list-no-data">
-                          No customers found
+                    {filteredCustomers.map((customer, index) => (
+                      <tr key={customer._id}>
+                        <td>{index + 1}</td>
+                        <td>{customer.name}</td>
+                        <td>{customer.email}</td>
+                        <td>{customer.phoneNumber}</td>
+                        <td>{customer.address}</td>
+                        <td>{customer.pincode}</td>
+                        <td>AED{customer.creditLimit.toFixed(2)}</td>
+                        <td>AED{customer.balanceCreditLimit.toFixed(2)}</td>
+                        <td>{customer.billingType}</td>
+                        <td>
+                          <Link
+                            to={`/customer/create?edit=${customer._id}`}
+                            className="customer-list-icon-button customer-list-edit-button"
+                            aria-label={`Edit customer ${customer.name}`}
+                          >
+                            ✎
+                          </Link>
+                        </td>
+                        <td>
+                          <button
+                            className="customer-list-icon-button customer-list-delete-button"
+                            onClick={() => handleDelete(customer._id, customer.name)}
+                            aria-label={`Delete customer ${customer.name}`}
+                          >
+                            🗑️
+                          </button>
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>

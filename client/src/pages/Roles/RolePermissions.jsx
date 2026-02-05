@@ -50,7 +50,9 @@ const RolePermissions = () => {
     CustomerOrderReports: "menu.customer.order.reports",
     CustomerBillStatement: "menu.customer.bill.statement",
     CustomerCreditLimit: "menu.customer.credit.limit",
-    Settings: "menu.settings"
+    Settings: "menu.settings",
+    CreateCustomerRequest: "menu.customer.requests.create",
+    MyCustomerRequests: "menu.customer.requests.my",
   };
 
   const fetchRole = useCallback(async () => {

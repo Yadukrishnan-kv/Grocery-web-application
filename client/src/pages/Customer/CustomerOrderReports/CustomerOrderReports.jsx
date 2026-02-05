@@ -1,5 +1,5 @@
 // src/pages/Customer/Reports/CustomerOrderReports.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CustomerOrderReports.css';
@@ -13,6 +13,11 @@ const CustomerOrderReports = () => {
   const [activeItem, setActiveItem] = useState('Order Reports');
   const [user, setUser] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
+
+  // Filter states (same as OrderReports)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -56,6 +61,32 @@ const CustomerOrderReports = () => {
     fetchMyOrders();
   }, [fetchCurrentUser, fetchMyOrders]);
 
+  // Filtered orders (same logic as before)
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      const matchesSearch = !searchTerm.trim() || 
+        (order.product?.productName?.toLowerCase().includes(searchTerm.toLowerCase().trim()));
+
+      let matchesDate = true;
+      const orderDate = new Date(order.orderDate);
+      orderDate.setHours(0, 0, 0, 0);
+
+      if (fromDate) {
+        const start = new Date(fromDate);
+        start.setHours(0, 0, 0, 0);
+        matchesDate = matchesDate && orderDate >= start;
+      }
+
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+        matchesDate = matchesDate && orderDate <= end;
+      }
+
+      return matchesSearch && matchesDate;
+    });
+  }, [orders, searchTerm, fromDate, toDate]);
+
   const downloadDeliveredInvoice = async (orderId) => {
     setDownloadingOrderId(orderId);
     try {
@@ -88,36 +119,11 @@ const CustomerOrderReports = () => {
     }
   };
 
-  const downloadPendingInvoice = async (orderId) => {
-    setDownloadingOrderId(orderId);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${backendUrl}/api/orders/getpendinginvoice/${orderId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob',
-        }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `pending-invoice-${orderId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading pending invoice:", error);
-      if (error.response?.status === 400) {
-        alert("No pending quantity available for this order.");
-      } else {
-        alert("Failed to download pending invoice.");
-      }
-    } finally {
-      setDownloadingOrderId(null);
-    }
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFromDate('');
+    setToDate('');
   };
 
   if (!user) {
@@ -143,21 +149,74 @@ const CustomerOrderReports = () => {
           <div className="customer-reports-container">
             <div className="customer-reports-header-section">
               <h2 className="customer-reports-page-title">My Order Reports</h2>
-              <button
-                className="customer-reports-refresh-button"
-                onClick={fetchMyOrders}
-                disabled={loading}
-              >
-                {loading ? 'Refreshing...' : 'Refresh My Orders'}
-              </button>
+
+              {/* Exact same controls group as before */}
+              <div className="customer-reports-controls-group">
+                <div className="customer-reports-date-group">
+                  <input
+                    type="date"
+                    id="fromDate"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="customer-reports-date-input"
+                  />
+                </div>
+
+                <div className="customer-reports-date-group">
+                  <input
+                    type="date"
+                    id="toDate"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="customer-reports-date-input"
+                  />
+                </div>
+
+                <div className="customer-reports-search-container">
+                  <input
+                    type="text"
+                    className="customer-reports-search-input"
+                    placeholder="Search by product name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <button
+                      className="customer-reports-search-clear"
+                      onClick={() => setSearchTerm('')}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  className="customer-reports-reset-button"
+                  onClick={resetFilters}
+                >
+                  Reset Filters
+                </button>
+
+                <button
+                  className="customer-reports-refresh-button"
+                  onClick={fetchMyOrders}
+                  disabled={loading}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh My Orders'}
+                </button>
+              </div>
             </div>
 
             {error && <div className="customer-reports-error-message">{error}</div>}
 
             {loading ? (
               <div className="customer-reports-loading">Loading your orders...</div>
-            ) : orders.length === 0 ? (
-              <div className="customer-reports-no-data">No orders found</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="customer-reports-no-data">
+                No orders found
+                {(fromDate || toDate || searchTerm) ? ' matching your filters' : ''}
+              </div>
             ) : (
               <div className="customer-reports-table-wrapper">
                 <table className="customer-reports-data-table">
@@ -165,9 +224,9 @@ const CustomerOrderReports = () => {
                     <tr>
                       <th>No</th>
                       <th>Product</th>
-                      <th>Ordered Qty</th>
-                      <th>Delivered Qty</th>
-                      <th>Pending Qty</th>
+                      <th>Ordered Qty (in unit)</th>
+                      <th>Delivered Qty (in unit)</th>
+                      <th>Pending Qty (in unit)</th>
                       <th>Price</th>
                       <th>Total Amount</th>
                       <th>Status</th>
@@ -176,20 +235,19 @@ const CustomerOrderReports = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((order, index) => {
+                    {filteredOrders.map((order, index) => {
                       const pendingQty = order.orderedQuantity - order.deliveredQuantity;
                       const hasDelivered = order.deliveredQuantity > 0;
-                      const hasPending = pendingQty > 0;
 
                       return (
                         <tr key={order._id}>
                           <td>{index + 1}</td>
                           <td>{order.product?.productName || 'N/A'}</td>
-                          <td>{order.orderedQuantity}</td>
-                          <td>{order.deliveredQuantity}</td>
-                          <td>{pendingQty}</td>
-                          <td>₹{order.price.toFixed(2)}</td>
-                          <td>₹{order.totalAmount.toFixed(2)}</td>
+                          <td>{order.orderedQuantity} {order.unit || ''}</td>
+                          <td>{order.deliveredQuantity} {order.unit || ''}</td>
+                          <td>{pendingQty} {order.unit || ''}</td>
+                          <td>AED{order.price?.toFixed(2) || '0.00'}</td>
+                          <td>AED{order.totalAmount?.toFixed(2) || '0.00'}</td>
                           <td>
                             <span className={`customer-reports-status-badge customer-reports-status-${order.status?.toLowerCase() || 'pending'}`}>
                               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
@@ -198,6 +256,7 @@ const CustomerOrderReports = () => {
                           <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                           <td>
                             <div className="customer-reports-action-buttons">
+                              {/* Only Delivered Invoice - no Pending Invoice */}
                               {hasDelivered && (
                                 <button
                                   className="customer-reports-invoice-button delivered"
@@ -207,18 +266,6 @@ const CustomerOrderReports = () => {
                                   {downloadingOrderId === order._id
                                     ? 'Downloading...'
                                     : 'Delivered Invoice'}
-                                </button>
-                              )}
-
-                              {hasPending && (
-                                <button
-                                  className="customer-reports-invoice-button pending"
-                                  onClick={() => downloadPendingInvoice(order._id)}
-                                  disabled={downloadingOrderId === order._id}
-                                >
-                                  {downloadingOrderId === order._id
-                                    ? 'Downloading...'
-                                    : 'Pending Invoice'}
                                 </button>
                               )}
                             </div>

@@ -76,7 +76,8 @@ const getPermissions = async (req, res) => {
         "menu.products", 
         "menu.customers",
         "menu.sales",
-        "menu.settings"
+        "menu.settings",
+        "menu.customer.requests",
         // Note: menu.deliveries is excluded for Admin
       ];
       return res.json({ permissions: adminPermissions });
@@ -120,6 +121,10 @@ const getPermissions = async (req, res) => {
       else if (permission === "menu.customer.credit.limit") {
         expandedPermissions.push("menu.customer.credit.limit");
       }
+      else if (permission === "menu.customer.requests") {
+        expandedPermissions.push("menu.customer.requests.create", "menu.customer.requests.my");
+      }
+      
       
       
 

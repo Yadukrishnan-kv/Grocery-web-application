@@ -30,6 +30,10 @@ const MENU_PERMISSIONS = {
   'CustomerCreditLimit': 'menu.customer.credit.limit',
   'Settings': 'menu.settings',
   'CompanySettings': 'menu.settings.company',
+  'CustomerRequests': 'menu.customer.requests',
+  'CreateCustomerRequest': 'menu.customer.requests.create',
+  'MyCustomerRequests': 'menu.customer.requests.my',
+  
 };
 
 const navItems = [
@@ -114,11 +118,26 @@ const navItems = [
       { id: 'CustomerCreditLimit', label: 'Credit Info', path: '/customer/credit-limit' }
     ]
   },
+  { 
+    id: 'CustomerRequests', 
+    label: 'Customer Requests', 
+    icon: '📝',
+    path: '/admin/customer-requests/pending',
+  },
   { id: 'Settings', label: 'Settings', icon: '⚙️', 
     subItems: [
       { id: 'CompanySettings', label: 'Company Settings', path: '/company-settings' }
     ]
-   }
+   },
+   { 
+    id: 'CreateCustomerRequest', 
+    label: 'Create Customer ', 
+    icon: '📝',
+    subItems: [
+      { id: 'CreateCustomerRequest', label: 'Create Request', path: '/sales/customer-requests/create' },
+      { id: 'MyCustomerRequests', label: 'My Requests', path: '/sales/customer-requests/my' }
+    ]
+  }
 ];
 
 const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
@@ -140,9 +159,12 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
       item.id !== 'CustomerOrderStatus' &&
       item.id !== 'CustomerOrderReports' &&
       item.id !== 'CustomerBillStatement' &&
-      item.id !== 'CustomerCreditLimit'
+      item.id !== 'CustomerCreditLimit' &&
+      item.id !== 'CreateCustomerRequest'
     );
   }
+
+
   
   return itemsToFilter.filter(item => {
     const itemPermission = MENU_PERMISSIONS[item.id];

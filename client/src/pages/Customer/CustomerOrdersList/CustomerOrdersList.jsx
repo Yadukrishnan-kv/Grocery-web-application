@@ -1,5 +1,5 @@
 // src/pages/Customer/Orders/CustomerOrdersList.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CustomerOrdersList.css';
@@ -11,7 +11,9 @@ const CustomerOrdersList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState('Orders');
   const [user, setUser] = useState(null);
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -57,6 +59,24 @@ const CustomerOrdersList = () => {
     window.location.href = '/customer/create-order';
   };
 
+  // Filter orders based on search term and status
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      const matchesSearch = !searchTerm.trim() || 
+        (order.product?.productName && 
+         order.product.productName.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = statusFilter === 'all' || 
+        (order.status && order.status.toLowerCase() === statusFilter.toLowerCase());
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [orders, searchTerm, statusFilter]);
+
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
   if (!user) {
     return <div className="customer-orders-loading">Loading...</div>;
   }
@@ -80,16 +100,66 @@ const CustomerOrdersList = () => {
           <div className="customer-orders-container">
             <div className="customer-orders-header-section">
               <h2 className="customer-orders-page-title">My Orders</h2>
-              <button 
-                className="customer-orders-create-button"
-                onClick={handleCreateOrder}
-              >
-                Create Order
-              </button>
+
+              {/* Exact same controls group as OrderList */}
+              <div className="customer-orders-controls-group">
+                {/* Filter first */}
+                <div className="customer-orders-filter-group">
+                  <label htmlFor="statusFilter" className="customer-orders-filter-label">
+                    Filter by Status:
+                  </label>
+                  <select
+                    id="statusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="customer-orders-status-filter"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                {/* Search bar (second) */}
+                <div className="customer-orders-search-container">
+                  <input
+                    type="text"
+                    className="customer-orders-search-input"
+                    placeholder="Search by product name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label="Search orders by product name"
+                  />
+                  {searchTerm && (
+                    <button
+                      className="customer-orders-search-clear"
+                      onClick={clearSearch}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* Create Button (last) */}
+                <button 
+                  className="customer-orders-create-button"
+                  onClick={handleCreateOrder}
+                >
+                  Create Order
+                </button>
+              </div>
             </div>
             
             {loading ? (
               <div className="customer-orders-loading">Loading orders...</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="customer-orders-no-data">
+                No orders found
+                {statusFilter !== 'all' ? ` with status "${statusFilter}"` : ''}
+                {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
+              </div>
             ) : (
               <div className="customer-orders-table-wrapper">
                 <table className="customer-orders-data-table">
@@ -98,41 +168,30 @@ const CustomerOrdersList = () => {
                       <th scope="col">No</th>
                       <th scope="col">Product</th>
                       <th scope="col">Ordered Qty</th>
-                     
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
                       <th scope="col">Remarks</th>
-
                       <th scope="col">Status</th>
                       <th scope="col">Order Date</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.length > 0 ? (
-                      orders.map((order, index) => (
-                        <tr key={order._id}>
-                          <td>{index + 1}</td>
-                          <td>{order.product?.productName || 'N/A'}</td>
-                          <td>{order.orderedQuantity}</td>
-                        
-                          <td>${order.price.toFixed(2)}</td>
-                          <td>${order.totalAmount.toFixed(2)}</td>
-                          <td>{order.remarks || '-'}</td>
-                          <td>
-                            <span className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || 'pending'}`}>
-                              {order.status || 'Pending'}
-                            </span>
-                          </td>
-                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="8" className="customer-orders-no-data">
-                          No orders found
+                    {filteredOrders.map((order, index) => (
+                      <tr key={order._id}>
+                        <td>{index + 1}</td>
+                        <td>{order.product?.productName || 'N/A'}</td>
+                        <td>{order.orderedQuantity} {order.unit || ''}</td>
+                        <td>AED{order.price?.toFixed(2) || '0.00'}</td>
+                        <td>AED{order.totalAmount?.toFixed(2) || '0.00'}</td>
+                        <td>{order.remarks || '-'}</td>
+                        <td>
+                          <span className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || 'pending'}`}>
+                            {order.status || 'Pending'}
+                          </span>
                         </td>
+                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>

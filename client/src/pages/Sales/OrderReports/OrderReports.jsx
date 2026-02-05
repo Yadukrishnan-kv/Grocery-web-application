@@ -14,9 +14,9 @@ const OrderReports = () => {
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
 
   // New filter states
-  const [searchTerm, setSearchTerm] = useState(''); // Customer name search
-  const [fromDate, setFromDate] = useState('');     // YYYY-MM-DD
-  const [toDate, setToDate] = useState('');         // YYYY-MM-DD
+  const [searchTerm, setSearchTerm] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -59,17 +59,14 @@ const OrderReports = () => {
     fetchDeliveredOrders();
   }, [fetchCurrentUser, fetchDeliveredOrders]);
 
-  // Filtered orders using useMemo (efficient)
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
-      // Customer name search
       const matchesSearch = !searchTerm.trim() || 
         (order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase().trim()));
 
-      // Date range filter
       let matchesDate = true;
       const orderDate = new Date(order.orderDate);
-      orderDate.setHours(0, 0, 0, 0); // Normalize to start of day
+      orderDate.setHours(0, 0, 0, 0);
 
       if (fromDate) {
         const start = new Date(fromDate);
@@ -79,7 +76,7 @@ const OrderReports = () => {
 
       if (toDate) {
         const end = new Date(toDate);
-        end.setHours(23, 59, 59, 999); // End of day
+        end.setHours(23, 59, 59, 999);
         matchesDate = matchesDate && orderDate <= end;
       }
 
@@ -118,55 +115,23 @@ const OrderReports = () => {
     }
   };
 
-  const downloadPendingInvoice = async (orderId) => {
-    setDownloadingOrderId(orderId);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${backendUrl}/api/orders/getpendinginvoice/${orderId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob'
-        }
-      );
+  // const refreshOrderData = async (orderId) => {
+  //   try {
+  //     const token = localStorage.getItem('token');
+  //     const response = await axios.get(`${backendUrl}/api/orders/getorderbyid/${orderId}`, {
+  //       headers: { Authorization: `Bearer ${token}` }
+  //     });
       
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `pending-invoice-${orderId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error('Error downloading pending invoice:', error);
-      if (error.response?.status === 400) {
-        alert('No pending quantity available for this order');
-      } else {
-        alert('Failed to download pending invoice');
-      }
-    } finally {
-      setDownloadingOrderId(null);
-    }
-  };
+  //     setOrders(prevOrders => 
+  //       prevOrders.map(order => 
+  //         order._id === orderId ? response.data : order
+  //       )
+  //     );
+  //   } catch (error) {
+  //     console.error('Error refreshing order data:', error);
+  //   }
+  // };
 
-  const refreshOrderData = async (orderId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/orders/getorderbyid/${orderId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order._id === orderId ? response.data : order
-        )
-      );
-    } catch (error) {
-      console.error('Error refreshing order data:', error);
-    }
-  };
-
-  // Reset all filters
   const resetFilters = () => {
     setSearchTerm('');
     setFromDate('');
@@ -197,11 +162,8 @@ const OrderReports = () => {
             <div className="order-reports-header-section">
               <h2 className="order-reports-page-title">Order Reports</h2>
 
-              {/* Controls: Date filters → Search → Reset → Refresh */}
               <div className="order-reports-controls-group">
-                {/* From Date */}
                 <div className="order-reports-date-group">
-                  {/* <label htmlFor="fromDate" className="order-reports-filter-label">From Date</label> */}
                   <input
                     type="date"
                     id="fromDate"
@@ -211,9 +173,7 @@ const OrderReports = () => {
                   />
                 </div>
 
-                {/* To Date */}
                 <div className="order-reports-date-group">
-                  {/* <label htmlFor="toDate" className="order-reports-filter-label">To Date</label> */}
                   <input
                     type="date"
                     id="toDate"
@@ -223,7 +183,6 @@ const OrderReports = () => {
                   />
                 </div>
 
-                {/* Search by Customer */}
                 <div className="order-reports-search-container">
                   <input
                     type="text"
@@ -243,7 +202,6 @@ const OrderReports = () => {
                   )}
                 </div>
 
-                {/* Reset Filters */}
                 <button
                   className="order-reports-reset-button"
                   onClick={resetFilters}
@@ -251,7 +209,6 @@ const OrderReports = () => {
                   Reset Filters
                 </button>
 
-                {/* Refresh Data */}
                 <button 
                   className="order-reports-refresh-button"
                   onClick={fetchDeliveredOrders}
@@ -319,6 +276,7 @@ const OrderReports = () => {
                           </td>
                           <td>
                             <div className="order-reports-action-buttons">
+                              {/* Only Delivered Invoice - no Pending Invoice */}
                               {order.deliveredQuantity > 0 && (
                                 <button
                                   className="order-reports-invoice-button delivered"
@@ -329,23 +287,13 @@ const OrderReports = () => {
                                 </button>
                               )}
 
-                              {pendingQty > 0 && (
-                                <button
-                                  className="order-reports-invoice-button pending"
-                                  onClick={() => downloadPendingInvoice(order._id)}
-                                  disabled={downloadingOrderId === order._id}
-                                >
-                                  {downloadingOrderId === order._id ? 'Downloading...' : 'Pending Invoice'}
-                                </button>
-                              )}
-
-                              <button
+                              {/* <button
                                 className="order-reports-refresh-order-button"
                                 onClick={() => refreshOrderData(order._id)}
                                 title="Refresh order data"
                               >
                                 🔄
-                              </button>
+                              </button> */}
                             </div>
                           </td>
                         </tr>

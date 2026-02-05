@@ -10,4 +10,8 @@ export const MENU_PERMISSIONS = {
   products_add: "menu.products.add",
   orders: "menu.orders",
   settings: "menu.settings",
+
+  customer_requests: "menu.customer.requests",
+  customer_requests_create: "menu.customer.requests.create",
+  customer_requests_my: "menu.customer.requests.my"
 };
