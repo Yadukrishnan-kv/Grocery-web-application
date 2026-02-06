@@ -179,3 +179,25 @@
     padding: 0.6rem;
   }
 }
+
+/* NEW: Billing Config Section */
+.billing-config-section {
+  background: #f8fafc;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  border: 1px solid #e2e8f0;
+}
+
+.billing-config-section h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 1rem;
+}
+
+.billing-config-section p {
+  font-size: 0.95rem;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}

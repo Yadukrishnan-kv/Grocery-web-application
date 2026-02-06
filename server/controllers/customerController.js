@@ -15,6 +15,8 @@ const createCustomer = async (req, res) => {
       pincode,
       creditLimit,
       billingType = "Credit limit",
+      statementType,  // NEW
+      dueDays,        // NEW
     } = req.body;
 
     // 1. Basic validation
@@ -34,6 +36,20 @@ const createCustomer = async (req, res) => {
       return res.status(400).json({ message: "Invalid credit limit value" });
     }
 
+    // NEW: Validate billing config if billingType = "Credit limit"
+    let parsedStatementType = null;
+    let parsedDueDays = null;
+    if (billingType === "Credit limit") {
+      if (!statementType || !["invoice-based", "monthly"].includes(statementType)) {
+        return res.status(400).json({ message: "Invalid statement type. Must be 'invoice-based' or 'monthly'" });
+      }
+      if (!dueDays || isNaN(dueDays) || parseInt(dueDays) < 0) {
+        return res.status(400).json({ message: "Due days must be a non-negative number" });
+      }
+      parsedStatementType = statementType;
+      parsedDueDays = parseInt(dueDays);
+    }
+
     // 2. Check duplicates
     const existingCustomer = await Customer.findOne({ email: email.trim().toLowerCase() });
     if (existingCustomer) {
@@ -45,7 +61,7 @@ const createCustomer = async (req, res) => {
       return res.status(400).json({ message: "This email is already registered as a user account" });
     }
 
-    // 3. Create USER first (so we can get user._id)
+    // 3. Create USER first
     const defaultPassword = process.env.NODE_ENV === "production" 
       ? crypto.randomBytes(10).toString("hex") 
       : "customer123";
@@ -53,11 +69,11 @@ const createCustomer = async (req, res) => {
     const user = await User.create({
       username: name.trim(),
       email: email.trim().toLowerCase(),
-      password: defaultPassword,          // plain → will be hashed by pre-save hook
+      password: defaultPassword,
       role: "Customer",
     });
 
-    // 4. Now create CUSTOMER and link it to the user
+    // 4. Create CUSTOMER with new fields
     const customer = await Customer.create({
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -66,10 +82,12 @@ const createCustomer = async (req, res) => {
       pincode: pincode.trim(),
       creditLimit: parsedCreditLimit,
       billingType,
-      user: user._id,                      // ← now safe to use user._id
+      statementType: parsedStatementType,  // NEW
+      dueDays: parsedDueDays,              // NEW
+      user: user._id,
     });
 
-    // 5. Response (never expose password in production)
+    // 5. Response (same as before)
     const responseData = {
       message: "Customer and login account created successfully",
       customer: {
@@ -82,6 +100,8 @@ const createCustomer = async (req, res) => {
         creditLimit: customer.creditLimit,
         balanceCreditLimit: customer.balanceCreditLimit,
         billingType: customer.billingType,
+        statementType: customer.statementType,  // NEW
+        dueDays: customer.dueDays,              // NEW
         createdAt: customer.createdAt,
       },
       note: process.env.NODE_ENV === "production"
@@ -89,7 +109,6 @@ const createCustomer = async (req, res) => {
         : "Development mode: temporary password is 'customer123'",
     };
 
-    // Only show temp password in development (REMOVE in production!)
     if (process.env.NODE_ENV !== "production") {
       responseData.defaultLoginInfo = {
         email: user.email,
@@ -360,17 +379,18 @@ const acceptCustomerRequest = async (req, res) => {
       return res.status(400).json({ message: "Request already processed" });
     }
 
-    // Create User
-    const defaultPassword = crypto.randomBytes(10).toString("hex");
+    // Use the SAME default password as direct creation
+    const defaultPassword = process.env.NODE_ENV === "production" 
+      ? "customer123"  // You can change this in production
+      : "customer123";
 
     const user = await User.create({
       username: request.name.trim(),
       email: request.email,
-      password: defaultPassword,
+      password: defaultPassword,  // ← same as createCustomer
       role: "Customer",
     });
 
-    // Create Customer
     const customer = await Customer.create({
       user: user._id,
       name: request.name,
@@ -387,11 +407,36 @@ const acceptCustomerRequest = async (req, res) => {
     request.status = "accepted";
     await request.save();
 
-    res.json({
+    // Return same style response as createCustomer
+    const responseData = {
       message: "Request accepted - Customer created",
-      customer,
-      note: `Login credentials: Email ${user.email}, Temp Password: ${defaultPassword} (change immediately)`
-    });
+      customer: {
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        phoneNumber: customer.phoneNumber,
+        address: customer.address,
+        pincode: customer.pincode,
+        creditLimit: customer.creditLimit,
+        balanceCreditLimit: customer.balanceCreditLimit,
+        billingType: customer.billingType,
+        createdAt: customer.createdAt,
+      },
+      note: process.env.NODE_ENV === "production"
+        ? "Customer account created. Default password is 'customer123' (they should change it immediately)"
+        : "Development mode: Default password is 'customer123'",
+    };
+
+    // In dev mode, include credentials clearly
+    if (process.env.NODE_ENV !== "production") {
+      responseData.defaultLoginInfo = {
+        email: user.email,
+        temporaryPassword: defaultPassword,
+        note: "Please change your password immediately after first login",
+      };
+    }
+
+    res.status(201).json(responseData);
   } catch (error) {
     console.error("Accept request error:", error);
     res.status(500).json({ message: "Server error" });

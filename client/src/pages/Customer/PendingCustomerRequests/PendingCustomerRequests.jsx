@@ -58,26 +58,29 @@ const PendingCustomerRequests = () => {
       }
     );
 
-    const { customer, note } = response.data;
+    const { customer, note, defaultLoginInfo } = response.data;
 
-    // Extract temp password from note (or improve backend to return it separately)
-    const tempPasswordMatch = note.match(/Temp Password: (\S+)/);
-    const tempPassword = tempPasswordMatch ? tempPasswordMatch[1] : 'Not returned';
+    // Show consistent message (same as admin create)
+    let alertMessage = `Customer created successfully!\n\n` +
+                      `Name: ${customer.name}\n` +
+                      `Email: ${customer.email}\n\n` +
+                      `${note}\n\n` +
+                      `The customer can now login with the default password 'customer123'.\n` +
+                      `They MUST change it immediately after first login.`;
 
-    alert(
-      `Customer created successfully!\n\n` +
-      `Login Email: ${customer.email}\n` +
-      `Temporary Password: ${tempPassword}\n\n` +
-      `Copy and share this securely with the customer.\n` +
-      `They MUST change the password after first login.`
-    );
+    if (defaultLoginInfo) {
+      alertMessage += `\n\nDevelopment mode credentials:\n` +
+                      `Email: ${defaultLoginInfo.email}\n` +
+                      `Temporary Password: ${defaultLoginInfo.temporaryPassword}`;
+    }
+
+    alert(alertMessage);
 
     setRequests(prev => prev.filter(r => r._id !== id));
   } catch (error) {
     alert(error.response?.data?.message || 'Error accepting request');
   }
 };
-
   const handleReject = async (id) => {
     const reason = prompt('Reason for rejection (optional):');
     try {

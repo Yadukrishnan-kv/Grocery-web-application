@@ -7,6 +7,7 @@ import axios from 'axios';
 
 const CustomerBillStatement = () => {
   const [bills, setBills] = useState([]);
+  const [config, setConfig] = useState({ billingType: '', statementType: '', dueDays: '' });  // NEW
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState('Bill Statement');
@@ -48,10 +49,28 @@ const CustomerBillStatement = () => {
     }
   }, [backendUrl]);
 
+  // NEW: Fetch customer billing config
+  const fetchBillingConfig = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${backendUrl}/api/customers/my-profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setConfig({
+        billingType: response.data.billingType,
+        statementType: response.data.statementType,
+        dueDays: response.data.dueDays,
+      });
+    } catch (error) {
+      console.error('Error fetching billing config:', error);
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
     fetchCurrentUser();
     fetchCustomerBills();
-  }, [fetchCurrentUser, fetchCustomerBills]);
+    fetchBillingConfig();  // NEW
+  }, [fetchCurrentUser, fetchCustomerBills, fetchBillingConfig]);
 
   const handlePayBill = async (billId, amountDue) => {
     const paymentAmount = prompt(`Enter payment amount (Max: $${amountDue.toFixed(2)}):`);
@@ -96,6 +115,18 @@ const CustomerBillStatement = () => {
           <div className="customer-bills-container">
             <div className="customer-bills-header-section">
               <h2 className="customer-bills-page-title">Bill Statements</h2>
+            </div>
+
+            {/* NEW: Display Billing Config */}
+            <div className="billing-config-section">
+              <h3>Your Billing Configuration</h3>
+              <p>Billing Type: {config.billingType || 'N/A'}</p>
+              {config.billingType === 'Credit limit' && (
+                <>
+                  <p>Statement Type: {config.statementType ? config.statementType.charAt(0).toUpperCase() + config.statementType.slice(1) : 'N/A'}</p>
+                  <p>Due Days: {config.dueDays || 'N/A'}</p>
+                </>
+              )}
             </div>
             
             {loading ? (

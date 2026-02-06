@@ -1,4 +1,4 @@
-// CreateCustomer.jsx
+// src/pages/Admin/CreateCustomer.jsx (or your path)
 import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
@@ -15,7 +15,9 @@ const CreateCustomer = () => {
     address: '',
     pincode: '',
     creditLimit: '',
-    billingType: 'Credit limit'
+    billingType: 'Credit limit',
+    statementType: '',  // NEW
+    dueDays: '',        // NEW
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +58,16 @@ const CreateCustomer = () => {
 
     if (!formData.creditLimit || isNaN(formData.creditLimit) || parseFloat(formData.creditLimit) < 0) {
       newErrors.creditLimit = 'Valid credit limit is required';
+    }
+
+    // NEW: Validate if billingType = "Credit limit"
+    if (formData.billingType === "Credit limit") {
+      if (!formData.statementType) {
+        newErrors.statementType = 'Statement type is required for Credit limit';
+      }
+      if (!formData.dueDays || isNaN(formData.dueDays) || parseInt(formData.dueDays) < 0) {
+        newErrors.dueDays = 'Valid due days is required (non-negative number)';
+      }
     }
 
     setErrors(newErrors);
@@ -101,7 +113,9 @@ const CreateCustomer = () => {
         address: formData.address.trim(),
         pincode: formData.pincode.trim(),
         creditLimit: parseFloat(formData.creditLimit),
-        billingType: formData.billingType
+        billingType: formData.billingType,
+        statementType: formData.billingType === "Credit limit" ? formData.statementType : null,  // NEW
+        dueDays: formData.billingType === "Credit limit" ? parseInt(formData.dueDays) : null,  // NEW
       };
 
       let response;
@@ -122,7 +136,7 @@ const CreateCustomer = () => {
 
       setIsSuccess(true);
 
-      // Show helpful message about login credentials (only on create)
+      // Show message (same as before)
       if (!isEdit) {
         const { defaultLoginInfo } = response.data;
         if (defaultLoginInfo) {
@@ -163,7 +177,9 @@ const CreateCustomer = () => {
         address: customer.address,
         pincode: customer.pincode,
         creditLimit: customer.creditLimit.toString(),
-        billingType: customer.billingType
+        billingType: customer.billingType,
+        statementType: customer.statementType || '',
+        dueDays: customer.dueDays ? customer.dueDays.toString() : '',
       });
       setIsEdit(true);
       setCustomerId(id);
@@ -361,19 +377,64 @@ const CreateCustomer = () => {
               </div>
 
               <div className="customer-form-group">
-  <label htmlFor="billingType">Billing Type</label>
-  <select
-    id="billingType"
-    name="billingType"
-    value={formData.billingType}
-    onChange={handleChange}
-    className="customer-select"
-  >
-    <option value="Credit limit">Credit Limit</option>
-    <option value="Cash">Cash</option>
-  </select>
-</div>
+                <label htmlFor="billingType">Billing Type</label>
+                <select
+                  id="billingType"
+                  name="billingType"
+                  value={formData.billingType}
+                  onChange={handleChange}
+                  className="customer-select"
+                >
+                  <option value="Credit limit">Credit Limit</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
             </div>
+
+            {/* NEW: Conditional Billing Config */}
+            {formData.billingType === "Credit limit" && (
+              <div className="customer-form-row">
+                <div className="customer-form-group">
+                  <label htmlFor="statementType">Statement Type</label>
+                  <select
+                    id="statementType"
+                    name="statementType"
+                    value={formData.statementType}
+                    onChange={handleChange}
+                    className="customer-select"
+                  >
+                    <option value="">Select statement type</option>
+                    <option value="invoice-based">Invoice-based</option>
+                    <option value="monthly">Monthly Statement</option>
+                  </select>
+                  {errors.statementType && (
+                    <p id="statementType-error" className="customer-error-text" role="alert">
+                      {errors.statementType}
+                    </p>
+                  )}
+                </div>
+
+                <div className="customer-form-group">
+                  <label htmlFor="dueDays">Due Days</label>
+                  <input
+                    id="dueDays"
+                    name="dueDays"
+                    type="number"
+                    min="0"
+                    value={formData.dueDays}
+                    onChange={handleChange}
+                    aria-invalid={!!errors.dueDays}
+                    aria-describedby={errors.dueDays ? "dueDays-error" : undefined}
+                    className="customer-input"
+                  />
+                  {errors.dueDays && (
+                    <p id="dueDays-error" className="customer-error-text" role="alert">
+                      {errors.dueDays}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {errors.submit && (
               <div className="customer-error-banner" role="alert">

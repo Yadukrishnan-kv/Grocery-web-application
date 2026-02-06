@@ -53,6 +53,16 @@ const customerSchema = new Schema(
       default: "Credit limit",
       required: true,
     },
+    statementType: {
+      type: String,
+      enum: ["invoice-based", "monthly"],
+      default: null,  
+    },
+    dueDays: {
+      type: Number,
+      min: 0,
+      default: null,  
+    },
   },
   { timestamps: true }
 );
