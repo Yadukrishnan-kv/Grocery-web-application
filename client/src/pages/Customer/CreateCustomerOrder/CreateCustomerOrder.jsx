@@ -11,7 +11,7 @@ const CreateCustomerOrder = () => {
     productId: '',
     orderedQuantity: '',
     payment: 'credit',
-    remarks: ''   // ← New field added
+    remarks: ''
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -50,6 +50,7 @@ const CreateCustomerOrder = () => {
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
+      alert('Failed to load products');
     }
   }, [backendUrl]);
 
@@ -61,14 +62,12 @@ const CreateCustomerOrder = () => {
     }
 
     if (!formData.orderedQuantity || isNaN(formData.orderedQuantity) || parseInt(formData.orderedQuantity) < 1) {
-      newErrors.orderedQuantity = 'Valid ordered quantity is required';
+      newErrors.orderedQuantity = 'Valid ordered quantity is required (minimum 1)';
     }
 
     if (!formData.payment) {
       newErrors.payment = 'Payment method is required';
     }
-
-    // remarks is optional → no validation needed
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -82,10 +81,7 @@ const CreateCustomerOrder = () => {
     }));
 
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
@@ -106,15 +102,18 @@ const CreateCustomerOrder = () => {
         }
       };
 
-      // Get customer ID from current user (logged-in customer)
-      const customerId = user._id;
+      // Get customer ID from logged-in user's customer profile
+      const customerProfile = await axios.get(`${backendUrl}/api/customers/my-profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const customerId = customerProfile.data._id;
 
       await axios.post(`${backendUrl}/api/orders/createorder`, {
         customerId,
         productId: formData.productId,
         orderedQuantity: parseInt(formData.orderedQuantity),
         payment: formData.payment,
-        remarks: formData.remarks.trim()   // ← New field sent to backend
+        remarks: formData.remarks.trim()
       }, config);
 
       setIsSuccess(true);
@@ -131,11 +130,9 @@ const CreateCustomerOrder = () => {
 
   useEffect(() => {
     const loadData = async () => {
+      setLoading(true);
       try {
-        await Promise.all([
-          fetchCurrentUser(),
-          fetchProducts()
-        ]);
+        await Promise.all([fetchCurrentUser(), fetchProducts()]);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -149,6 +146,8 @@ const CreateCustomerOrder = () => {
   if (loading || !user) {
     return <div className="create-customer-order-loading">Loading...</div>;
   }
+
+  const selectedProduct = products.find(p => p._id === formData.productId);
 
   return (
     <div className="create-customer-order-layout">
@@ -187,12 +186,13 @@ const CreateCustomerOrder = () => {
                 <option value="">Select a product</option>
                 {products.map(product => (
                   <option key={product._id} value={product._id}>
-                    {product.productName} - ${product.price.toFixed(2)} (Qty: {product.quantity})
+                    {product.productName} - AED{product.price.toFixed(2)} 
+                    (Available: {product.quantity} {product.unit || 'units'})
                   </option>
                 ))}
               </select>
               {errors.productId && (
-                <p id="productid-error" className="create-customer-order-error-text" role="alert">
+                <p id="productid-error" className="create-customer-order-error-text">
                   {errors.productId}
                 </p>
               )}
@@ -206,16 +206,23 @@ const CreateCustomerOrder = () => {
                   name="orderedQuantity"
                   type="number"
                   min="1"
+                  max={selectedProduct ? selectedProduct.quantity : undefined}
                   value={formData.orderedQuantity}
                   onChange={handleChange}
                   aria-invalid={!!errors.orderedQuantity}
                   aria-describedby={errors.orderedQuantity ? "orderedquantity-error" : undefined}
                   className="create-customer-order-input"
+                  placeholder="Enter quantity"
                 />
                 {errors.orderedQuantity && (
-                  <p id="orderedquantity-error" className="create-customer-order-error-text" role="alert">
+                  <p id="orderedquantity-error" className="create-customer-order-error-text">
                     {errors.orderedQuantity}
                   </p>
+                )}
+                {selectedProduct && (
+                  <small className="quantity-info">
+                    Max available: {selectedProduct.quantity} {selectedProduct.unit || 'units'}
+                  </small>
                 )}
               </div>
 
@@ -234,14 +241,13 @@ const CreateCustomerOrder = () => {
                   <option value="cash">Cash</option>
                 </select>
                 {errors.payment && (
-                  <p id="payment-error" className="create-customer-order-error-text" role="alert">
+                  <p id="payment-error" className="create-customer-order-error-text">
                     {errors.payment}
                   </p>
                 )}
               </div>
             </div>
 
-            {/* New Remarks field */}
             <div className="create-customer-order-form-group">
               <label htmlFor="remarks">Remarks / Special Instructions (optional)</label>
               <textarea
@@ -267,7 +273,7 @@ const CreateCustomerOrder = () => {
               disabled={isLoading}
               aria-busy={isLoading}
             >
-              {isLoading ? 'Creating...' : 'Create Order'}
+              {isLoading ? 'Creating Order...' : 'Create Order'}
             </button>
           </form>
         </div>

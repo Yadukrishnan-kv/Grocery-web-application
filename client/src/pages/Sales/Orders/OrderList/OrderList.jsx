@@ -117,6 +117,30 @@ const OrderList = () => {
     }
   };
 
+  const handleDownloadOrderInvoice = async (orderId) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(
+      `${backendUrl}/api/orders/invoice/${orderId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      }
+    );
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `order-invoice-${orderId}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (error) {
+    console.error('Error downloading order invoice:', error);
+    alert('Failed to download invoice');
+  }
+};
+
   // Clear search
   const clearSearch = () => {
     setSearchTerm('');
@@ -208,6 +232,7 @@ const OrderList = () => {
                       <th scope="col">Remarks</th>
                       <th scope="col">Order Date</th>
                       <th scope="col">Delivery Partner</th>
+                      <th scope="col">Invoice</th>
                       <th scope="col">Actions</th>
                     </tr>
                   </thead>
@@ -260,6 +285,19 @@ const OrderList = () => {
                               <span className="order-list-not-assigned">Not Assigned</span>
                             )}
                           </td>
+                          <td>
+  <div className="order-list-invoice-buttons">
+    {order.orderedQuantity > 0 && (
+      <button
+        className="order-list-download-btn order-invoice"
+        onClick={() => handleDownloadOrderInvoice(order._id)}
+        title="Download Order Invoice"
+      >
+        Download Invoice
+      </button>
+    )}
+  </div>
+</td>
                           <td>
                             <div className="order-list-action-buttons">
                               <Link

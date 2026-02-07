@@ -1,4 +1,4 @@
-// src/pages/Customer/CustomerList.jsx
+// src/pages/Admin/CustomerList.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
@@ -13,6 +13,7 @@ const CustomerList = () => {
   const [activeItem, setActiveItem] = useState('Customers');
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dueDaysFilter, setDueDaysFilter] = useState('all');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -23,7 +24,6 @@ const CustomerList = () => {
         window.location.href = '/login';
         return;
       }
-      
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -70,23 +70,59 @@ const CustomerList = () => {
     }
   };
 
-  // Clear search
-  const clearSearch = () => {
-    setSearchTerm('');
+  // Calculate days remaining for the most recent pending bill (dummy logic)
+  const getDaysRemaining = (customer) => {
+    // In real system → fetch from bills API
+    // For now, we simulate based on last known due date or assume no bill
+    return customer.pendingBillDaysLeft !== undefined ? customer.pendingBillDaysLeft : null;
   };
 
-  // Filter customers based on search term (Name or Email)
+  const getDueStatusText = (days) => {
+    if (days === null) return "No pending bill";
+    if (days < 0) return `Overdue by ${Math.abs(days)} days`;
+    if (days === 0) return "Due today";
+    return `${days} days left`;
+  };
+
+  const getDueClass = (days) => {
+    if (days === null) return "due-neutral";
+    if (days < 0) return "due-red";
+    if (days <= 5) return "due-yellow";
+    return "due-green";
+  };
+
+  const clearSearch = () => setSearchTerm('');
+
+  // Filter customers
   const filteredCustomers = useMemo(() => {
     return customers.filter(customer => {
-      if (!searchTerm.trim()) return true;
-      
-      const query = searchTerm.toLowerCase().trim();
-      return (
-        customer.name?.toLowerCase().includes(query) ||
-        customer.email?.toLowerCase().includes(query)
-      );
+      const matchesSearch = !searchTerm.trim() || 
+        customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const daysLeft = getDaysRemaining(customer);
+
+      if (dueDaysFilter === 'all') return matchesSearch;
+
+      if (dueDaysFilter === 'no-pending') {
+        return matchesSearch && daysLeft === null;
+      }
+      if (dueDaysFilter === 'overdue') {
+        return matchesSearch && daysLeft !== null && daysLeft < 0;
+      }
+      if (dueDaysFilter === '1-5') {
+        return matchesSearch && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
+      }
+      if (dueDaysFilter === '6-15') {
+        return matchesSearch && daysLeft !== null && daysLeft > 5 && daysLeft <= 15;
+      }
+      if (dueDaysFilter === '16+') {
+        return matchesSearch && daysLeft !== null && daysLeft > 15;
+      }
+
+      return matchesSearch;
     });
-  }, [customers, searchTerm]);
+  }, [customers, searchTerm, dueDaysFilter]);
 
   if (!user) {
     return <div className="customer-list-loading">Loading...</div>;
@@ -112,9 +148,8 @@ const CustomerList = () => {
             <div className="customer-list-header-section">
               <h2 className="customer-list-page-title">Customer Management</h2>
 
-              {/* Exact same controls group as OrderList */}
               <div className="customer-list-controls-group">
-                {/* Search bar */}
+                {/* Search */}
                 <div className="customer-list-search-container">
                   <input
                     type="text"
@@ -122,17 +157,32 @@ const CustomerList = () => {
                     placeholder="Search by name or email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    aria-label="Search customers by name or email"
                   />
                   {searchTerm && (
-                    <button
-                      className="customer-list-search-clear"
-                      onClick={clearSearch}
-                      aria-label="Clear search"
-                    >
+                    <button className="customer-list-search-clear" onClick={clearSearch}>
                       ×
                     </button>
                   )}
+                </div>
+
+                {/* Due Days Filter */}
+                <div className="customer-list-filter-group">
+                  <label htmlFor="dueDaysFilter" className="customer-list-filter-label">
+                    Due Days:
+                  </label>
+                  <select
+                    id="dueDaysFilter"
+                    value={dueDaysFilter}
+                    onChange={(e) => setDueDaysFilter(e.target.value)}
+                    className="customer-list-filter-select"
+                  >
+                    <option value="all">All</option>
+                    <option value="no-pending">No Pending Bill</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="1-5">1-5 Days Left</option>
+                    <option value="6-15">6-15 Days Left</option>
+                    <option value="16+">16+ Days Left</option>
+                  </select>
                 </div>
 
                 {/* Create Button */}
@@ -148,6 +198,7 @@ const CustomerList = () => {
               <div className="customer-list-no-data">
                 No customers found
                 {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
+                {dueDaysFilter !== 'all' ? ` with due filter` : ''}
               </div>
             ) : (
               <div className="customer-list-table-wrapper">
@@ -163,42 +214,54 @@ const CustomerList = () => {
                       <th scope="col">Credit Limit</th>
                       <th scope="col">Balance</th>
                       <th scope="col">Billing Type</th>
+                      <th scope="col">Statement Type</th>
+                      <th scope="col">Due Days</th>
+                      <th scope="col">Current Bill Due</th>
                       <th scope="col">Edit</th>
                       <th scope="col">Delete</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCustomers.map((customer, index) => (
-                      <tr key={customer._id}>
-                        <td>{index + 1}</td>
-                        <td>{customer.name}</td>
-                        <td>{customer.email}</td>
-                        <td>{customer.phoneNumber}</td>
-                        <td>{customer.address}</td>
-                        <td>{customer.pincode}</td>
-                        <td>AED{customer.creditLimit.toFixed(2)}</td>
-                        <td>AED{customer.balanceCreditLimit.toFixed(2)}</td>
-                        <td>{customer.billingType}</td>
-                        <td>
-                          <Link
-                            to={`/customer/create?edit=${customer._id}`}
-                            className="customer-list-icon-button customer-list-edit-button"
-                            aria-label={`Edit customer ${customer.name}`}
-                          >
-                            ✎
-                          </Link>
-                        </td>
-                        <td>
-                          <button
-                            className="customer-list-icon-button customer-list-delete-button"
-                            onClick={() => handleDelete(customer._id, customer.name)}
-                            aria-label={`Delete customer ${customer.name}`}
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredCustomers.map((customer, index) => {
+                      const daysLeft = getDaysRemaining(customer);
+                      const dueStatusText = getDueStatusText(daysLeft);
+                      const dueClass = getDueClass(daysLeft);
+
+                      return (
+                        <tr key={customer._id}>
+                          <td>{index + 1}</td>
+                          <td>{customer.name}</td>
+                          <td>{customer.email}</td>
+                          <td>{customer.phoneNumber}</td>
+                          <td>{customer.address}</td>
+                          <td>{customer.pincode}</td>
+                          <td>AED{customer.creditLimit.toFixed(2)}</td>
+                          <td>AED{customer.balanceCreditLimit.toFixed(2)}</td>
+                          <td>{customer.billingType}</td>
+                          <td>{customer.statementType ? customer.statementType.charAt(0).toUpperCase() + customer.statementType.slice(1) : 'N/A'}</td>
+                          <td>{customer.dueDays || 'N/A'}</td>
+                          <td className={dueClass}>
+                            {dueStatusText}
+                          </td>
+                          <td>
+                            <Link
+                              to={`/customer/create?edit=${customer._id}`}
+                              className="customer-list-icon-button customer-list-edit-button"
+                            >
+                              ✎
+                            </Link>
+                          </td>
+                          <td>
+                            <button
+                              className="customer-list-icon-button customer-list-delete-button"
+                              onClick={() => handleDelete(customer._id, customer.name)}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

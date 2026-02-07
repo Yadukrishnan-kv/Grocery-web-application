@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import '../../Customer/CreateCustomer/CreateCustomer.css'; // Use same CSS as CreateCustomer or copy below
+import '../../Customer/CreateCustomer/CreateCustomer.css'; // Reuse same CSS
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -15,7 +15,9 @@ const CreateCustomerRequest = () => {
     address: '',
     pincode: '',
     creditLimit: '',
-    billingType: 'Credit limit'
+    billingType: 'Credit limit',
+    statementType: '',
+    dueDays: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -26,34 +28,25 @@ const CreateCustomerRequest = () => {
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
 
-  // Same validation as admin CreateCustomer.jsx
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Customer name is required';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please provide a valid email';
-    }
-
-    if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Phone number is required';
-    }
-
-    if (!formData.address.trim()) {
-      newErrors.address = 'Address is required';
-    }
-
-    if (!formData.pincode.trim()) {
-      newErrors.pincode = 'Pincode is required';
-    }
-
+    if (!formData.name.trim()) newErrors.name = 'Customer name is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Please provide a valid email';
+    if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Phone number is required';
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    if (!formData.pincode.trim()) newErrors.pincode = 'Pincode is required';
     if (!formData.creditLimit || isNaN(formData.creditLimit) || parseFloat(formData.creditLimit) < 0) {
       newErrors.creditLimit = 'Valid credit limit is required';
+    }
+
+    // NEW: Validate if Credit limit
+    if (formData.billingType === "Credit limit") {
+      if (!formData.statementType) newErrors.statementType = 'Statement type is required for Credit limit';
+      if (!formData.dueDays || isNaN(formData.dueDays) || parseInt(formData.dueDays) < 0) {
+        newErrors.dueDays = 'Valid due days is required (non-negative number)';
+      }
     }
 
     setErrors(newErrors);
@@ -99,7 +92,9 @@ const CreateCustomerRequest = () => {
         address: formData.address.trim(),
         pincode: formData.pincode.trim(),
         creditLimit: parseFloat(formData.creditLimit),
-        billingType: formData.billingType
+        billingType: formData.billingType,
+        statementType: formData.billingType === "Credit limit" ? formData.statementType : null,
+        dueDays: formData.billingType === "Credit limit" ? parseInt(formData.dueDays) : null,
       };
 
       await axios.post(
@@ -135,8 +130,7 @@ const CreateCustomerRequest = () => {
 
         setUser(res.data.user || res.data);
 
-        // Only Salesman can access this page
-        if (res.data.user.role !== "Sales man") {
+        if (res.data.user.role !== "Sales man") {  // fixed typo
           navigate('/dashboard');
         }
       } catch (error) {
@@ -150,13 +144,9 @@ const CreateCustomerRequest = () => {
     fetchUser();
   }, [backendUrl, navigate]);
 
-  if (loading) {
-    return <div className="customer-loading">Loading user information...</div>;
-  }
+  if (loading) return <div className="customer-loading">Loading user information...</div>;
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
     <div className="customer-form-layout">
@@ -180,6 +170,7 @@ const CreateCustomerRequest = () => {
               Request submitted successfully! Admin will review it.
             </div>
           )}
+
           <form onSubmit={handleSubmit} noValidate>
             <div className="customer-form-row">
               <div className="customer-form-group">
@@ -194,11 +185,7 @@ const CreateCustomerRequest = () => {
                   aria-describedby={errors.name ? "name-error" : undefined}
                   className="customer-input"
                 />
-                {errors.name && (
-                  <p id="name-error" className="customer-error-text" role="alert">
-                    {errors.name}
-                  </p>
-                )}
+                {errors.name && <p id="name-error" className="customer-error-text">{errors.name}</p>}
               </div>
 
               <div className="customer-form-group">
@@ -213,11 +200,7 @@ const CreateCustomerRequest = () => {
                   aria-describedby={errors.email ? "email-error" : undefined}
                   className="customer-input"
                 />
-                {errors.email && (
-                  <p id="email-error" className="customer-error-text" role="alert">
-                    {errors.email}
-                  </p>
-                )}
+                {errors.email && <p id="email-error" className="customer-error-text">{errors.email}</p>}
               </div>
             </div>
 
@@ -234,11 +217,7 @@ const CreateCustomerRequest = () => {
                   aria-describedby={errors.phoneNumber ? "phonenumber-error" : undefined}
                   className="customer-input"
                 />
-                {errors.phoneNumber && (
-                  <p id="phonenumber-error" className="customer-error-text" role="alert">
-                    {errors.phoneNumber}
-                  </p>
-                )}
+                {errors.phoneNumber && <p id="phonenumber-error" className="customer-error-text">{errors.phoneNumber}</p>}
               </div>
 
               <div className="customer-form-group">
@@ -253,11 +232,7 @@ const CreateCustomerRequest = () => {
                   aria-describedby={errors.pincode ? "pincode-error" : undefined}
                   className="customer-input"
                 />
-                {errors.pincode && (
-                  <p id="pincode-error" className="customer-error-text" role="alert">
-                    {errors.pincode}
-                  </p>
-                )}
+                {errors.pincode && <p id="pincode-error" className="customer-error-text">{errors.pincode}</p>}
               </div>
             </div>
 
@@ -273,11 +248,7 @@ const CreateCustomerRequest = () => {
                 aria-describedby={errors.address ? "address-error" : undefined}
                 className="customer-textarea"
               />
-              {errors.address && (
-                <p id="address-error" className="customer-error-text" role="alert">
-                  {errors.address}
-                </p>
-              )}
+              {errors.address && <p id="address-error" className="customer-error-text">{errors.address}</p>}
             </div>
 
             <div className="customer-form-row">
@@ -295,11 +266,7 @@ const CreateCustomerRequest = () => {
                   aria-describedby={errors.creditLimit ? "creditlimit-error" : undefined}
                   className="customer-input"
                 />
-                {errors.creditLimit && (
-                  <p id="creditlimit-error" className="customer-error-text" role="alert">
-                    {errors.creditLimit}
-                  </p>
-                )}
+                {errors.creditLimit && <p id="creditlimit-error" className="customer-error-text">{errors.creditLimit}</p>}
               </div>
 
               <div className="customer-form-group">
@@ -316,6 +283,43 @@ const CreateCustomerRequest = () => {
                 </select>
               </div>
             </div>
+
+            {/* NEW: Conditional Billing Configuration */}
+            {formData.billingType === "Credit limit" && (
+              <div className="customer-form-row">
+                <div className="customer-form-group">
+                  <label htmlFor="statementType">Statement Type</label>
+                  <select
+                    id="statementType"
+                    name="statementType"
+                    value={formData.statementType}
+                    onChange={handleChange}
+                    className="customer-select"
+                  >
+                    <option value="">Select statement type</option>
+                    <option value="invoice-based">Invoice-based</option>
+                    <option value="monthly">Monthly Statement</option>
+                  </select>
+                  {errors.statementType && <p className="customer-error-text">{errors.statementType}</p>}
+                </div>
+
+                <div className="customer-form-group">
+                  <label htmlFor="dueDays">Due Days</label>
+                  <input
+                    id="dueDays"
+                    name="dueDays"
+                    type="number"
+                    min="0"
+                    value={formData.dueDays}
+                    onChange={handleChange}
+                    aria-invalid={!!errors.dueDays}
+                    aria-describedby={errors.dueDays ? "dueDays-error" : undefined}
+                    className="customer-input"
+                  />
+                  {errors.dueDays && <p id="dueDays-error" className="customer-error-text">{errors.dueDays}</p>}
+                </div>
+              </div>
+            )}
 
             {errors.submit && (
               <div className="customer-error-banner" role="alert">

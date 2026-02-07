@@ -23,7 +23,7 @@ const CustomerOrdersList = () => {
         window.location.href = '/login';
         return;
       }
-      
+
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -59,16 +59,15 @@ const CustomerOrdersList = () => {
     window.location.href = '/customer/create-order';
   };
 
-  // Filter orders based on search term and status
+  // Filter orders
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
-      const matchesSearch = !searchTerm.trim() || 
-        (order.product?.productName && 
-         order.product.productName.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesStatus = statusFilter === 'all' || 
-        (order.status && order.status.toLowerCase() === statusFilter.toLowerCase());
-      
+      const matchesSearch = !searchTerm.trim() ||
+        (order.product?.productName?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const matchesStatus = statusFilter === 'all' ||
+        (order.status?.toLowerCase() === statusFilter.toLowerCase());
+
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
@@ -83,14 +82,14 @@ const CustomerOrdersList = () => {
 
   return (
     <div className="customer-orders-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem={activeItem} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem={activeItem}
         onSetActiveItem={setActiveItem}
         onClose={() => setSidebarOpen(false)}
         user={user}
@@ -101,9 +100,8 @@ const CustomerOrdersList = () => {
             <div className="customer-orders-header-section">
               <h2 className="customer-orders-page-title">My Orders</h2>
 
-              {/* Exact same controls group as OrderList */}
               <div className="customer-orders-controls-group">
-                {/* Filter first */}
+                {/* Status Filter */}
                 <div className="customer-orders-filter-group">
                   <label htmlFor="statusFilter" className="customer-orders-filter-label">
                     Filter by Status:
@@ -121,7 +119,7 @@ const CustomerOrdersList = () => {
                   </select>
                 </div>
 
-                {/* Search bar (second) */}
+                {/* Search */}
                 <div className="customer-orders-search-container">
                   <input
                     type="text"
@@ -142,8 +140,8 @@ const CustomerOrdersList = () => {
                   )}
                 </div>
 
-                {/* Create Button (last) */}
-                <button 
+                {/* Create Button */}
+                <button
                   className="customer-orders-create-button"
                   onClick={handleCreateOrder}
                 >
@@ -151,7 +149,7 @@ const CustomerOrdersList = () => {
                 </button>
               </div>
             </div>
-            
+
             {loading ? (
               <div className="customer-orders-loading">Loading orders...</div>
             ) : filteredOrders.length === 0 ? (
@@ -167,10 +165,13 @@ const CustomerOrdersList = () => {
                     <tr>
                       <th scope="col">No</th>
                       <th scope="col">Product</th>
+                      <th scope="col">Unit</th>
                       <th scope="col">Ordered Qty</th>
+                      <th scope="col">Delivered Qty</th>
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
                       <th scope="col">Remarks</th>
+                      <th scope="col">Payment</th>
                       <th scope="col">Status</th>
                       <th scope="col">Order Date</th>
                     </tr>
@@ -180,13 +181,16 @@ const CustomerOrdersList = () => {
                       <tr key={order._id}>
                         <td>{index + 1}</td>
                         <td>{order.product?.productName || 'N/A'}</td>
-                        <td>{order.orderedQuantity} {order.unit || ''}</td>
+                        <td>{order.unit || '-'}</td>
+                        <td>{order.orderedQuantity}</td>
+                        <td>{order.deliveredQuantity || 0}</td>
                         <td>AED{order.price?.toFixed(2) || '0.00'}</td>
                         <td>AED{order.totalAmount?.toFixed(2) || '0.00'}</td>
                         <td>{order.remarks || '-'}</td>
+                        <td>{order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || 'N/A'}</td>
                         <td>
                           <span className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || 'pending'}`}>
-                            {order.status || 'Pending'}
+                            {order.status?.charAt(0).toUpperCase() + order.status?.slice(1) || 'Pending'}
                           </span>
                         </td>
                         <td>{new Date(order.orderDate).toLocaleDateString()}</td>

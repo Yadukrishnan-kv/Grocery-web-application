@@ -4,7 +4,7 @@ const Customer = require("../models/Customer");
 const User = require("../models/User");
 const CompanySettings = require("../models/CompanySettings");
 const InvoiceCounter = require('../models/InvoiceCounter');
-
+const { createInvoiceBasedBill } = require('../controllers/billController');  // ← import it
 
 const PDFDocument = require('pdfkit');
 
@@ -63,7 +63,8 @@ const createOrder = async (req, res) => {
       totalAmount,
       payment,
       remarks: remarks || '',
-      unit: product.unit  // ← NEW: Save product's unit
+      unit: product.unit,
+      orderDate: req.body.orderDate || new Date()
     });
 
     res.status(201).json(order);
@@ -181,7 +182,7 @@ const deleteOrder = async (req, res) => {
 
 const deliverOrder = async (req, res) => {
   try {
-    const { quantity } = req.body; // Quantity to deliver this time
+    const { quantity, deliveredAt } = req.body; // Quantity to deliver this time
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -195,9 +196,23 @@ const deliverOrder = async (req, res) => {
       return res.status(400).json({ message: "Invalid delivery quantity" });
     }
 
+    // Update delivered quantity
     order.deliveredQuantity += quantity;
+
+    // Set deliveredAt if this is the first delivery
+    if (order.deliveredQuantity === quantity) {
+      order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
+    }
+
+    // If fully delivered → change status + generate bill if invoice-based
     if (order.deliveredQuantity === order.orderedQuantity) {
       order.status = "delivered";
+
+      // NEW: Auto-generate bill for invoice-based
+      const customer = await Customer.findById(order.customer);
+      if (customer && customer.statementType === "invoice-based") {
+        await createInvoiceBasedBill(order);
+      }
     }
 
     await order.save();
@@ -577,6 +592,40 @@ const getMyAssignedOrders = async (req, res) => {
   }
 };
 
+
+// New endpoint: Generate single invoice for the order (ordered + delivered info)
+const getOrderInvoice = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
+      .populate("product", "productName price");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const filename = `order-invoice-${order._id.toString().slice(-8)}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ size: 'A4', margin: 0 });
+    doc.pipe(res);
+
+    // Reuse your existing PDF generator function
+    // We pass the full order object (it already has orderedQuantity, deliveredQuantity, etc.)
+    await generateStyledInvoicePDF(doc, order, 'ORDER INVOICE', `ORD-${order._id.toString().slice(-6)}`);
+
+    doc.end();
+
+    console.log(`Order invoice served for order ${order._id}`);
+  } catch (error) {
+    console.error('Error generating order invoice:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Server error", error: error.message });
+    }
+  }
+};
+
 // Delivery man accepts the order
 const acceptAssignedOrder = async (req, res) => {
   try {
@@ -734,5 +783,5 @@ module.exports = {
   assignOrderToDeliveryMan,
   getMyAssignedOrders,
   acceptAssignedOrder,
-  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders
+  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders,getOrderInvoice
 };

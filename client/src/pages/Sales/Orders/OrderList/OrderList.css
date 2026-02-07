@@ -412,4 +412,22 @@
   
   
 }
+.order-list-invoice-buttons {
+  display: flex;
+  gap: 8px;
+}
 
+.order-list-download-btn.order-invoice {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  background-color: #1e40af; /* nice blue */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.order-list-download-btn.order-invoice:hover {
+  background-color: #1e3a8a;
+}

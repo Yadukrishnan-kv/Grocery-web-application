@@ -39,6 +39,17 @@ const customerRequestSchema = new Schema(
       default: "Credit limit",
       required: true,
     },
+    // NEW FIELDS — same as Customer model
+    statementType: {
+      type: String,
+      enum: ["invoice-based", "monthly"],
+      default: null,
+    },
+    dueDays: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
     salesman: {
       type: Schema.Types.ObjectId,
       ref: "User",

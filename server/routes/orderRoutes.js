@@ -15,7 +15,7 @@ const {
   assignOrderToDeliveryMan,
   getMyAssignedOrders,
   acceptAssignedOrder,
-  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders
+  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders,getOrderInvoice
 } = require("../controllers/orderController");
 
 
@@ -40,5 +40,6 @@ router.get("/admin-delivered-orders", getDeliveredOrdersForAdmin);
 router.get("/customerorders", getCustomerOrders);
 router.get("/customerorder/:id", getCustomerOrderById);
 router.get("/my-orders", getMyOrders);
+router.get('/invoice/:id', getOrderInvoice);
 
 module.exports = router;

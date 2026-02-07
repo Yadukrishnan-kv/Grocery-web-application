@@ -201,3 +201,43 @@
   color: #475569;
   margin-bottom: 0.5rem;
 }
+
+/* Days Remaining Column Styles */
+.days-green {
+  color: #166534;
+  font-weight: 600;
+}
+
+.days-yellow {
+  color: #92400e;
+  font-weight: 600;
+}
+
+.days-red {
+  color: #991b1b;
+  font-weight: bold;
+}
+
+.days-neutral {
+  color: #64748b;
+}
+/* Days Remaining Styles */
+.days-green {
+  color: #166534; /* dark green */
+  font-weight: 600;
+}
+
+.days-yellow {
+  color: #92400e; /* orange/brown */
+  font-weight: 600;
+}
+
+.days-red {
+  color: #991b1b; /* red */
+  font-weight: bold;
+}
+
+.days-neutral {
+  color: #64748b; /* gray for due date only */
+  font-style: italic;
+}

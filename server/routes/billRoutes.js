@@ -8,7 +8,7 @@ const {
   getBillById,
   payBill,
   getCustomerBills,
-  getCustomerBillById
+  getCustomerBillById,generateTestMonthlyBill
 } = require("../controllers/billController");
 
 

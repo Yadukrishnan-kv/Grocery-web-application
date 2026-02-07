@@ -227,9 +227,9 @@ const getMyCustomerProfile = async (req, res) => {
       return res.status(403).json({ message: "Access denied - Customers only" });
     }
 
-    // Find Customer where user field matches logged-in User _id
+    // Include new fields
     const customer = await Customer.findOne({ user: req.user._id })
-      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType');
+      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType statementType dueDays');
 
     if (!customer) {
       return res.status(404).json({ message: "Customer profile not found" });
@@ -241,6 +241,7 @@ const getMyCustomerProfile = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 const createCustomerProfile = async (req, res) => {
   try {
     const { name, phoneNumber, address, pincode } = req.body;
@@ -268,7 +269,7 @@ const createCustomerProfile = async (req, res) => {
 // Salesman creates request
 const createCustomerRequest = async (req, res) => {
   try {
-    if (req.user.role !== "Sales man") {
+    if (req.user.role !== "Sales man") {  
       return res.status(403).json({ message: "Only salesmen can create customer requests" });
     }
 
@@ -280,9 +281,11 @@ const createCustomerRequest = async (req, res) => {
       pincode,
       creditLimit,
       billingType = "Credit limit",
+      statementType,  // NEW
+      dueDays,        // NEW
     } = req.body;
 
-    // Validation (same as direct create)
+    // Validation
     if (
       !name?.trim() ||
       !email?.trim() ||
@@ -299,7 +302,21 @@ const createCustomerRequest = async (req, res) => {
       return res.status(400).json({ message: "Invalid credit limit value" });
     }
 
-    // Check if email already exists in customers or requests
+    // NEW: Validate billing config if "Credit limit"
+    let parsedStatementType = null;
+    let parsedDueDays = null;
+    if (billingType === "Credit limit") {
+      if (!statementType || !["invoice-based", "monthly"].includes(statementType)) {
+        return res.status(400).json({ message: "Invalid statement type. Must be 'invoice-based' or 'monthly'" });
+      }
+      if (!dueDays || isNaN(dueDays) || parseInt(dueDays) < 0) {
+        return res.status(400).json({ message: "Due days must be a non-negative number" });
+      }
+      parsedStatementType = statementType;
+      parsedDueDays = parseInt(dueDays);
+    }
+
+    // Check duplicates
     const existingCustomer = await Customer.findOne({ email: email.trim().toLowerCase() });
     const existingRequest = await CustomerRequest.findOne({
       email: email.trim().toLowerCase(),
@@ -317,6 +334,8 @@ const createCustomerRequest = async (req, res) => {
       pincode: pincode.trim(),
       creditLimit: parsedCreditLimit,
       billingType,
+      statementType: parsedStatementType,  // NEW
+      dueDays: parsedDueDays,              // NEW
       salesman: req.user._id,
     });
 
@@ -379,15 +398,15 @@ const acceptCustomerRequest = async (req, res) => {
       return res.status(400).json({ message: "Request already processed" });
     }
 
-    // Use the SAME default password as direct creation
+    // Use same default password logic
     const defaultPassword = process.env.NODE_ENV === "production" 
-      ? "customer123"  // You can change this in production
+      ? crypto.randomBytes(10).toString("hex") 
       : "customer123";
 
     const user = await User.create({
       username: request.name.trim(),
       email: request.email,
-      password: defaultPassword,  // ← same as createCustomer
+      password: defaultPassword,
       role: "Customer",
     });
 
@@ -401,13 +420,13 @@ const acceptCustomerRequest = async (req, res) => {
       creditLimit: request.creditLimit,
       balanceCreditLimit: request.creditLimit,
       billingType: request.billingType,
+      statementType: request.statementType,  // NEW — copy from request
+      dueDays: request.dueDays,              // NEW — copy from request
     });
 
-    // Update request to accepted
     request.status = "accepted";
     await request.save();
 
-    // Return same style response as createCustomer
     const responseData = {
       message: "Request accepted - Customer created",
       customer: {
@@ -420,6 +439,8 @@ const acceptCustomerRequest = async (req, res) => {
         creditLimit: customer.creditLimit,
         balanceCreditLimit: customer.balanceCreditLimit,
         billingType: customer.billingType,
+        statementType: customer.statementType,  // NEW
+        dueDays: customer.dueDays,              // NEW
         createdAt: customer.createdAt,
       },
       note: process.env.NODE_ENV === "production"
@@ -427,7 +448,6 @@ const acceptCustomerRequest = async (req, res) => {
         : "Development mode: Default password is 'customer123'",
     };
 
-    // In dev mode, include credentials clearly
     if (process.env.NODE_ENV !== "production") {
       responseData.defaultLoginInfo = {
         email: user.email,
@@ -470,7 +490,38 @@ const rejectCustomerRequest = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+const getAllCustomersWithDue = async (req, res) => {
+  try {
+    const customers = await Customer.find().sort({ name: 1 });
 
+    const customersWithDue = await Promise.all(customers.map(async (customer) => {
+      const latestPendingBill = await Bill.findOne({
+        customer: customer._id,
+        status: "pending"
+      }).sort({ cycleEnd: -1 });
+
+      const daysLeft = latestPendingBill ? getDaysRemaining(latestPendingBill.dueDate) : null;
+
+      return {
+        ...customer.toObject(),
+        pendingBillDaysLeft: daysLeft,
+        pendingDueDate: latestPendingBill?.dueDate
+      };
+    }));
+
+    res.json(customersWithDue);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Helper (can be in utils or controller)
+function getDaysRemaining(dueDate) {
+  const today = new Date();
+  const due = new Date(dueDate);
+  const diffTime = due - today;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
 
 
 module.exports = {
@@ -485,5 +536,6 @@ module.exports = {
   getMyCustomerRequests,
   getPendingCustomerRequests,
   acceptCustomerRequest,
-  rejectCustomerRequest
+  rejectCustomerRequest,
+  getAllCustomersWithDue
 };

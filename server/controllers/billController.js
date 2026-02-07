@@ -130,11 +130,20 @@ const getCustomerBills = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const bills = await Bill.find({ customer: req.user._id })
-      .sort({ cycleEnd: -1 });
+    // Step 1: Find the Customer document linked to this user
+    const customer = await Customer.findOne({ user: req.user._id });
+    if (!customer) {
+      return res.status(404).json({ message: "Customer profile not found" });
+    }
+
+    // Step 2: Find bills using the CUSTOMER _id
+    const bills = await Bill.find({ customer: customer._id })
+      .sort({ cycleEnd: -1 })
+      .populate("orders", "product orderedQuantity totalAmount orderDate status"); // optional
 
     res.json(bills);
   } catch (error) {
+    console.error("getCustomerBills error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -145,15 +154,23 @@ const getCustomerBillById = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const bill = await Bill.findById(req.params.id)
+    const customer = await Customer.findOne({ user: req.user._id });
+    if (!customer) {
+      return res.status(404).json({ message: "Customer profile not found" });
+    }
+
+    const bill = await Bill.findOne({
+      _id: req.params.id,
+      customer: customer._id  // ← must match customer, not user
+    })
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit billingType")
       .populate("orders", "product orderedQuantity totalAmount orderDate status");
 
-    if (!bill || bill.customer.toString() !== req.user._id.toString()) {
-      return res.status(404).json({ message: "Bill not found" });
+    if (!bill) {
+      return res.status(404).json({ message: "Bill not found or not yours" });
     }
 
-    // Check if overdue
+    // Check overdue
     if (bill.status === "pending" && new Date() > bill.dueDate) {
       bill.status = "overdue";
       await bill.save();
@@ -165,9 +182,45 @@ const getCustomerBillById = async (req, res) => {
   }
 };
 
+const createInvoiceBasedBill = async (order) => {
+  try {
+    const customer = await Customer.findById(order.customer);
+    if (!customer || customer.statementType !== "invoice-based") {
+      return null; // Not invoice-based or customer not found
+    }
+
+    const deliveryDate = order.deliveredAt || new Date();
+
+    // Due date = delivery date + dueDays
+    const dueDate = new Date(deliveryDate);
+    dueDate.setDate(dueDate.getDate() + customer.dueDays);
+
+    const bill = await Bill.create({
+      customer: order.customer,
+      cycleStart: deliveryDate,
+      cycleEnd: deliveryDate,
+      totalUsed: order.totalAmount,
+      amountDue: order.totalAmount,
+      dueDate,
+      paidAmount: 0,
+      status: "pending",
+      orders: [order._id], // Link to this order
+    });
+
+    // Optional: Link bill back to order
+    order.bill = bill._id;
+    await order.save();
+
+    console.log(`Invoice-based bill created for order ${order._id}: ${bill._id}`);
+    return bill;
+  } catch (error) {
+    console.error("Error creating invoice-based bill:", error);
+    return null;
+  }
+};
 module.exports = {
   generateBill,
   getAllBills,
   getBillById,
-  payBill,getCustomerBills,getCustomerBillById
+  payBill,getCustomerBills,getCustomerBillById,createInvoiceBasedBill
 };
