@@ -1,5 +1,5 @@
 // src/pages/Sales/MyCustomerRequests.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './MyCustomerRequests.css'; // New CSS file (below)
@@ -11,6 +11,8 @@ const MyCustomerRequests = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -46,6 +48,26 @@ const MyCustomerRequests = () => {
     fetchData();
   }, [backendUrl, navigate]);
 
+  // Combined search + status filter using useMemo for performance
+  const filteredRequests = useMemo(() => {
+    return requests.filter(request => {
+      // Search by name or email
+      const matchesSearch = !searchTerm.trim() ||
+        request.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        request.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Status filter
+      const matchesStatus = statusFilter === 'all' ||
+        request.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [requests, searchTerm, statusFilter]);
+
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
   if (loading) {
     return <div className="requests-loading">Loading requests...</div>;
   }
@@ -69,11 +91,54 @@ const MyCustomerRequests = () => {
           <div className="requests-container">
             <div className="requests-header-section">
               <h2 className="requests-page-title">My Customer Requests</h2>
+
+              {/* Search & Filter Controls */}
+              <div className="requests-controls-group">
+                {/* Status Filter */}
+                <div className="requests-filter-group">
+                  <label htmlFor="statusFilter" className="requests-filter-label">
+                    Filter by Status:
+                  </label>
+                  <select
+                    id="statusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="requests-status-filter"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+
+                {/* Search Bar */}
+                <div className="requests-search-container">
+                  <input
+                    type="text"
+                    className="requests-search-input"
+                    placeholder="Search by name or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <button
+                      className="requests-search-clear"
+                      onClick={clearSearch}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {requests.length === 0 ? (
+            {filteredRequests.length === 0 ? (
               <div className="requests-no-data">
-                No customer requests found
+                {requests.length === 0
+                  ? "No customer requests found"
+                  : "No requests match your search/filter"}
               </div>
             ) : (
               <div className="requests-table-wrapper">
@@ -92,7 +157,7 @@ const MyCustomerRequests = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {requests.map((request, index) => (
+                    {filteredRequests.map((request, index) => (
                       <tr key={request._id}>
                         <td>{index + 1}</td>
                         <td>{request.name}</td>
@@ -102,7 +167,7 @@ const MyCustomerRequests = () => {
                         <td>{request.billingType}</td>
                         <td>
                           <span className={`requests-status-badge requests-status-${request.status}`}>
-                            {request.status === 'pending' ? 'Pending' : 
+                            {request.status === 'pending' ? 'Pending' :
                              request.status === 'accepted' ? 'Accepted' : 'Rejected'}
                           </span>
                         </td>

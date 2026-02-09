@@ -15,7 +15,6 @@ const OrderList = () => {
   const [deliveryPartners, setDeliveryPartners] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -25,7 +24,6 @@ const OrderList = () => {
         window.location.href = '/login';
         return;
       }
-      
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -74,13 +72,11 @@ const OrderList = () => {
   // Filter orders based on search term and status
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
-      const matchesSearch = !searchTerm.trim() || 
-        (order.customer?.name && 
-         order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesStatus = statusFilter === 'all' || 
+      const matchesSearch = !searchTerm.trim() ||
+        (order.customer?.name &&
+          order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesStatus = statusFilter === 'all' ||
         (order.status && order.status.toLowerCase() === statusFilter.toLowerCase());
-      
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
@@ -117,29 +113,28 @@ const OrderList = () => {
     }
   };
 
-  const handleDownloadOrderInvoice = async (orderId) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await axios.get(
-      `${backendUrl}/api/orders/invoice/${orderId}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob'
-      }
-    );
-
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `order-invoice-${orderId}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  } catch (error) {
-    console.error('Error downloading order invoice:', error);
-    alert('Failed to download invoice');
-  }
-};
+  // const handleDownloadOrderInvoice = async (orderId) => {
+  //   try {
+  //     const token = localStorage.getItem('token');
+  //     const response = await axios.get(
+  //       `${backendUrl}/api/orders/invoice/${orderId}`,
+  //       {
+  //         headers: { Authorization: `Bearer ${token}` },
+  //         responseType: 'blob'
+  //       }
+  //     );
+  //     const url = window.URL.createObjectURL(new Blob([response.data]));
+  //     const link = document.createElement('a');
+  //     link.href = url;
+  //     link.setAttribute('download', `order-invoice-${orderId}.pdf`);
+  //     document.body.appendChild(link);
+  //     link.click();
+  //     link.remove();
+  //   } catch (error) {
+  //     console.error('Error downloading order invoice:', error);
+  //     alert('Failed to download invoice');
+  //   }
+  // };
 
   // Clear search
   const clearSearch = () => {
@@ -150,16 +145,24 @@ const OrderList = () => {
     return <div className="order-list-loading">Loading...</div>;
   }
 
+  // Helper to get assignment status display text
+  const getAssignmentStatusDisplay = (order) => {
+    if (order.assignmentStatus === 'accepted') return 'Accepted';
+    if (order.assignmentStatus === 'rejected') return 'Rejected';
+    if (order.assignmentStatus === 'assigned') return 'Assigned';
+    return 'Pending';
+  };
+
   return (
     <div className="order-list-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem={activeItem} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem={activeItem}
         onSetActiveItem={setActiveItem}
         onClose={() => setSidebarOpen(false)}
         user={user}
@@ -169,23 +172,23 @@ const OrderList = () => {
           <div className="order-list-container">
             <div className="order-list-header-section">
               <h2 className="order-list-page-title">Order Management</h2>
-
               {/* Controls: Filter first → then Search → then Create */}
               <div className="order-list-controls-group">
-              <label htmlFor="categoryFilter" className="subcategory-list-filter-label">
-                    Filter by Order Status:
-                  </label>                <select
+                <label htmlFor="statusFilter" className="order-list-filter-label">
+                  Filter by Order Status:
+                </label>
+                <select
+                  id="statusFilter"
                   className="order-list-status-filter"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   aria-label="Filter orders by status"
                 >
-                  <option value="all">All </option>
+                  <option value="all">All</option>
                   <option value="pending">Pending</option>
-                  <option value="delivered">delivered</option>
-                  <option value="cancelled">cancelled</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
-
                 {/* Search Bar (second) */}
                 <div className="order-list-search-container">
                   <input
@@ -206,14 +209,13 @@ const OrderList = () => {
                     </button>
                   )}
                 </div>
-
                 {/* Create Button (last) */}
                 <Link to="/order/create" className="order-list-create-button">
                   Create Order
                 </Link>
               </div>
             </div>
-            
+
             {loading ? (
               <div className="order-list-loading">Loading orders...</div>
             ) : (
@@ -232,7 +234,8 @@ const OrderList = () => {
                       <th scope="col">Remarks</th>
                       <th scope="col">Order Date</th>
                       <th scope="col">Delivery Partner</th>
-                      <th scope="col">Invoice</th>
+                      <th scope="col">Assignment Status</th> {/* NEW COLUMN */}
+                      {/* <th scope="col">Invoice</th> */}
                       <th scope="col">Actions</th>
                     </tr>
                   </thead>
@@ -259,7 +262,8 @@ const OrderList = () => {
                           </td>
                           <td>{order.orderDate ? new Date(order.orderDate).toLocaleDateString() : 'N/A'}</td>
                           <td>
-                            {order.assignmentStatus === "pending_assignment" ? (
+                            {/* Show dropdown if pending_assignment OR rejected (needs reassignment) */}
+                            {order.assignmentStatus === "pending_assignment" || order.assignmentStatus === "rejected" ? (
                               <select
                                 className="order-list-delivery-partner-select"
                                 onChange={(e) => {
@@ -270,7 +274,11 @@ const OrderList = () => {
                                 }}
                                 defaultValue=""
                               >
-                                <option value="">Assign Delivery Partner</option>
+                                <option value="">
+                                  {order.assignmentStatus === "rejected" 
+                                    ? "Reassign Partner" 
+                                    : "Assign Delivery Partner"}
+                                </option>
                                 {deliveryPartners.map(partner => (
                                   <option key={partner._id} value={partner._id}>
                                     {partner.username}
@@ -286,18 +294,24 @@ const OrderList = () => {
                             )}
                           </td>
                           <td>
-  <div className="order-list-invoice-buttons">
-    {order.orderedQuantity > 0 && (
-      <button
-        className="order-list-download-btn order-invoice"
-        onClick={() => handleDownloadOrderInvoice(order._id)}
-        title="Download Order Invoice"
-      >
-        Download Invoice
-      </button>
-    )}
-  </div>
-</td>
+                            {/* NEW: Assignment status badge */}
+                            <span className={`order-list-assignment-badge order-list-assignment-${order.assignmentStatus?.toLowerCase() || 'pending'}`}>
+                              {getAssignmentStatusDisplay(order)}
+                            </span>
+                          </td>
+                          {/* <td>
+                            <div className="order-list-invoice-buttons">
+                              {order.orderedQuantity > 0 && (
+                                <button
+                                  className="order-list-download-btn order-invoice"
+                                  onClick={() => handleDownloadOrderInvoice(order._id)}
+                                  title="Download Order Invoice"
+                                >
+                                  Download Invoice
+                                </button>
+                              )}
+                            </div>
+                          </td> */}
                           <td>
                             <div className="order-list-action-buttons">
                               <Link
@@ -320,9 +334,9 @@ const OrderList = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="12" className="order-list-no-data">
-                          {orders.length === 0 
-                            ? 'No orders found' 
+                        <td colSpan="14" className="order-list-no-data">
+                          {orders.length === 0
+                            ? 'No orders found'
                             : 'No orders match your filters'}
                         </td>
                       </tr>

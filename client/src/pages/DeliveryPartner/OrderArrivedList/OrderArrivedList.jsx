@@ -12,10 +12,10 @@ const OrderArrivedList = () => {
   const [activeItem, setActiveItem] = useState('Order arrived');
   const [user, setUser] = useState(null);
   const [acceptingOrderId, setAcceptingOrderId] = useState(null);
+  const [rejectingOrderId, setRejectingOrderId] = useState(null); // NEW
   const [searchTerm, setSearchTerm] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -25,14 +25,12 @@ const OrderArrivedList = () => {
         window.location.href = '/login';
         return;
       }
-      
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUser(response.data.user || response.data);
     } catch (error) {
       console.error("Failed to load user", error);
-      
       if (error.response?.status === 401) {
         localStorage.removeItem('token');
         alert('Your session has expired. Please login again.');
@@ -50,16 +48,13 @@ const OrderArrivedList = () => {
       if (!token) {
         throw new Error('No token found');
       }
-      
       const response = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
       const assignedOrders = response.data.filter(order => order.assignmentStatus === "assigned");
       setOrders(assignedOrders);
     } catch (error) {
       console.error('Error fetching assigned orders:', error);
-      
       if (error.response?.status === 401) {
         localStorage.removeItem('token');
         alert('Your session has expired. Please login again.');
@@ -82,7 +77,6 @@ const OrderArrivedList = () => {
 
   const handleAcceptOrder = async (orderId) => {
     if (!window.confirm('Are you sure you want to accept this order?')) return;
-    
     setAcceptingOrderId(orderId);
     try {
       const token = localStorage.getItem('token');
@@ -100,6 +94,27 @@ const OrderArrivedList = () => {
     }
   };
 
+  // NEW: Reject order handler
+  const handleRejectOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to reject this order? The order will be returned to the admin for reassignment.')) return;
+    setRejectingOrderId(orderId);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${backendUrl}/api/orders/reject/${orderId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchAssignedOrders();
+      alert('Order rejected successfully. It has been returned for reassignment.');
+    } catch (error) {
+      console.error('Error rejecting order:', error);
+      alert('Failed to reject order. Please try again.');
+    } finally {
+      setRejectingOrderId(null);
+    }
+  };
+
   const clearFilters = () => {
     setSearchTerm('');
     setFromDate('');
@@ -110,28 +125,24 @@ const OrderArrivedList = () => {
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       // Search by customer name
-      const matchesSearch = !searchTerm.trim() || 
+      const matchesSearch = !searchTerm.trim() ||
         (order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()));
-
       // Date range filter
       let matchesDate = true;
       if (fromDate || toDate) {
         const orderDate = new Date(order.orderDate);
         orderDate.setHours(0, 0, 0, 0); // Normalize to start of day
-
         if (fromDate) {
           const start = new Date(fromDate);
           start.setHours(0, 0, 0, 0);
           if (orderDate < start) matchesDate = false;
         }
-
         if (toDate) {
           const end = new Date(toDate);
           end.setHours(23, 59, 59, 999); // End of day
           if (orderDate > end) matchesDate = false;
         }
       }
-
       return matchesSearch && matchesDate;
     });
   }, [orders, searchTerm, fromDate, toDate]);
@@ -142,14 +153,14 @@ const OrderArrivedList = () => {
 
   return (
     <div className="order-arrived-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem={activeItem} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem={activeItem}
         onSetActiveItem={setActiveItem}
         onClose={() => setSidebarOpen(false)}
         user={user}
@@ -158,7 +169,6 @@ const OrderArrivedList = () => {
         <div className="order-arrived-container-wrapper">
           <div className="order-arrived-container">
             <h2 className="order-arrived-page-title">Order Arrived</h2>
-            
             {/* Controls: Date From → Date To → Search → Clear → (no create button here) */}
             <div className="order-arrived-controls-group">
               {/* From Date */}
@@ -174,7 +184,6 @@ const OrderArrivedList = () => {
                   className="order-arrived-date-input"
                 />
               </div>
-
               {/* To Date */}
               <div className="order-arrived-date-filter">
                 <label htmlFor="toDate" className="order-arrived-filter-label">
@@ -188,7 +197,6 @@ const OrderArrivedList = () => {
                   className="order-arrived-date-input"
                 />
               </div>
-
               {/* Search bar */}
               <div className="order-arrived-search-container">
                 <input
@@ -209,7 +217,6 @@ const OrderArrivedList = () => {
                   </button>
                 )}
               </div>
-
               {/* Clear Filters Button */}
               {(searchTerm || fromDate || toDate) && (
                 <button
@@ -220,7 +227,6 @@ const OrderArrivedList = () => {
                 </button>
               )}
             </div>
-
             {loading ? (
               <div className="order-arrived-loading">Loading orders...</div>
             ) : filteredOrders.length === 0 ? (
@@ -241,7 +247,7 @@ const OrderArrivedList = () => {
                       <th scope="col">Total Amount</th>
                       <th scope="col">Remarks</th>
                       <th scope="col">Order Date</th>
-                      <th scope="col">Accept Order</th>
+                      <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -256,13 +262,22 @@ const OrderArrivedList = () => {
                         <td>{order.remarks || '-'}</td>
                         <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                         <td>
-                          <button
-                            className="order-arrived-accept-button"
-                            onClick={() => handleAcceptOrder(order._id)}
-                            disabled={acceptingOrderId === order._id}
-                          >
-                            {acceptingOrderId === order._id ? 'Accepting...' : 'Accept'}
-                          </button>
+                          <div className="order-arrived-action-buttons">
+                            <button
+                              className="order-arrived-accept-button"
+                              onClick={() => handleAcceptOrder(order._id)}
+                              disabled={acceptingOrderId === order._id || rejectingOrderId === order._id}
+                            >
+                              {acceptingOrderId === order._id ? 'Accepting...' : 'Accept'}
+                            </button>
+                            <button
+                              className="order-arrived-reject-button"
+                              onClick={() => handleRejectOrder(order._id)}
+                              disabled={acceptingOrderId === order._id || rejectingOrderId === order._id}
+                            >
+                              {rejectingOrderId === order._id ? 'Rejecting...' : 'Reject'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

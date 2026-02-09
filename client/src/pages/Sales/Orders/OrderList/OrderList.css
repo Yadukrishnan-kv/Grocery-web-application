@@ -431,3 +431,76 @@
 .order-list-download-btn.order-invoice:hover {
   background-color: #1e3a8a;
 }
+/* Append to existing OrderList.css */
+
+/* Assignment status badges */
+.order-list-assignment-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  letter-spacing: 0.025em;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.order-list-assignment-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.order-list-assignment-assigned {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.order-list-assignment-accepted {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.order-list-assignment-rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* Filter label styling */
+.order-list-filter-label {
+  margin-right: 0.5rem;
+  font-weight: 500;
+  color: #334155;
+  white-space: nowrap;
+}
+
+/* Responsive adjustments for new column */
+@media (max-width: 1200px) {
+  .order-list-data-table {
+    min-width: 1600px; /* Wider to accommodate new column */
+  }
+}
+
+@media (max-width: 768px) {
+  .order-list-controls-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  
+  .order-list-filter-label {
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  
+  #statusFilter {
+    width: 100%;
+  }
+}

@@ -1,7 +1,7 @@
 const Customer = require("../models/Customer");
 const User = require("../models/User");
 const CustomerRequest = require("../models/CustomerRequest");
-
+const Bill = require("../models/Bill");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
@@ -490,38 +490,42 @@ const rejectCustomerRequest = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-const getAllCustomersWithDue = async (req, res) => {
-  try {
-    const customers = await Customer.find().sort({ name: 1 });
-
-    const customersWithDue = await Promise.all(customers.map(async (customer) => {
-      const latestPendingBill = await Bill.findOne({
-        customer: customer._id,
-        status: "pending"
-      }).sort({ cycleEnd: -1 });
-
-      const daysLeft = latestPendingBill ? getDaysRemaining(latestPendingBill.dueDate) : null;
-
-      return {
-        ...customer.toObject(),
-        pendingBillDaysLeft: daysLeft,
-        pendingDueDate: latestPendingBill?.dueDate
-      };
-    }));
-
-    res.json(customersWithDue);
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Helper (can be in utils or controller)
 function getDaysRemaining(dueDate) {
   const today = new Date();
   const due = new Date(dueDate);
   const diffTime = due - today;
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
+
+const getAllCustomersWithDue = async (req, res) => {
+  try {
+    const customers = await Customer.find().sort({ name: 1 });
+
+    const customersWithDue = await Promise.all(
+      customers.map(async (customer) => {
+        const latestPendingBill = await Bill.findOne({
+          customer: customer._id,
+          status: "pending"
+        }).sort({ cycleEnd: -1 });
+
+        const daysLeft = latestPendingBill
+          ? getDaysRemaining(latestPendingBill.dueDate)
+          : null;
+
+        return {
+          ...customer.toObject(),
+          pendingBillDaysLeft: daysLeft,
+          pendingDueDate: latestPendingBill?.dueDate
+        };
+      })
+    );
+
+    res.json(customersWithDue);
+  } catch (error) {
+    console.error("Error in getAllCustomersWithDue:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 
 module.exports = {

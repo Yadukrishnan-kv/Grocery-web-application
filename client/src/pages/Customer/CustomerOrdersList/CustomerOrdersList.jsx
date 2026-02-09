@@ -13,7 +13,6 @@ const CustomerOrdersList = () => {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -23,7 +22,6 @@ const CustomerOrdersList = () => {
         window.location.href = '/login';
         return;
       }
-
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -64,16 +62,23 @@ const CustomerOrdersList = () => {
     return orders.filter(order => {
       const matchesSearch = !searchTerm.trim() ||
         (order.product?.productName?.toLowerCase().includes(searchTerm.toLowerCase()));
-
       const matchesStatus = statusFilter === 'all' ||
         (order.status?.toLowerCase() === statusFilter.toLowerCase());
-
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
 
   const clearSearch = () => {
     setSearchTerm('');
+  };
+
+  // Helper to get assignment status display text
+  const getAssignmentStatusDisplay = (order) => {
+    if (!order.assignedTo) return 'Not Assigned';
+    if (order.assignmentStatus === 'accepted') return 'Accepted';
+    if (order.assignmentStatus === 'rejected') return 'Rejected';
+    if (order.assignmentStatus === 'assigned') return 'Assigned';
+    return 'Pending';
   };
 
   if (!user) {
@@ -99,7 +104,6 @@ const CustomerOrdersList = () => {
           <div className="customer-orders-container">
             <div className="customer-orders-header-section">
               <h2 className="customer-orders-page-title">My Orders</h2>
-
               <div className="customer-orders-controls-group">
                 {/* Status Filter */}
                 <div className="customer-orders-filter-group">
@@ -118,7 +122,6 @@ const CustomerOrdersList = () => {
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
-
                 {/* Search */}
                 <div className="customer-orders-search-container">
                   <input
@@ -139,7 +142,6 @@ const CustomerOrdersList = () => {
                     </button>
                   )}
                 </div>
-
                 {/* Create Button */}
                 <button
                   className="customer-orders-create-button"
@@ -149,7 +151,6 @@ const CustomerOrdersList = () => {
                 </button>
               </div>
             </div>
-
             {loading ? (
               <div className="customer-orders-loading">Loading orders...</div>
             ) : filteredOrders.length === 0 ? (
@@ -173,6 +174,8 @@ const CustomerOrdersList = () => {
                       <th scope="col">Remarks</th>
                       <th scope="col">Payment</th>
                       <th scope="col">Status</th>
+                      <th scope="col">Delivery Partner</th>
+                      <th scope="col">Assignment Status</th> {/* NEW COLUMN */}
                       <th scope="col">Order Date</th>
                     </tr>
                   </thead>
@@ -191,6 +194,14 @@ const CustomerOrdersList = () => {
                         <td>
                           <span className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || 'pending'}`}>
                             {order.status?.charAt(0).toUpperCase() + order.status?.slice(1) || 'Pending'}
+                          </span>
+                        </td>
+                        <td>
+                          {order.assignedTo?.username || 'Not Assigned'}
+                        </td>
+                        <td>
+                          <span className={`customer-orders-assignment-badge customer-orders-assignment-${order.assignmentStatus?.toLowerCase() || 'pending'}`}>
+                            {getAssignmentStatusDisplay(order)}
                           </span>
                         </td>
                         <td>{new Date(order.orderDate).toLocaleDateString()}</td>

@@ -5,6 +5,13 @@ import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CustomerBillStatement.css';
 import axios from 'axios';
 
+// Helper: Format date to DD/MM/YYYY
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+};
+
 const CustomerBillStatement = () => {
   const [bills, setBills] = useState([]);
   const [config, setConfig] = useState({
@@ -19,7 +26,6 @@ const CustomerBillStatement = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
-  // Fetch logged-in user info
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -39,7 +45,6 @@ const CustomerBillStatement = () => {
     }
   }, [backendUrl]);
 
-  // Fetch customer's bills
   const fetchCustomerBills = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -53,7 +58,6 @@ const CustomerBillStatement = () => {
     }
   }, [backendUrl]);
 
-  // Fetch customer's billing configuration
   const fetchBillingConfig = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -70,7 +74,6 @@ const CustomerBillStatement = () => {
     }
   }, [backendUrl]);
 
-  // Load all data in parallel
   useEffect(() => {
     const loadAllData = async () => {
       setLoading(true);
@@ -83,7 +86,7 @@ const CustomerBillStatement = () => {
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
-        setLoading(false); // Always stop loading when done (success or error)
+        setLoading(false);
       }
     };
 
@@ -93,7 +96,7 @@ const CustomerBillStatement = () => {
   // Calculate days remaining until due date
   const getDaysRemaining = (dueDate) => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to midnight
+    today.setHours(0, 0, 0, 0);
     const due = new Date(dueDate);
     due.setHours(0, 0, 0, 0);
     const diffTime = due - today;
@@ -113,13 +116,22 @@ const CustomerBillStatement = () => {
     // Monthly statement: countdown only starts 7 days before due date
     if (config.statementType === 'monthly') {
       if (days > 7) {
-        return { text: `Due on ${new Date(dueDate).toLocaleDateString()}`, className: 'days-neutral' };
+        return { 
+          text: `Due on ${formatDate(dueDate)}`, 
+          className: 'days-neutral' 
+        };
       } else if (days > 0) {
-        return { text: `${days} days left`, className: days > 3 ? 'days-green' : 'days-yellow' };
+        return { 
+          text: `${days} days left`, 
+          className: days > 3 ? 'days-green' : 'days-yellow' 
+        };
       } else if (days === 0) {
         return { text: 'Due today', className: 'days-yellow' };
       } else {
-        return { text: `Overdue by ${Math.abs(days)} days`, className: 'days-red' };
+        return { 
+          text: `Overdue by ${Math.abs(days)} days`, 
+          className: 'days-red' 
+        };
       }
     }
 
@@ -131,12 +143,15 @@ const CustomerBillStatement = () => {
     } else if (days === 0) {
       return { text: 'Due today', className: 'days-yellow' };
     } else {
-      return { text: `Overdue by ${Math.abs(days)} days`, className: 'days-red' };
+      return { 
+        text: `Overdue by ${Math.abs(days)} days`, 
+        className: 'days-red' 
+      };
     }
   };
 
   const handlePayBill = async (billId, amountDue) => {
-    const paymentAmount = prompt(`Enter payment amount (Max: $${amountDue.toFixed(2)}):`);
+    const paymentAmount = prompt(`Enter payment amount (Max: AED ${amountDue.toFixed(2)}):`);
     if (paymentAmount && !isNaN(paymentAmount) && parseFloat(paymentAmount) > 0 && parseFloat(paymentAmount) <= amountDue) {
       try {
         const token = localStorage.getItem('token');
@@ -145,7 +160,7 @@ const CustomerBillStatement = () => {
           { paymentAmount: parseFloat(paymentAmount) },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        fetchCustomerBills(); // Refresh bills
+        fetchCustomerBills();
       } catch (error) {
         console.error('Error paying bill:', error);
         alert('Failed to process payment');
@@ -217,15 +232,15 @@ const CustomerBillStatement = () => {
                         return (
                           <tr key={bill._id}>
                             <td>{index + 1}</td>
-                            <td>{new Date(bill.cycleStart).toLocaleDateString()}</td>
-                            <td>{new Date(bill.cycleEnd).toLocaleDateString()}</td>
-                            <td>${bill.totalUsed?.toFixed(2) || '0.00'}</td>
-                            <td>${bill.amountDue?.toFixed(2) || '0.00'}</td>
-                            <td>{new Date(bill.dueDate).toLocaleDateString()}</td>
+                            <td>{formatDate(bill.cycleStart)}</td>
+                            <td>{formatDate(bill.cycleEnd)}</td>
+                            <td>AED {bill.totalUsed?.toFixed(2) || '0.00'}</td>
+                            <td>AED {bill.amountDue?.toFixed(2) || '0.00'}</td>
+                            <td>{formatDate(bill.dueDate)}</td>
                             <td className={daysDisplay.className}>
                               {daysDisplay.text}
                             </td>
-                            <td>${bill.paidAmount?.toFixed(2) || '0.00'}</td>
+                            <td>AED {bill.paidAmount?.toFixed(2) || '0.00'}</td>
                             <td>
                               <span className={`customer-bills-status-badge customer-bills-status-${bill.status?.toLowerCase() || 'pending'}`}>
                                 {bill.status?.charAt(0).toUpperCase() + bill.status?.slice(1) || 'Pending'}

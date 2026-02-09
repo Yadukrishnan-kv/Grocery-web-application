@@ -315,3 +315,36 @@
     width: 100%;
   }
 }
+/* Append to existing CustomerOrdersList.css */
+
+/* Assignment status badges for customer view */
+.customer-orders-assignment-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.8rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+}
+
+.customer-orders-assignment-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.customer-orders-assignment-assigned {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.customer-orders-assignment-accepted {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.customer-orders-assignment-rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}

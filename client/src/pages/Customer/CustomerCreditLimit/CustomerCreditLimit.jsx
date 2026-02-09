@@ -76,6 +76,16 @@ const CustomerCreditLimit = () => {
     ? ((usedCredit / customer.creditLimit) * 100).toFixed(1) 
     : 0;
 
+  // Format billing type display
+  const getBillingTypeDisplay = () => {
+    if (customer.billingType === 'Credit limit') {
+      return 'Credit Limit';
+    } else if (customer.billingType === 'Cash') {
+      return 'Cash Payment';
+    }
+    return customer.billingType || 'N/A';
+  };
+
   return (
     <div className="customer-credit-layout">
       <Header
@@ -98,17 +108,17 @@ const CustomerCreditLimit = () => {
             <div className="customer-credit-summary">
               <div className="customer-credit-card">
                 <h3>Total Credit Limit</h3>
-                <p className="customer-credit-amount">₹{customer.creditLimit.toFixed(2)}</p>
+                <p className="customer-credit-amount">AED {customer.creditLimit.toFixed(2)}</p>
               </div>
 
               <div className="customer-credit-card">
                 <h3>Available Credit</h3>
-                <p className="customer-credit-amount customer-credit-available">₹{availableCredit.toFixed(2)}</p>
+                <p className="customer-credit-amount customer-credit-available">AED {availableCredit.toFixed(2)}</p>
               </div>
 
               <div className="customer-credit-card">
                 <h3>Used Credit</h3>
-                <p className="customer-credit-amount customer-credit-used">₹{usedCredit.toFixed(2)}</p>
+                <p className="customer-credit-amount customer-credit-used">AED {usedCredit.toFixed(2)}</p>
               </div>
 
               <div className="customer-credit-card">
@@ -130,10 +140,30 @@ const CustomerCreditLimit = () => {
               <h3>Billing Information</h3>
               <div className="customer-credit-info-row">
                 <span className="customer-credit-label">Billing Type:</span>
-                <span className="customer-credit-value">
-                  {customer.billingType === 'creditcard' ? 'Credit Card (30-day cycle)' : 'Immediate Payment'}
-                </span>
+                <span className="customer-credit-value">{getBillingTypeDisplay()}</span>
               </div>
+              
+              {customer.billingType === 'Credit limit' && (
+                <>
+                  <div className="customer-credit-info-row">
+                    <span className="customer-credit-label">Statement Type:</span>
+                    <span className="customer-credit-value">
+                      {customer.statementType 
+                        ? customer.statementType.charAt(0).toUpperCase() + customer.statementType.slice(1) 
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="customer-credit-info-row">
+                    <span className="customer-credit-label">Due Days:</span>
+                    <span className="customer-credit-value">
+                      {customer.dueDays !== null && customer.dueDays !== undefined 
+                        ? `${customer.dueDays} days` 
+                        : 'N/A'}
+                    </span>
+                  </div>
+                </>
+              )}
+              
               <div className="customer-credit-info-row">
                 <span className="customer-credit-label">Email:</span>
                 <span className="customer-credit-value">{customer.email}</span>

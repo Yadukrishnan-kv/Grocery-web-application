@@ -38,7 +38,8 @@ const CustomerList = () => {
   const fetchCustomers = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/customers/getallcustomers`, {
+      // Use the endpoint that includes pending bill info
+      const response = await axios.get(`${backendUrl}/api/customers/getallcustomerswithdue`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCustomers(response.data);
@@ -70,11 +71,12 @@ const CustomerList = () => {
     }
   };
 
-  // Calculate days remaining for the most recent pending bill (dummy logic)
+  // Use real pending bill days from backend
   const getDaysRemaining = (customer) => {
-    // In real system → fetch from bills API
-    // For now, we simulate based on last known due date or assume no bill
-    return customer.pendingBillDaysLeft !== undefined ? customer.pendingBillDaysLeft : null;
+    // pendingBillDaysLeft comes from getAllCustomersWithDue endpoint
+    return customer.pendingBillDaysLeft !== undefined && customer.pendingBillDaysLeft !== null
+      ? customer.pendingBillDaysLeft
+      : null;
   };
 
   const getDueStatusText = (days) => {
@@ -96,7 +98,7 @@ const CustomerList = () => {
   // Filter customers
   const filteredCustomers = useMemo(() => {
     return customers.filter(customer => {
-      const matchesSearch = !searchTerm.trim() || 
+      const matchesSearch = !searchTerm.trim() ||
         customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -235,10 +237,14 @@ const CustomerList = () => {
                           <td>{customer.phoneNumber}</td>
                           <td>{customer.address}</td>
                           <td>{customer.pincode}</td>
-                          <td>AED{customer.creditLimit.toFixed(2)}</td>
-                          <td>AED{customer.balanceCreditLimit.toFixed(2)}</td>
+                          <td>AED{customer.creditLimit?.toFixed(2) || '0.00'}</td>
+                          <td>AED{customer.balanceCreditLimit?.toFixed(2) || '0.00'}</td>
                           <td>{customer.billingType}</td>
-                          <td>{customer.statementType ? customer.statementType.charAt(0).toUpperCase() + customer.statementType.slice(1) : 'N/A'}</td>
+                          <td>
+                            {customer.statementType
+                              ? customer.statementType.charAt(0).toUpperCase() + customer.statementType.slice(1)
+                              : 'N/A'}
+                          </td>
                           <td>{customer.dueDays || 'N/A'}</td>
                           <td className={dueClass}>
                             {dueStatusText}
