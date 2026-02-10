@@ -296,3 +296,124 @@
     width: 80%;
   }
 }
+
+/* Confirmation Modal for Delete */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+
+.confirm-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  animation: modalPop 0.3s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.confirm-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.confirm-text {
+  font-size: 1.1rem;
+  color: #475569;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.confirm-warning {
+  font-size: 0.95rem;
+  color: #ef4444;
+  font-weight: 500;
+  margin-bottom: 28px;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+
+.confirm-cancel,
+.confirm-delete {
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.confirm-cancel {
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+}
+
+.confirm-cancel:hover {
+  background: #cbd5e1;
+}
+
+.confirm-delete {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+.confirm-delete:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .confirm-modal {
+    padding: 20px;
+    max-width: 90%;
+  }
+  .confirm-title {
+    font-size: 1.4rem;
+  }
+  .confirm-text {
+    font-size: 1rem;
+  }
+  .confirm-actions {
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 768px) {
+  .confirm-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+  .confirm-cancel,
+  .confirm-delete {
+    width: auto;
+    min-width: 140px;
+  }
+}

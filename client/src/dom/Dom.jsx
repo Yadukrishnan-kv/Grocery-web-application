@@ -35,6 +35,8 @@ import CompanySettings from "../pages/Settings/CompanySettings/CompanySettings";
 import CreateCustomerRequest from "../pages/Salesmanpages/CreateCustomerRequest/CreateCustomerRequest";
 import MyCustomerRequests from "../pages/Salesmanpages/MyCustomerRequests/MyCustomerRequests";
 import PendingCustomerRequests from "../pages/Customer/PendingCustomerRequests/PendingCustomerRequests";
+import Wallet from "../pages/DeliveryPartner/Wallet/Wallet";
+import WalletMoney from "../pages/WalletMoney/WalletMoney";
 function Dom() {
   return (
     <div>
@@ -123,6 +125,8 @@ function Dom() {
               path="/admin/customer-requests/pending"
               element={<PendingCustomerRequests />}
             />
+            <Route path="/delivery/wallet" element={<Wallet />} />
+            <Route path="/admin/wallet-money" element={<WalletMoney />} />
           </Routes>
         </BrowserRouter>
       </PermissionProvider>

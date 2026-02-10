@@ -1,52 +1,57 @@
 // src/pages/Delivery/AcceptedOrdersList.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import Header from '../../../components/layout/Header/Header';
-import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import './AcceptedOrdersList.css';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import Header from "../../../components/layout/Header/Header";
+import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+import DirhamSymbol from "../../../Assets/aed-symbol.png";
+
+import "./AcceptedOrdersList.css";
+import axios from "axios";
 
 const AcceptedOrdersList = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState('Accepted Orders');
+  const [activeItem, setActiveItem] = useState("Accepted Orders");
   const [user, setUser] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(''); // ← NEW: search state
+  const [searchTerm, setSearchTerm] = useState(""); // ← NEW: search state
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        window.location.href = '/login';
+        window.location.href = "/login";
         return;
       }
-      
+
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       setUser(response.data.user || response.data);
     } catch (error) {
       console.error("Failed to load user", error);
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem("token");
+      window.location.href = "/login";
     }
   }, [backendUrl]);
 
   const fetchAcceptedOrders = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const acceptedOrders = response.data.filter(order => 
-        order.assignmentStatus === "accepted"
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/orders/my-assigned-orders`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const acceptedOrders = response.data.filter(
+        (order) => order.assignmentStatus === "accepted",
       );
       setOrders(acceptedOrders);
     } catch (error) {
-      console.error('Error fetching accepted orders:', error);
-      alert('Failed to load orders');
+      console.error("Error fetching accepted orders:", error);
+      alert("Failed to load orders");
     } finally {
       setLoading(false);
     }
@@ -62,13 +67,23 @@ const AcceptedOrdersList = () => {
     if (!searchTerm.trim()) return orders;
 
     const query = searchTerm.toLowerCase().trim();
-    return orders.filter(order =>
-      order.customer?.name?.toLowerCase().includes(query)
+    return orders.filter((order) =>
+      order.customer?.name?.toLowerCase().includes(query),
     );
   }, [orders, searchTerm]);
 
   const clearSearch = () => {
-    setSearchTerm('');
+    setSearchTerm("");
+  };
+
+  // Helper function to format date as DD/MM/YYYY
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   if (!user) {
@@ -77,19 +92,21 @@ const AcceptedOrdersList = () => {
 
   return (
     <div className="accepted-orders-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem={activeItem} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem={activeItem}
         onSetActiveItem={setActiveItem}
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`accepted-orders-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`accepted-orders-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="accepted-orders-container-wrapper">
           <div className="accepted-orders-container">
             <div className="accepted-orders-header-section">
@@ -118,13 +135,13 @@ const AcceptedOrdersList = () => {
                 </div>
               </div>
             </div>
-            
+
             {loading ? (
               <div className="accepted-orders-loading">Loading orders...</div>
             ) : filteredOrders.length === 0 ? (
               <div className="accepted-orders-no-data">
                 No accepted orders found
-                {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
+                {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
               </div>
             ) : (
               <div className="accepted-orders-table-wrapper">
@@ -146,14 +163,52 @@ const AcceptedOrdersList = () => {
                     {filteredOrders.map((order, index) => (
                       <tr key={order._id}>
                         <td>{index + 1}</td>
-                        <td>{order.customer?.name || 'N/A'}</td>
-                        <td>{order.product?.productName || 'N/A'}</td>
+                        <td>{order.customer?.name || "N/A"}</td>
+                        <td>{order.product?.productName || "N/A"}</td>
                         <td>{order.orderedQuantity}</td>
-                        <td>AED{order.price.toFixed(2)}</td>
-                        <td>AED{order.totalAmount.toFixed(2)}</td>
-                        <td>{order.remarks || '-'}</td>
-                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                        <td>{order.acceptedAt ? new Date(order.acceptedAt).toLocaleDateString() : 'N/A'}</td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <img
+                              src={DirhamSymbol}
+                              alt="Dirham Symbol"
+                              width={15}
+                              height={15}
+                              style={{
+                                paddingTop: "2px",
+                              }}
+                            />
+                            <span>{order.price.toFixed(2)}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <img
+                              src={DirhamSymbol}
+                              alt="Dirham Symbol"
+                              width={15}
+                              height={15}
+                              style={{
+                                paddingTop: "2px",
+                              }}
+                            />
+                            <span>{order.totalAmount.toFixed(2)}</span>
+                          </div>
+                        </td>
+                        <td>{order.remarks || "-"}</td>
+                        <td>{formatDate(order.orderDate)}</td>
+                        <td>{formatDate(order.acceptedAt)}</td>
                       </tr>
                     ))}
                   </tbody>

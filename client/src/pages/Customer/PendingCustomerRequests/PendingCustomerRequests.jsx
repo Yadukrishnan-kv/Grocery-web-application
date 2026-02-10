@@ -2,15 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import './PendingCustomerRequests.css'; // New CSS file (below)
+import './PendingCustomerRequests.css';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 const PendingCustomerRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
+
+  // NEW: Rejection modal states
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [requestToReject, setRequestToReject] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -37,6 +43,7 @@ const PendingCustomerRequests = () => {
         setUser(userRes.data.user || userRes.data);
       } catch (error) {
         console.error("Error fetching data:", error);
+        toast.error("Failed to load data");
         navigate('/login');
       } finally {
         setLoading(false);
@@ -46,51 +53,75 @@ const PendingCustomerRequests = () => {
     fetchData();
   }, [backendUrl, navigate]);
 
- const handleAccept = async (id) => {
-  if (!window.confirm('Accept this request? This will create the customer account.')) return;
-
-  try {
-    const response = await axios.post(
-      `${backendUrl}/api/customers/customer-requests/accept/${id}`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      }
-    );
-
-    const { customer, note, defaultLoginInfo } = response.data;
-
-    // Show consistent message (same as admin create)
-    let alertMessage = `Customer created successfully!\n\n` +
-                      `Name: ${customer.name}\n` +
-                      `Email: ${customer.email}\n\n` +
-                      `${note}\n\n` +
-                      `The customer can now login with the default password 'customer123'.\n` +
-                      `They MUST change it immediately after first login.`;
-
-    if (defaultLoginInfo) {
-      alertMessage += `\n\nDevelopment mode credentials:\n` +
-                      `Email: ${defaultLoginInfo.email}\n` +
-                      `Temporary Password: ${defaultLoginInfo.temporaryPassword}`;
-    }
-
-    alert(alertMessage);
-
-    setRequests(prev => prev.filter(r => r._id !== id));
-  } catch (error) {
-    alert(error.response?.data?.message || 'Error accepting request');
-  }
-};
-  const handleReject = async (id) => {
-    const reason = prompt('Reason for rejection (optional):');
+  const handleAccept = async (id) => {
     try {
-      await axios.post(`${backendUrl}/api/customers/customer-requests/reject/${id}`, { rejectionReason: reason || '' }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      const response = await axios.post(
+        `${backendUrl}/api/customers/customer-requests/accept/${id}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        }
+      );
+
+      const { customer, note, defaultLoginInfo } = response.data;
+
+      let message = `Customer accepted and created successfully!\n\n` +
+                    `Name: ${customer.name}\n` +
+                    `Email: ${customer.email}\n\n`;
+
+      if (note) {
+        message += `${note}\n\n`;
+      }
+
+      message += `Default password: 'customer123'\n` +
+                 `Customer must change it on first login.`;
+
+      if (defaultLoginInfo?.temporaryPassword) {
+        message += `\n\nTemporary password: ${defaultLoginInfo.temporaryPassword}`;
+      }
+
+      toast.success(message, {
+        duration: 8000,
+        style: { whiteSpace: 'pre-line' }
       });
+
       setRequests(prev => prev.filter(r => r._id !== id));
-      alert('Request rejected');
     } catch (error) {
-      alert(error.response?.data?.message || 'Error rejecting request');
+      const msg = error.response?.data?.message || 'Error accepting request';
+      toast.error(msg);
+    }
+  };
+
+  // Open rejection modal
+  const handleReject = (id) => {
+    setRequestToReject(id);
+    setRejectionReason('');
+    setShowRejectModal(true);
+  };
+
+  // Confirm rejection
+  const confirmReject = async () => {
+    if (!requestToReject) return;
+
+    setShowRejectModal(false);
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${backendUrl}/api/customers/customer-requests/reject/${requestToReject}`, 
+        { rejectionReason: rejectionReason.trim() || '' }, 
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      toast.success('Request rejected successfully');
+      setRequests(prev => prev.filter(r => r._id !== requestToReject));
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Error rejecting request';
+      toast.error(msg);
+    } finally {
+      setRequestToReject(null);
+      setRejectionReason('');
     }
   };
 
@@ -175,6 +206,46 @@ const PendingCustomerRequests = () => {
           </div>
         </div>
       </main>
+
+      {/* Responsive Rejection Confirmation Modal */}
+      {showRejectModal && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal">
+            <h3 className="confirm-title">Reject Request</h3>
+            
+
+            <div className="reject-reason-group">
+              <label htmlFor="rejectionReason">Reason for Rejection (optional)</label>
+              <textarea
+                id="rejectionReason"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Enter reason (optional)"
+                rows="3"
+                className="reject-reason-input"
+              />
+            </div>
+
+            <div className="confirm-actions">
+              <button
+                className="confirm-cancel"
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectionReason('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="confirm-reject"
+                onClick={confirmReject}
+              >
+                Reject Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

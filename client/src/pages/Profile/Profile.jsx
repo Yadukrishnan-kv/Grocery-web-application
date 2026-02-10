@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 import './Profile.css';
 
 const Profile = () => {
@@ -68,15 +69,15 @@ const Profile = () => {
     // Client-side password validation (only if attempting to change password)
     if (editForm.newPassword || editForm.confirmNewPassword || editForm.currentPassword) {
       if (!editForm.currentPassword) {
-        alert("Current password is required to change password");
+        toast.error("Current password is required to change password");
         return;
       }
       if (editForm.newPassword.length < 6) {
-        alert("New password must be at least 6 characters");
+        toast.error("New password must be at least 6 characters");
         return;
       }
       if (editForm.newPassword !== editForm.confirmNewPassword) {
-        alert("New password and confirm password do not match");
+        toast.error("New password and confirm password do not match");
         return;
       }
     }
@@ -112,9 +113,9 @@ const Profile = () => {
         confirmNewPassword: ''
       }));
 
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update profile");
+      toast.error(err.response?.data?.message || "Failed to update profile");
     }
   };
 
@@ -182,7 +183,6 @@ const Profile = () => {
                   />
                 </div>
 
-                
                 <div className="form-group">
                   <label htmlFor="currentPassword">Current Password</label>
                   <input

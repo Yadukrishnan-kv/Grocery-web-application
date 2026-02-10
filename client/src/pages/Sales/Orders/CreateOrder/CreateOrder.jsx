@@ -1,9 +1,11 @@
+// src/pages/Order/CreateOrder.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../../../components/layout/Header/Header';
 import Sidebar from '../../../../components/layout/Sidebar/Sidebar';
 import './CreateOrder.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const CreateOrder = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,13 +18,12 @@ const CreateOrder = () => {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
-  const [selectedProductUnit, setSelectedProductUnit] = useState(''); // Track selected product's unit
+  const [selectedProductUnit, setSelectedProductUnit] = useState('');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -65,7 +66,6 @@ const CreateOrder = () => {
       }));
     }
 
-    // Update selected unit when product changes
     if (name === 'productId') {
       const selected = products.find(p => p._id === value);
       setSelectedProductUnit(selected ? selected.unit : '');
@@ -74,7 +74,6 @@ const CreateOrder = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSuccess(false);
 
     if (!validateForm()) return;
 
@@ -98,19 +97,19 @@ const CreateOrder = () => {
       };
 
       if (isEdit) {
-        alert('Order updates are not supported. Please create a new order.');
+        toast.error('Order updates are not supported. Please create a new order.');
         return;
       } else {
         await axios.post(`${backendUrl}/api/orders/createorder`, submitData, config);
+        toast.success('Order created successfully!');
       }
 
-      setIsSuccess(true);
       setTimeout(() => {
         navigate('/order/list');
       }, 1500);
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
-      setErrors({ submit: errorMessage });
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -132,13 +131,13 @@ const CreateOrder = () => {
         remarks: order.remarks || ''
       });
 
-      // Set unit from selected product
       const selectedProduct = products.find(p => p._id === order.product?._id);
       setSelectedProductUnit(selectedProduct ? selectedProduct.unit : '');
 
       setIsEdit(true);
     } catch (error) {
       console.error("Failed to fetch order data", error);
+      toast.error("Failed to load order data");
       navigate('/order/list');
     }
   }, [backendUrl, navigate, products]);
@@ -152,6 +151,7 @@ const CreateOrder = () => {
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
+      toast.error("Failed to load customers");
     }
   }, [backendUrl]);
 
@@ -164,6 +164,7 @@ const CreateOrder = () => {
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
+      toast.error("Failed to load products");
     }
   }, [backendUrl]);
 
@@ -232,11 +233,7 @@ const CreateOrder = () => {
       <main className={`order-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="order-form-card">
           <h1>{isEdit ? 'Edit Order' : 'Create New Order'}</h1>
-          {isSuccess && (
-            <div className="order-success-message" role="alert">
-              {isEdit ? 'Order updated successfully!' : 'Order created successfully!'}
-            </div>
-          )}
+
           <form onSubmit={handleSubmit} noValidate>
             <div className="order-form-group">
               <label htmlFor="customerId">Customer</label>
@@ -286,7 +283,6 @@ const CreateOrder = () => {
                   {errors.productId}
                 </p>
               )}
-              {/* Show selected unit */}
               {selectedProductUnit && (
                 <small className="order-help-text">
                   Selected unit: {selectedProductUnit}
@@ -357,12 +353,6 @@ const CreateOrder = () => {
                 className="order-textarea"
               />
             </div>
-
-            {errors.submit && (
-              <div className="order-error-banner" role="alert">
-                {errors.submit}
-              </div>
-            )}
 
             <button
               type="submit"

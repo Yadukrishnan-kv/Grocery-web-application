@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
+import DirhamSymbol from "../../../Assets/aed-symbol.png";
+
 import './MyCustomerRequests.css'; // New CSS file (below)
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -163,7 +165,23 @@ const MyCustomerRequests = () => {
                         <td>{request.name}</td>
                         <td>{request.email}</td>
                         <td>{request.phoneNumber}</td>
-                        <td>AED{request.creditLimit.toFixed(2)}</td>
+                        <td><div
+                                                    style={{
+                                                      display: "flex",
+                                                      alignItems: "center",
+                                                      gap: "4px",
+                                                    }}
+                                                  >
+                                                    <img
+                                                      src={DirhamSymbol}
+                                                      alt="Dirham Symbol"
+                                                      width={15}
+                                                      height={15}
+                                                       style={{
+                                                        paddingTop: "3px",
+                                                      }}
+                                                    />
+                                                    <span>{request.creditLimit.toFixed(2)}</span></div></td>
                         <td>{request.billingType}</td>
                         <td>
                           <span className={`requests-status-badge requests-status-${request.status}`}>

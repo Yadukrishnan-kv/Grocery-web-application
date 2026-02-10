@@ -1,6 +1,7 @@
-// Header.jsx
+// src/components/layout/Header/Header.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 import './Header.css';
 
 const Header = ({ sidebarOpen, onToggleSidebar, user }) => {
@@ -9,8 +10,19 @@ const Header = ({ sidebarOpen, onToggleSidebar, user }) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/login');
+    try {
+      localStorage.removeItem('token');
+      toast.success('Logged out successfully', {
+        duration: 3000,
+      });
+      // Small delay to let toast be visible
+      setTimeout(() => {
+        navigate('/login');
+      }, 500);
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to logout. Please try again.");
+    }
   };
 
   const togglePopup = () => {
@@ -59,8 +71,6 @@ const Header = ({ sidebarOpen, onToggleSidebar, user }) => {
     navigate('/profile');
     closePopup();
   };
-
-  
 
   if (!user) return null;
 

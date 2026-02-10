@@ -5,6 +5,7 @@ const User = require("../models/User");
 const CompanySettings = require("../models/CompanySettings");
 const InvoiceCounter = require('../models/InvoiceCounter');
 const { createInvoiceBasedBill } = require('../controllers/billController');  // ← import it
+const PaymentTransaction = require("../models/PaymentTransaction");
 
 const PDFDocument = require('pdfkit');
 
@@ -182,7 +183,7 @@ const deleteOrder = async (req, res) => {
 
 const deliverOrder = async (req, res) => {
   try {
-    const { quantity, deliveredAt } = req.body; // Quantity to deliver this time
+    const { quantity, deliveredAt, paymentMethod, chequeDetails } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -196,19 +197,35 @@ const deliverOrder = async (req, res) => {
       return res.status(400).json({ message: "Invalid delivery quantity" });
     }
 
-    // Update delivered quantity
+    const deliveryAmount = quantity * order.price;
+
+    if (paymentMethod === "credit") {
+      const customer = await Customer.findById(order.customer);
+      if (customer.balanceCreditLimit < deliveryAmount) {
+        return res.status(400).json({ message: "Insufficient credit balance for this delivery" });
+      }
+      customer.balanceCreditLimit -= deliveryAmount;
+      await customer.save();
+    } else if (paymentMethod === "cash" || paymentMethod === "cheque") {
+      await PaymentTransaction.create({
+        order: order._id,
+        deliveryMan: req.user._id,
+        amount: deliveryAmount,
+        method: paymentMethod,
+        chequeDetails: paymentMethod === "cheque" ? chequeDetails : undefined,
+      });
+    } else {
+      return res.status(400).json({ message: "Invalid payment method" });
+    }
+
     order.deliveredQuantity += quantity;
 
-    // Set deliveredAt if this is the first delivery
     if (order.deliveredQuantity === quantity) {
       order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
     }
 
-    // If fully delivered → change status + generate bill if invoice-based
     if (order.deliveredQuantity === order.orderedQuantity) {
       order.status = "delivered";
-
-      // NEW: Auto-generate bill for invoice-based
       const customer = await Customer.findById(order.customer);
       if (customer && customer.statementType === "invoice-based") {
         await createInvoiceBasedBill(order);
@@ -529,32 +546,34 @@ const assignOrderToDeliveryMan = async (req, res) => {
   try {
     const { deliveryManId } = req.body;
     const order = await Order.findById(req.params.id);
-
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-
-    if (order.assignmentStatus !== "pending_assignment") {
+    
+    // ✅ FIXED: Allow reassignment for BOTH pending_assignment AND rejected orders
+    if (order.assignmentStatus !== "pending_assignment" && order.assignmentStatus !== "rejected") {
       return res.status(400).json({ message: "Order is not available for assignment" });
     }
-
+    
     const deliveryMan = await User.findOne({ _id: deliveryManId, role: "Delivery Man" });
     if (!deliveryMan) {
       return res.status(400).json({ message: "Valid delivery man not found" });
     }
-
+    
+    // ✅ CRITICAL: Clear previous assignment when reassigning rejected orders
     order.assignedTo = deliveryManId;
-    order.assignmentStatus = "assigned";
+    order.assignmentStatus = "assigned"; // Reset status to assigned
     order.assignedAt = new Date();
-
+    // Optional: Clear rejection metadata if exists
+    // delete order.rejectionReason;
+    
     await order.save();
-
-    // Return populated order
+    
     const updatedOrder = await Order.findById(order._id)
       .populate("customer", "name email phoneNumber address pincode")
       .populate("product", "productName price")
       .populate("assignedTo", "username");
-
+      
     res.json({
       message: "Order assigned successfully",
       order: updatedOrder
@@ -630,21 +649,21 @@ const getOrderInvoice = async (req, res) => {
 const acceptAssignedOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-
     if (!order) return res.status(404).json({ message: "Order not found" });
-
+    
     if (String(order.assignedTo) !== String(req.user._id)) {
       return res.status(403).json({ message: "This order is not assigned to you" });
     }
-
-    if (order.assignmentStatus !== "assigned") {
+    
+    // ✅ FIXED: Allow re-accepting rejected orders assigned to current user
+    if (order.assignmentStatus !== "assigned" && order.assignmentStatus !== "rejected") {
       return res.status(400).json({ message: "Order cannot be accepted at this stage" });
     }
-
+    
     order.assignmentStatus = "accepted";
     order.acceptedAt = new Date();
     await order.save();
-
+    
     res.json({ message: "Order accepted successfully", order });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -654,31 +673,25 @@ const acceptAssignedOrder = async (req, res) => {
 // Delivery man rejects the order (can add reason later)
 const rejectAssignedOrder = async (req, res) => {
   try {
-    const { reason } = req.body; // optional
-
+    const { reason } = req.body;
     const order = await Order.findById(req.params.id);
-
     if (!order) return res.status(404).json({ message: "Order not found" });
-
+    
     if (String(order.assignedTo) !== String(req.user._id)) {
       return res.status(403).json({ message: "This order is not assigned to you" });
     }
-
+    
     if (order.assignmentStatus !== "assigned") {
       return res.status(400).json({ message: "Order cannot be rejected at this stage" });
     }
-
+    
+    // ✅ CRITICAL: Keep assignedTo pointing to rejecting partner (for CancelledOrdersList visibility)
+    // Only change status to rejected - DO NOT clear assignedTo
     order.assignmentStatus = "rejected";
-    // You can store rejection reason if you want
-    // order.rejectionReason = reason || "No reason provided";
-
+    if (reason) order.rejectionReason = reason;
     await order.save();
-
-    // Optional: You can make order available for reassignment again
-    // order.assignedTo = null;
-    // order.assignmentStatus = "pending_assignment";
-
-    res.json({ message: "Order rejected", order });
+    
+    res.json({ message: "Order rejected successfully", order });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }

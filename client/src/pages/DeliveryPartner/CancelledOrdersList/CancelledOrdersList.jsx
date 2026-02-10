@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import Header from '../../../components/layout/Header/Header';
-import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import './CancelledOrdersList.css';
-import axios from 'axios';
+// src/pages/Delivery/CancelledOrdersList.jsx
+import React, { useState, useEffect, useCallback } from "react";
+import Header from "../../../components/layout/Header/Header";
+import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+import DirhamSymbol from "../../../Assets/aed-symbol.png";
+
+import "./CancelledOrdersList.css";
+import axios from "axios";
 
 const CancelledOrdersList = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState('Cancelled Orders'); // fixed typo
+  const [activeItem, setActiveItem] = useState("Cancelled Orders"); // fixed typo
   const [user, setUser] = useState(null);
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
 
@@ -16,40 +19,40 @@ const CancelledOrdersList = () => {
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        window.location.href = '/login';
+        window.location.href = "/login";
         return;
       }
-      
+
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       setUser(response.data.user || response.data);
     } catch (error) {
       console.error("Failed to load user", error);
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem("token");
+      window.location.href = "/login";
     }
   }, [backendUrl]);
 
   const fetchCancellableOrders = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const cancellableOrders = response.data.filter(order => 
-        order.assignmentStatus === "accepted"
-      );
-      setOrders(cancellableOrders);
-    } catch (error) {
-      console.error('Error fetching cancellable orders:', error);
-      alert('Failed to load orders');
-    } finally {
-      setLoading(false);
-    }
-  }, [backendUrl]);
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const cancellableOrders = response.data.filter(order => 
+      order.assignmentStatus === "accepted" || order.assignmentStatus === "rejected"
+    );
+    setOrders(cancellableOrders);
+  } catch (error) {
+    console.error('Error fetching cancellable orders:', error);
+    alert('Failed to load orders');
+  } finally {
+    setLoading(false);
+  }
+}, [backendUrl]);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -57,23 +60,60 @@ const CancelledOrdersList = () => {
   }, [fetchCurrentUser, fetchCancellableOrders]);
 
   const handleCancelOrder = async (orderId) => {
-    if (!window.confirm('Are you sure you want to cancel this order? This action cannot be undone.')) return;
-    
+    if (
+      !window.confirm(
+        "Are you sure you want to cancel this order? This action cannot be undone.",
+      )
+    )
+      return;
+
     setCancellingOrderId(orderId);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       await axios.post(
         `${backendUrl}/api/orders/cancelorder/${orderId}`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       fetchCancellableOrders();
     } catch (error) {
-      console.error('Error cancelling order:', error);
-      alert('Failed to cancel order. Please try again.');
+      console.error("Error cancelling order:", error);
+      alert("Failed to cancel order. Please try again.");
     } finally {
       setCancellingOrderId(null);
     }
+  };
+
+  const handleReacceptOrder = async (orderId) => {
+  if (!window.confirm("Re-accept this rejected order?")) return;
+  
+  try {
+    const token = localStorage.getItem('token');
+    await axios.post(
+      `${backendUrl}/api/orders/accept/${orderId}`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    fetchCancellableOrders();
+    alert("Order re-accepted successfully.");
+  } catch (error) {
+    console.error('Error re-accepting order:', error);
+    if (error.response?.status === 400) {
+      alert("Order is already assigned to someone else or not available for re-accept.");
+    } else {
+      alert("Failed to re-accept order. Please try again.");
+    }
+  }
+};
+
+  // Helper function to format date as DD/MM/YYYY
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   if (!user) {
@@ -82,23 +122,25 @@ const CancelledOrdersList = () => {
 
   return (
     <div className="cancelled-orders-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem={activeItem} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem={activeItem}
         onSetActiveItem={setActiveItem}
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`cancelled-orders-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`cancelled-orders-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="cancelled-orders-container-wrapper">
           <div className="cancelled-orders-container">
             <h2 className="cancelled-orders-page-title">Cancel Orders</h2>
-            
+
             {loading ? (
               <div className="cancelled-orders-loading">Loading orders...</div>
             ) : (
@@ -114,6 +156,8 @@ const CancelledOrdersList = () => {
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
                       <th scope="col">Order Date</th>
+                                            <th scope="col">Re-accept Order</th>
+
                       <th scope="col">Cancel Order</th>
                     </tr>
                   </thead>
@@ -122,20 +166,81 @@ const CancelledOrdersList = () => {
                       orders.map((order, index) => (
                         <tr key={order._id}>
                           <td>{index + 1}</td>
-                          <td>{order.customer?.name || 'N/A'}</td>
-                          <td>{order.product?.productName || 'N/A'}</td>
+                          <td>{order.customer?.name || "N/A"}</td>
+                          <td>{order.product?.productName || "N/A"}</td>
                           <td>{order.orderedQuantity}</td>
                           <td>{order.deliveredQuantity}</td>
-                          <td>${order.price.toFixed(2)}</td>
-                          <td>${order.totalAmount.toFixed(2)}</td>
-                          <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="Dirham Symbol"
+                                width={15}
+                                height={15}
+                                style={{
+                                  paddingTop: "3px",
+                                }}
+                              />
+                              <span>{order.price.toFixed(2)}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="Dirham Symbol"
+                                width={15}
+                                height={15}
+                                style={{
+                                  paddingTop: "3px",
+                                }}
+                              />
+                              <span>{order.totalAmount.toFixed(2)}</span>
+                            </div>
+                          </td>
+                          <td>{formatDate(order.orderDate)}</td>
+                          <td>
+  {order.assignmentStatus === "accepted" && (
+    <button
+      className="cancelled-orders-cancel-button"
+      onClick={() => handleCancelOrder(order._id)}
+      disabled={cancellingOrderId === order._id}
+    >
+      {cancellingOrderId === order._id ? 'Cancelling...' : 'Cancel'}
+    </button>
+  )}
+
+  {order.assignmentStatus === "rejected" && (
+    <button
+      className="cancelled-orders-reaccept-button"
+      onClick={() => handleReacceptOrder(order._id)}
+      disabled={cancellingOrderId === order._id}
+    >
+      Re-accept
+    </button>
+  )}
+</td>
                           <td>
                             <button
                               className="cancelled-orders-cancel-button"
                               onClick={() => handleCancelOrder(order._id)}
                               disabled={cancellingOrderId === order._id}
                             >
-                              {cancellingOrderId === order._id ? 'Cancelling...' : 'Cancel'}
+                              {cancellingOrderId === order._id
+                                ? "Cancelling..."
+                                : "Cancel"}
                             </button>
                           </td>
                         </tr>

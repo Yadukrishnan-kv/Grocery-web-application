@@ -1,22 +1,27 @@
-// src/pages/Products/ProductList.jsx
+// src/pages/Products/ProductList/ProductList.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
-import { DirhamSymbol } from "dirham-symbol";
+import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./ProductList.css";
 import axios from "axios";
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading,setLoading] = useState(true); // ← fixed: removed unused setLoading
+  const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Products");
   const [user, setUser] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+
+  // NEW: Confirmation modal for delete
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -27,7 +32,7 @@ const ProductList = () => {
         window.location.href = "/login";
         return;
       }
-      
+
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -40,21 +45,21 @@ const ProductList = () => {
   }, [backendUrl]);
 
   const fetchProducts = useCallback(async () => {
-  try {
-    const token = localStorage.getItem("token");
-    const response = await axios.get(
-      `${backendUrl}/api/products/getallproducts`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    setProducts(response.data);
-    setFilteredProducts(response.data);
-  } catch (error) {
-    console.error("Error fetching products:", error);
-    alert("Failed to load products. Please check your connection or login again.");
-  } finally {
-    setLoading(false);
-  }
-}, [backendUrl]);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/products/getallproducts`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setProducts(response.data);
+      setFilteredProducts(response.data);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      toast.error("Failed to load products");
+    } finally {
+      setLoading(false);
+    }
+  }, [backendUrl]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -77,17 +82,18 @@ const ProductList = () => {
     fetchCategories();
   }, [fetchCurrentUser, fetchProducts, fetchCategories]);
 
-  // Apply filters
   useEffect(() => {
     let result = products;
 
-    if (selectedCategory !== 'All') {
-      result = result.filter(product => product.CategoryName === selectedCategory);
+    if (selectedCategory !== "All") {
+      result = result.filter(
+        (product) => product.CategoryName === selectedCategory
+      );
     }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      result = result.filter(product =>
+      result = result.filter((product) =>
         product.productName?.toLowerCase().includes(query)
       );
     }
@@ -95,27 +101,39 @@ const ProductList = () => {
     setFilteredProducts(result);
   }, [selectedCategory, searchQuery, products]);
 
-  const handleDelete = async (id, productName) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete product "${productName}"?`
-      )
-    ) {
-      try {
-        const token = localStorage.getItem("token");
-        await axios.delete(`${backendUrl}/api/products/deleteproduct/${id}`, {
+  const handleDeleteClick = (id, productName) => {
+    setProductToDelete({ id, productName });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!productToDelete) return;
+
+    setShowDeleteModal(false);
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(
+        `${backendUrl}/api/products/deleteproduct/${productToDelete.id}`,
+        {
           headers: { Authorization: `Bearer ${token}` },
-        });
-        fetchProducts();
-      } catch (error) {
-        console.error("Error deleting product:", error);
-        alert("Failed to delete product. Please try again.");
-      }
+        }
+      );
+
+      toast.success(
+        `Product "${productToDelete.productName}" deleted successfully!`
+      );
+      fetchProducts();
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to delete product. Please try again.");
+    } finally {
+      setProductToDelete(null);
     }
   };
 
   const clearSearch = () => {
-    setSearchQuery('');
+    setSearchQuery("");
   };
 
   if (!user) {
@@ -146,7 +164,10 @@ const ProductList = () => {
 
               <div className="product-list-controls-group">
                 <div className="product-list-filter-group">
-                  <label htmlFor="categoryFilter" className="product-list-filter-label">
+                  <label
+                    htmlFor="categoryFilter"
+                    className="product-list-filter-label"
+                  >
                     Filter by Category:
                   </label>
                   <select
@@ -156,7 +177,7 @@ const ProductList = () => {
                     className="product-list-category-filter"
                   >
                     <option value="All">All Categories</option>
-                    {categories.map(cat => (
+                    {categories.map((cat) => (
                       <option key={cat._id} value={cat.CategoryName}>
                         {cat.CategoryName}
                       </option>
@@ -184,7 +205,10 @@ const ProductList = () => {
                   )}
                 </div>
 
-                <Link to="/product/create" className="product-list-create-button">
+                <Link
+                  to="/product/create"
+                  className="product-list-create-button"
+                >
                   Create Product
                 </Link>
               </div>
@@ -195,8 +219,8 @@ const ProductList = () => {
             ) : filteredProducts.length === 0 ? (
               <div className="product-list-no-data">
                 No products found
-                {selectedCategory !== 'All' ? ` in "${selectedCategory}"` : ''}
-                {searchQuery.trim() ? ` matching "${searchQuery}"` : ''}
+                {selectedCategory !== "All" ? ` in "${selectedCategory}"` : ""}
+                {searchQuery.trim() ? ` matching "${searchQuery}"` : ""}
               </div>
             ) : (
               <div className="product-list-table-wrapper">
@@ -222,8 +246,26 @@ const ProductList = () => {
                         <td>{product.CategoryName}</td>
                         <td>{product.subCategoryName}</td>
                         <td>
-                          <DirhamSymbol /> {product.price.toFixed(2)}
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <img
+                              src={DirhamSymbol}
+                              alt="Dirham Symbol"
+                              width={15}
+                              height={15}
+                              style={{
+                                paddingTop: "3px",
+                              }}
+                            />
+                            <span>{product.price.toFixed(2)}</span>
+                          </div>
                         </td>
+
                         <td>{product.quantity}</td>
                         <td>{product.unit || "N/A"}</td>
                         <td>
@@ -239,7 +281,7 @@ const ProductList = () => {
                           <button
                             className="product-list-icon-button product-list-delete-button"
                             onClick={() =>
-                              handleDelete(product._id, product.productName)
+                              handleDeleteClick(product._id, product.productName)
                             }
                             aria-label={`Delete product ${product.productName}`}
                           >
@@ -255,6 +297,35 @@ const ProductList = () => {
           </div>
         </div>
       </main>
+
+      {/* Responsive Delete Confirmation Modal */}
+      {showDeleteModal && productToDelete && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal">
+            <h3 className="confirm-title">Delete Product</h3>
+            <p className="confirm-text">
+              Are you sure you want to delete 
+              <strong> "{productToDelete.productName}"</strong>?
+            </p>
+            <p className="confirm-warning">This action cannot be undone.</p>
+
+            <div className="confirm-actions">
+              <button 
+                className="confirm-cancel"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="confirm-delete"
+                onClick={confirmDelete}
+              >
+                Delete Product
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

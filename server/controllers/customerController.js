@@ -443,17 +443,9 @@ const acceptCustomerRequest = async (req, res) => {
         dueDays: customer.dueDays,              // NEW
         createdAt: customer.createdAt,
       },
-      note: process.env.NODE_ENV === "production"
-        ? "Customer account created. Default password is 'customer123' (they should change it immediately)"
-        : "Development mode: Default password is 'customer123'",
-    };
+      
 
-    if (process.env.NODE_ENV !== "production") {
-      responseData.defaultLoginInfo = {
-        email: user.email,
-        temporaryPassword: defaultPassword,
-        note: "Please change your password immediately after first login",
-      };
+   
     }
 
     res.status(201).json(responseData);

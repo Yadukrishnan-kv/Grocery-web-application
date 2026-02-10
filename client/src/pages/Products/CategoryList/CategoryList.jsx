@@ -1,10 +1,11 @@
-// src/pages/Category/CategoryList.jsx
+// src/pages/Products/CategoryList/CategoryList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import './CategoryList.css';  // Updated CSS below
+import './CategoryList.css';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const CategoryList = () => {
   const [categories, setCategories] = useState([]);
@@ -13,7 +14,11 @@ const CategoryList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState('Products');
   const [user, setUser] = useState(null);
-  const [searchQuery, setSearchQuery] = useState(''); // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // NEW: Confirmation modal for delete
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -43,15 +48,15 @@ const CategoryList = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCategories(response.data);
-      setFilteredCategories(response.data); // Initial display = all
+      setFilteredCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      toast.error("Failed to load categories");
     } finally {
       setLoading(false);
     }
   }, [backendUrl]);
 
-  // Filter categories when searchQuery changes
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredCategories(categories);
@@ -70,22 +75,32 @@ const CategoryList = () => {
     fetchCategories();
   }, [fetchCurrentUser, fetchCategories]);
 
-  const handleDelete = async (id, categoryName) => {
-    if (window.confirm(`Are you sure you want to delete category "${categoryName}"?`)) {
-      try {
-        const token = localStorage.getItem('token');
-        await axios.delete(`${backendUrl}/api/categories/deletecategory/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        fetchCategories();
-      } catch (error) {
-        console.error('Error deleting category:', error);
-        alert('Failed to delete category. Please try again.');
-      }
+  const handleDeleteClick = (id, categoryName) => {
+    setCategoryToDelete({ id, categoryName });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!categoryToDelete) return;
+
+    setShowDeleteModal(false);
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${backendUrl}/api/categories/deletecategory/${categoryToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success(`Category "${categoryToDelete.categoryName}" deleted successfully!`);
+      fetchCategories();
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast.error("Failed to delete category. Please try again.");
+    } finally {
+      setCategoryToDelete(null);
     }
   };
 
-  // Clear search
   const clearSearch = () => {
     setSearchQuery('');
   };
@@ -114,9 +129,7 @@ const CategoryList = () => {
             <div className="category-list-header-section">
               <h2 className="category-list-page-title">Category Management</h2>
 
-              {/* Exact same controls group as OrderList */}
               <div className="category-list-controls-group">
-                {/* Search bar */}
                 <div className="category-list-search-container">
                   <input
                     type="text"
@@ -137,7 +150,6 @@ const CategoryList = () => {
                   )}
                 </div>
 
-                {/* Create Button */}
                 <Link to="/category/create" className="category-list-create-button">
                   Create Category
                 </Link>
@@ -178,7 +190,7 @@ const CategoryList = () => {
                         <td>
                           <button
                             className="category-list-icon-button category-list-delete-button"
-                            onClick={() => handleDelete(category._id, category.CategoryName)}
+                            onClick={() => handleDeleteClick(category._id, category.CategoryName)}
                             aria-label={`Delete category ${category.CategoryName}`}
                           >
                             🗑️
@@ -193,6 +205,33 @@ const CategoryList = () => {
           </div>
         </div>
       </main>
+
+      {/* Confirmation Modal for Delete */}
+      {showDeleteModal && categoryToDelete && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal">
+            <h3 className="confirm-title">Confirm Delete Category</h3>
+            <p className="confirm-text">
+              Are you sure you want to delete category <strong>"{categoryToDelete.categoryName}"</strong>?
+            </p>
+            <p className="confirm-warning">This action cannot be undone.</p>
+            <div className="confirm-actions">
+              <button
+                className="confirm-cancel"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="confirm-delete"
+                onClick={confirmDelete}
+              >
+                Delete Category
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

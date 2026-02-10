@@ -1,10 +1,11 @@
-// User.jsx
+// src/pages/Users/User.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './User.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const User = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,7 +17,6 @@ const User = () => {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
@@ -42,7 +42,6 @@ const User = () => {
       newErrors.email = 'Please provide a valid email';
     }
 
-    // Password is only required for new users, not for updates
     if (!isEdit && !formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password && formData.password.length < 6) {
@@ -74,7 +73,6 @@ const User = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSuccess(false);
 
     if (!validateForm()) return;
 
@@ -96,6 +94,8 @@ const User = () => {
           email: formData.email,
           role: formData.role
         }, config);
+
+        toast.success('User updated successfully!');
       } else {
         // Create new user
         await axios.post(`${backendUrl}/api/users/createUser`, {
@@ -104,21 +104,22 @@ const User = () => {
           password: formData.password,
           role: formData.role
         }, config);
+
+        toast.success('User created successfully!');
       }
 
-      setIsSuccess(true);
+      // Navigate after short delay so user sees the success toast
       setTimeout(() => {
         navigate('/userlist');
       }, 1500);
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
-      setErrors({ submit: errorMessage });
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch roles from backend - wrapped in useCallback
   const fetchRoles = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -128,12 +129,13 @@ const User = () => {
       setRoles(response.data);
     } catch (error) {
       console.error("Failed to fetch roles:", error);
+      toast.error("Failed to load roles");
     }
-  }, [backendUrl]); // Add backendUrl as dependency
+  }, [backendUrl]);
 
   useEffect(() => {
     fetchRoles();
-  }, [fetchRoles]); // Include fetchRoles in dependencies
+  }, [fetchRoles]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -164,6 +166,7 @@ const User = () => {
           }
         } catch (error) {
           console.error("Failed to fetch user data for edit", error);
+          toast.error("Failed to load user data");
           navigate('/userlist');
         }
       };
@@ -223,11 +226,7 @@ const User = () => {
       <main className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="registration-card">
           <h1>{isEdit ? 'Edit User' : 'Create New User'}</h1>
-          {isSuccess && (
-            <div className="success-message" role="alert">
-              {isEdit ? 'User updated successfully!' : 'User created successfully!'}
-            </div>
-          )}
+
           <form onSubmit={handleSubmit} noValidate>
             <div className="form-row">
               <div className="form-group">
@@ -310,12 +309,6 @@ const User = () => {
                 </p>
               )}
             </div>
-
-            {errors.submit && (
-              <div className="error-banner" role="alert">
-                {errors.submit}
-              </div>
-            )}
 
             <button
               type="submit"

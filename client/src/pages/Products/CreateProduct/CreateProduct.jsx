@@ -1,10 +1,11 @@
-// CreateProduct.jsx
+// src/pages/Products/CreateProduct/CreateProduct.jsx
 import React, { useEffect, useState, useCallback } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import "./CreateProduct.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const CreateProduct = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -18,7 +19,6 @@ const CreateProduct = () => {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
@@ -86,7 +86,6 @@ const CreateProduct = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSuccess(false);
 
     if (!validateForm()) return;
 
@@ -114,17 +113,21 @@ const CreateProduct = () => {
         await axios.put(
           `${backendUrl}/api/products/updateproduct/${productId}`,
           submitData,
-          config,
+          config
         );
+
+        toast.success("Product updated successfully!");
       } else {
         await axios.post(
           `${backendUrl}/api/products/createproduct`,
           submitData,
-          config,
+          config
         );
+
+        toast.success("Product created successfully!");
       }
 
-      setIsSuccess(true);
+      // Navigate after toast visibility
       setTimeout(() => {
         navigate("/product/list");
       }, 1500);
@@ -132,7 +135,7 @@ const CreateProduct = () => {
       const errorMessage =
         err.response?.data?.message ||
         "Something went wrong. Please try again.";
-      setErrors({ submit: errorMessage });
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +149,7 @@ const CreateProduct = () => {
           `${backendUrl}/api/products/getallproducts`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          },
+          }
         );
 
         const products = response.data;
@@ -168,10 +171,11 @@ const CreateProduct = () => {
         }
       } catch (error) {
         console.error("Failed to fetch product data", error);
+        toast.error("Failed to load product data");
         navigate("/product/list");
       }
     },
-    [backendUrl, navigate],
+    [backendUrl, navigate]
   );
 
   const fetchCategories = useCallback(async () => {
@@ -181,11 +185,12 @@ const CreateProduct = () => {
         `${backendUrl}/api/categories/getallcategories`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        },
+        }
       );
       setCategories(response.data);
     } catch (error) {
       console.error("Failed to fetch categories", error);
+      toast.error("Failed to load categories");
     }
   }, [backendUrl]);
 
@@ -197,26 +202,27 @@ const CreateProduct = () => {
           `${backendUrl}/api/subcategories/getallsubcategories`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          },
+          }
         );
         const filteredSubCategories = response.data.filter(
-          (sc) => sc.CategoryName === categoryName,
+          (sc) => sc.CategoryName === categoryName
         );
         setSubCategories(filteredSubCategories);
 
         if (
           formData.subCategoryName &&
           !filteredSubCategories.some(
-            (sc) => sc.subCategoryName === formData.subCategoryName,
+            (sc) => sc.subCategoryName === formData.subCategoryName
           )
         ) {
           setFormData((prev) => ({ ...prev, subCategoryName: "" }));
         }
       } catch (error) {
         console.error("Failed to fetch sub-categories", error);
+        toast.error("Failed to load sub-categories");
       }
     },
-    [backendUrl, formData.subCategoryName],
+    [backendUrl, formData.subCategoryName]
   );
 
   useEffect(() => {
@@ -294,13 +300,7 @@ const CreateProduct = () => {
       >
         <div className="product-form-card">
           <h1>{isEdit ? "Edit Product" : "Create New Product"}</h1>
-          {isSuccess && (
-            <div className="product-success-message" role="alert">
-              {isEdit
-                ? "Product updated successfully!"
-                : "Product created successfully!"}
-            </div>
-          )}
+
           <form onSubmit={handleSubmit} noValidate>
             {/* 1. Product Name */}
             <div className="product-form-group">
@@ -395,29 +395,6 @@ const CreateProduct = () => {
                 </p>
               )}
             </div>
-            <div className="product-form-group">
-              <label htmlFor="quantity">
-                Quantity {formData.unit ? `(in ${formData.unit})` : ""}
-              </label>
-              <input
-                id="quantity"
-                name="quantity"
-                type="number"
-                min="0"
-                value={formData.quantity}
-                onChange={handleChange}
-                aria-invalid={!!errors.quantity}
-                aria-describedby={
-                  errors.quantity ? "quantity-error" : undefined
-                }
-                className="product-input"
-                placeholder={
-                  formData.unit
-                    ? `e.g., 10 (for 10 ${formData.unit})`
-                    : "Enter quantity"
-                }
-              />
-            </div>
 
             {/* 4. Unit */}
             <div className="product-form-group">
@@ -458,7 +435,39 @@ const CreateProduct = () => {
               )}
             </div>
 
-            {/* 5. Quantity (with dynamic label) */}
+            {/* 5. Quantity */}
+            <div className="product-form-group">
+              <label htmlFor="quantity">
+                Quantity {formData.unit ? `(in ${formData.unit})` : ""}
+              </label>
+              <input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="0"
+                value={formData.quantity}
+                onChange={handleChange}
+                aria-invalid={!!errors.quantity}
+                aria-describedby={
+                  errors.quantity ? "quantity-error" : undefined
+                }
+                className="product-input"
+                placeholder={
+                  formData.unit
+                    ? `e.g., 10 (for 10 ${formData.unit})`
+                    : "Enter quantity"
+                }
+              />
+              {errors.quantity && (
+                <p
+                  id="quantity-error"
+                  className="product-error-text"
+                  role="alert"
+                >
+                  {errors.quantity}
+                </p>
+              )}
+            </div>
 
             {/* 6. Price */}
             <div className="product-form-group">
@@ -476,17 +485,15 @@ const CreateProduct = () => {
                 className="product-input"
               />
               {errors.price && (
-                <p id="price-error" className="product-error-text" role="alert">
+                <p
+                  id="price-error"
+                  className="product-error-text"
+                  role="alert"
+                >
                   {errors.price}
                 </p>
               )}
             </div>
-
-            {errors.submit && (
-              <div className="product-error-banner" role="alert">
-                {errors.submit}
-              </div>
-            )}
 
             <button
               type="submit"

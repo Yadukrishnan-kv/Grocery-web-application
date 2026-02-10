@@ -5,10 +5,11 @@ import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './UserTable.css';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const UserTable = () => {
   const [users, setUsers] = useState([]);
-  const [roles, setRoles] = useState([]); // ← NEW: dynamic roles from API
+  const [roles, setRoles] = useState([]);
   const [tableLoading, setTableLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -17,6 +18,10 @@ const UserTable = () => {
   const [userLoading, setUserLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+
+  // NEW: Confirmation modal for delete
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -50,12 +55,10 @@ const UserTable = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Filter out Admin and superadmin (as in original)
       const filteredUsers = res.data.filter(
         user => user.role !== 'Admin' && user.role !== 'superadmin'
       );
 
-      // Extract unique roles dynamically
       const uniqueRoles = [...new Set(
         filteredUsers.map(user => user.role).filter(role => role)
       )].sort();
@@ -75,7 +78,6 @@ const UserTable = () => {
     fetchUsers();
   }, [fetchCurrentUser, fetchUsers]);
 
-  // Filter users based on search term and role
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
       const matchesSearch = !searchTerm.trim() || 
@@ -89,25 +91,34 @@ const UserTable = () => {
     });
   }, [users, searchTerm, roleFilter]);
 
-  const handleDelete = async (id, username, role) => {
+  const handleDeleteClick = (id, username, role) => {
     if (role === 'Admin' || role === 'superadmin') {
-      alert(`Cannot delete protected role: ${role}`);
+      toast.error(`Cannot delete protected role: ${role}`);
       return;
     }
 
-    if (window.confirm(`Are you sure you want to delete user "${username}"?`)) {
-      try {
-        const token = localStorage.getItem('token');
-        await axios.delete(`${backendUrl}/api/users/deleteUser/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+    setUserToDelete({ id, username });
+    setShowDeleteModal(true);
+  };
 
-        // Refresh table
-        fetchUsers();
-      } catch (err) {
-        console.error("Delete error:", err);
-        alert("Failed to delete user. Please try again.");
-      }
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+
+    setShowDeleteModal(false);
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${backendUrl}/api/users/deleteUser/${userToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      toast.success(`User "${userToDelete.username}" deleted successfully!`);
+      fetchUsers(); // Refresh table
+    } catch (err) {
+      console.error("Delete error:", err);
+      toast.error("Failed to delete user. Please try again.");
+    } finally {
+      setUserToDelete(null);
     }
   };
 
@@ -143,9 +154,7 @@ const UserTable = () => {
             <div className="user-table-header-section">
               <h2 className="user-table-page-title">User Management</h2>
 
-              {/* Exact same controls group as OrderList */}
               <div className="user-table-controls-group">
-                {/* Filter first */}
                 <div className="user-table-filter-group">
                   <label htmlFor="roleFilter" className="user-table-filter-label">
                     Filter by Role:
@@ -165,7 +174,6 @@ const UserTable = () => {
                   </select>
                 </div>
 
-                {/* Search bar (second) */}
                 <div className="user-table-search-container">
                   <input
                     type="text"
@@ -186,7 +194,6 @@ const UserTable = () => {
                   )}
                 </div>
 
-                {/* Create Button (last) */}
                 <Link to="/user/create" className="user-table-create-button">
                   Create User
                 </Link>
@@ -241,7 +248,7 @@ const UserTable = () => {
                             className={`user-table-icon-button user-table-delete-button ${
                               user.role === 'Admin' || user.role === 'superadmin' ? 'disabled' : ''
                             }`}
-                            onClick={() => handleDelete(user._id, user.username, user.role)}
+                            onClick={() => handleDeleteClick(user._id, user.username, user.role)}
                             disabled={user.role === 'Admin' || user.role === 'superadmin'}
                             aria-label={
                               user.role === 'Admin' || user.role === 'superadmin'
@@ -261,6 +268,33 @@ const UserTable = () => {
           </div>
         </div>
       </main>
+
+      {/* Confirmation Modal for Delete */}
+      {showDeleteModal && userToDelete && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal">
+            <h3 className="confirm-title">Confirm Delete User</h3>
+            <p className="confirm-text">
+              Are you sure you want to delete user <strong>"{userToDelete.username}"</strong>?
+            </p>
+            <p className="confirm-warning">This action cannot be undone.</p>
+            <div className="confirm-actions">
+              <button
+                className="confirm-cancel"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="confirm-delete"
+                onClick={confirmDelete}
+              >
+                Delete User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

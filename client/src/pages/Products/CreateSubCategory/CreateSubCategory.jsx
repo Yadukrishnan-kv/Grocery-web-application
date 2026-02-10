@@ -1,10 +1,11 @@
-// CreateSubCategory.jsx
+// src/pages/Products/CreateSubCategory/CreateSubCategory.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CreateSubCategory.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW
 
 const CreateSubCategory = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -14,7 +15,6 @@ const CreateSubCategory = () => {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
@@ -57,7 +57,6 @@ const CreateSubCategory = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSuccess(false);
 
     if (!validateForm()) return;
 
@@ -77,20 +76,24 @@ const CreateSubCategory = () => {
           CategoryName: formData.CategoryName,
           subCategoryName: formData.subCategoryName
         }, config);
+
+        toast.success('Sub-category updated successfully!');
       } else {
         await axios.post(`${backendUrl}/api/subcategories/createsubcategory`, {
           CategoryName: formData.CategoryName,
           subCategoryName: formData.subCategoryName
         }, config);
+
+        toast.success('Sub-category created successfully!');
       }
 
-      setIsSuccess(true);
+      // Navigate after toast is visible
       setTimeout(() => {
         navigate('/subcategory/list');
       }, 1500);
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
-      setErrors({ submit: errorMessage });
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -118,6 +121,7 @@ const CreateSubCategory = () => {
       }
     } catch (error) {
       console.error("Failed to fetch sub-category data", error);
+      toast.error("Failed to load sub-category data");
       navigate('/subcategory/list');
     }
   }, [backendUrl, navigate]);
@@ -132,6 +136,7 @@ const CreateSubCategory = () => {
         setCategories(response.data);
       } catch (error) {
         console.error("Failed to fetch categories", error);
+        toast.error("Failed to load categories");
       }
     };
 
@@ -198,11 +203,7 @@ const CreateSubCategory = () => {
       <main className={`subcategory-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="subcategory-form-card">
           <h1>{isEdit ? 'Edit Sub-Category' : 'Create New Sub-Category'}</h1>
-          {isSuccess && (
-            <div className="subcategory-success-message" role="alert">
-              {isEdit ? 'Sub-category updated successfully!' : 'Sub-category created successfully!'}
-            </div>
-          )}
+
           <form onSubmit={handleSubmit} noValidate>
             <div className="subcategory-form-group">
               <label htmlFor="CategoryName">Category Name</label>
@@ -247,12 +248,6 @@ const CreateSubCategory = () => {
                 </p>
               )}
             </div>
-
-            {errors.submit && (
-              <div className="subcategory-error-banner" role="alert">
-                {errors.submit}
-              </div>
-            )}
 
             <button
               type="submit"

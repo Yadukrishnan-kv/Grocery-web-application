@@ -396,3 +396,203 @@
     width: 100%;
   }
 }
+
+/* Confirmation Modal for Delete */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px; /* Safe padding on small screens */
+}
+
+/* Modal Container */
+.confirm-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px; /* Reduced on mobile */
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  animation: modalPop 0.3s ease-out;
+  max-height: 90vh;
+  overflow-y: auto; /* Scroll if needed */
+}
+
+/* Animation */
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Title */
+.confirm-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+/* Text */
+.confirm-text {
+  font-size: 1.1rem;
+  color: #475569;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.confirm-warning {
+  font-size: 0.95rem;
+  color: #ef4444;
+  font-weight: 500;
+  margin-bottom: 28px;
+}
+
+/* Action Buttons */
+.confirm-actions {
+  display: flex;
+  flex-direction: column; /* Stack on mobile */
+  gap: 12px;
+  justify-content: center;
+}
+
+.confirm-cancel,
+.confirm-delete {
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%; /* Full width on small screens */
+  text-align: center;
+}
+
+.confirm-cancel {
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+}
+
+.confirm-cancel:hover {
+  background: #cbd5e1;
+}
+
+.confirm-delete {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+.confirm-delete:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+}
+
+/* ────────────────────────────────────────────────
+   RESPONSIVE DESIGN (all screen widths)
+───────────────────────────────────────────────── */
+
+/* Very small mobile (≤ 360px) */
+@media (max-width: 360px) {
+  .confirm-modal {
+    padding: 20px;
+    max-width: 95%;
+    border-radius: 12px;
+  }
+
+  .confirm-title {
+    font-size: 1.35rem;
+  }
+
+  .confirm-text {
+    font-size: 1rem;
+  }
+
+  .confirm-warning {
+    font-size: 0.9rem;
+  }
+
+  .confirm-cancel,
+  .confirm-delete {
+    padding: 12px 20px;
+    font-size: 0.95rem;
+  }
+}
+
+/* Mobile & small phones (≤ 480px) */
+@media (max-width: 480px) {
+  .confirm-modal {
+    padding: 20px 24px;
+    max-width: 90%;
+  }
+
+  .confirm-title {
+    font-size: 1.4rem;
+    margin-bottom: 12px;
+  }
+
+  .confirm-text {
+    font-size: 1.05rem;
+  }
+
+  .confirm-warning {
+    margin-bottom: 24px;
+  }
+
+  .confirm-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .confirm-cancel,
+  .confirm-delete {
+    width: 100%;
+    padding: 14px;
+  }
+}
+
+/* Tablets / medium screens (≤ 768px) */
+@media (max-width: 768px) {
+  .confirm-modal {
+    max-width: 85%;
+    padding: 28px 32px;
+  }
+
+  .confirm-title {
+    font-size: 1.45rem;
+  }
+
+  .confirm-actions {
+    flex-direction: column;
+  }
+}
+
+/* Large tablets & small desktops (≤ 1024px) */
+@media (max-width: 1024px) {
+  .confirm-modal {
+    max-width: 80%;
+  }
+}
+
+/* Large screens (≥ 1440px) */
+@media (min-width: 1440px) {
+  .confirm-modal {
+    max-width: 460px;
+    padding: 40px;
+  }
+
+  .confirm-title {
+    font-size: 1.6rem;
+  }
+
+  .confirm-text {
+    font-size: 1.15rem;
+  }
+}

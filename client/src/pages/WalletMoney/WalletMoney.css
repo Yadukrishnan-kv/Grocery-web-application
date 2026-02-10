@@ -1,0 +1,258 @@
+/* src/pages/Admin/WalletMoney.css */
+
+.wallet-money-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f4f7fa;
+  padding-top: 50px;
+}
+
+.wallet-money-main-content {
+  padding: 20px;
+  transition: margin-left 0.3s ease;
+}
+
+.wallet-money-main-content.sidebar-open {
+  margin-left: 250px; /* Adjust based on your sidebar width */
+}
+
+.wallet-money-container-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.wallet-money-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 30px;
+}
+
+.wallet-money-page-title {
+  font-size: 28px;
+  margin-bottom: 30px;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.wallet-money-loading,
+.wallet-money-no-data {
+  text-align: center;
+  padding: 80px 20px;
+  color: #6b7280;
+  font-size: 18px;
+}
+
+.wallet-money-table-wrapper {
+  overflow-x: auto;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.wallet-money-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.wallet-money-data-table th,
+.wallet-money-data-table td {
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.wallet-money-data-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+.wallet-money-data-table td {
+  color: #1f2937;
+}
+
+.wallet-money-status-badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.wallet-money-status-received {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.wallet-money-status-paid_to_admin {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.wallet-money-receive-btn {
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.wallet-money-receive-btn:hover {
+  background: #2563eb;
+}
+
+.wallet-money-receive-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.wallet-money-filter {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wallet-money-filter label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.wallet-money-filter select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+}
+
+/* Confirmation Modal for Mark Received */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+
+.confirm-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  animation: modalPop 0.3s ease-out;
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.confirm-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.confirm-text {
+  font-size: 1.1rem;
+  color: #475569;
+  margin-bottom: 32px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.confirm-cancel,
+.confirm-confirm {
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.confirm-cancel {
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+}
+
+.confirm-cancel:hover {
+  background: #cbd5e1;
+}
+
+.confirm-confirm {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+
+.confirm-confirm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+.confirm-confirm:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .confirm-modal {
+    padding: 24px;
+    max-width: 90%;
+  }
+
+  .confirm-title {
+    font-size: 1.4rem;
+  }
+
+  .confirm-text {
+    font-size: 1rem;
+  }
+
+  .confirm-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .confirm-cancel,
+  .confirm-confirm {
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .confirm-actions {
+    flex-direction: row;
+  }
+
+  .confirm-cancel,
+  .confirm-confirm {
+    width: auto;
+    min-width: 140px;
+  }
+}
+

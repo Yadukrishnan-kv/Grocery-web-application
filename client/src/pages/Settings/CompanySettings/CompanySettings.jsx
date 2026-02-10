@@ -1,24 +1,23 @@
 // src/pages/Admin/Settings/CompanySettings.jsx
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import Header from '../../../components/layout/Header/Header';
-import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import './CompanySettings.css';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import Header from "../../../components/layout/Header/Header";
+import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+import toast from "react-hot-toast"; // ← NEW IMPORT
+import "./CompanySettings.css";
 
 const CompanySettings = () => {
   const [formData, setFormData] = useState({
-    companyName: '',
-    companyAddress: '',
-    companyPhone: '',
-    companyEmail: '',
-    bankName: '',
-    bankAccountNumber: ''
+    companyName: "",
+    companyAddress: "",
+    companyPhone: "",
+    companyEmail: "",
+    bankName: "",
+    bankAccountNumber: "",
   });
   const [settingsId, setSettingsId] = useState(null); // for update
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [settingsExist, setSettingsExist] = useState(false);
@@ -28,33 +27,36 @@ const CompanySettings = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem("token");
         if (!token) {
-          window.location.href = '/login';
+          window.location.href = "/login";
           return;
         }
 
         // Get current user
         const userRes = await axios.get(`${backendUrl}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         setCurrentUser(userRes.data.user || userRes.data);
 
         // Get company settings
-        const settingsRes = await axios.get(`${backendUrl}/api/settings/company-settings`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const settingsRes = await axios.get(
+          `${backendUrl}/api/settings/company-settings`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
 
         if (settingsRes.data) {
           setSettingsExist(true);
           setSettingsId(settingsRes.data._id);
           setFormData({
-            companyName: settingsRes.data.companyName || '',
-            companyAddress: settingsRes.data.companyAddress || '',
-            companyPhone: settingsRes.data.companyPhone || '',
-            companyEmail: settingsRes.data.companyEmail || '',
-            bankName: settingsRes.data.bankName || '',
-            bankAccountNumber: settingsRes.data.bankAccountNumber || ''
+            companyName: settingsRes.data.companyName || "",
+            companyAddress: settingsRes.data.companyAddress || "",
+            companyPhone: settingsRes.data.companyPhone || "",
+            companyEmail: settingsRes.data.companyEmail || "",
+            bankName: settingsRes.data.bankName || "",
+            bankAccountNumber: settingsRes.data.bankAccountNumber || "",
           });
         } else {
           setSettingsExist(false);
@@ -62,7 +64,9 @@ const CompanySettings = () => {
           // Form remains empty for create
         }
       } catch (err) {
-        setErrorMsg(err.response?.data?.message || 'Failed to load company settings');
+        toast.error(
+          err.response?.data?.message || "Failed to load company settings",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -73,31 +77,27 @@ const CompanySettings = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    setSuccessMsg('');
-    setErrorMsg('');
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
-    setSuccessMsg('');
-    setErrorMsg('');
 
     // Basic validation
     if (!formData.companyName.trim()) {
-      setErrorMsg("Company name is required");
+      toast.error("Company name is required");
       setIsSaving(false);
       return;
     }
     if (!formData.companyAddress.trim()) {
-      setErrorMsg("Company address is required");
+      toast.error("Company address is required");
       setIsSaving(false);
       return;
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       let res;
 
       if (settingsExist && settingsId) {
@@ -105,14 +105,14 @@ const CompanySettings = () => {
         res = await axios.put(
           `${backendUrl}/api/settings/company-settings/${settingsId}`,
           formData,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
         // Create new
         res = await axios.post(
           `${backendUrl}/api/settings/company-settings`,
           formData,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         // After create → update state
         setSettingsId(res.data.settings._id);
@@ -120,16 +120,18 @@ const CompanySettings = () => {
       }
 
       setFormData(res.data.settings || res.data);
-      setSuccessMsg("Company settings saved successfully!");
+      toast.success("Company settings saved successfully!");
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Failed to save settings");
+      toast.error(err.response?.data?.message || "Failed to save settings");
     } finally {
       setIsSaving(false);
     }
   };
 
   if (isLoading) {
-    return <div className="company-loading">Loading company invoice settings...</div>;
+    return (
+      <div className="company-loading">Loading company invoice settings...</div>
+    );
   }
 
   return (
@@ -146,25 +148,21 @@ const CompanySettings = () => {
         onClose={() => setSidebarOpen(false)}
         user={currentUser}
       />
-      <main className={`company-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`company-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="company-container">
           <h1>Company Invoice Settings</h1>
           <p className="company-subtitle">
-            These details will appear on all generated invoices (DELIVERED & PENDING)
+            These details will appear on all generated invoices (DELIVERED &
+            PENDING)
           </p>
 
           {!settingsExist && (
             <div className="info-banner">
-              No company invoice details configured yet. Please fill in the form below to create them.
+              No company invoice details configured yet. Please fill in the form
+              below to create them.
             </div>
-          )}
-
-          {successMsg && (
-            <div className="success-message">{successMsg}</div>
-          )}
-
-          {errorMsg && (
-            <div className="error-banner">{errorMsg}</div>
           )}
 
           <form onSubmit={handleSubmit} className="company-form">
@@ -255,16 +253,12 @@ const CompanySettings = () => {
             </div>
 
             <div className="form-actions">
-              <button
-                type="submit"
-                className="save-btn"
-                disabled={isSaving}
-              >
+              <button type="submit" className="save-btn" disabled={isSaving}>
                 {isSaving
-                  ? 'Saving...'
+                  ? "Saving..."
                   : settingsExist
-                  ? 'Update Company Details'
-                  : 'Create Company Details'}
+                    ? "Update Company Details"
+                    : "Create Company Details"}
               </button>
             </div>
           </form>

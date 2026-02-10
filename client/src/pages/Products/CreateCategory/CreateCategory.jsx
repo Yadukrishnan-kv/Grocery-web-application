@@ -1,10 +1,11 @@
-// CreateCategory.jsx
+// src/pages/Products/CreateCategory/CreateCategory.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CreateCategory.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const CreateCategory = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -13,7 +14,6 @@ const CreateCategory = () => {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
@@ -51,7 +51,6 @@ const CreateCategory = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSuccess(false);
 
     if (!validateForm()) return;
 
@@ -70,19 +69,23 @@ const CreateCategory = () => {
         await axios.put(`${backendUrl}/api/categories/updatecategory/${categoryId}`, {
           CategoryName: formData.CategoryName
         }, config);
+
+        toast.success('Category updated successfully!');
       } else {
         await axios.post(`${backendUrl}/api/categories/createcategory`, {
           CategoryName: formData.CategoryName
         }, config);
+
+        toast.success('Category created successfully!');
       }
 
-      setIsSuccess(true);
+      // Navigate after short delay so user sees the success toast
       setTimeout(() => {
         navigate('/category/list');
       }, 1500);
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
-      setErrors({ submit: errorMessage });
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -109,6 +112,7 @@ const CreateCategory = () => {
       }
     } catch (error) {
       console.error("Failed to fetch category data", error);
+      toast.error("Failed to load category data");
       navigate('/category/list');
     }
   }, [backendUrl, navigate]);
@@ -173,11 +177,7 @@ const CreateCategory = () => {
       <main className={`category-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="category-form-card">
           <h1>{isEdit ? 'Edit Category' : 'Create New Category'}</h1>
-          {isSuccess && (
-            <div className="category-success-message" role="alert">
-              {isEdit ? 'Category updated successfully!' : 'Category created successfully!'}
-            </div>
-          )}
+
           <form onSubmit={handleSubmit} noValidate>
             <div className="category-form-group">
               <label htmlFor="CategoryName">Category Name</label>
@@ -196,12 +196,6 @@ const CreateCategory = () => {
                 </p>
               )}
             </div>
-
-            {errors.submit && (
-              <div className="category-error-banner" role="alert">
-                {errors.submit}
-              </div>
-            )}
 
             <button
               type="submit"

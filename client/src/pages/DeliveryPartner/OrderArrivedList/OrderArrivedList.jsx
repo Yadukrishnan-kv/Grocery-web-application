@@ -1,69 +1,76 @@
 // src/pages/Delivery/OrderArrivedList.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import Header from '../../../components/layout/Header/Header';
-import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import './OrderArrivedList.css';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import Header from "../../../components/layout/Header/Header";
+import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import "./OrderArrivedList.css";
+import axios from "axios";
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const OrderArrivedList = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState('Order arrived');
+  const [activeItem, setActiveItem] = useState("Order arrived");
   const [user, setUser] = useState(null);
   const [acceptingOrderId, setAcceptingOrderId] = useState(null);
-  const [rejectingOrderId, setRejectingOrderId] = useState(null); // NEW
-  const [searchTerm, setSearchTerm] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [rejectingOrderId, setRejectingOrderId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        window.location.href = '/login';
+        window.location.href = "/login";
         return;
       }
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       setUser(response.data.user || response.data);
     } catch (error) {
       console.error("Failed to load user", error);
       if (error.response?.status === 401) {
-        localStorage.removeItem('token');
-        alert('Your session has expired. Please login again.');
-        window.location.href = '/login';
+        localStorage.removeItem("token");
+        toast.error("Your session has expired. Please login again.");
+        window.location.href = "/login";
       } else {
-        alert('Failed to load user information.');
-        window.location.href = '/login';
+        toast.error("Failed to load user information.");
+        window.location.href = "/login";
       }
     }
   }, [backendUrl]);
 
   const fetchAssignedOrders = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('No token found');
+        throw new Error("No token found");
       }
-      const response = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const assignedOrders = response.data.filter(order => order.assignmentStatus === "assigned");
+      const response = await axios.get(
+        `${backendUrl}/api/orders/my-assigned-orders`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const assignedOrders = response.data.filter(
+        (order) => order.assignmentStatus === "assigned"
+      );
       setOrders(assignedOrders);
     } catch (error) {
-      console.error('Error fetching assigned orders:', error);
+      console.error("Error fetching assigned orders:", error);
       if (error.response?.status === 401) {
-        localStorage.removeItem('token');
-        alert('Your session has expired. Please login again.');
-        window.location.href = '/login';
+        localStorage.removeItem("token");
+        toast.error("Your session has expired. Please login again.");
+        window.location.href = "/login";
       } else if (error.response?.status === 403) {
-        alert('You do not have permission to view assigned orders.');
+        toast.error("You do not have permission to view assigned orders.");
         setOrders([]);
       } else {
-        alert('Failed to load orders. Please try again later.');
+        toast.error("Failed to load orders. Please try again later.");
       }
     } finally {
       setLoading(false);
@@ -76,62 +83,61 @@ const OrderArrivedList = () => {
   }, [fetchCurrentUser, fetchAssignedOrders]);
 
   const handleAcceptOrder = async (orderId) => {
-    if (!window.confirm('Are you sure you want to accept this order?')) return;
     setAcceptingOrderId(orderId);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       await axios.post(
         `${backendUrl}/api/orders/accept/${orderId}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      toast.success("Order accepted successfully");
       fetchAssignedOrders();
     } catch (error) {
-      console.error('Error accepting order:', error);
-      alert('Failed to accept order. Please try again.');
+      console.error("Error accepting order:", error);
+      toast.error("Failed to accept order. Please try again.");
     } finally {
       setAcceptingOrderId(null);
     }
   };
 
-  // NEW: Reject order handler
   const handleRejectOrder = async (orderId) => {
-    if (!window.confirm('Are you sure you want to reject this order? The order will be returned to the admin for reassignment.')) return;
     setRejectingOrderId(orderId);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       await axios.post(
         `${backendUrl}/api/orders/reject/${orderId}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      toast.success("Order rejected successfully. It has been returned for reassignment.");
       fetchAssignedOrders();
-      alert('Order rejected successfully. It has been returned for reassignment.');
     } catch (error) {
-      console.error('Error rejecting order:', error);
-      alert('Failed to reject order. Please try again.');
+      console.error("Error rejecting order:", error);
+      toast.error("Failed to reject order. Please try again.");
     } finally {
       setRejectingOrderId(null);
     }
   };
 
   const clearFilters = () => {
-    setSearchTerm('');
-    setFromDate('');
-    setToDate('');
+    setSearchTerm("");
+    setFromDate("");
+    setToDate("");
   };
 
-  // Filter orders: Search by customer + Date range
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
-      // Search by customer name
-      const matchesSearch = !searchTerm.trim() ||
-        (order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()));
-      // Date range filter
+    return orders.filter((order) => {
+      const matchesSearch =
+        !searchTerm.trim() ||
+        order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+
       let matchesDate = true;
       if (fromDate || toDate) {
         const orderDate = new Date(order.orderDate);
-        orderDate.setHours(0, 0, 0, 0); // Normalize to start of day
+        orderDate.setHours(0, 0, 0, 0);
         if (fromDate) {
           const start = new Date(fromDate);
           start.setHours(0, 0, 0, 0);
@@ -139,13 +145,22 @@ const OrderArrivedList = () => {
         }
         if (toDate) {
           const end = new Date(toDate);
-          end.setHours(23, 59, 59, 999); // End of day
+          end.setHours(23, 59, 59, 999);
           if (orderDate > end) matchesDate = false;
         }
       }
       return matchesSearch && matchesDate;
     });
   }, [orders, searchTerm, fromDate, toDate]);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
 
   if (!user) {
     return <div className="order-arrived-loading">Loading...</div>;
@@ -165,13 +180,14 @@ const OrderArrivedList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`order-arrived-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`order-arrived-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="order-arrived-container-wrapper">
           <div className="order-arrived-container">
             <h2 className="order-arrived-page-title">Order Arrived</h2>
-            {/* Controls: Date From → Date To → Search → Clear → (no create button here) */}
+
             <div className="order-arrived-controls-group">
-              {/* From Date */}
               <div className="order-arrived-date-filter">
                 <label htmlFor="fromDate" className="order-arrived-filter-label">
                   From Date:
@@ -184,7 +200,7 @@ const OrderArrivedList = () => {
                   className="order-arrived-date-input"
                 />
               </div>
-              {/* To Date */}
+
               <div className="order-arrived-date-filter">
                 <label htmlFor="toDate" className="order-arrived-filter-label">
                   To Date:
@@ -197,7 +213,7 @@ const OrderArrivedList = () => {
                   className="order-arrived-date-input"
                 />
               </div>
-              {/* Search bar */}
+
               <div className="order-arrived-search-container">
                 <input
                   type="text"
@@ -210,14 +226,14 @@ const OrderArrivedList = () => {
                 {searchTerm && (
                   <button
                     className="order-arrived-search-clear"
-                    onClick={() => setSearchTerm('')}
+                    onClick={() => setSearchTerm("")}
                     aria-label="Clear search"
                   >
                     ×
                   </button>
                 )}
               </div>
-              {/* Clear Filters Button */}
+
               {(searchTerm || fromDate || toDate) && (
                 <button
                   className="order-arrived-clear-button"
@@ -227,12 +243,15 @@ const OrderArrivedList = () => {
                 </button>
               )}
             </div>
+
             {loading ? (
               <div className="order-arrived-loading">Loading orders...</div>
             ) : filteredOrders.length === 0 ? (
               <div className="order-arrived-no-data">
                 No assigned orders found
-                {(searchTerm || fromDate || toDate) ? ' matching your filters' : ''}
+                {searchTerm || fromDate || toDate
+                  ? " matching your filters"
+                  : ""}
               </div>
             ) : (
               <div className="order-arrived-table-wrapper">
@@ -254,28 +273,80 @@ const OrderArrivedList = () => {
                     {filteredOrders.map((order, index) => (
                       <tr key={order._id}>
                         <td>{index + 1}</td>
-                        <td>{order.customer?.name || 'N/A'}</td>
-                        <td>{order.product?.productName || 'N/A'}</td>
-                        <td>{order.orderedQuantity} {order.unit || ''}</td>
-                        <td>AED{order.price?.toFixed(2) || '0.00'}</td>
-                        <td>AED{order.totalAmount?.toFixed(2) || '0.00'}</td>
-                        <td>{order.remarks || '-'}</td>
-                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                        <td>{order.customer?.name || "N/A"}</td>
+                        <td>{order.product?.productName || "N/A"}</td>
+                        <td>
+                          {order.orderedQuantity} {order.unit || ""}
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <img
+                              src={DirhamSymbol}
+                              alt="Dirham Symbol"
+                              width={20}
+                              height={20}
+                              style={{
+                                paddingTop: "2px",
+                              }}
+                            />
+                            <span>{order.price?.toFixed(2) || "0.00"}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <img
+                              src={DirhamSymbol}
+                              alt="Dirham Symbol"
+                              width={20}
+                              height={20}
+                              style={{
+                                paddingTop: "2px",
+                              }}
+                            />
+                            <span>
+                              {order.totalAmount?.toFixed(2) || "0.00"}
+                            </span>
+                          </div>
+                        </td>
+                        <td>{order.remarks || "-"}</td>
+                        <td>{formatDate(order.orderDate)}</td>
                         <td>
                           <div className="order-arrived-action-buttons">
                             <button
                               className="order-arrived-accept-button"
                               onClick={() => handleAcceptOrder(order._id)}
-                              disabled={acceptingOrderId === order._id || rejectingOrderId === order._id}
+                              disabled={
+                                acceptingOrderId === order._id ||
+                                rejectingOrderId === order._id
+                              }
                             >
-                              {acceptingOrderId === order._id ? 'Accepting...' : 'Accept'}
+                              {acceptingOrderId === order._id
+                                ? "Accepting..."
+                                : "Accept"}
                             </button>
                             <button
                               className="order-arrived-reject-button"
                               onClick={() => handleRejectOrder(order._id)}
-                              disabled={acceptingOrderId === order._id || rejectingOrderId === order._id}
+                              disabled={
+                                acceptingOrderId === order._id ||
+                                rejectingOrderId === order._id
+                              }
                             >
-                              {rejectingOrderId === order._id ? 'Rejecting...' : 'Reject'}
+                              {rejectingOrderId === order._id
+                                ? "Rejecting..."
+                                : "Reject"}
                             </button>
                           </div>
                         </td>

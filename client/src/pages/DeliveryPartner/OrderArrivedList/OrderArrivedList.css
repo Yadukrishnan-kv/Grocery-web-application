@@ -233,7 +233,7 @@
 
 .order-arrived-search-clear {
   position: absolute;
-  right: 0.75rem;
+  right: 2rem;
   top: 50%;
   transform: translateY(-50%);
   background: none;
@@ -349,4 +349,24 @@
     width: 100%;
     max-width: 150px;
   }
+
+  .order-arrived-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.125rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+}
 }

@@ -1,10 +1,11 @@
-// src/pages/Admin/CreateCustomer.jsx (or your path)
+// src/pages/Admin/CreateCustomer.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CreateCustomer.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const CreateCustomer = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,12 +17,11 @@ const CreateCustomer = () => {
     pincode: '',
     creditLimit: '',
     billingType: 'Credit limit',
-    statementType: '',  // NEW
-    dueDays: '',        // NEW
+    statementType: '',
+    dueDays: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
@@ -60,7 +60,6 @@ const CreateCustomer = () => {
       newErrors.creditLimit = 'Valid credit limit is required';
     }
 
-    // NEW: Validate if billingType = "Credit limit"
     if (formData.billingType === "Credit limit") {
       if (!formData.statementType) {
         newErrors.statementType = 'Statement type is required for Credit limit';
@@ -91,7 +90,6 @@ const CreateCustomer = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSuccess(false);
 
     if (!validateForm()) return;
 
@@ -114,8 +112,8 @@ const CreateCustomer = () => {
         pincode: formData.pincode.trim(),
         creditLimit: parseFloat(formData.creditLimit),
         billingType: formData.billingType,
-        statementType: formData.billingType === "Credit limit" ? formData.statementType : null,  // NEW
-        dueDays: formData.billingType === "Credit limit" ? parseInt(formData.dueDays) : null,  // NEW
+        statementType: formData.billingType === "Credit limit" ? formData.statementType : null,
+        dueDays: formData.billingType === "Credit limit" ? parseInt(formData.dueDays) : null,
       };
 
       let response;
@@ -126,37 +124,32 @@ const CreateCustomer = () => {
           submitData,
           config
         );
+        toast.success('Customer updated successfully!');
       } else {
         response = await axios.post(
           `${backendUrl}/api/customers/createcustomer`,
           submitData,
           config
         );
+        toast.success('Customer created successfully!');
       }
 
-      setIsSuccess(true);
-
-      // Show message (same as before)
-      if (!isEdit) {
-        const { defaultLoginInfo } = response.data;
-        if (defaultLoginInfo) {
-          alert(
-            `Customer created!\n\n` +
-            `Login credentials created automatically:\n` +
-            `Email: ${defaultLoginInfo.email}\n` +
-            `Temporary Password: ${defaultLoginInfo.temporaryPassword}\n\n` +
-            `${defaultLoginInfo.note}\n\n` +
-            `Redirecting to customer list...`
-          );
-        }
+      // Show login credentials toast for new customers (if returned)
+      if (!isEdit && response.data?.defaultLoginInfo) {
+        const { email, temporaryPassword, note } = response.data.defaultLoginInfo;
+        toast.success(
+          `Login credentials created!\nEmail: ${email}\nTemporary Password: ${temporaryPassword}\n${note || ''}`,
+          { duration: 8000, style: { whiteSpace: 'pre-line' } }
+        );
       }
 
+      // Navigate after toast is visible
       setTimeout(() => {
         navigate('/customer/list');
-      }, 1500);
+      }, 2000);
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
-      setErrors({ submit: errorMessage });
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -185,6 +178,7 @@ const CreateCustomer = () => {
       setCustomerId(id);
     } catch (error) {
       console.error("Failed to fetch customer data", error);
+      toast.error("Failed to load customer data");
       navigate('/customer/list');
     }
   }, [backendUrl, navigate]);
@@ -249,11 +243,7 @@ const CreateCustomer = () => {
       <main className={`customer-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="customer-form-card">
           <h1>{isEdit ? 'Edit Customer' : 'Create New Customer'}</h1>
-          {isSuccess && (
-            <div className="customer-success-message" role="alert">
-              {isEdit ? 'Customer updated successfully!' : 'Customer created successfully!'}
-            </div>
-          )}
+
           <form onSubmit={handleSubmit} noValidate>
             <div className="customer-form-row">
               <div className="customer-form-group">
@@ -356,7 +346,7 @@ const CreateCustomer = () => {
 
             <div className="customer-form-row">
               <div className="customer-form-group">
-                <label htmlFor="creditLimit">Credit Limit ($)</label>
+                <label htmlFor="creditLimit">Credit Limit (AED)</label>
                 <input
                   id="creditLimit"
                   name="creditLimit"
@@ -391,7 +381,6 @@ const CreateCustomer = () => {
               </div>
             </div>
 
-            {/* NEW: Conditional Billing Config */}
             {formData.billingType === "Credit limit" && (
               <div className="customer-form-row">
                 <div className="customer-form-group">
@@ -433,12 +422,6 @@ const CreateCustomer = () => {
                     </p>
                   )}
                 </div>
-              </div>
-            )}
-
-            {errors.submit && (
-              <div className="customer-error-banner" role="alert">
-                {errors.submit}
               </div>
             )}
 

@@ -33,6 +33,8 @@ const MENU_PERMISSIONS = {
   'CustomerRequests': 'menu.customer.requests',
   'CreateCustomerRequest': 'menu.customer.requests.create',
   'MyCustomerRequests': 'menu.customer.requests.my',
+  'Wallet': 'menu.wallet',
+  'WalletMoney': 'menu.wallet.money',
   
 };
 
@@ -124,6 +126,7 @@ const navItems = [
     icon: '📝',
     path: '/admin/customer-requests/pending',
   },
+   { id: 'WalletMoney', label: 'Wallet Money', icon: '💰', path: '/admin/wallet-money' },
   { id: 'Settings', label: 'Settings', icon: '⚙️', 
     subItems: [
       { id: 'CompanySettings', label: 'Company Settings', path: '/company-settings' }
@@ -137,7 +140,11 @@ const navItems = [
       { id: 'CreateCustomerRequest', label: 'Create Request', path: '/sales/customer-requests/create' },
       { id: 'MyCustomerRequests', label: 'My Requests', path: '/sales/customer-requests/my' }
     ]
-  }
+    
+  },
+  { id: 'Wallet', label: 'Wallet', icon: '💰', path: '/delivery/wallet' },
+ 
+  
 ];
 
 const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
@@ -160,7 +167,8 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
       item.id !== 'CustomerOrderReports' &&
       item.id !== 'CustomerBillStatement' &&
       item.id !== 'CustomerCreditLimit' &&
-      item.id !== 'CreateCustomerRequest'
+      item.id !== 'CreateCustomerRequest' &&
+      item.id !== 'Wallet'
     );
   }
 

@@ -230,7 +230,7 @@
 
 .delivered-orders-search-clear {
   position: absolute;
-  right: 0.75rem;
+  right: 2rem;
   top: 50%;
   transform: translateY(-50%);
   background: none;
@@ -318,5 +318,303 @@
   
   .delivered-orders-status-filter {
     width: 80%;
+  }
+  .delivered-orders-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.125rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  line-height: 1;
+}
+}
+
+/* Modal styles - add to DeliveredOrdersList.css or a separate file */
+
+/* Delivery Modal Overlay */
+.delivery-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px; /* Safe padding on small screens */
+}
+
+/* Modal Container */
+.delivery-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 520px;
+  padding: 24px; /* Reduced padding on small screens */
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  animation: modalPop 0.3s ease-out;
+  max-height: 90vh;
+  overflow-y: auto; /* Scroll if content is too long */
+}
+
+/* Animation */
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Title (if you ever add it back) */
+.modal-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+/* Sections */
+.modal-section {
+  margin-bottom: 24px;
+}
+
+/* Labels */
+.modal-label {
+  display: block;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+
+/* Inputs */
+.modal-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 1rem;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+}
+
+/* Radio Group */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1rem;
+  color: #1e293b;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 10px;
+  transition: all 0.2s;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.radio-label:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.radio-label input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #6366f1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Cheque Section */
+.cheque-section {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cheque-title {
+  font-size: 1.25rem;
+  color: #1e293b;
+  margin-bottom: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Action Buttons */
+.modal-actions {
+  display: flex;
+  flex-direction: column; /* Stack on mobile */
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-back-btn,
+.modal-cancel-btn,
+.modal-next-btn {
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%; /* Full width on mobile */
+  text-align: center;
+}
+
+.modal-back-btn {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.modal-back-btn:hover {
+  background: #e2e8f0;
+}
+
+.modal-cancel-btn {
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+}
+
+.modal-cancel-btn:hover {
+  background: #cbd5e1;
+}
+
+.modal-next-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+
+.modal-next-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+.modal-next-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ────────────────────────────────────────────────
+   RESPONSIVE DESIGN (for all screen widths)
+───────────────────────────────────────────────── */
+
+/* Mobile (≤ 480px) */
+@media (max-width: 480px) {
+  .delivery-modal {
+    padding: 20px;
+    max-width: 95%;
+    border-radius: 12px;
+  }
+
+  .modal-title {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+  }
+
+  .modal-label {
+    font-size: 0.95rem;
+  }
+
+  .modal-input {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .radio-label {
+    font-size: 0.95rem;
+    padding: 10px 14px;
+  }
+
+  .cheque-title {
+    font-size: 1.15rem;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .modal-back-btn,
+  .modal-cancel-btn,
+  .modal-next-btn {
+    font-size: 0.95rem;
+    padding: 14px;
+  }
+}
+
+/* Small tablets / phones (≤ 768px) */
+@media (max-width: 768px) {
+  .delivery-modal {
+    padding: 24px;
+    max-width: 90%;
+  }
+
+  .modal-title {
+    font-size: 1.6rem;
+  }
+
+  .modal-section {
+    margin-bottom: 20px;
+  }
+}
+
+/* Large tablets & small desktops (≤ 1024px) */
+@media (max-width: 1024px) {
+  .delivery-modal {
+    max-width: 85%;
+    padding: 28px;
+  }
+}
+
+/* Very large screens (≥ 1440px) */
+@media (min-width: 1440px) {
+  .delivery-modal {
+    max-width: 560px;
+    padding: 40px;
+  }
+
+  .modal-title {
+    font-size: 1.9rem;
+  }
+
+  .modal-label {
+    font-size: 1.1rem;
   }
 }

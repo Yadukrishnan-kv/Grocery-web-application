@@ -3,8 +3,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
+import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import './CustomerList.css';
 import axios from 'axios';
+import toast from 'react-hot-toast'; // ← NEW IMPORT
 
 const CustomerList = () => {
   const [customers, setCustomers] = useState([]);
@@ -14,6 +16,10 @@ const CustomerList = () => {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [dueDaysFilter, setDueDaysFilter] = useState('all');
+
+  // NEW: Confirmation modal for delete
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -38,14 +44,13 @@ const CustomerList = () => {
   const fetchCustomers = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      // Use the endpoint that includes pending bill info
       const response = await axios.get(`${backendUrl}/api/customers/getallcustomerswithdue`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
-      alert('Failed to load customers');
+      toast.error('Failed to load customers');
     } finally {
       setLoading(false);
     }
@@ -56,24 +61,33 @@ const CustomerList = () => {
     fetchCustomers();
   }, [fetchCurrentUser, fetchCustomers]);
 
-  const handleDelete = async (id, customerName) => {
-    if (window.confirm(`Are you sure you want to delete customer "${customerName}"?`)) {
-      try {
-        const token = localStorage.getItem('token');
-        await axios.delete(`${backendUrl}/api/customers/deletecustomer/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        fetchCustomers();
-      } catch (error) {
-        console.error('Error deleting customer:', error);
-        alert('Failed to delete customer. Please try again.');
-      }
+  const handleDeleteClick = (id, customerName) => {
+    setCustomerToDelete({ id, customerName });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!customerToDelete) return;
+
+    setShowDeleteModal(false);
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${backendUrl}/api/customers/deletecustomer/${customerToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success(`Customer "${customerToDelete.customerName}" deleted successfully!`);
+      fetchCustomers();
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      toast.error('Failed to delete customer. Please try again.');
+    } finally {
+      setCustomerToDelete(null);
     }
   };
 
-  // Use real pending bill days from backend
   const getDaysRemaining = (customer) => {
-    // pendingBillDaysLeft comes from getAllCustomersWithDue endpoint
     return customer.pendingBillDaysLeft !== undefined && customer.pendingBillDaysLeft !== null
       ? customer.pendingBillDaysLeft
       : null;
@@ -95,7 +109,6 @@ const CustomerList = () => {
 
   const clearSearch = () => setSearchTerm('');
 
-  // Filter customers
   const filteredCustomers = useMemo(() => {
     return customers.filter(customer => {
       const matchesSearch = !searchTerm.trim() ||
@@ -151,7 +164,6 @@ const CustomerList = () => {
               <h2 className="customer-list-page-title">Customer Management</h2>
 
               <div className="customer-list-controls-group">
-                {/* Search */}
                 <div className="customer-list-search-container">
                   <input
                     type="text"
@@ -167,7 +179,6 @@ const CustomerList = () => {
                   )}
                 </div>
 
-                {/* Due Days Filter */}
                 <div className="customer-list-filter-group">
                   <label htmlFor="dueDaysFilter" className="customer-list-filter-label">
                     Due Days:
@@ -187,7 +198,6 @@ const CustomerList = () => {
                   </select>
                 </div>
 
-                {/* Create Button */}
                 <Link to="/customer/create" className="customer-list-create-button">
                   Create Customer
                 </Link>
@@ -237,8 +247,30 @@ const CustomerList = () => {
                           <td>{customer.phoneNumber}</td>
                           <td>{customer.address}</td>
                           <td>{customer.pincode}</td>
-                          <td>AED{customer.creditLimit?.toFixed(2) || '0.00'}</td>
-                          <td>AED{customer.balanceCreditLimit?.toFixed(2) || '0.00'}</td>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <img
+                                src={DirhamSymbol}
+                                alt="Dirham Symbol"
+                                width={15}
+                                height={15}
+                                style={{ paddingTop: "3px" }}
+                              />
+                              <span>{customer.creditLimit?.toFixed(2) || "0.00"}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <img
+                                src={DirhamSymbol}
+                                alt="Dirham Symbol"
+                                width={15}
+                                height={15}
+                                style={{ paddingTop: "3px" }}
+                              />
+                              <span>{customer.balanceCreditLimit?.toFixed(2) || "0.00"}</span>
+                            </div>
+                          </td>
                           <td>{customer.billingType}</td>
                           <td>
                             {customer.statementType
@@ -260,7 +292,7 @@ const CustomerList = () => {
                           <td>
                             <button
                               className="customer-list-icon-button customer-list-delete-button"
-                              onClick={() => handleDelete(customer._id, customer.name)}
+                              onClick={() => handleDeleteClick(customer._id, customer.name)}
                             >
                               🗑️
                             </button>
@@ -275,6 +307,35 @@ const CustomerList = () => {
           </div>
         </div>
       </main>
+
+      {/* Responsive Delete Confirmation Modal */}
+      {showDeleteModal && customerToDelete && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal">
+            <h3 className="confirm-title">Delete Customer</h3>
+            <p className="confirm-text">
+              Are you sure you want to delete 
+              <strong> "{customerToDelete.customerName}"</strong>?
+            </p>
+            <p className="confirm-warning">This action cannot be undone.</p>
+
+            <div className="confirm-actions">
+              <button 
+                className="confirm-cancel"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="confirm-delete"
+                onClick={confirmDelete}
+              >
+                Delete Customer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
