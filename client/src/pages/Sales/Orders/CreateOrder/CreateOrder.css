@@ -224,3 +224,143 @@
   color: #9ca3af;
 }
 
+/* =========================================
+   ORDER ITEMS SECTION STYLES
+   ========================================= */
+
+/* Section Header */
+.order-form-card h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #374151;
+  margin: 2rem 0 1rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Container for a single product row (Product + Qty + Remove) */
+.order-item-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: flex-end;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Styling for Inputs/Selects specifically inside the Order Item Row 
+   (Ensures they match the global .order-input style without needing extra classes in JSX) */
+.order-item-row select,
+.order-item-row input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #1f2937;
+  background: white;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box; /* Ensures padding doesn't break width */
+}
+
+.order-item-row select:focus,
+.order-item-row input:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Flex distribution: Product takes more space, Qty takes less */
+.order-item-row select {
+  flex: 2; 
+}
+
+.order-item-row input {
+  flex: 1;
+}
+
+/* Remove Item Button (The "Closing X") */
+.remove-item-btn {
+  padding: 0.75rem 1rem;
+  background-color: #fee2e2; /* Light Red Background */
+  color: #b91c1c; /* Dark Red Text */
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  height: 46px; /* Matches input height roughly */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+}
+
+.remove-item-btn:hover {
+  background-color: #fecaca;
+  border-color: #fca5a5;
+  transform: translateY(-1px);
+}
+
+/* Add Another Product Button */
+.add-item-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  color: #64748b;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.add-item-btn:hover {
+  border-color: #4f46e5;
+  color: #4f46e5;
+  background-color: #eef2ff;
+}
+
+/* Animation for adding new rows */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================
+   MOBILE RESPONSIVENESS FOR ORDER ITEMS
+   ========================================= */
+@media (max-width: 768px) {
+  .order-item-row {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch; /* Full width on mobile */
+  }
+
+  .order-item-row select,
+  .order-item-row input {
+    width: 100%;
+  }
+
+  .remove-item-btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: 0.25rem;
+  }
+  
+  .order-form-card h3 {
+    font-size: 1rem;
+    margin-top: 1.5rem;
+  }
+}

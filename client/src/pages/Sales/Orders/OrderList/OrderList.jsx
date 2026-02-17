@@ -6,7 +6,7 @@ import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../../Assets/aed-symbol.png";
 import "./OrderList.css";
 import axios from "axios";
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from 'react-hot-toast';
 
 const OrderList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -18,7 +18,6 @@ const OrderList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // NEW: Confirmation modal for delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
 
@@ -111,7 +110,7 @@ const OrderList = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      toast.success(`Order "${orderToDelete.orderId}" deleted successfully!`);
+      toast.success(`Order deleted successfully!`);
       fetchOrders();
     } catch (error) {
       console.error("Error deleting order:", error);
@@ -195,6 +194,7 @@ const OrderList = () => {
                 >
                   <option value="all">All</option>
                   <option value="pending">Pending</option>
+                  <option value="partial_delivered">Partial Delivered</option>
                   <option value="delivered">Delivered</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
@@ -234,10 +234,9 @@ const OrderList = () => {
                     <tr>
                       <th scope="col">No</th>
                       <th scope="col">Customer</th>
-                      <th scope="col">Product</th>
-                      <th scope="col">Ordered Qty</th>
-                      <th scope="col">Price (AED)</th>
-                      <th scope="col">Total Amount (AED)</th>
+                      <th scope="col">Products</th>           {/* ← Changed label */}
+                      <th scope="col">Total Qty</th>         {/* ← New */}
+                      <th scope="col">Grand Total (AED)</th> {/* ← Changed label */}
                       <th scope="col">Payment</th>
                       <th scope="col">Remarks</th>
                       <th scope="col">Delivery Partner</th>
@@ -253,28 +252,28 @@ const OrderList = () => {
                         <tr key={order._id}>
                           <td>{index + 1}</td>
                           <td>{order.customer?.name || "N/A"}</td>
-                          <td>{order.product?.productName || "N/A"}</td>
-                          <td>
-                            {order.orderedQuantity} {order.unit || ""}
-                          </td>
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="Dirham Symbol"
-                                width={15}
-                                height={15}
-                                style={{ paddingTop: "3px" }}
-                              />
-                              <span> {order.price?.toFixed(2) || "0.00"}</span>
+
+                          {/* Multi-product display – keeps your original styling */}
+                         <td className="products-cell">
+                          {order.orderItems?.length > 0 ? (
+                            <div className="products-list">
+                              {order.orderItems.map((item, i) => (
+                                <div key={i} className="product-tag">
+                                  <span className="product-name">{item.product?.productName || "Unknown"}</span>
+                                  <span className="product-qty">× {item.orderedQuantity}</span>
+                                  <span className="product-unit">{item.unit || ""}</span>
+                                </div>
+                              ))}
                             </div>
-                          </td>
+                          ) : (
+                            <span className="no-products">No products</span>
+                          )}
+                        </td>
+
+                          {/* Total ordered quantity (virtual field) */}
+                          <td>{order.totalOrderedQuantity || order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0}</td>
+
+                          {/* Grand total */}
                           <td>
                             <div
                               style={{
@@ -291,11 +290,13 @@ const OrderList = () => {
                                 style={{ paddingTop: "3px" }}
                               />
                               <span>
-                                {" "}
-                                {order.totalAmount?.toFixed(2) || "0.00"}
+                                {order.grandTotal?.toFixed(2) ||
+                                  order.orderItems?.reduce((sum, it) => sum + it.totalAmount, 0)?.toFixed(2) ||
+                                  "0.00"}
                               </span>
                             </div>
                           </td>
+
                           <td>{order.payment || "N/A"}</td>
                           <td title={order.remarks || ""}>
                             {order.remarks
@@ -348,17 +349,18 @@ const OrderList = () => {
                               {order.assignmentStatus === "accepted"
                                 ? "Accepted"
                                 : order.assignmentStatus === "rejected"
-                                  ? "Rejected"
-                                  : order.assignmentStatus === "assigned"
-                                    ? "Assigned"
-                                    : "Pending"}
+                                ? "Rejected"
+                                : order.assignmentStatus === "assigned"
+                                ? "Assigned"
+                                : "Pending"}
                             </span>
                           </td>
                           <td>
                             <span
                               className={`order-list-status-badge order-list-status-${order.status?.toLowerCase() || "pending"}`}
                             >
-                              {order.status || "Pending"}
+                              {order.status?.charAt(0).toUpperCase() +
+                                order.status?.slice(1) || "Pending"}
                             </span>
                           </td>
                           <td>{formatDate(order.orderDate)}</td>
@@ -401,14 +403,14 @@ const OrderList = () => {
         </div>
       </main>
 
-      {/* Responsive Delete Confirmation Modal */}
+      {/* Your existing delete modal – unchanged */}
       {showDeleteModal && orderToDelete && (
         <div className="confirm-modal-overlay">
           <div className="confirm-modal">
             <h3 className="confirm-title">Delete Order</h3>
             <p className="confirm-text">
-           Are you sure you want to delete this order?
-             
+              Are you sure you want to delete order 
+              <strong> #{orderToDelete.orderId}</strong>?
             </p>
             <p className="confirm-warning">This action cannot be undone.</p>
 

@@ -5,7 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import "./CreateProduct.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from "react-hot-toast";
 
 const CreateProduct = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -14,7 +14,6 @@ const CreateProduct = () => {
     CategoryName: "",
     subCategoryName: "",
     unit: "",
-    quantity: "",
     price: "",
   });
   const [errors, setErrors] = useState({});
@@ -47,14 +46,6 @@ const CreateProduct = () => {
 
     if (!formData.unit) {
       newErrors.unit = "Unit is required";
-    }
-
-    if (
-      !formData.quantity ||
-      isNaN(formData.quantity) ||
-      parseInt(formData.quantity) < 0
-    ) {
-      newErrors.quantity = "Valid quantity is required";
     }
 
     if (
@@ -105,15 +96,15 @@ const CreateProduct = () => {
         CategoryName: formData.CategoryName,
         subCategoryName: formData.subCategoryName,
         unit: formData.unit,
-        quantity: parseInt(formData.quantity),
         price: parseFloat(formData.price),
+        // quantity is NOT sent anymore – backend will default to 0
       };
 
       if (isEdit) {
         await axios.put(
           `${backendUrl}/api/products/updateproduct/${productId}`,
           submitData,
-          config
+          config,
         );
 
         toast.success("Product updated successfully!");
@@ -121,13 +112,12 @@ const CreateProduct = () => {
         await axios.post(
           `${backendUrl}/api/products/createproduct`,
           submitData,
-          config
+          config,
         );
 
         toast.success("Product created successfully!");
       }
 
-      // Navigate after toast visibility
       setTimeout(() => {
         navigate("/product/list");
       }, 1500);
@@ -149,7 +139,7 @@ const CreateProduct = () => {
           `${backendUrl}/api/products/getallproducts`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
 
         const products = response.data;
@@ -161,8 +151,8 @@ const CreateProduct = () => {
             CategoryName: productToEdit.CategoryName || "",
             subCategoryName: productToEdit.subCategoryName || "",
             unit: productToEdit.unit || "",
-            quantity: productToEdit.quantity?.toString() || "",
             price: productToEdit.price?.toString() || "",
+            // quantity is NOT loaded/used anymore
           });
           setIsEdit(true);
           setProductId(id);
@@ -175,7 +165,7 @@ const CreateProduct = () => {
         navigate("/product/list");
       }
     },
-    [backendUrl, navigate]
+    [backendUrl, navigate],
   );
 
   const fetchCategories = useCallback(async () => {
@@ -185,7 +175,7 @@ const CreateProduct = () => {
         `${backendUrl}/api/categories/getallcategories`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       setCategories(response.data);
     } catch (error) {
@@ -202,17 +192,17 @@ const CreateProduct = () => {
           `${backendUrl}/api/subcategories/getallsubcategories`,
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
         const filteredSubCategories = response.data.filter(
-          (sc) => sc.CategoryName === categoryName
+          (sc) => sc.CategoryName === categoryName,
         );
         setSubCategories(filteredSubCategories);
 
         if (
           formData.subCategoryName &&
           !filteredSubCategories.some(
-            (sc) => sc.subCategoryName === formData.subCategoryName
+            (sc) => sc.subCategoryName === formData.subCategoryName,
           )
         ) {
           setFormData((prev) => ({ ...prev, subCategoryName: "" }));
@@ -222,7 +212,7 @@ const CreateProduct = () => {
         toast.error("Failed to load sub-categories");
       }
     },
-    [backendUrl, formData.subCategoryName]
+    [backendUrl, formData.subCategoryName],
   );
 
   useEffect(() => {
@@ -435,41 +425,7 @@ const CreateProduct = () => {
               )}
             </div>
 
-            {/* 5. Quantity */}
-            <div className="product-form-group">
-              <label htmlFor="quantity">
-                Quantity {formData.unit ? `(in ${formData.unit})` : ""}
-              </label>
-              <input
-                id="quantity"
-                name="quantity"
-                type="number"
-                min="0"
-                value={formData.quantity}
-                onChange={handleChange}
-                aria-invalid={!!errors.quantity}
-                aria-describedby={
-                  errors.quantity ? "quantity-error" : undefined
-                }
-                className="product-input"
-                placeholder={
-                  formData.unit
-                    ? `e.g., 10 (for 10 ${formData.unit})`
-                    : "Enter quantity"
-                }
-              />
-              {errors.quantity && (
-                <p
-                  id="quantity-error"
-                  className="product-error-text"
-                  role="alert"
-                >
-                  {errors.quantity}
-                </p>
-              )}
-            </div>
-
-            {/* 6. Price */}
+            {/* 5. Price (quantity field removed) */}
             <div className="product-form-group">
               <label htmlFor="price">Price (AED)</label>
               <input
@@ -485,11 +441,7 @@ const CreateProduct = () => {
                 className="product-input"
               />
               {errors.price && (
-                <p
-                  id="price-error"
-                  className="product-error-text"
-                  role="alert"
-                >
+                <p id="price-error" className="product-error-text" role="alert">
                   {errors.price}
                 </p>
               )}

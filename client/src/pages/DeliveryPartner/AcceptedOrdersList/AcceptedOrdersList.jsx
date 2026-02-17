@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
-
 import "./AcceptedOrdersList.css";
 import axios from "axios";
+import toast from 'react-hot-toast';
 
 const AcceptedOrdersList = () => {
   const [orders, setOrders] = useState([]);
@@ -13,7 +13,7 @@ const AcceptedOrdersList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Accepted Orders");
   const [user, setUser] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(""); // ← NEW: search state
+  const [searchTerm, setSearchTerm] = useState("");
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -24,7 +24,6 @@ const AcceptedOrdersList = () => {
         window.location.href = "/login";
         return;
       }
-
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -41,17 +40,17 @@ const AcceptedOrdersList = () => {
       const token = localStorage.getItem("token");
       const response = await axios.get(
         `${backendUrl}/api/orders/my-assigned-orders`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      // Filter only accepted orders
       const acceptedOrders = response.data.filter(
-        (order) => order.assignmentStatus === "accepted",
+        (order) => order.assignmentStatus === "accepted"
       );
       setOrders(acceptedOrders);
     } catch (error) {
       console.error("Error fetching accepted orders:", error);
-      alert("Failed to load orders");
+      toast.error("Failed to load accepted orders");
     } finally {
       setLoading(false);
     }
@@ -62,21 +61,18 @@ const AcceptedOrdersList = () => {
     fetchAcceptedOrders();
   }, [fetchCurrentUser, fetchAcceptedOrders]);
 
-  // Filter orders by customer name
+  // Filter by customer name
   const filteredOrders = useMemo(() => {
     if (!searchTerm.trim()) return orders;
 
     const query = searchTerm.toLowerCase().trim();
     return orders.filter((order) =>
-      order.customer?.name?.toLowerCase().includes(query),
+      order.customer?.name?.toLowerCase().includes(query)
     );
   }, [orders, searchTerm]);
 
-  const clearSearch = () => {
-    setSearchTerm("");
-  };
+  const clearSearch = () => setSearchTerm("");
 
-  // Helper function to format date as DD/MM/YYYY
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
@@ -112,7 +108,6 @@ const AcceptedOrdersList = () => {
             <div className="accepted-orders-header-section">
               <h2 className="accepted-orders-page-title">Accepted Orders</h2>
 
-              {/* Search bar (same style as OrderList) */}
               <div className="accepted-orders-controls-group">
                 <div className="accepted-orders-search-container">
                   <input
@@ -150,10 +145,9 @@ const AcceptedOrdersList = () => {
                     <tr>
                       <th scope="col">No</th>
                       <th scope="col">Customer</th>
-                      <th scope="col">Product</th>
-                      <th scope="col">Ordered Qty</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Total Amount</th>
+                      <th scope="col">Products</th>           {/* Updated */}
+                      <th scope="col">Total Qty</th>         {/* Added */}
+                      <th scope="col">Grand Total</th>       {/* Updated */}
                       <th scope="col">Remarks</th>
                       <th scope="col">Order Date</th>
                       <th scope="col">Accepted At</th>
@@ -164,48 +158,63 @@ const AcceptedOrdersList = () => {
                       <tr key={order._id}>
                         <td>{index + 1}</td>
                         <td>{order.customer?.name || "N/A"}</td>
-                        <td>{order.product?.productName || "N/A"}</td>
-                        <td>{order.orderedQuantity}</td>
+
+                        {/* Multi-product attractive display */}
+                        <td className="products-cell">
+                          {order.orderItems?.length > 0 ? (
+                            <div className="products-list">
+                              {order.orderItems.map((item, i) => (
+                                <div key={i} className="product-tag">
+                                  <span className="product-name">
+                                    {item.product?.productName || "Unknown Product"}
+                                  </span>
+                                  <span className="product-qty">
+                                    × {item.orderedQuantity}
+                                  </span>
+                                  <span className="product-unit">
+                                    {item.unit || ""}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="no-products">No products</span>
+                          )}
+                        </td>
+
+                        {/* Total ordered quantity */}
+                        <td>
+                          {order.totalOrderedQuantity ||
+                            order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) ||
+                            0}
+                        </td>
+
+                        {/* Grand total with Dirham symbol */}
                         <td>
                           <div
                             style={{
                               display: "flex",
                               alignItems: "center",
-                              gap: "4px",
+                              gap: "6px",
                             }}
                           >
                             <img
                               src={DirhamSymbol}
-                              alt="Dirham Symbol"
+                              alt="AED"
                               width={15}
                               height={15}
-                              style={{
-                                paddingTop: "2px",
-                              }}
+                              style={{ paddingTop: "2px" }}
                             />
-                            <span>{order.price.toFixed(2)}</span>
+                            <span style={{ fontWeight: 500 }}>
+                              {order.grandTotal?.toFixed(2) ||
+                                order.orderItems
+                                  ?.reduce((sum, it) => sum + it.totalAmount, 0)
+                                  ?.toFixed(2) ||
+                                "0.00"}
+                            </span>
                           </div>
                         </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            <img
-                              src={DirhamSymbol}
-                              alt="Dirham Symbol"
-                              width={15}
-                              height={15}
-                              style={{
-                                paddingTop: "2px",
-                              }}
-                            />
-                            <span>{order.totalAmount.toFixed(2)}</span>
-                          </div>
-                        </td>
+
                         <td>{order.remarks || "-"}</td>
                         <td>{formatDate(order.orderDate)}</td>
                         <td>{formatDate(order.acceptedAt)}</td>

@@ -11,7 +11,7 @@ const PDFDocument = require('pdfkit');
 
 const createOrder = async (req, res) => {
   try {
-    let { customerId, productId, orderedQuantity, payment, remarks } = req.body;
+    let { customerId, orderItems, payment, remarks } = req.body;
 
     // Auto-set customerId for Customer role
     if (req.user.role === "Customer") {
@@ -25,47 +25,55 @@ const createOrder = async (req, res) => {
     }
 
     const customer = await Customer.findById(customerId);
-    if (!customer) {
-      return res.status(404).json({ message: "Customer not found" });
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    if (!Array.isArray(orderItems) || orderItems.length === 0) {
+      return res.status(400).json({ message: "At least one product is required" });
     }
 
-    // Fetch product (including unit)
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+    let grandTotal = 0;
+    const processedItems = [];
+
+    for (const item of orderItems) {
+      const product = await Product.findById(item.productId);
+      if (!product) return res.status(404).json({ message: `Product ${item.productId} not found` });
+
+      // NO STOCK CHECK ANYMORE – as per your request
+      // if (product.quantity < item.orderedQuantity) { ... } ← REMOVED
+
+      const itemTotal = product.price * item.orderedQuantity;
+      grandTotal += itemTotal;
+
+      processedItems.push({
+        product: item.productId,
+        unit: product.unit,
+        orderedQuantity: item.orderedQuantity,
+        deliveredQuantity: 0,
+        price: product.price,
+        totalAmount: itemTotal,
+        remarks: item.remarks || '',
+      });
+
+      // NO STOCK REDUCTION ANYMORE – as per your request
+      // product.quantity -= item.orderedQuantity;
+      // await product.save(); ← REMOVED
     }
 
-    if (product.quantity < orderedQuantity) {
-      return res.status(400).json({ message: "Insufficient product quantity" });
-    }
-
-    const price = product.price;
-    const totalAmount = price * orderedQuantity;
-
-    // Handle credit payment
+    // Handle credit payment (still keep this check)
     if (payment === "credit") {
-      if (customer.balanceCreditLimit < totalAmount) {
+      if (customer.balanceCreditLimit < grandTotal) {
         return res.status(400).json({ message: "Insufficient credit balance" });
       }
-      customer.balanceCreditLimit -= totalAmount;
+      customer.balanceCreditLimit -= grandTotal;
       await customer.save();
     }
 
-    // Update product stock
-    product.quantity -= orderedQuantity;
-    await product.save();
-
-    // Create order with unit from product
     const order = await Order.create({
       customer: customerId,
-      product: productId,
-      orderedQuantity,
-      price,
-      totalAmount,
+      orderItems: processedItems,
       payment,
       remarks: remarks || '',
-      unit: product.unit,
-      orderDate: req.body.orderDate || new Date()
+      orderDate: req.body.orderDate || new Date(),
     });
 
     res.status(201).json(order);
@@ -74,11 +82,13 @@ const createOrder = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
 const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find()
       .populate("customer", "name email phoneNumber address pincode")
-      .populate("product", "productName price")
+      .populate("orderItems.product", "productName price unit")   // ← FIXED
       .populate("assignedTo", "username")
       .sort({ orderDate: -1 });
     res.json(orders);
@@ -91,10 +101,8 @@ const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("product", "productName price quantity");
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
+      .populate("orderItems.product", "productName price quantity unit");   // ← FIXED
+    if (!order) return res.status(404).json({ message: "Order not found" });
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -160,81 +168,116 @@ const deleteOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Revert inventory and credit if pending or partial
+    // Revert inventory and credit only if not fully delivered
     if (order.status !== "delivered") {
-      const remaining = order.orderedQuantity - order.deliveredQuantity;
-      const product = await Product.findById(order.product);
-      product.quantity += remaining;
-      await product.save();
+      for (const item of order.orderItems) {
+        const remainingQty = item.orderedQuantity - item.deliveredQuantity;
+        if (remainingQty > 0) {
+          const product = await Product.findById(item.product);
+          if (product) {
+            product.quantity += remainingQty;
+            await product.save();
+          }
+        }
+      }
 
+      // Revert credit balance if credit payment
       if (order.payment === "credit") {
         const customer = await Customer.findById(order.customer);
-        customer.balanceCreditLimit += (remaining * order.price);
-        await customer.save();
+        if (customer) {
+          const remainingAmount = order.orderItems.reduce((sum, item) => {
+            const remainingQty = item.orderedQuantity - item.deliveredQuantity;
+            return sum + remainingQty * item.price;
+          }, 0);
+
+          customer.balanceCreditLimit += remainingAmount;
+          await customer.save();
+        }
       }
     }
 
     await Order.findByIdAndDelete(req.params.id);
     res.json({ message: "Order deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Delete order error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 const deliverOrder = async (req, res) => {
   try {
-    const { quantity, deliveredAt, paymentMethod, chequeDetails } = req.body;
+    const { deliveredItems, deliveredAt, paymentMethod, chequeDetails } = req.body;
+    // deliveredItems: [{ product: productId, quantity: number }]
+
     const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-    if (order.status !== "pending") {
-      return res.status(400).json({ message: "Order not pending" });
-    }
+    if (!order) return res.status(404).json({ message: "Order not found" });
 
-    const remaining = order.orderedQuantity - order.deliveredQuantity;
-    if (quantity > remaining || quantity <= 0) {
-      return res.status(400).json({ message: "Invalid delivery quantity" });
+    if (order.status === "delivered" || order.status === "cancelled") {
+      return res.status(400).json({ message: "Order cannot be delivered" });
     }
 
-    const deliveryAmount = quantity * order.price;
+    let grandDeliveryAmount = 0;
 
+    // Validate and update each item
+    for (const inputItem of deliveredItems) {
+      const orderItem = order.orderItems.id(inputItem.product);
+      if (!orderItem) {
+        return res.status(400).json({ message: `Product ${inputItem.product} not found in order` });
+      }
+
+      const qtyToDeliver = Number(inputItem.quantity);
+      const remaining = orderItem.orderedQuantity - orderItem.deliveredQuantity;
+
+      if (qtyToDeliver <= 0 || qtyToDeliver > remaining) {
+        return res.status(400).json({
+          message: `Invalid quantity for ${orderItem.product.productName || "product"}: max ${remaining}`
+        });
+      }
+
+      orderItem.deliveredQuantity += qtyToDeliver;
+      grandDeliveryAmount += qtyToDeliver * orderItem.price;
+    }
+
+    // Payment handling (same as before)
     if (paymentMethod === "credit") {
       const customer = await Customer.findById(order.customer);
-      if (customer.balanceCreditLimit < deliveryAmount) {
-        return res.status(400).json({ message: "Insufficient credit balance for this delivery" });
+      if (customer.balanceCreditLimit < grandDeliveryAmount) {
+        return res.status(400).json({ message: "Insufficient credit balance" });
       }
-      customer.balanceCreditLimit -= deliveryAmount;
+      customer.balanceCreditLimit -= grandDeliveryAmount;
       await customer.save();
     } else if (paymentMethod === "cash" || paymentMethod === "cheque") {
       await PaymentTransaction.create({
         order: order._id,
         deliveryMan: req.user._id,
-        amount: deliveryAmount,
+        amount: grandDeliveryAmount,
         method: paymentMethod,
         chequeDetails: paymentMethod === "cheque" ? chequeDetails : undefined,
       });
-    } else {
-      return res.status(400).json({ message: "Invalid payment method" });
     }
 
-    order.deliveredQuantity += quantity;
-
-    if (order.deliveredQuantity === quantity) {
-      order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
-    }
-
-    if (order.deliveredQuantity === order.orderedQuantity) {
+    // Update status if fully delivered
+    const totalOrdered = order.orderItems.reduce((sum, i) => sum + i.orderedQuantity, 0);
+    const totalDelivered = order.orderItems.reduce((sum, i) => sum + i.deliveredQuantity, 0);
+    if (totalDelivered >= totalOrdered) {
       order.status = "delivered";
-      const customer = await Customer.findById(order.customer);
-      if (customer && customer.statementType === "invoice-based") {
-        await createInvoiceBasedBill(order);
-      }
+    } else {
+      order.status = "partial_delivered"; // optional new status
     }
+
+    order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
 
     await order.save();
+
+    // Optional: create invoice if fully delivered and invoice-based
+    const customer = await Customer.findById(order.customer);
+    if (order.status === "delivered" && customer?.statementType === "invoice-based") {
+      await createInvoiceBasedBill(order);
+    }
+
     res.json(order);
   } catch (error) {
+    console.error("Deliver order error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -242,24 +285,27 @@ const deliverOrder = async (req, res) => {
 const cancelOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-    if (order.status !== "pending") {
-      return res.status(400).json({ message: "Order not pending" });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (order.status === "delivered" || order.status === "cancelled") {
+      return res.status(400).json({ message: "Cannot cancel this order" });
     }
 
-    const remaining = order.orderedQuantity - order.deliveredQuantity;
-
-    // Revert inventory
-    const product = await Product.findById(order.product);
-    product.quantity += remaining;
-    await product.save();
+    // Revert stock for all items
+    for (const item of order.orderItems) {
+      const product = await Product.findById(item.product);
+      product.quantity += item.orderedQuantity - item.deliveredQuantity;
+      await product.save();
+    }
 
     // Revert credit if applicable
     if (order.payment === "credit") {
       const customer = await Customer.findById(order.customer);
-      customer.balanceCreditLimit += (remaining * order.price);
+      const remainingAmount = order.orderItems.reduce(
+        (sum, item) => sum + (item.orderedQuantity - item.deliveredQuantity) * item.price,
+        0
+      );
+      customer.balanceCreditLimit += remainingAmount;
       await customer.save();
     }
 
@@ -271,7 +317,6 @@ const cancelOrder = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 
 
@@ -288,19 +333,18 @@ const getDeliveredInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("product", "productName");
+      .populate("orderItems.product", "productName price unit");  // ← FIXED HERE
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.deliveredQuantity === 0) {
+    if (order.totalDeliveredQuantity === 0) {  // Use virtual if you have it, or calculate
       return res.status(400).json({ message: "No delivered quantity" });
     }
 
     const counter = await getOrInitCounter();
 
-    // Generate number ONLY if not already set for this order
     if (!order.deliveredInvoiceNumber) {
       counter.deliveredCount += 1;
       await counter.save();
@@ -308,8 +352,6 @@ const getDeliveredInvoice = async (req, res) => {
       order.deliveredInvoiceNumber = `DEL-${counter.deliveredCount}`;
       order.firstDeliveredInvoiceDate = new Date();
       await order.save();
-
-      console.log(`First delivered invoice generated for order ${order._id}: ${order.deliveredInvoiceNumber}`);
     }
 
     const invoiceNo = order.deliveredInvoiceNumber;
@@ -321,11 +363,11 @@ const getDeliveredInvoice = async (req, res) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
     doc.pipe(res);
 
+    // IMPORTANT: Your generateStyledInvoicePDF is still using old single-product destructuring!
+    // Update it too (see below)
     await generateStyledInvoicePDF(doc, order, 'DELIVERED INVOICE', invoiceNo);
 
     doc.end();
-
-    console.log(`Delivered invoice served: ${invoiceNo} for order ${order._id}`);
   } catch (error) {
     console.error('Error generating delivered invoice:', error);
     if (!res.headersSent) {
@@ -338,20 +380,22 @@ const getPendingInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("product", "productName");
+      .populate("orderItems.product", "productName price unit");  // ← FIXED HERE
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    const remaining = order.orderedQuantity - order.deliveredQuantity;
-    if (remaining === 0) {
+    const totalOrdered = order.totalOrderedQuantity || order.orderItems.reduce((s, i) => s + i.orderedQuantity, 0);
+    const totalDelivered = order.totalDeliveredQuantity || order.orderItems.reduce((s, i) => s + i.deliveredQuantity, 0);
+    const remaining = totalOrdered - totalDelivered;
+
+    if (remaining <= 0) {
       return res.status(400).json({ message: "No pending quantity" });
     }
 
     const counter = await getOrInitCounter();
 
-    // Generate number ONLY if not already set for this order
     if (!order.pendingInvoiceNumber) {
       counter.pendingCount += 1;
       await counter.save();
@@ -359,8 +403,6 @@ const getPendingInvoice = async (req, res) => {
       order.pendingInvoiceNumber = `PEN-${counter.pendingCount}`;
       order.firstPendingInvoiceDate = new Date();
       await order.save();
-
-      console.log(`First pending invoice generated for order ${order._id}: ${order.pendingInvoiceNumber}`);
     }
 
     const invoiceNo = order.pendingInvoiceNumber;
@@ -372,18 +414,20 @@ const getPendingInvoice = async (req, res) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
     doc.pipe(res);
 
+    // Create pending version with remaining quantities
     const pendingOrder = {
       ...order.toObject(),
-      orderedQuantity: remaining,
-      deliveredQuantity: 0,
-      totalAmount: remaining * order.price
+      orderItems: order.orderItems.map(item => ({
+        ...item.toObject(),
+        orderedQuantity: item.orderedQuantity - item.deliveredQuantity,
+        deliveredQuantity: 0,
+        totalAmount: (item.orderedQuantity - item.deliveredQuantity) * item.price
+      }))
     };
 
     await generateStyledInvoicePDF(doc, pendingOrder, 'PENDING INVOICE', invoiceNo);
 
     doc.end();
-
-    console.log(`Pending invoice served: ${invoiceNo} for order ${order._id}`);
   } catch (error) {
     console.error('Error generating pending invoice:', error);
     if (!res.headersSent) {
@@ -394,96 +438,67 @@ const getPendingInvoice = async (req, res) => {
 
 
 
-// Make this function async since it awaits DB query
 const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
-  // Fetch company settings - MUST exist
   const company = await CompanySettings.findOne();
-
-  // No fallback / defaults — throw meaningful error if missing
   if (!company) {
-    throw new Error(
-      "Company invoice settings not configured. " +
-      "Please go to Admin → Settings → Company Invoice Settings and fill in the details first."
-    );
+    throw new Error("Company invoice settings not configured.");
   }
 
-  const {
-    _id: orderId,
-    customer,
-    product,
-    orderedQuantity,
-    price,
-    totalAmount,
-    payment,
-    orderDate
-  } = order;
-
-  // Page dimensions (A4)
   const pageWidth = 595.28;
   const pageHeight = 841.89;
   const margin = 50;
   const contentWidth = pageWidth - (margin * 2);
 
-  // Format date
-  const date = new Date(orderDate);
+  const date = new Date(order.orderDate || order.deliveredAt || Date.now());
   const formattedDate = date.toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'long',
     year: 'numeric'
   });
 
-  // Set base font
   doc.fontSize(12).font('Helvetica').fillColor('#000000');
 
-  // Header section
+  // Header
   const headerY = margin;
-
-  // Company name (left side) — dynamic
   doc.fontSize(22).font('Helvetica-Bold')
      .text(company.companyName || 'INGOUDE COMPANY', margin, headerY);
 
-  // Invoice title (left side, below company name)
   doc.fontSize(36).font('Helvetica-Bold').fillColor('#b0123b')
-     .text(invoiceType.includes('DELIVERED') ? 'DELIVERED INVOICE' : 'PENDING INVOICE', margin, headerY + 40);
+     .text(invoiceType, margin, headerY + 40);
 
-  // Invoice number and date (right side)
   const invoiceInfoX = pageWidth - margin - 200;
   doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000')
      .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
      .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
 
-  // Bill To and From sections
+  // Bill To / From (unchanged)
   const infoY = headerY + 120;
   const billToX = margin;
   const fromX = pageWidth - margin - 250;
 
-  // Bill To
-  doc.fontSize(14).font('Helvetica-Bold')
-     .text('Bill To:', billToX, infoY);
+  doc.fontSize(14).font('Helvetica-Bold').text('Bill To:', billToX, infoY);
   doc.fontSize(12).font('Helvetica')
-     .text(customer.name || 'N/A', billToX, infoY + 25)
-     .text(customer.phoneNumber || 'N/A', billToX, infoY + 45)
-     .text(customer.address || 'N/A', billToX, infoY + 65)
-     .text(`Pincode: ${customer.pincode || 'N/A'}`, billToX, infoY + 85);
+     .text(order.customer?.name || 'N/A', billToX, infoY + 25)
+     .text(order.customer?.phoneNumber || 'N/A', billToX, infoY + 45)
+     .text(order.customer?.address || 'N/A', billToX, infoY + 65)
+     .text(`Pincode: ${order.customer?.pincode || 'N/A'}`, billToX, infoY + 85);
 
-  // From (Company info) — all dynamic
-  doc.fontSize(14).font('Helvetica-Bold')
-     .text('From:', fromX, infoY);
+  doc.fontSize(14).font('Helvetica-Bold').text('From:', fromX, infoY);
   doc.fontSize(12).font('Helvetica')
      .text(company.companyName || 'INGOUDE COMPANY', fromX, infoY + 25)
      .text(company.companyPhone || 'N/A', fromX, infoY + 45)
      .text(company.companyAddress || 'N/A', fromX, infoY + 65);
 
-  // Table section
+  // Table - now supports MULTIPLE products
   const tableY = infoY + 130;
   const rowHeight = 40;
 
   const descCol = margin;
-  const qtyCol = margin + 300;
-  const priceCol = margin + 370;
+  const qtyCol = margin + 280;
+  const priceCol = margin + 360;
   const totalCol = margin + 440;
 
-  // Table header (red background)
+  // Header row
   doc.rect(margin - 10, tableY - 5, contentWidth + 20, rowHeight)
      .fillColor('#b0123b').fill();
   doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold')
@@ -492,92 +507,85 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
      .text('Price', priceCol, tableY + 10, { width: 70, align: 'center' })
      .text('Total', totalCol, tableY + 10, { width: 70, align: 'center' });
 
-  // Table data row
-  const dataY = tableY + rowHeight;
-  doc.fillColor('#000000').fontSize(12).font('Helvetica')
-     .text(product.productName || 'N/A', descCol, dataY + 10)
-     .text(orderedQuantity.toString(), qtyCol, dataY + 10, { width: 70, align: 'center' })
-     .text(`$${price.toFixed(2)}`, priceCol, dataY + 10, { width: 70, align: 'center' })
-     .text(`$${totalAmount.toFixed(2)}`, totalCol, dataY + 10, { width: 70, align: 'center' });
+  // Data rows - loop through orderItems
+  let currentY = tableY + rowHeight;
+  let grandTotal = 0;
 
-  // Table bottom border
-  doc.strokeColor('#dddddd').lineWidth(1)
-     .moveTo(margin - 10, dataY + rowHeight)
-     .lineTo(margin - 10 + contentWidth + 20, dataY + rowHeight)
-     .stroke();
+  order.orderItems.forEach(item => {
+    const qty = invoiceType.includes('PENDING') 
+      ? (item.orderedQuantity - item.deliveredQuantity)
+      : item.deliveredQuantity || item.orderedQuantity;
 
-  // Subtotal section (right aligned)
-  const subtotalY = dataY + 80;
+    const itemTotal = qty * item.price;
+    grandTotal += itemTotal;
+
+    doc.fillColor('#000000').fontSize(12).font('Helvetica')
+       .text(item.product?.productName || 'Unknown Product', descCol, currentY + 10)
+       .text(qty.toString(), qtyCol, currentY + 10, { width: 70, align: 'center' })
+       .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 10, { width: 70, align: 'center' })
+       .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 10, { width: 70, align: 'center' });
+
+    currentY += rowHeight;
+  });
+
+  // Subtotal
+  const subtotalY = currentY + 40;
   const subtotalWidth = 200;
   const subtotalX = pageWidth - margin - subtotalWidth;
 
   doc.rect(subtotalX, subtotalY, subtotalWidth, 35)
      .fillColor('#222222').fill();
   doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold')
-     .text('Sub Total', subtotalX + 15, subtotalY + 12)
-     .text(`$${totalAmount.toFixed(2)}`, subtotalX + subtotalWidth - 20, subtotalY + 12, { align: 'right' });
+     .text('Grand Total', subtotalX + 15, subtotalY + 12)
+     .text(`AED ${grandTotal.toFixed(2)}`, subtotalX + subtotalWidth - 20, subtotalY + 12, { align: 'right' });
 
-  // Footer section
+  // Footer - unchanged
   const footerY = subtotalY + 80;
 
-  // Payment Information (left side) — dynamic
   doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
      .text('Payment Information:', margin, footerY);
   doc.fontSize(12).font('Helvetica')
      .text(`Bank: ${company.bankName || 'N/A'}`, margin, footerY + 25)
      .text(`Account: ${company.bankAccountNumber || 'N/A'}`, margin, footerY + 45)
-     .text(`Payment Method: ${payment.charAt(0).toUpperCase() + payment.slice(1)}`, margin, footerY + 65)
-     .text(`Order ID: ${orderId.toString()}`, margin, footerY + 85);
+     .text(`Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || 'N/A'}`, margin, footerY + 65)
+     .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
 
-  // Thank You message (right side)
   const thankYouX = pageWidth - margin - 200;
   doc.fontSize(36).font('Helvetica-Bold').fillColor('#000000')
      .text('Thank You!', thankYouX, footerY, { width: 200, align: 'right' });
 
-  // System-generated note at bottom
   const bottomY = footerY + 150;
   doc.fontSize(10).font('Helvetica-Oblique').fillColor('#666666')
      .text('This is a system-generated invoice', margin, bottomY);
 };
 
 
-
 const assignOrderToDeliveryMan = async (req, res) => {
   try {
     const { deliveryManId } = req.body;
     const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-    
-    // ✅ FIXED: Allow reassignment for BOTH pending_assignment AND rejected orders
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
     if (order.assignmentStatus !== "pending_assignment" && order.assignmentStatus !== "rejected") {
       return res.status(400).json({ message: "Order is not available for assignment" });
     }
-    
+
     const deliveryMan = await User.findOne({ _id: deliveryManId, role: "Delivery Man" });
-    if (!deliveryMan) {
-      return res.status(400).json({ message: "Valid delivery man not found" });
-    }
-    
-    // ✅ CRITICAL: Clear previous assignment when reassigning rejected orders
+    if (!deliveryMan) return res.status(400).json({ message: "Valid delivery man not found" });
+
     order.assignedTo = deliveryManId;
-    order.assignmentStatus = "assigned"; // Reset status to assigned
+    order.assignmentStatus = "assigned";
     order.assignedAt = new Date();
-    // Optional: Clear rejection metadata if exists
-    // delete order.rejectionReason;
-    
+
     await order.save();
-    
+
+    // Fixed populate
     const updatedOrder = await Order.findById(order._id)
       .populate("customer", "name email phoneNumber address pincode")
-      .populate("product", "productName price")
+      .populate("orderItems.product", "productName price unit")   // ← FIXED
       .populate("assignedTo", "username");
-      
-    res.json({
-      message: "Order assigned successfully",
-      order: updatedOrder
-    });
+
+    res.json({ message: "Order assigned successfully", order: updatedOrder });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -597,15 +605,15 @@ const getMyAssignedOrders = async (req, res) => {
     }
 
     const orders = await Order.find({
-      assignedTo: req.user._id,
-      assignmentStatus: { $in: ["assigned", "accepted", "rejected"] },
-    })
-      .populate("customer", "name phoneNumber address pincode")
-      .populate("product", "productName price")
-      .populate("assignedTo", "username email")
-      .sort({ assignedAt: -1 });
+    assignedTo: req.user._id,
+    assignmentStatus: { $in: ["assigned", "accepted", "rejected"] },
+  })
+    .populate("customer", "name phoneNumber address pincode")
+    .populate("orderItems.product", "productName price unit")   // ← FIXED
+    .populate("assignedTo", "username email")
+    .sort({ assignedAt: -1 });
 
-    res.json(orders);
+  res.json(orders);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -722,20 +730,19 @@ const getMyOrders = async (req, res) => {
       return res.status(403).json({ message: "Access denied - Customers only" });
     }
 
-    // Find the Customer profile linked to this logged-in User
     const customer = await Customer.findOne({ user: req.user._id });
     if (!customer) {
-      return res.status(404).json({ message: "Your customer profile not found. Contact admin." });
+      return res.status(404).json({ message: "Your customer profile not found." });
     }
 
     const orders = await Order.find({ customer: customer._id })
-      .populate("product", "productName price quantity")
-      .populate("assignedTo", "username email") // Delivery partner if assigned
+      .populate("orderItems.product", "productName price unit quantity")   // ← FIXED HERE
+      .populate("assignedTo", "username email")
       .sort({ orderDate: -1 });
 
     res.json(orders);
   } catch (error) {
-    console.error("Get customer orders error:", error);
+    console.error("Get my orders error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -746,14 +753,13 @@ const getCustomerOrders = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // Find the Customer document linked to this logged-in User
     const customer = await Customer.findOne({ user: req.user._id });
     if (!customer) {
       return res.status(404).json({ message: "Customer profile not found" });
     }
 
     const orders = await Order.find({ customer: customer._id })
-      .populate("product", "productName price")
+      .populate("orderItems.product", "productName price unit")   // ← FIXED HERE
       .sort({ orderDate: -1 });
 
     res.json(orders);
@@ -768,13 +774,21 @@ const getCustomerOrderById = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const order = await Order.findById(req.params.id)
+    const customer = await Customer.findOne({ user: req.user._id });
+    if (!customer) {
+      return res.status(404).json({ message: "Customer profile not found" });
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      customer: customer._id,
+    })
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("product", "productName price quantity")
+      .populate("orderItems.product", "productName price quantity unit")   // ← FIXED HERE
       .populate("assignedTo", "username");
 
-    if (!order || order.customer.toString() !== req.user._id.toString()) {
-      return res.status(404).json({ message: "Order not found" });
+    if (!order) {
+      return res.status(404).json({ message: "Order not found or not yours" });
     }
 
     res.json(order);

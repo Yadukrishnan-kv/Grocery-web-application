@@ -1,366 +1,296 @@
-// src/pages/Order/CreateOrder.jsx
-import React, { useEffect, useState, useCallback } from 'react';
-import Header from '../../../../components/layout/Header/Header';
-import Sidebar from '../../../../components/layout/Sidebar/Sidebar';
-import './CreateOrder.css';
-import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+// src/pages/Orders/CreateOrder/CreateOrder.jsx (Admin version)
+import React, { useState, useEffect, useCallback } from "react";
+import Header from "../../../../components/layout/Header/Header";
+import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
+import "./CreateOrder.css";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import toast from "react-hot-toast";
 
 const CreateOrder = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
   const [formData, setFormData] = useState({
-    customerId: '',
-    productId: '',
-    orderedQuantity: '',
-    payment: 'credit',
-    remarks: ''
+    customerId: "",
+    payment: "credit",
+    remarks: "",
+    orderItems: [{ productId: "", orderedQuantity: "" }],
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isEdit, setIsEdit] = useState(false);
-  const [customers, setCustomers] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [selectedProductUnit, setSelectedProductUnit] = useState('');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.customerId) {
-      newErrors.customerId = 'Customer is required';
-    }
-
-    if (!formData.productId) {
-      newErrors.productId = 'Product is required';
-    }
-
-    if (!formData.orderedQuantity || isNaN(formData.orderedQuantity) || parseInt(formData.orderedQuantity) < 1) {
-      newErrors.orderedQuantity = 'Valid ordered quantity is required';
-    }
-
-    if (!formData.payment) {
-      newErrors.payment = 'Payment method is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-
-    if (name === 'productId') {
-      const selected = products.find(p => p._id === value);
-      setSelectedProductUnit(selected ? selected.unit : '');
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-
-    setIsLoading(true);
-
-    try {
-      const token = localStorage.getItem('token');
-      const config = {
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      };
-
-      const submitData = {
-        customerId: formData.customerId,
-        productId: formData.productId,
-        orderedQuantity: parseInt(formData.orderedQuantity),
-        payment: formData.payment,
-        remarks: formData.remarks.trim()
-      };
-
-      if (isEdit) {
-        toast.error('Order updates are not supported. Please create a new order.');
-        return;
-      } else {
-        await axios.post(`${backendUrl}/api/orders/createorder`, submitData, config);
-        toast.success('Order created successfully!');
-      }
-
-      setTimeout(() => {
-        navigate('/order/list');
-      }, 1500);
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchOrderData = useCallback(async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/orders/getorderbyid/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      const order = response.data;
-      setFormData({
-        customerId: order.customer?._id || '',
-        productId: order.product?._id || '',
-        orderedQuantity: order.orderedQuantity.toString(),
-        payment: order.payment,
-        remarks: order.remarks || ''
-      });
-
-      const selectedProduct = products.find(p => p._id === order.product?._id);
-      setSelectedProductUnit(selectedProduct ? selectedProduct.unit : '');
-
-      setIsEdit(true);
-    } catch (error) {
-      console.error("Failed to fetch order data", error);
-      toast.error("Failed to load order data");
-      navigate('/order/list');
-    }
-  }, [backendUrl, navigate, products]);
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/customers/getallcustomers`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/customers/getallcustomers`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setCustomers(response.data);
     } catch (error) {
-      console.error('Error fetching customers:', error);
       toast.error("Failed to load customers");
     }
   }, [backendUrl]);
 
   const fetchProducts = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/products/getallproducts`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/products/getallproducts`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setProducts(response.data);
     } catch (error) {
-      console.error('Error fetching products:', error);
       toast.error("Failed to load products");
     }
   }, [backendUrl]);
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        navigate('/login');
+        navigate("/login");
         return;
       }
-
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       setUser(response.data.user || response.data);
     } catch (error) {
-      console.error("Failed to load user", error);
-      localStorage.removeItem('token');
-      navigate('/login');
+      localStorage.removeItem("token");
+      navigate("/login");
     } finally {
       setLoading(false);
     }
-  }, [navigate, backendUrl]);
+  }, [backendUrl, navigate]);
 
   useEffect(() => {
     fetchCustomers();
     fetchProducts();
-  }, [fetchCustomers, fetchProducts]);
-
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const editId = searchParams.get('edit');
-    
-    if (editId) {
-      fetchOrderData(editId);
-    }
-  }, [location.search, fetchOrderData]);
-
-  useEffect(() => {
     fetchCurrentUser();
-  }, [fetchCurrentUser]);
+  }, [fetchCustomers, fetchProducts, fetchCurrentUser]);
 
-  if (loading) {
-    return <div className="order-loading">Loading user information...</div>;
-  }
+  const addItem = () => {
+    setFormData((prev) => ({
+      ...prev,
+      orderItems: [...prev.orderItems, { productId: "", orderedQuantity: "" }],
+    }));
+  };
 
-  if (!user) {
-    return null;
-  }
+  const removeItem = (index) => {
+    if (formData.orderItems.length === 1) return;
+    setFormData((prev) => ({
+      ...prev,
+      orderItems: prev.orderItems.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...formData.orderItems];
+    newItems[index][field] = value;
+    setFormData((prev) => ({ ...prev, orderItems: newItems }));
+  };
+
+  const handleCustomerChange = (e) => {
+    const selectedCustomerId = e.target.value;
+    const selectedCustomer = customers.find(
+      (c) => c._id === selectedCustomerId
+    );
+
+    const defaultPayment = selectedCustomer?.paymentMethod || 
+                          selectedCustomer?.defaultPayment || 
+                          "credit";
+
+    setFormData({
+      ...formData,
+      customerId: selectedCustomerId,
+      payment: defaultPayment,
+    });
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.customerId) newErrors.customerId = "Customer is required";
+    if (!formData.payment) newErrors.payment = "Payment method is required";
+
+    formData.orderItems.forEach((item, index) => {
+      if (!item.productId) {
+        newErrors[`orderItems.${index}.productId`] = "Product is required";
+      }
+      if (
+        !item.orderedQuantity ||
+        isNaN(item.orderedQuantity) ||
+        parseInt(item.orderedQuantity) < 1
+      ) {
+        newErrors[`orderItems.${index}.orderedQuantity`] =
+          "Valid quantity ≥ 1 required";
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+
+    try {
+      const token = localStorage.getItem("token");
+      const submitData = {
+        customerId: formData.customerId,
+        payment: formData.payment,
+        remarks: formData.remarks.trim(),
+        orderItems: formData.orderItems.map((item) => ({
+          productId: item.productId,
+          orderedQuantity: parseInt(item.orderedQuantity),
+        })),
+      };
+
+      await axios.post(`${backendUrl}/api/orders/createorder`, submitData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      toast.success("Order created successfully!");
+      setTimeout(() => navigate("/order/list"), 1500);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to create order");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (loading) return <div className="order-loading">Loading...</div>;
 
   return (
     <div className="order-form-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem="Orders" 
-        onSetActiveItem={() => {}} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem="Orders"
+        onSetActiveItem={() => {}}
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`order-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`order-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="order-form-card">
-          <h1>{isEdit ? 'Edit Order' : 'Create New Order'}</h1>
+          <h1>Create New Order</h1>
 
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="order-form-group">
-              <label htmlFor="customerId">Customer</label>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Customer</label>
               <select
-                id="customerId"
-                name="customerId"
                 value={formData.customerId}
-                onChange={handleChange}
-                aria-invalid={!!errors.customerId}
-                aria-describedby={errors.customerId ? "customerid-error" : undefined}
-                className="order-select"
+                onChange={handleCustomerChange}
               >
-                <option value="">Select a customer</option>
-                {customers.map(customer => (
-                  <option key={customer._id} value={customer._id}>
-                    {customer.name}
+                <option value="">Select Customer</option>
+                {customers.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
                   </option>
                 ))}
               </select>
               {errors.customerId && (
-                <p id="customerid-error" className="order-error-text" role="alert">
-                  {errors.customerId}
-                </p>
+                <p className="error-text">{errors.customerId}</p>
               )}
             </div>
 
-            <div className="order-form-group">
-              <label htmlFor="productId">Product</label>
+            <div className="form-group">
+              <label>
+                Payment Method 
+                {formData.customerId && (
+                  <span className="auto-fetch-badge"> of Customer</span>
+                )}
+              </label>
               <select
-                id="productId"
-                name="productId"
-                value={formData.productId}
-                onChange={handleChange}
-                aria-invalid={!!errors.productId}
-                aria-describedby={errors.productId ? "productid-error" : undefined}
-                className="order-select"
+                value={formData.payment}
+                onChange={(e) =>
+                  setFormData({ ...formData, payment: e.target.value })
+                }
+                disabled={!!formData.customerId}
+                className={formData.customerId ? "auto-filled" : ""}
               >
-                <option value="">Select a product</option>
-                {products.map(product => (
-                  <option key={product._id} value={product._id}>
-                    {product.productName} - AED {product.price.toFixed(2)} / {product.unit} 
-                  </option>
-                ))}
+                <option value="credit">Credit</option>
+                <option value="cash">Cash</option>
               </select>
-              {errors.productId && (
-                <p id="productid-error" className="order-error-text" role="alert">
-                  {errors.productId}
-                </p>
-              )}
-              {selectedProductUnit && (
-                <small className="order-help-text">
-                  Selected unit: {selectedProductUnit}
-                </small>
-              )}
+              {errors.payment && <p className="error-text">{errors.payment}</p>}
             </div>
 
-            <div className="order-form-row">
-              <div className="order-form-group">
-                <label htmlFor="orderedQuantity">
-                  Quantity {selectedProductUnit ? `(in ${selectedProductUnit})` : ''}
-                </label>
+            <h3>Order Items</h3>
+            {formData.orderItems.map((item, index) => (
+              <div key={index} className="order-item-row">
+                <select
+                  value={item.productId}
+                  onChange={(e) =>
+                    handleItemChange(index, "productId", e.target.value)
+                  }
+                >
+                  <option value="">Select Product</option>
+                  {products.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.productName} - AED {p.price.toFixed(2)} / {p.unit}
+                      {/* Removed stock display */}
+                    </option>
+                  ))}
+                </select>
+
                 <input
-                  id="orderedQuantity"
-                  name="orderedQuantity"
                   type="number"
                   min="1"
-                  value={formData.orderedQuantity}
-                  onChange={handleChange}
-                  aria-invalid={!!errors.orderedQuantity}
-                  aria-describedby={errors.orderedQuantity ? "orderedquantity-error" : undefined}
-                  className="order-input"
-                  placeholder={selectedProductUnit ? `e.g., 10 (for 10 ${selectedProductUnit})` : 'Enter quantity'}
+                  placeholder="Quantity"
+                  value={item.orderedQuantity}
+                  onChange={(e) =>
+                    handleItemChange(index, "orderedQuantity", e.target.value)
+                  }
                 />
-                {errors.orderedQuantity && (
-                  <p id="orderedquantity-error" className="order-error-text" role="alert">
-                    {errors.orderedQuantity}
-                  </p>
-                )}
-                {selectedProductUnit && (
-                  <small className="order-help-text">
-                    Enter how many {selectedProductUnit} you want to order
-                  </small>
+
+                {formData.orderItems.length > 1 && (
+                  <button
+                    type="button"
+                    className="remove-item-btn"
+                    onClick={() => removeItem(index)}
+                  >
+                    Remove
+                  </button>
                 )}
               </div>
+            ))}
 
-              <div className="order-form-group">
-                <label htmlFor="payment">Payment Method</label>
-                <select
-                  id="payment"
-                  name="payment"
-                  value={formData.payment}
-                  onChange={handleChange}
-                  aria-invalid={!!errors.payment}
-                  aria-describedby={errors.payment ? "payment-error" : undefined}
-                  className="order-select"
-                >
-                  <option value="credit">Credit</option>
-                  <option value="cash">Cash</option>
-                </select>
-                {errors.payment && (
-                  <p id="payment-error" className="order-error-text" role="alert">
-                    {errors.payment}
-                  </p>
-                )}
-              </div>
-            </div>
+            <button type="button" className="add-item-btn" onClick={addItem}>
+              + Add Another Product
+            </button>
 
-            <div className="order-form-group">
-              <label htmlFor="remarks">Remarks / Comments (Optional)</label>
+            <div className="form-group">
+              <label>Remarks (Optional)</label>
               <textarea
-                id="remarks"
-                name="remarks"
-                rows="4"
                 value={formData.remarks}
-                onChange={handleChange}
-                placeholder="Add any special instructions, delivery notes, or additional comments..."
-                className="order-textarea"
+                onChange={(e) =>
+                  setFormData({ ...formData, remarks: e.target.value })
+                }
+                rows="3"
               />
             </div>
 
-            <button
-              type="submit"
-              className="order-submit-button"
-              disabled={isLoading}
-              aria-busy={isLoading}
-            >
-              {isLoading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Order' : 'Create Order')}
+            <button type="submit" className="submit-btn" disabled={isLoading}>
+              {isLoading ? "Creating..." : "Create Order"}
             </button>
           </form>
         </div>

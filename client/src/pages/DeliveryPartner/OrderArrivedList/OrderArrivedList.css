@@ -370,3 +370,78 @@
   height: 1.75rem;
 }
 }
+
+/* ────────────────────────────────────────────────
+   Attractive Multi-Product Display (for Delivery page)
+───────────────────────────────────────────────── */
+
+.products-cell {
+  max-width: 280px;
+  white-space: normal;
+  line-height: 1.5;
+  padding: 1rem;
+}
+
+.products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.product-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(16, 185, 129, 0.05); /* subtle green for delivery context */
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.product-tag:hover {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  transform: translateX(2px);
+}
+
+.product-name {
+  font-weight: 500;
+  color: #1e293b;
+  flex: 1;
+}
+
+.product-qty {
+  font-weight: 700;
+  color: #059669; /* green accent */
+  min-width: 60px;
+  text-align: right;
+}
+
+.product-unit {
+  color: #64748b;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.no-products {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .products-cell {
+    max-width: none;
+  }
+
+  .product-tag {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .product-qty {
+    text-align: left;
+  }
+}

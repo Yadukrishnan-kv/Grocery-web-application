@@ -53,8 +53,9 @@ const RolePermissions = () => {
     Settings: "menu.settings",
     CreateCustomerRequest: "menu.customer.requests.create",
     MyCustomerRequests: "menu.customer.requests.my",
-    Wallet: "menu.wallet",  // NEW
-    WalletMoney: "menu.wallet.money",
+    CashWallet: "menu.CashWallet",  
+    ChequeWallet: "menu.ChequeWallet",  
+    WalletMoney: "menu.wallet.money",  
   };
 
   const fetchRole = useCallback(async () => {

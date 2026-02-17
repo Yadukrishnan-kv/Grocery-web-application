@@ -6,7 +6,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./ProductList.css";
 import axios from "axios";
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from 'react-hot-toast';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
@@ -232,7 +232,7 @@ const ProductList = () => {
                       <th scope="col">Category</th>
                       <th scope="col">Sub-Category</th>
                       <th scope="col">Price (AED)</th>
-                      <th scope="col">Quantity</th>
+                      {/* Quantity column removed */}
                       <th scope="col">Unit</th>
                       <th scope="col">Edit</th>
                       <th scope="col">Delete</th>
@@ -266,7 +266,8 @@ const ProductList = () => {
                           </div>
                         </td>
 
-                        <td>{product.quantity}</td>
+                        {/* Quantity cell removed */}
+
                         <td>{product.unit || "N/A"}</td>
                         <td>
                           <Link

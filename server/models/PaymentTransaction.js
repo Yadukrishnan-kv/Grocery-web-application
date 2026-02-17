@@ -36,7 +36,7 @@ const paymentTransactionSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["received", "paid_to_admin"],
+     enum: ["received", "pending", "paid_to_admin", "rejected"],
       default: "received",
     },
   },

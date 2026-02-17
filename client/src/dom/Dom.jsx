@@ -37,6 +37,7 @@ import MyCustomerRequests from "../pages/Salesmanpages/MyCustomerRequests/MyCust
 import PendingCustomerRequests from "../pages/Customer/PendingCustomerRequests/PendingCustomerRequests";
 import Wallet from "../pages/DeliveryPartner/Wallet/Wallet";
 import WalletMoney from "../pages/WalletMoney/WalletMoney";
+import ChequeWallet from "../pages/DeliveryPartner/Wallet/ChequeWallet";
 function Dom() {
   return (
     <div>
@@ -126,6 +127,8 @@ function Dom() {
               element={<PendingCustomerRequests />}
             />
             <Route path="/delivery/wallet" element={<Wallet />} />
+            <Route path="/delivery/wallet/cheque" element={<ChequeWallet />} />
+
             <Route path="/admin/wallet-money" element={<WalletMoney />} />
           </Routes>
         </BrowserRouter>

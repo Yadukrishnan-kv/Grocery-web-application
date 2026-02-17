@@ -14,4 +14,6 @@ export const MENU_PERMISSIONS = {
   customer_requests: "menu.customer.requests",
   customer_requests_create: "menu.customer.requests.create",
   customer_requests_my: "menu.customer.requests.my"
+
+  
 };

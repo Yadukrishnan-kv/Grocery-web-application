@@ -22,12 +22,6 @@ const productSchema = new Schema(
       required: [true, "Price is required"],
       min: 0,
     },
-    quantity: {
-      type: Number,
-      required: [true, "Quantity is required"],
-      min: 0,
-      default: 0,
-    },
     unit: {
       type: String,
       enum: [

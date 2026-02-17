@@ -638,3 +638,74 @@
     min-width: 140px;
   }
 }
+
+/* ────────────────────────────────────────────────
+   Attractive Multi-Product Display (Products column)
+───────────────────────────────────────────────── */
+
+.products-cell {
+  max-width: 260px;
+  white-space: normal;
+  line-height: 1.5;
+}
+
+.products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.product-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: rgba(79, 70, 229, 0.04);
+  border: 1px solid rgba(79, 70, 229, 0.12);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.product-tag:hover {
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(79, 70, 229, 0.3);
+  transform: translateX(2px);
+}
+
+.product-name {
+  font-weight: 500;
+  color: #1e293b;
+  flex: 1;
+}
+
+.product-qty {
+  font-weight: 700;
+  color: #4f46e5;
+  min-width: 50px;
+  text-align: right;
+}
+
+.product-unit {
+  color: #64748b;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.no-products {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Make sure column doesn't break layout on small screens */
+@media (max-width: 1200px) {
+  .order-list-data-table td:nth-child(3) {
+    max-width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .products-cell {
+    max-width: none;
+  }
+}

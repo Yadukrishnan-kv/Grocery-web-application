@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
-
 import "./CustomerOrderReports.css";
 import axios from "axios";
+import toast from "react-hot-toast";
 
 const CustomerOrderReports = () => {
   const [orders, setOrders] = useState([]);
@@ -16,7 +16,6 @@ const CustomerOrderReports = () => {
   const [user, setUser] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
 
-  // Filter states (same as OrderReports)
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -26,17 +25,12 @@ const CustomerOrderReports = () => {
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) {
-        window.location.href = "/login";
-        return;
-      }
-
+      if (!token) return (window.location.href = "/login");
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUser(response.data.user || response.data);
-    } catch (error) {
-      console.error("Failed to load user:", error);
+    } catch (err) {
       localStorage.removeItem("token");
       window.location.href = "/login";
     }
@@ -50,9 +44,10 @@ const CustomerOrderReports = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(response.data);
-    } catch (error) {
-      console.error("Error fetching your orders:", error);
+    } catch (err) {
+      console.error("Error fetching your orders:", err);
       setError("Failed to load your orders. Please try again later.");
+      toast.error("Failed to load orders");
     } finally {
       setLoading(false);
     }
@@ -63,14 +58,19 @@ const CustomerOrderReports = () => {
     fetchMyOrders();
   }, [fetchCurrentUser, fetchMyOrders]);
 
-  // Filtered orders (same logic as before)
+  // Filter orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchesSearch =
         !searchTerm.trim() ||
-        order.product?.productName
+        order.customer?.name
           ?.toLowerCase()
-          .includes(searchTerm.toLowerCase().trim());
+          .includes(searchTerm.toLowerCase().trim()) ||
+        order.orderItems?.some((item) =>
+          item.product?.productName
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase().trim()),
+        );
 
       let matchesDate = true;
       const orderDate = new Date(order.orderDate);
@@ -81,7 +81,6 @@ const CustomerOrderReports = () => {
         start.setHours(0, 0, 0, 0);
         matchesDate = matchesDate && orderDate >= start;
       }
-
       if (toDate) {
         const end = new Date(toDate);
         end.setHours(23, 59, 59, 999);
@@ -112,38 +111,31 @@ const CustomerOrderReports = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading delivered invoice:", error);
-      if (error.response?.status === 400) {
-        alert("No delivered quantity available for this order.");
-      } else {
-        alert("Failed to download delivered invoice.");
-      }
+    } catch (err) {
+      console.error("Error downloading delivered invoice:", err);
+      toast.error(
+        err.response?.status === 400
+          ? "No delivered quantity available for this order."
+          : "Failed to download delivered invoice.",
+      );
     } finally {
       setDownloadingOrderId(null);
     }
   };
 
-  // Reset all filters
   const resetFilters = () => {
     setSearchTerm("");
     setFromDate("");
     setToDate("");
   };
 
-  // Helper to format date as DD/MM/YYYY
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
   };
 
-  if (!user) {
-    return <div className="customer-reports-loading">Loading...</div>;
-  }
+  if (!user) return <div className="customer-reports-loading">Loading...</div>;
 
   return (
     <div className="customer-reports-layout">
@@ -167,7 +159,6 @@ const CustomerOrderReports = () => {
             <div className="customer-reports-header-section">
               <h2 className="customer-reports-page-title">My Order Reports</h2>
 
-              {/* Exact same controls group as before */}
               <div className="customer-reports-controls-group">
                 <div className="customer-reports-date-group">
                   <input
@@ -193,7 +184,7 @@ const CustomerOrderReports = () => {
                   <input
                     type="text"
                     className="customer-reports-search-input"
-                    placeholder="Search by product name..."
+                    placeholder="Search by customer or product..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -201,7 +192,6 @@ const CustomerOrderReports = () => {
                     <button
                       className="customer-reports-search-clear"
                       onClick={() => setSearchTerm("")}
-                      aria-label="Clear search"
                     >
                       ×
                     </button>
@@ -236,9 +226,7 @@ const CustomerOrderReports = () => {
             ) : filteredOrders.length === 0 ? (
               <div className="customer-reports-no-data">
                 No orders found
-                {fromDate || toDate || searchTerm
-                  ? " matching your filters"
-                  : ""}
+                {(fromDate || toDate || searchTerm) && " matching your filters"}
               </div>
             ) : (
               <div className="customer-reports-table-wrapper">
@@ -246,12 +234,11 @@ const CustomerOrderReports = () => {
                   <thead>
                     <tr>
                       <th>No</th>
-                      <th>Product</th>
-                      <th>Ordered Qty (in unit)</th>
-                      <th>Delivered Qty (in unit)</th>
-                      <th>Pending Qty (in unit)</th>
-                      <th>Price</th>
-                      <th>Total Amount</th>
+                      <th>Products</th>
+                      <th>Total Ordered Qty</th>
+                      <th>Total Delivered Qty</th>
+                      <th>Pending Qty</th>
+                      <th>Grand Total</th>
                       <th>Status</th>
                       <th>Order Date</th>
                       <th>Actions</th>
@@ -259,77 +246,85 @@ const CustomerOrderReports = () => {
                   </thead>
                   <tbody>
                     {filteredOrders.map((order, index) => {
-                      const pendingQty =
-                        order.orderedQuantity - order.deliveredQuantity;
-                      const hasDelivered = order.deliveredQuantity > 0;
+                      const totalOrdered =
+                        order.orderItems?.reduce(
+                          (sum, item) => sum + item.orderedQuantity,
+                          0,
+                        ) || 0;
+                      const totalDelivered =
+                        order.orderItems?.reduce(
+                          (sum, item) => sum + item.deliveredQuantity,
+                          0,
+                        ) || 0;
+                      const pendingQty = totalOrdered - totalDelivered;
+                      const grandTotal =
+                        order.orderItems
+                          ?.reduce((sum, item) => sum + item.totalAmount, 0)
+                          ?.toFixed(2) || "0.00";
+                      const hasDelivered = totalDelivered > 0;
 
                       return (
                         <tr key={order._id}>
                           <td>{index + 1}</td>
-                          <td>{order.product?.productName || "N/A"}</td>
-                          <td>
-                            {order.orderedQuantity} {order.unit || ""}
+
+                          {/* Multi-product column */}
+                          <td className="products-cell">
+                            {order.orderItems?.length > 0 ? (
+                              <div className="products-list">
+                                {order.orderItems.map((item, i) => (
+                                  <div key={i} className="product-tag">
+                                    <span className="product-name">
+                                      {item.product?.productName || "Unknown"}
+                                    </span>
+                                    <span className="product-qty">
+                                      × {item.orderedQuantity}
+                                    </span>
+                                    <span className="product-unit">
+                                      {item.unit || ""}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="no-products">No products</span>
+                            )}
                           </td>
-                          <td>
-                            {order.deliveredQuantity} {order.unit || ""}
-                          </td>
-                          <td>
-                            {pendingQty} {order.unit || ""}
-                          </td>
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="Dirham Symbol"
-                                width={15}
-                                height={15}
-                                style={{
-                                  paddingTop: "3px",
-                                }}
-                              />
-                              <span>{order.price?.toFixed(2) || "0.00"}</span>
-                            </div>
-                          </td>
+
+                          <td>{totalOrdered}</td>
+                          <td>{totalDelivered}</td>
+                          <td>{pendingQty}</td>
+
                           <td>
                             <div
                               style={{
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "4px",
+                                gap: "6px",
                               }}
                             >
                               <img
                                 src={DirhamSymbol}
-                                alt="Dirham Symbol"
+                                alt="AED"
                                 width={15}
                                 height={15}
-                                style={{
-                                  paddingTop: "3px",
-                                }}
                               />
-                              <span>
-                                {order.totalAmount?.toFixed(2) || "0.00"}
-                              </span>
+                              <span>{grandTotal}</span>
                             </div>
                           </td>
+
                           <td>
                             <span
                               className={`customer-reports-status-badge customer-reports-status-${order.status?.toLowerCase() || "pending"}`}
                             >
-                              {order.status.charAt(0).toUpperCase() +
-                                order.status.slice(1)}
+                              {order.status?.charAt(0).toUpperCase() +
+                                order.status?.slice(1) || "Pending"}
                             </span>
                           </td>
+
                           <td>{formatDate(order.orderDate)}</td>
+
                           <td>
                             <div className="customer-reports-action-buttons">
-                              {/* Only Delivered Invoice - no Pending Invoice */}
                               {hasDelivered && (
                                 <button
                                   className="customer-reports-invoice-button delivered"

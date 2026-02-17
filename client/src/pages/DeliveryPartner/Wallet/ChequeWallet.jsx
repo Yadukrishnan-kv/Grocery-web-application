@@ -1,20 +1,20 @@
-// src/pages/Delivery/CashWallet.jsx  (renamed from Wallet.jsx)
+// src/pages/Delivery/ChequeWallet.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "react-hot-toast";
-import "./Wallet.css"; // keep same CSS
+import "./Wallet.css"; // Reuse same CSS
 import axios from "axios";
 
-const Wallet = () => {
+const ChequeWallet = () => {
   const [walletData, setWalletData] = useState({
     totalAmount: 0,
     transactions: [],
   });
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState("Cash Wallet");
+  const [activeItem, setActiveItem] = useState("Cheque Wallet");
   const [user, setUser] = useState(null);
   const [payingTxId, setPayingTxId] = useState(null);
 
@@ -37,17 +37,17 @@ const Wallet = () => {
     }
   }, [backendUrl]);
 
-  const fetchCashWallet = useCallback(async () => {
+  const fetchChequeWallet = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      const response = await axios.get(`${backendUrl}/api/wallet/delivery/cash-wallet`, {
+      const response = await axios.get(`${backendUrl}/api/wallet/delivery/cheque-wallet`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setWalletData(response.data);
     } catch (error) {
-      console.error("Error fetching cash wallet:", error);
-      toast.error("Failed to load cash wallet details");
+      console.error("Error fetching cheque wallet:", error);
+      toast.error("Failed to load cheque wallet details");
     } finally {
       setLoading(false);
     }
@@ -55,15 +55,15 @@ const Wallet = () => {
 
   useEffect(() => {
     fetchCurrentUser();
-    fetchCashWallet();
-  }, [fetchCurrentUser, fetchCashWallet]);
+    fetchChequeWallet();
+  }, [fetchCurrentUser, fetchChequeWallet]);
 
-  const handleRequestPayCashToAdmin = (transactionId) => {
+  const handleRequestPayChequeToAdmin = (transactionId) => {
     setTxToConfirm(transactionId);
     setShowConfirmModal(true);
   };
 
-  const confirmRequestPayCashToAdmin = async () => {
+  const confirmRequestPayChequeToAdmin = async () => {
     if (!txToConfirm) return;
 
     setShowConfirmModal(false);
@@ -72,15 +72,15 @@ const Wallet = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `${backendUrl}/api/wallet/delivery/request-pay-cash-to-admin`,
+        `${backendUrl}/api/wallet/delivery/request-pay-cheque-to-admin`,
         { transactionId: txToConfirm },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      toast.success("Request sent to admin for cash payment approval!");
-      fetchCashWallet();
+      toast.success("Request sent to admin for cheque payment approval!");
+      fetchChequeWallet();
     } catch (error) {
-      console.error("Error requesting pay cash to admin:", error);
+      console.error("Error requesting pay cheque to admin:", error);
       toast.error("Failed to send request");
     } finally {
       setPayingTxId(null);
@@ -111,11 +111,11 @@ const Wallet = () => {
       >
         <div className="wallet-container-wrapper">
           <div className="wallet-container">
-            <h2 className="wallet-page-title">Cash Wallet</h2>
+            <h2 className="wallet-page-title">Cheque Wallet</h2>
 
             <div className="wallet-summary">
               <div className="wallet-total">
-                <h3>Total Cash Collected</h3>
+                <h3>Total Cheque Collected</h3>
                 <div className="total-amount">
                   <img src={DirhamSymbol} alt="AED" width={30} height={30} style={{marginTop:"5px"}}/>
                   <span>{walletData.totalAmount.toFixed(2)}</span>
@@ -123,17 +123,17 @@ const Wallet = () => {
               </div>
               <button
                 className="wallet-refresh-btn"
-                onClick={fetchCashWallet}
+                onClick={fetchChequeWallet}
                 disabled={loading}
               >
-                {loading ? "Refreshing..." : "Refresh Cash Wallet"}
+                {loading ? "Refreshing..." : "Refresh Cheque Wallet"}
               </button>
             </div>
 
             {loading ? (
-              <div className="wallet-loading">Loading cash transactions...</div>
+              <div className="wallet-loading">Loading cheque transactions...</div>
             ) : walletData.transactions.length === 0 ? (
-              <div className="wallet-no-data">No cash payments received yet</div>
+              <div className="wallet-no-data">No cheque payments received yet</div>
             ) : (
               <div className="wallet-table-wrapper">
                 <table className="wallet-data-table">
@@ -144,6 +144,7 @@ const Wallet = () => {
                       <th>Order ID</th>
                       <th>Amount (AED)</th>
                       <th>Method</th>
+                      <th>Cheque Details</th>
                       <th>Date</th>
                       <th>Status</th>
                       <th>Action</th>
@@ -156,7 +157,16 @@ const Wallet = () => {
                         <td>{tx.order?.customer?.name || "N/A"}</td>
                         <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
                         <td>{tx.amount.toFixed(2)}</td>
-                        <td>Cash</td>
+                        <td>Cheque</td>
+                        <td>
+                          {tx.chequeDetails && typeof tx.chequeDetails === "object" ? (
+                            <div className="cheque-info">
+                              <div><strong>Number:</strong> {tx.chequeDetails.number || "-"}</div>
+                              <div><strong>Bank:</strong> {tx.chequeDetails.bank || "-"}</div>
+                              <div><strong>Date:</strong> {tx.chequeDetails.date ? new Date(tx.chequeDetails.date).toLocaleDateString() : "-"}</div>
+                            </div>
+                          ) : "-"}
+                        </td>
                         <td>{new Date(tx.date).toLocaleDateString()}</td>
                         <td>
                           <span className={`wallet-status-badge wallet-status-${tx.status}`}>
@@ -167,7 +177,7 @@ const Wallet = () => {
                           {tx.status === "received" && (
                             <button
                               className="wallet-pay-admin-btn"
-                              onClick={() => handleRequestPayCashToAdmin(tx._id)}
+                              onClick={() => handleRequestPayChequeToAdmin(tx._id)}
                               disabled={payingTxId === tx._id}
                             >
                               {payingTxId === tx._id ? "Processing..." : "Request Pay to Admin"}
@@ -193,15 +203,15 @@ const Wallet = () => {
       {showConfirmModal && (
         <div className="confirm-modal-overlay">
           <div className="confirm-modal">
-            <h3 className="confirm-title">Confirm Cash Payment Request to Admin</h3>
+            <h3 className="confirm-title">Confirm Cheque Payment Request to Admin</h3>
             <p className="confirm-text">
-              Are you sure you want to request approval for handing over AED {walletData.transactions.find(t => t._id === txToConfirm)?.amount?.toFixed(2) || "0.00"} cash to the admin?
+              Are you sure you want to request approval for handing over the cheque of AED {walletData.transactions.find(t => t._id === txToConfirm)?.amount?.toFixed(2) || "0.00"} to the admin?
             </p>
             <div className="confirm-actions">
               <button className="confirm-cancel" onClick={() => setShowConfirmModal(false)}>
                 No, Cancel
               </button>
-              <button className="confirm-confirm" onClick={confirmRequestPayCashToAdmin} disabled={payingTxId === txToConfirm}>
+              <button className="confirm-confirm" onClick={confirmRequestPayChequeToAdmin} disabled={payingTxId === txToConfirm}>
                 {payingTxId === txToConfirm ? "Processing..." : "Yes, Request"}
               </button>
             </div>
@@ -212,4 +222,4 @@ const Wallet = () => {
   );
 };
 
-export default Wallet;
+export default ChequeWallet;

@@ -79,6 +79,7 @@ const getPermissions = async (req, res) => {
         "menu.settings",
         "menu.customer.requests",
         "menu.wallet.money",
+        
         // Note: menu.deliveries is excluded for Admin
       ];
       return res.json({ permissions: adminPermissions });
@@ -125,8 +126,10 @@ const getPermissions = async (req, res) => {
       else if (permission === "menu.customer.requests") {
         expandedPermissions.push("menu.customer.requests.create", "menu.customer.requests.my");
       }
-      else if (permission === "menu.wallet") {
-        expandedPermissions.push("menu.wallet");
+      else if (permission === "menu.CashWallet") {
+        expandedPermissions.push("menu.CashWallet");
+      } else if (permission === "menu.ChequeWallet") {
+        expandedPermissions.push("menu.ChequeWallet");
       } else if (permission === "menu.wallet.money") {
         expandedPermissions.push("menu.wallet.money");
       }

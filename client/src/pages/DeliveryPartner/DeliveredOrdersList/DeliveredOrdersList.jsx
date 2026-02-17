@@ -3,8 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
-import toast from "react-hot-toast"; // ← NEW IMPORT
-
+import toast from "react-hot-toast";
 import "./DeliveredOrdersList.css";
 import axios from "axios";
 
@@ -19,49 +18,38 @@ const DeliveredOrdersList = () => {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [currentOrderInfo, setCurrentOrderInfo] = useState(null);
-  const [quantity, setQuantity] = useState("");
+  const [currentOrder, setCurrentOrder] = useState(null);
+  const [deliveryInputs, setDeliveryInputs] = useState({}); // { productSubdocId: quantity }
   const [paymentMethod, setPaymentMethod] = useState("credit");
   const [chequeNumber, setChequeNumber] = useState("");
   const [chequeBank, setChequeBank] = useState("");
   const [chequeDate, setChequeDate] = useState("");
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
-
   const fractionalUnits = ["kg", "gram", "liter", "ml", "meter", "cm", "inch"];
 
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) {
-        window.location.href = "/login";
-        return;
-      }
-      const response = await axios.get(`${backendUrl}/api/auth/me`, {
+      if (!token) return window.location.href = "/login";
+      const res = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setUser(response.data.user || response.data);
-    } catch (error) {
-      console.error("Failed to load user", error);
+      setUser(res.data.user || res.data);
+    } catch (err) {
       localStorage.removeItem("token");
       window.location.href = "/login";
     }
   }, [backendUrl]);
 
-  const fetchAllAcceptedOrders = useCallback(async () => {
+  const fetchAcceptedOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${backendUrl}/api/orders/my-assigned-orders`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const acceptedOrders = response.data.filter(
-        (order) => order.assignmentStatus === "accepted"
-      );
-      setOrders(acceptedOrders);
-    } catch (error) {
-      console.error("Error fetching accepted orders:", error);
+      const res = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setOrders(res.data.filter(o => o.assignmentStatus === "accepted"));
+    } catch (err) {
       toast.error("Failed to load orders");
     } finally {
       setLoading(false);
@@ -70,70 +58,72 @@ const DeliveredOrdersList = () => {
 
   useEffect(() => {
     fetchCurrentUser();
-    fetchAllAcceptedOrders();
-  }, [fetchCurrentUser, fetchAllAcceptedOrders]);
+    fetchAcceptedOrders();
+  }, [fetchCurrentUser, fetchAcceptedOrders]);
 
-  const openDeliveryModal = (orderId, orderedQuantity, deliveredQuantity, unit, price, totalAmount) => {
-    const remaining = orderedQuantity - deliveredQuantity;
-    const allowDecimal = fractionalUnits.includes(unit?.toLowerCase());
-
-    setCurrentOrderInfo({
-      orderId,
-      orderedQuantity,
-      deliveredQuantity,
-      unit,
-      price,
-      totalAmount,
-      remaining,
-      allowDecimal,
+  // Open modal and initialize inputs for each product
+  const openDeliveryModal = (order) => {
+    const inputs = {};
+    order.orderItems.forEach(item => {
+      inputs[item._id] = ""; // use subdocument _id as key
     });
 
-    setQuantity("");
+    setCurrentOrder(order);
+    setDeliveryInputs(inputs);
     setPaymentMethod("credit");
     setChequeNumber("");
     setChequeBank("");
     setChequeDate("");
-    setCurrentStep(1);
     setShowDeliveryModal(true);
   };
 
-  const handleNextStep = () => {
-    if (currentStep === 1) {
-      if (!quantity || isNaN(quantity) || quantity <= 0 || quantity > currentOrderInfo.remaining) {
-        toast.error(
-          `Please enter a valid quantity (max ${currentOrderInfo.remaining.toFixed(
-            currentOrderInfo.allowDecimal ? 2 : 0
-          )} ${currentOrderInfo.unit || ""})`
-        );
-        return;
-      }
-
-      if (!currentOrderInfo.allowDecimal && !Number.isInteger(Number(quantity))) {
-        toast.error(`For ${currentOrderInfo.unit} units, only whole numbers are allowed.`);
-        return;
-      }
-      setCurrentStep(2);
-    } else if (currentStep === 2) {
-      if (paymentMethod === "cheque") {
-        setCurrentStep(3);
-      } else {
-        proceedWithDelivery();
-      }
+  const handleQuantityChange = (productSubId, value) => {
+    // Allow empty string (to clear input)
+    if (value === "" || (!isNaN(value) && Number(value) >= 0)) {
+      setDeliveryInputs(prev => ({ ...prev, [productSubId]: value }));
     }
   };
 
-  const handlePreviousStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+  const getProductRemaining = (item) => {
+    const inputQty = Number(deliveryInputs[item._id] || 0);
+    return item.orderedQuantity - item.deliveredQuantity - inputQty;
+  };
+
+  const validateDelivery = () => {
+    for (const item of currentOrder.orderItems) {
+      const qty = Number(deliveryInputs[item._id] || 0);
+      const max = item.orderedQuantity - item.deliveredQuantity;
+
+      if (qty > max) {
+        return `Cannot deliver more than remaining (${max} ${item.unit || ""}) for ${item.product?.productName || "product"}`;
+      }
+      if (qty < 0 || (qty > 0 && isNaN(qty))) {
+        return "Invalid quantity entered";
+      }
     }
+    return null;
   };
 
   const proceedWithDelivery = async () => {
+    const error = validateDelivery();
+    if (error) return toast.error(error);
+
+    // Prepare delivered items (only those with quantity > 0)
+    const deliveredItems = currentOrder.orderItems
+      .map(item => {
+        const qty = Number(deliveryInputs[item._id] || 0);
+        return qty > 0 ? { product: item._id, quantity: qty } : null;
+      })
+      .filter(Boolean);
+
+    if (deliveredItems.length === 0) {
+      return toast.error("Please enter quantity for at least one product");
+    }
+
     let chequeDetails = null;
     if (paymentMethod === "cheque") {
       if (!chequeNumber.trim() || !chequeBank.trim() || !chequeDate) {
-        toast.error("Please fill all cheque details: number, bank, and date.");
-        return;
+        return toast.error("Please fill all cheque details");
       }
       chequeDetails = {
         number: chequeNumber.trim(),
@@ -143,66 +133,60 @@ const DeliveredOrdersList = () => {
     }
 
     setShowDeliveryModal(false);
-    setDeliveringOrderId(currentOrderInfo.orderId);
+    setDeliveringOrderId(currentOrder._id);
 
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `${backendUrl}/api/orders/deliverorder/${currentOrderInfo.orderId}`,
+        `${backendUrl}/api/orders/deliverorder/${currentOrder._id}`,
         {
-          quantity: Number(quantity),
+          deliveredItems,
+          deliveredAt: new Date().toISOString(),
           paymentMethod,
           chequeDetails,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // SUCCESS TOASTS (replaced alert)
-      if (paymentMethod === "credit") {
-        toast.success("Order delivered successfully (credit used).");
-      } else if (paymentMethod === "cash") {
-        toast.success("Order delivered. Cash received added to your wallet.");
-      } else {
-        toast.success("Order delivered. Cheque received added to your wallet.");
-      }
-
-      fetchAllAcceptedOrders();
-    } catch (error) {
-      console.error("Error delivering order:", error);
-      toast.error(error.response?.data?.message || "Failed to deliver order. Please try again.");
+      toast.success("Delivery recorded successfully!");
+      fetchAcceptedOrders();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to record delivery");
     } finally {
       setDeliveringOrderId(null);
-      setCurrentOrderInfo(null);
+      setCurrentOrder(null);
     }
   };
 
   const getDeliveryStatus = (order) => {
-    if (order.deliveredQuantity === 0) return "Not Delivered";
-    if (order.deliveredQuantity < order.orderedQuantity) return "Partially Delivered";
+    const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
+    const totalDelivered = order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
+
+    if (totalDelivered === 0) return "Not Delivered";
+    if (totalDelivered < totalOrdered) return "Partially Delivered";
     return "Fully Delivered";
   };
 
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesSearch =
-        !searchTerm.trim() ||
+    return orders.filter(order => {
+      const matchesSearch = !searchTerm.trim() ||
         order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesStatus =
-        statusFilter === "all" ||
+      const matchesStatus = statusFilter === "all" ||
         getDeliveryStatus(order).toLowerCase().replace(" ", "-") === statusFilter;
-
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
 
-  const clearSearch = () => {
-    setSearchTerm("");
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
-  if (!user) {
-    return <div className="delivered-orders-loading">Loading...</div>;
-  }
+  if (!user) return <div className="delivered-orders-loading">Loading...</div>;
 
   return (
     <div className="delivered-orders-layout">
@@ -218,9 +202,7 @@ const DeliveredOrdersList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main
-        className={`delivered-orders-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
-      >
+      <main className={`delivered-orders-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="delivered-orders-container-wrapper">
           <div className="delivered-orders-container">
             <h2 className="delivered-orders-page-title">Deliver Orders</h2>
@@ -233,7 +215,7 @@ const DeliveredOrdersList = () => {
                 <select
                   id="statusFilter"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={e => setStatusFilter(e.target.value)}
                   className="delivered-orders-status-filter"
                 >
                   <option value="all">All Statuses</option>
@@ -249,15 +231,10 @@ const DeliveredOrdersList = () => {
                   className="delivered-orders-search-input"
                   placeholder="Search by customer name..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  aria-label="Search orders by customer name"
+                  onChange={e => setSearchTerm(e.target.value)}
                 />
                 {searchTerm && (
-                  <button
-                    className="delivered-orders-search-clear"
-                    onClick={clearSearch}
-                    aria-label="Clear search"
-                  >
+                  <button className="delivered-orders-search-clear" onClick={() => setSearchTerm("")}>
                     ×
                   </button>
                 )}
@@ -269,97 +246,92 @@ const DeliveredOrdersList = () => {
             ) : filteredOrders.length === 0 ? (
               <div className="delivered-orders-no-data">
                 No orders found
-                {statusFilter !== "all" ? ` with status "${statusFilter.replace("-", " ")}"` : ""}
-                {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
+                {statusFilter !== "all" && ` with status "${statusFilter.replace("-", " ")}"`}
+                {searchTerm.trim() && ` matching "${searchTerm}"`}
               </div>
             ) : (
               <div className="delivered-orders-table-wrapper">
                 <table className="delivered-orders-data-table">
                   <thead>
                     <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Customer</th>
-                      <th scope="col">Product</th>
-                      <th scope="col">Ordered Qty</th>
-                      <th scope="col">Delivered Qty</th>
-                      <th scope="col">Remaining Qty</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Total Amount</th>
-                      <th scope="col">Remarks</th>
-                      <th scope="col">Delivery Status</th>
-                      <th scope="col">Order Date</th>
-                      <th scope="col">Actions</th>
+                      <th>No</th>
+                      <th>Customer</th>
+                      <th>Products</th>
+                      <th>Total Ordered</th>
+                      <th>Total Delivered</th>
+                      <th>Remaining</th>
+                      <th>Grand Total</th>
+                      <th>Remarks</th>
+                      <th>Status</th>
+                      <th>Order Date</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.map((order, index) => (
-                      <tr key={order._id}>
-                        <td>{index + 1}</td>
-                        <td>{order.customer?.name || "N/A"}</td>
-                        <td>{order.product?.productName || "N/A"}</td>
-                        <td>{order.orderedQuantity} {order.unit || ""}</td>
-                        <td>{order.deliveredQuantity} {order.unit || ""}</td>
-                        <td>
-                          {(order.orderedQuantity - order.deliveredQuantity).toFixed(2)}{" "}
-                          {order.unit || ""}
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                            <img
-                              src={DirhamSymbol}
-                              alt="Dirham Symbol"
-                              width={18}
-                              height={20}
-                              style={{ paddingTop: "2px" }}
-                            />
-                            <span>{order.price.toFixed(2)}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                            <img
-                              src={DirhamSymbol}
-                              alt="Dirham Symbol"
-                                 width={18}
-                              height={20}
-                              style={{ paddingTop: "2px" }}
-                            />
-                            <span>{order.totalAmount.toFixed(2)}</span>
-                          </div>
-                        </td>
-                        <td>{order.remarks || "-"}</td>
-                        <td>
-                          <span
-                            className={`delivered-orders-status-badge delivered-orders-status-${getDeliveryStatus(order).toLowerCase().replace(" ", "-")}`}
-                          >
-                            {getDeliveryStatus(order)}
-                          </span>
-                        </td>
-                        <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                        <td>
-                          {order.deliveredQuantity < order.orderedQuantity ? (
-                            <button
-                              className="delivered-orders-deliver-button"
-                              onClick={() =>
-                                openDeliveryModal(
-                                  order._id,
-                                  order.orderedQuantity,
-                                  order.deliveredQuantity,
-                                  order.unit,
-                                  order.price,
-                                  order.totalAmount
-                                )
-                              }
-                              disabled={deliveringOrderId === order._id}
-                            >
-                              {deliveringOrderId === order._id ? "Delivering..." : "Deliver"}
-                            </button>
-                          ) : (
-                            <span className="delivered-orders-delivered-text">Completed</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredOrders.map((order, index) => {
+                      const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
+                      const totalDelivered = order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
+                      const remaining = totalOrdered - totalDelivered;
+                      const grandTotal = order.orderItems?.reduce((s, i) => s + i.totalAmount, 0)?.toFixed(2) || "0.00";
+
+                      return (
+                        <tr key={order._id}>
+                          <td>{index + 1}</td>
+                          <td>{order.customer?.name || "N/A"}</td>
+
+                          <td className="products-cell">
+                            {order.orderItems?.length > 0 ? (
+                              <div className="products-list">
+                                {order.orderItems.map((item, i) => (
+                                  <div key={i} className="product-tag">
+                                    <span className="product-name">{item.product?.productName || "—"}</span>
+                                    <span className="product-qty">× {item.orderedQuantity}</span>
+                                    <span className="product-unit">{item.unit || ""}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="no-products">No products</span>
+                            )}
+                          </td>
+
+                          <td>{totalOrdered}</td>
+                          <td>{totalDelivered}</td>
+                          <td>{remaining}</td>
+
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <img src={DirhamSymbol} alt="AED" width={18} height={20} style={{ paddingTop: "2px" }} />
+                              <span>{grandTotal}</span>
+                            </div>
+                          </td>
+
+                          <td>{order.remarks || "—"}</td>
+
+                          <td>
+                            <span className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(" ", "-")}`}>
+                              {getDeliveryStatus(order)}
+                            </span>
+                          </td>
+
+                          <td>{formatDate(order.orderDate)}</td>
+
+                          <td>
+                            {remaining > 0 ? (
+                              <button
+                                className="deliver-btn"
+                                onClick={() => openDeliveryModal(order)}
+                                disabled={deliveringOrderId === order._id}
+                              >
+                                {deliveringOrderId === order._id ? "Delivering..." : "Deliver"}
+                              </button>
+                            ) : (
+                              <span className="completed-text">Completed</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -367,116 +339,88 @@ const DeliveredOrdersList = () => {
           </div>
         </div>
 
-        {/* Delivery Modal with Steps (NO STEP TITLE) */}
-        {showDeliveryModal && currentOrderInfo && (
+        {/* ────────────────────────────────────────────────
+            Per-Product Delivery Modal
+        ──────────────────────────────────────────────── */}
+        {showDeliveryModal && currentOrder && (
           <div className="delivery-modal-overlay">
             <div className="delivery-modal">
-              {currentStep === 1 && (
-                <div className="modal-section">
-                  <label className="modal-label">
-                    Quantity to Deliver (Max: {currentOrderInfo.remaining.toFixed(currentOrderInfo.allowDecimal ? 2 : 0)} {currentOrderInfo.unit || ""})
-                  </label>
-                  <input
-                    type="number"
-                    className="modal-input"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="Enter quantity"
-                    step={currentOrderInfo.allowDecimal ? "0.01" : "1"}
-                    min="0.01"
-                    max={currentOrderInfo.remaining}
-                    required
-                  />
-                </div>
-              )}
+              <h3>Deliver Order #{currentOrder._id.toString().slice(-8)}</h3>
 
-              {currentStep === 2 && (
-                <div className="modal-section">
-                  <label className="modal-label">Payment Method</label>
-                  <div className="radio-group">
-                    <label className="radio-label">
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="credit"
-                        checked={paymentMethod === "credit"}
-                        onChange={() => setPaymentMethod("credit")}
-                      />
-                      <span>Credit</span>
-                    </label>
-                    <label className="radio-label">
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="cash"
-                        checked={paymentMethod === "cash"}
-                        onChange={() => setPaymentMethod("cash")}
-                      />
-                      <span>Cash</span>
-                    </label>
-                    <label className="radio-label">
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="cheque"
-                        checked={paymentMethod === "cheque"}
-                        onChange={() => setPaymentMethod("cheque")}
-                      />
-                      <span>Cheque</span>
-                    </label>
-                  </div>
-                </div>
-              )}
+             <div className="products-delivery-list">
+  {currentOrder.orderItems.map(item => {
+    const remaining = getProductRemaining(item); 
 
-              {currentStep === 3 && paymentMethod === "cheque" && (
-                <div className="modal-section cheque-section">
-                  <h3 className="cheque-title">Cheque Details</h3>
-                  <label className="modal-label">Cheque Number</label>
+    return (
+      <div key={item._id} className="product-delivery-row">
+        <div className="product-info">
+          <strong>{item.product?.productName || "Unknown Product"}</strong>
+          <div>Ordered: {item.orderedQuantity} {item.unit || ""}</div>
+          <div>Already Delivered: {item.deliveredQuantity} {item.unit || ""}</div>
+        </div>
+
+        <div className="quantity-input-group">
+          <label>Deliver Now:</label>
+          <input
+            type="number"
+            min="0"
+            max={item.orderedQuantity - item.deliveredQuantity}
+            step={fractionalUnits.includes(item.unit?.toLowerCase()) ? "0.01" : "1"}
+            value={deliveryInputs[item._id] || ""}
+            onChange={e => handleQuantityChange(item._id, e.target.value)}
+            placeholder="0"
+          />
+          <span className={`remaining-text ${remaining < 0 ? "negative" : ""}`}>
+            Remaining: {remaining >= 0 ? remaining : "Over-delivered!"}
+            {item.unit ? ` ${item.unit}` : ""}
+          </span>
+        </div>
+      </div>
+    );
+  })}
+</div>
+
+              {/* Payment Method */}
+              <div className="payment-section">
+                <label>Payment Method</label>
+                <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+                  <option value="credit">Credit</option>
+                  <option value="cash">Cash</option>
+                  <option value="cheque">Cheque</option>
+                </select>
+              </div>
+
+              {/* Cheque Details */}
+              {paymentMethod === "cheque" && (
+                <div className="cheque-details">
                   <input
-                    type="text"
-                    className="modal-input"
+                    placeholder="Cheque Number"
                     value={chequeNumber}
-                    onChange={(e) => setChequeNumber(e.target.value)}
-                    placeholder="e.g. 123456789"
-                    required
+                    onChange={e => setChequeNumber(e.target.value)}
                   />
-
-                  <label className="modal-label">Bank Name</label>
                   <input
-                    type="text"
-                    className="modal-input"
+                    placeholder="Bank Name"
                     value={chequeBank}
-                    onChange={(e) => setChequeBank(e.target.value)}
-                    placeholder="e.g. Emirates NBD"
-                    required
+                    onChange={e => setChequeBank(e.target.value)}
                   />
-
-                  <label className="modal-label">Cheque Date</label>
                   <input
                     type="date"
-                    className="modal-input"
                     value={chequeDate}
-                    onChange={(e) => setChequeDate(e.target.value)}
-                    required
+                    onChange={e => setChequeDate(e.target.value)}
                   />
                 </div>
               )}
 
               <div className="modal-actions">
-                {currentStep > 1 && (
-                  <button className="modal-back-btn" onClick={handlePreviousStep}>
-                    Back
-                  </button>
-                )}
-                <button className="modal-cancel-btn" onClick={() => setShowDeliveryModal(false)}>
+                <button className="cancel-btn" onClick={() => setShowDeliveryModal(false)}>
                   Cancel
                 </button>
                 <button
-                  className="modal-next-btn"
-                  onClick={handleNextStep}
-                  disabled={currentStep === 1 && !quantity}
+                  className="submit-btn"
+                  onClick={proceedWithDelivery}
+                  disabled={deliveringOrderId === currentOrder._id}
                 >
-                  {currentStep === (paymentMethod === "cheque" ? 3 : 2) ? "Submit & Deliver" : "Next"}
+                  {deliveringOrderId === currentOrder._id ? "Submitting..." : "Confirm Delivery"}
                 </button>
               </div>
             </div>

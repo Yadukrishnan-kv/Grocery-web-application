@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
-
 import "./CustomerOrdersList.css";
 import axios from "axios";
+import toast from "react-hot-toast";
 
 const CustomerOrdersList = () => {
   const [orders, setOrders] = useState([]);
@@ -39,15 +39,15 @@ const CustomerOrdersList = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${backendUrl}/api/orders/customerorders`,
+        `${backendUrl}/api/orders/my-orders`, // ← Updated endpoint (matches your backend route)
         {
           headers: { Authorization: `Bearer ${token}` },
-        },
+        }
       );
       setOrders(response.data);
     } catch (error) {
       console.error("Error fetching customer orders:", error);
-      alert("Failed to load orders");
+      toast.error("Failed to load your orders");
     } finally {
       setLoading(false);
     }
@@ -67,19 +67,20 @@ const CustomerOrdersList = () => {
     return orders.filter((order) => {
       const matchesSearch =
         !searchTerm.trim() ||
-        order.product?.productName
-          ?.toLowerCase()
-          .includes(searchTerm.toLowerCase());
+        order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.orderItems?.some(item =>
+          item.product?.productName?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
       const matchesStatus =
         statusFilter === "all" ||
         order.status?.toLowerCase() === statusFilter.toLowerCase();
+
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
 
-  const clearSearch = () => {
-    setSearchTerm("");
-  };
+  const clearSearch = () => setSearchTerm("");
 
   // Helper to get assignment status display text
   const getAssignmentStatusDisplay = (order) => {
@@ -90,7 +91,7 @@ const CustomerOrdersList = () => {
     return "Pending";
   };
 
-  // Helper to format date as DD/MM/YYYY
+  // Format date as DD/MM/YYYY
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
@@ -142,19 +143,21 @@ const CustomerOrdersList = () => {
                   >
                     <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
+                    <option value="partial_delivered">Partially Delivered</option>
                     <option value="delivered">Delivered</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
+
                 {/* Search */}
                 <div className="customer-orders-search-container">
                   <input
                     type="text"
                     className="customer-orders-search-input"
-                    placeholder="Search by product name..."
+                    placeholder="Search by customer or product..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    aria-label="Search orders by product name"
+                    aria-label="Search orders by customer or product name"
                   />
                   {searchTerm && (
                     <button
@@ -166,6 +169,7 @@ const CustomerOrdersList = () => {
                     </button>
                   )}
                 </div>
+
                 {/* Create Button */}
                 <button
                   className="customer-orders-create-button"
@@ -175,6 +179,7 @@ const CustomerOrdersList = () => {
                 </button>
               </div>
             </div>
+
             {loading ? (
               <div className="customer-orders-loading">Loading orders...</div>
             ) : filteredOrders.length === 0 ? (
@@ -189,11 +194,10 @@ const CustomerOrdersList = () => {
                   <thead>
                     <tr>
                       <th scope="col">No</th>
-                      <th scope="col">Product</th>
-                      <th scope="col">Ordered Qty</th>
-                      <th scope="col">Delivered Qty</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Total Amount</th>
+                      <th scope="col">Products</th>
+                      <th scope="col">Total Ordered Qty</th>
+                      <th scope="col">Total Delivered Qty</th>
+                      <th scope="col">Grand Total</th>
                       <th scope="col">Remarks</th>
                       <th scope="col">Payment</th>
                       <th scope="col">Delivery Partner</th>
@@ -202,81 +206,84 @@ const CustomerOrdersList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.map((order, index) => (
-                      <tr key={order._id}>
-                        <td>{index + 1}</td>
-                        <td>{order.product?.productName || "N/A"}</td>
-                        <td>
-                          {order.orderedQuantity} {order.unit}
-                        </td>
-                        <td>
-                          {order.deliveredQuantity || 0} {order.unit}
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            <img
-                              src={DirhamSymbol}
-                              alt="Dirham Symbol"
-                              width={15}
-                              height={15}
+                    {filteredOrders.map((order, index) => {
+                      const totalOrdered = order.orderItems?.reduce((sum, item) => sum + item.orderedQuantity, 0) || 0;
+                      const totalDelivered = order.orderItems?.reduce((sum, item) => sum + item.deliveredQuantity, 0) || 0;
+                      const grandTotal = order.orderItems?.reduce((sum, item) => sum + item.totalAmount, 0)?.toFixed(2) || "0.00";
+
+                      return (
+                        <tr key={order._id}>
+                          <td>{index + 1}</td>
+
+                          {/* Multi-product display */}
+                          <td className="products-cell">
+                            {order.orderItems?.length > 0 ? (
+                              <div className="products-list">
+                                {order.orderItems.map((item, i) => (
+                                  <div key={i} className="product-tag">
+                                    <span className="product-name">
+                                      {item.product?.productName || "Unknown"}
+                                    </span>
+                                    <span className="product-qty">× {item.orderedQuantity}</span>
+                                    <span className="product-unit">{item.unit || ""}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="no-products">No products</span>
+                            )}
+                          </td>
+
+                          <td>{totalOrdered}</td>
+                          <td>{totalDelivered}</td>
+
+                          <td>
+                            <div
                               style={{
-                                paddingTop: "3px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
                               }}
-                            />
-                            <span>{order.price?.toFixed(2) || "0.00"}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            <img
-                              src={DirhamSymbol}
-                              alt="Dirham Symbol"
-                              width={15}
-                              height={15}
-                              style={{
-                                paddingTop: "3px",
-                              }}
-                            />
-                            <span>
-                              {order.totalAmount?.toFixed(2) || "0.00"}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="AED"
+                                width={15}
+                                height={15}
+                                style={{ paddingTop: "3px" }}
+                              />
+                              <span>{grandTotal}</span>
+                            </div>
+                          </td>
+
+                          <td>{order.remarks || "-"}</td>
+
+                          <td>
+                            {order.payment?.charAt(0).toUpperCase() +
+                              order.payment?.slice(1) || "N/A"}
+                          </td>
+
+                          <td>
+                            <span
+                              className={`customer-orders-assignment-badge customer-orders-assignment-${order.assignmentStatus?.toLowerCase() || "pending"}`}
+                            >
+                              {getAssignmentStatusDisplay(order)}
                             </span>
-                          </div>
-                        </td>
-                        <td>{order.remarks || "-"}</td>
-                        <td>
-                          {order.payment?.charAt(0).toUpperCase() +
-                            order.payment?.slice(1) || "N/A"}
-                        </td>
-                        <td>
-                          <span
-                            className={`customer-orders-assignment-badge customer-orders-assignment-${order.assignmentStatus?.toLowerCase() || "pending"}`}
-                          >
-                            {getAssignmentStatusDisplay(order)}
-                          </span>
-                        </td>
-                        <td>
-                          <span
-                            className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || "pending"}`}
-                          >
-                            {order.status?.charAt(0).toUpperCase() +
-                              order.status?.slice(1) || "Pending"}
-                          </span>
-                        </td>
-                        <td>{formatDate(order.orderDate)}</td>
-                      </tr>
-                    ))}
+                          </td>
+
+                          <td>
+                            <span
+                              className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || "pending"}`}
+                            >
+                              {order.status?.charAt(0).toUpperCase() +
+                                order.status?.slice(1) || "Pending"}
+                            </span>
+                          </td>
+
+                          <td>{formatDate(order.orderDate)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

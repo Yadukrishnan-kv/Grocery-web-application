@@ -5,7 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./OrderArrivedList.css";
 import axios from "axios";
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from 'react-hot-toast';
 
 const OrderArrivedList = () => {
   const [orders, setOrders] = useState([]);
@@ -47,15 +47,14 @@ const OrderArrivedList = () => {
   const fetchAssignedOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("No token found");
-      }
+      if (!token) throw new Error("No token found");
+
       const response = await axios.get(
         `${backendUrl}/api/orders/my-assigned-orders`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      // Only show orders that are assigned (not yet accepted/rejected)
       const assignedOrders = response.data.filter(
         (order) => order.assignmentStatus === "assigned"
       );
@@ -249,9 +248,7 @@ const OrderArrivedList = () => {
             ) : filteredOrders.length === 0 ? (
               <div className="order-arrived-no-data">
                 No assigned orders found
-                {searchTerm || fromDate || toDate
-                  ? " matching your filters"
-                  : ""}
+                {searchTerm || fromDate || toDate ? " matching your filters" : ""}
               </div>
             ) : (
               <div className="order-arrived-table-wrapper">
@@ -260,10 +257,9 @@ const OrderArrivedList = () => {
                     <tr>
                       <th scope="col">No</th>
                       <th scope="col">Customer</th>
-                      <th scope="col">Product</th>
-                      <th scope="col">Ordered Qty</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Total Amount</th>
+                      <th scope="col">Products</th>           {/* Updated */}
+                      <th scope="col">Total Qty</th>         {/* New */}
+                      <th scope="col">Grand Total</th>       {/* Updated */}
                       <th scope="col">Remarks</th>
                       <th scope="col">Order Date</th>
                       <th scope="col">Actions</th>
@@ -274,54 +270,66 @@ const OrderArrivedList = () => {
                       <tr key={order._id}>
                         <td>{index + 1}</td>
                         <td>{order.customer?.name || "N/A"}</td>
-                        <td>{order.product?.productName || "N/A"}</td>
-                        <td>
-                          {order.orderedQuantity} {order.unit || ""}
+
+                        {/* Attractive multi-product display */}
+                        <td className="products-cell">
+                          {order.orderItems?.length > 0 ? (
+                            <div className="products-list">
+                              {order.orderItems.map((item, i) => (
+                                <div key={i} className="product-tag">
+                                  <span className="product-name">
+                                    {item.product?.productName || "Unknown Product"}
+                                  </span>
+                                  <span className="product-qty">
+                                    × {item.orderedQuantity}
+                                  </span>
+                                  <span className="product-unit">
+                                    {item.unit || ""}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="no-products">No products</span>
+                          )}
                         </td>
+
+                        {/* Total ordered quantity */}
+                        <td>
+                          {order.totalOrderedQuantity ||
+                            order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) ||
+                            0}
+                        </td>
+
+                        {/* Grand total with Dirham symbol */}
                         <td>
                           <div
                             style={{
                               display: "flex",
                               alignItems: "center",
-                              gap: "4px",
+                              gap: "6px",
                             }}
                           >
                             <img
                               src={DirhamSymbol}
-                              alt="Dirham Symbol"
+                              alt="AED"
                               width={20}
                               height={20}
-                              style={{
-                                paddingTop: "2px",
-                              }}
+                              style={{ paddingTop: "2px" }}
                             />
-                            <span>{order.price?.toFixed(2) || "0.00"}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            <img
-                              src={DirhamSymbol}
-                              alt="Dirham Symbol"
-                              width={20}
-                              height={20}
-                              style={{
-                                paddingTop: "2px",
-                              }}
-                            />
-                            <span>
-                              {order.totalAmount?.toFixed(2) || "0.00"}
+                            <span style={{ fontWeight: 500 }}>
+                              {order.grandTotal?.toFixed(2) ||
+                                order.orderItems
+                                  ?.reduce((sum, it) => sum + it.totalAmount, 0)
+                                  ?.toFixed(2) ||
+                                "0.00"}
                             </span>
                           </div>
                         </td>
+
                         <td>{order.remarks || "-"}</td>
                         <td>{formatDate(order.orderDate)}</td>
+
                         <td>
                           <div className="order-arrived-action-buttons">
                             <button
@@ -332,9 +340,7 @@ const OrderArrivedList = () => {
                                 rejectingOrderId === order._id
                               }
                             >
-                              {acceptingOrderId === order._id
-                                ? "Accepting..."
-                                : "Accept"}
+                              {acceptingOrderId === order._id ? "Accepting..." : "Accept"}
                             </button>
                             <button
                               className="order-arrived-reject-button"
@@ -344,9 +350,7 @@ const OrderArrivedList = () => {
                                 rejectingOrderId === order._id
                               }
                             >
-                              {rejectingOrderId === order._id
-                                ? "Rejecting..."
-                                : "Reject"}
+                              {rejectingOrderId === order._id ? "Rejecting..." : "Reject"}
                             </button>
                           </div>
                         </td>

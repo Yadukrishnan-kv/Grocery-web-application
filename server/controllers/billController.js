@@ -182,32 +182,41 @@ const getCustomerBillById = async (req, res) => {
   }
 };
 
+// billController.js (or wherever createInvoiceBasedBill is defined)
 const createInvoiceBasedBill = async (order) => {
   try {
     const customer = await Customer.findById(order.customer);
     if (!customer || customer.statementType !== "invoice-based") {
-      return null; // Not invoice-based or customer not found
+      return null; // Skip if not invoice-based
     }
 
+    // Calculate total used amount from this delivery
+    const totalUsed = order.orderItems.reduce((sum, item) => {
+      return sum + (item.deliveredQuantity * item.price);
+    }, 0);
+
+    // Use delivery date as cycle start/end (for per-delivery invoices)
     const deliveryDate = order.deliveredAt || new Date();
 
-    // Due date = delivery date + dueDays
+    // Calculate due date using customer's dueDays
     const dueDate = new Date(deliveryDate);
-    dueDate.setDate(dueDate.getDate() + customer.dueDays);
+    if (customer.dueDays) {
+      dueDate.setDate(dueDate.getDate() + customer.dueDays);
+    }
 
     const bill = await Bill.create({
       customer: order.customer,
       cycleStart: deliveryDate,
-      cycleEnd: deliveryDate,
-      totalUsed: order.totalAmount,
-      amountDue: order.totalAmount,
+      cycleEnd: deliveryDate, // single delivery invoice
+      totalUsed: totalUsed || 0,              // ← FIXED: always set a number
+      amountDue: totalUsed || 0,
       dueDate,
       paidAmount: 0,
       status: "pending",
-      orders: [order._id], // Link to this order
+      orders: [order._id],
     });
 
-    // Optional: Link bill back to order
+    // Optional: link bill back to order
     order.bill = bill._id;
     await order.save();
 
@@ -215,9 +224,10 @@ const createInvoiceBasedBill = async (order) => {
     return bill;
   } catch (error) {
     console.error("Error creating invoice-based bill:", error);
-    return null;
+    return null; // Don't crash the delivery flow
   }
 };
+
 module.exports = {
   generateBill,
   getAllBills,
