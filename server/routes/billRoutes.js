@@ -6,16 +6,14 @@ const {
   generateBill,
   getAllBills,
   getBillById,
-  payBill,
   getCustomerBills,
-  getCustomerBillById,generateTestMonthlyBill
+  getCustomerBillById
 } = require("../controllers/billController");
 
 
 router.post("/generatebill", generateBill);
 router.get("/getallbills", getAllBills);
 router.get("/getbillbyid/:id", getBillById);
-router.post("/paybill/:id", payBill);
 router.get("/customer-bills", getCustomerBills);
 router.get("/customer-bill/:id", getCustomerBillById);
 

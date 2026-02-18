@@ -54,7 +54,9 @@ const CreateRole = () => {
     Settings: "menu.settings",
     CashWallet: "menu.CashWallet",  
     ChequeWallet: "menu.ChequeWallet",  
-    WalletMoney: "menu.wallet.money",  
+    WalletMoney: "menu.wallet.money",
+    paymentRequestsdelivery: "menu.paymentRequestsdelivery",
+    paymentRequestssales: "menu.paymentRequestssales",
 
 
 

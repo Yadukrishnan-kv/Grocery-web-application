@@ -1,0 +1,525 @@
+/* PaymentRequests.css - Shared for Delivery & Sales Payment Requests Pages */
+
+/* ────────────────────────────────────────────────
+   General Layout
+───────────────────────────────────────────────── */
+.requests-layout {
+  display: flex;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+}
+
+.requests-main-content {
+  flex: 1;
+  padding: 30px;
+  transition: margin-left 0.3s ease;
+}
+
+.requests-main-content.sidebar-open {
+  margin-left: 250px; /* Adjust based on your sidebar width */
+}
+
+.requests-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  padding: 40px;
+}
+
+/* Page Title */
+.requests-page-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 2.5rem;
+  text-align: center;
+  letter-spacing: -0.5px;
+}
+
+/* Summary Cards (Totals) */
+.requests-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.8rem;
+  margin-bottom: 3rem;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  text-align: center;
+}
+
+.summary-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+.summary-card h4 {
+  font-size: 1.3rem;
+  color: #475569;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.summary-card .amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.summary-card .amount img {
+  width: 32px;
+  height: 32px;
+}
+
+/* Sections (Cash / Cheque) */
+.requests-section {
+  margin-bottom: 3.5rem;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.requests-section h3 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1.5rem;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+/* Tables */
+.requests-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  min-width: 900px;
+}
+
+.requests-table th,
+.requests-table td {
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.requests-table th {
+  background: #f1f5f9;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+}
+
+.requests-table td {
+  color: #1f2937;
+  font-size: 0.95rem;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-accepted {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.accept-btn,
+.reject-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.accept-btn {
+  background: #10b981;
+  color: white;
+}
+
+.accept-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.reject-btn {
+  background: #ef4444;
+  color: white;
+}
+
+.reject-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.accept-btn:disabled,
+.reject-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Cheque Info */
+.cheque-info {
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.cheque-info div {
+  margin-bottom: 4px;
+}
+
+/* Loading & No Data */
+.requests-loading,
+.requests-no-data {
+  text-align: center;
+  padding: 100px 20px;
+  color: #6b7280;
+  font-size: 1.3rem;
+  font-style: italic;
+}
+
+/* Confirmation Modal */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+
+.confirm-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  animation: modalPop 0.3s ease-out;
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.confirm-modal h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.confirm-modal p {
+  font-size: 1.1rem;
+  color: #475569;
+  margin-bottom: 32px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.cancel-btn,
+.accept-btn,
+.reject-btn {
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-btn {
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+}
+
+.cancel-btn:hover {
+  background: #cbd5e1;
+}
+
+.accept-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+
+.accept-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+.reject-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+.reject-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .requests-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .requests-container {
+    padding: 24px;
+  }
+
+  .requests-page-title {
+    font-size: 1.8rem;
+  }
+
+  .requests-section h3 {
+    font-size: 1.4rem;
+  }
+
+  .confirm-modal {
+    padding: 24px;
+    max-width: 90%;
+  }
+}
+
+.status-received { background: #d1fae5; color: #065f46; }   /* green - ready */
+.status-pending   { background: #fef3c7; color: #92400e; }   /* yellow - waiting */
+.status-paid_to_admin { background: #e0f2fe; color: #1e40af; } /* blue - done */
+
+.pay-admin-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pay-admin-btn:hover {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  transform: translateY(-1px);
+}
+/* Add to both PaymentRequests.css and BillWallet.css */
+
+/* Row highlighting for better UX */
+.requests-table tbody tr.pending-row,
+.data-table tbody tr.pending-row {
+  background-color: #fff8e1 !important;
+  border-left: 4px solid #ffc107;
+}
+
+.requests-table tbody tr.paid-row,
+.data-table tbody tr.paid-row {
+  background-color: #e8f5e9 !important;
+  border-left: 4px solid #28a745;
+  opacity: 0.9;
+}
+
+/* Status badge colors */
+.status-badge.status-received {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.status-badge.status-pending {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.status-badge.status-paid_to_admin {
+  background-color: #28a745;
+  color: white;
+}
+
+.status-badge.status-rejected {
+  background-color: #dc3545;
+  color: white;
+}
+
+/* Action buttons */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.accept-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.accept-btn:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.reject-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.reject-btn:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.pay-admin-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pay-admin-btn:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.text-muted {
+  color: #6c757d;
+  font-size: 12px;
+}
+
+.small {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+/* Modal styles */
+.confirm-modal-overlay,
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirm-modal {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.confirm-modal h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.confirm-modal p {
+  margin: 0 0 20px;
+  color: #555;
+  font-size: 14px;
+}
+
+.confirm-actions,
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirm-cancel,
+.cancel {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.confirm-accept,
+.confirm-pay-admin {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.confirm-reject {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}

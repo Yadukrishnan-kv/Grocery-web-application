@@ -29,10 +29,20 @@ const CustomerBillStatement = () => {
   const [activeItem, setActiveItem] = useState("Bill Statement");
   const [user, setUser] = useState(null);
 
-  // Payment modal states
+  // Payment request modal states
   const [showPayModal, setShowPayModal] = useState(false);
   const [billToPay, setBillToPay] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [chequeDetails, setChequeDetails] = useState({
+    number: "",
+    bank: "",
+    date: "",
+  });
+  const [recipientType, setRecipientType] = useState("delivery");
+  const [recipientId, setRecipientId] = useState("");
+  const [deliveryMen, setDeliveryMen] = useState([]);
+  const [salesMen, setSalesMen] = useState([]);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -84,6 +94,30 @@ const CustomerBillStatement = () => {
     }
   }, [backendUrl]);
 
+  const fetchDeliveryMen = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/api/users/delivery-men`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setDeliveryMen(response.data);
+    } catch (error) {
+      toast.error("Failed to load delivery men");
+    }
+  }, [backendUrl]);
+
+  const fetchSalesMen = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/api/users/sales-men`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSalesMen(response.data);
+    } catch (error) {
+      toast.error("Failed to load sales men");
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
     const loadAllData = async () => {
       setLoading(true);
@@ -92,6 +126,8 @@ const CustomerBillStatement = () => {
           fetchCurrentUser(),
           fetchCustomerBills(),
           fetchBillingConfig(),
+          fetchDeliveryMen(),
+          fetchSalesMen(),
         ]);
       } catch (error) {
         console.error("Error loading data:", error);
@@ -101,7 +137,7 @@ const CustomerBillStatement = () => {
     };
 
     loadAllData();
-  }, [fetchCurrentUser, fetchCustomerBills, fetchBillingConfig]);
+  }, [fetchCurrentUser, fetchCustomerBills, fetchBillingConfig, fetchDeliveryMen, fetchSalesMen]);
 
   // Calculate days remaining until due date
   const getDaysRemaining = (dueDate) => {
@@ -158,15 +194,24 @@ const CustomerBillStatement = () => {
     }
   };
 
-  // Open payment modal
+  // Open payment request modal
   const handlePayBill = (billId, amountDue) => {
     setBillToPay({ id: billId, amountDue });
     setPaymentAmount("");
+    setPaymentMethod("cash");
+    setChequeDetails({ number: "", bank: "", date: "" });
+    setRecipientType("delivery");
+    setRecipientId("");
     setShowPayModal(true);
   };
 
-  // Confirm and process payment
-  const confirmPayBill = async () => {
+  // Handle cheque details change
+  const handleChequeChange = (field, value) => {
+    setChequeDetails((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Confirm and send payment request
+  const confirmSendPaymentRequest = async () => {
     const amount = parseFloat(paymentAmount);
 
     if (isNaN(amount) || amount <= 0 || amount > billToPay.amountDue) {
@@ -176,24 +221,48 @@ const CustomerBillStatement = () => {
       return;
     }
 
+    if (paymentMethod === "cheque") {
+      if (!chequeDetails.number || !chequeDetails.bank || !chequeDetails.date) {
+        toast.error("Please fill all cheque details");
+        return;
+      }
+    }
+
+    if (!recipientType) {
+      toast.error("Please select recipient type");
+      return;
+    }
+
+    if (!recipientId) {
+      toast.error("Please select a recipient");
+      return;
+    }
+
     setShowPayModal(false);
 
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `${backendUrl}/api/bills/paybill/${billToPay.id}`,
-        { paymentAmount: amount },
+        `${backendUrl}/api/payment-requests/create`,
+        {
+          billId: billToPay.id,
+          amount,
+          method: paymentMethod,
+          chequeDetails: paymentMethod === "cheque" ? chequeDetails : undefined,
+          recipientType,
+          recipientId,
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      toast.success(`Payment of AED ${amount.toFixed(2)} processed successfully!`, {
+      toast.success(`Payment request of AED ${amount.toFixed(2)} sent successfully!`, {
         duration: 5000,
       });
 
-      fetchCustomerBills(); // refresh bills
+      fetchCustomerBills(); // refresh bills to show pending_payment
     } catch (error) {
-      console.error("Error paying bill:", error);
-      toast.error("Failed to process payment. Please try again.");
+      console.error("Error sending payment request:", error);
+      toast.error("Failed to send payment request. Please try again.");
     } finally {
       setBillToPay(null);
       setPaymentAmount("");
@@ -273,6 +342,7 @@ const CustomerBillStatement = () => {
                     {bills.length > 0 ? (
                       bills.map((bill, index) => {
                         const daysDisplay = getDaysRemainingDisplay(bill);
+                        const isPendingPayment = bill.status === "pending_payment";
                         return (
                           <tr key={bill._id}>
                             <td>{index + 1}</td>
@@ -347,7 +417,7 @@ const CustomerBillStatement = () => {
                               </span>
                             </td>
                             <td>
-                              {bill.status !== "paid" && (
+                              {bill.status !== "paid" && bill.status !== "pending_payment" && (
                                 <button
                                   className="customer-bills-pay-button"
                                   onClick={() =>
@@ -355,6 +425,14 @@ const CustomerBillStatement = () => {
                                   }
                                 >
                                   Pay Bill
+                                </button>
+                              )}
+                              {isPendingPayment && (
+                                <button
+                                  className="customer-bills-pay-button pending"
+                                  disabled
+                                >
+                                  Pending
                                 </button>
                               )}
                             </td>
@@ -376,11 +454,11 @@ const CustomerBillStatement = () => {
         </div>
       </main>
 
-      {/* Attractive Payment Modal */}
+      {/* Attractive Payment Request Modal */}
       {showPayModal && billToPay && (
         <div className="pay-modal-overlay">
           <div className="pay-modal">
-            <h3 className="pay-modal-title">Make Payment</h3>
+            <h3 className="pay-modal-title">Send Payment Request</h3>
 
             <div className="pay-modal-info">
               <p>
@@ -405,11 +483,69 @@ const CustomerBillStatement = () => {
                 className="pay-modal-input"
                 autoFocus
               />
-              {paymentAmount && parseFloat(paymentAmount) > billToPay.amountDue && (
-                <p className="pay-modal-error">
-                  Amount cannot exceed the due amount
-                </p>
-              )}
+            </div>
+
+            <div className="pay-modal-input-group">
+              <label>Payment Method</label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="pay-modal-select"
+              >
+                <option value="cash">Cash</option>
+                <option value="cheque">Cheque</option>
+              </select>
+            </div>
+
+            {paymentMethod === "cheque" && (
+              <div className="pay-modal-cheque-group">
+                <input
+                  placeholder="Cheque Number"
+                  value={chequeDetails.number}
+                  onChange={(e) => handleChequeChange("number", e.target.value)}
+                  className="pay-modal-input"
+                />
+                <input
+                  placeholder="Bank Name"
+                  value={chequeDetails.bank}
+                  onChange={(e) => handleChequeChange("bank", e.target.value)}
+                  className="pay-modal-input"
+                />
+                <input
+                  type="date"
+                  value={chequeDetails.date}
+                  onChange={(e) => handleChequeChange("date", e.target.value)}
+                  className="pay-modal-input"
+                />
+              </div>
+            )}
+
+            <div className="pay-modal-input-group">
+              <label>Recipient Type</label>
+              <select
+                value={recipientType}
+                onChange={(e) => setRecipientType(e.target.value)}
+                className="pay-modal-select"
+              >
+                <option value="delivery">Delivery Man</option>
+                <option value="sales">Sales Man</option>
+              </select>
+            </div>
+
+            <div className="pay-modal-input-group">
+              <label>Select Recipient</label>
+              <select
+                value={recipientId}
+                onChange={(e) => setRecipientId(e.target.value)}
+                className="pay-modal-select"
+              >
+                <option value="">Select {recipientType === "delivery" ? "Delivery Man" : "Sales Man"}</option>
+                {(recipientType === "delivery" ? deliveryMen : salesMen).map(person => (
+                  <option key={person._id} value={person._id}>
+                    {person.username}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="pay-modal-actions">
@@ -424,14 +560,17 @@ const CustomerBillStatement = () => {
               </button>
               <button
                 className="pay-modal-confirm"
-                onClick={confirmPayBill}
+                onClick={confirmSendPaymentRequest}
                 disabled={
                   !paymentAmount ||
                   parseFloat(paymentAmount) <= 0 ||
-                  parseFloat(paymentAmount) > billToPay.amountDue
+                  parseFloat(paymentAmount) > billToPay.amountDue ||
+                  !recipientType ||
+                  !recipientId ||
+                  (paymentMethod === "cheque" && (!chequeDetails.number || !chequeDetails.bank || !chequeDetails.date))
                 }
               >
-                Pay Now
+                Send Request
               </button>
             </div>
           </div>

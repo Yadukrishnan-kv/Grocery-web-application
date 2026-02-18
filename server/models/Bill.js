@@ -1,3 +1,4 @@
+// models/Bill.js (added "pending_payment" to enum)
 const { Schema, model } = require("mongoose");
 
 const billSchema = new Schema(
@@ -38,7 +39,7 @@ const billSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "paid", "overdue", "partial"],
+      enum: ["pending", "pending_payment", "paid", "overdue", "partial"], 
       default: "pending",
     },
     orders: [

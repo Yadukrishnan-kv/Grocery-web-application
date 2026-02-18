@@ -38,6 +38,9 @@ import PendingCustomerRequests from "../pages/Customer/PendingCustomerRequests/P
 import Wallet from "../pages/DeliveryPartner/Wallet/Wallet";
 import WalletMoney from "../pages/WalletMoney/WalletMoney";
 import ChequeWallet from "../pages/DeliveryPartner/Wallet/ChequeWallet";
+import PaymentRequestsDelivery from "../pages/DeliveryPartner/PaymentRequestsDelivery/PaymentRequestsDelivery";
+import PaymentRequestsSales from "../pages/Salesmanpages/PaymentRequestsSales/PaymentRequestsSales";
+import BillWallet from "../pages/BillWallet/BillWallet";
 function Dom() {
   return (
     <div>
@@ -130,6 +133,20 @@ function Dom() {
             <Route path="/delivery/wallet/cheque" element={<ChequeWallet />} />
 
             <Route path="/admin/wallet-money" element={<WalletMoney />} />
+
+            <Route 
+              path="/delivery/payment-requests" 
+              element={<PaymentRequestsDelivery />} 
+            />
+            <Route 
+              path="/sales/payment-requests" 
+              element={<PaymentRequestsSales />} 
+            />
+             <Route 
+              path="/admin/BillWallet" 
+              element={<BillWallet />} 
+            />
+
           </Routes>
         </BrowserRouter>
       </PermissionProvider>

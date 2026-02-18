@@ -181,12 +181,36 @@ const changePassword = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+// controllers/userController.js (add this)
+const getDeliveryMen = async (req, res) => {
+  try {
+    const deliveryMen = await User.find({ role: "Delivery Man" }).select("username _id");
+    res.json(deliveryMen);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
+const getSalesMen = async (req, res) => {
+  try {
+    const salesMen = await User.find({ role: "Sales Man" }).select("username _id");
+    res.json(salesMen);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Export them
+module.exports = {
+  // your existing functions...
+  getDeliveryMen,
+  getSalesMen,
+};
 module.exports = {
   getAllUsers,
   createUser,
   updateUser,
   deleteUser,
   changePassword,
-  editProfile,getMyProfile,updateMyProfile
+  editProfile,getMyProfile,updateMyProfile,getDeliveryMen,getSalesMen
 };

@@ -412,3 +412,205 @@
     min-width: 160px;
   }
 }
+.pay-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+}
+
+.pay-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  padding: 32px 40px;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.4);
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pay-modal-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.pay-modal-info {
+  text-align: center;
+  margin-bottom: 28px;
+  font-size: 1.1rem;
+  color: #475569;
+}
+
+.amount-due {
+  font-weight: 700;
+  color: #059669;
+  font-size: 1.3rem;
+}
+
+/* Input Groups (Labels + Inputs + Selects) */
+.pay-modal-input-group {
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.pay-modal-input-group label {
+  display: block;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+}
+
+.pay-modal-select {
+  width: 97%;
+  padding: 14px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 1rem;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.pay-modal-input:focus,
+.pay-modal-select:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+}
+
+.pay-modal-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 12 12'%3E%3Cpath stroke='%2364758b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m1 4 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 12px;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+/* Cheque Details Group */
+.pay-modal-cheque-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.pay-modal-cheque-group input {
+  width: 100%;
+}
+
+/* Error Message */
+.pay-modal-error {
+  color: #ef4444;
+  font-size: 0.95rem;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* Modal Actions */
+.pay-modal-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.pay-modal-cancel,
+.pay-modal-confirm {
+  padding: 14px 32px;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 140px;
+}
+
+.pay-modal-cancel {
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+}
+
+.pay-modal-cancel:hover {
+  background: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.pay-modal-confirm {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+
+.pay-modal-confirm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+.pay-modal-confirm:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .pay-modal {
+    padding: 24px 28px;
+    max-width: 92%;
+  }
+
+  .pay-modal-title {
+    font-size: 1.45rem;
+  }
+
+  .pay-modal-info {
+    font-size: 1rem;
+  }
+
+  .pay-modal-cheque-group {
+    grid-template-columns: 1fr;
+  }
+
+  .pay-modal-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pay-modal-cancel,
+  .pay-modal-confirm {
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .pay-modal-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .pay-modal-cancel,
+  .pay-modal-confirm {
+    width: auto;
+    min-width: 160px;
+  }
+}

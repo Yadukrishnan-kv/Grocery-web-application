@@ -28,6 +28,8 @@ app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/bills', require('./routes/billRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use("/api/wallet", require('./routes/walletRoutes'));
+app.use("/api/payment-requests", require('./routes/paymentRequestRoutes'));
+app.use("/api/bill-transactions", require('./routes/billTransactionRoutes'));
 
 // Health check endpoint
 app.get('/api/ping', (req, res) => {

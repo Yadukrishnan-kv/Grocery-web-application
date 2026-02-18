@@ -6,7 +6,7 @@ const {
   updateUser,
   deleteUser,
   changePassword,
-  editProfile,getMyProfile,updateMyProfile
+  editProfile,getMyProfile,updateMyProfile,getDeliveryMen,getSalesMen
 } = require("../controllers/userController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -22,4 +22,7 @@ router.delete("/deleteUser/:id",  deleteUser);
 router.get("/my-profile", protect, getMyProfile);
 router.put("/my-profile", protect, updateMyProfile);
 router.put("/change-password", protect, changePassword);
+// routes/userRoutes.js (add these)
+router.get("/delivery-men", protect, getDeliveryMen);
+router.get("/sales-men", protect, getSalesMen);
 module.exports = router;

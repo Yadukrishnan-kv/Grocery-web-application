@@ -1,3 +1,4 @@
+// controllers/billController.js
 const Bill = require("../models/Bill");
 const Order = require("../models/Order");
 const Customer = require("../models/Customer");
@@ -83,44 +84,6 @@ const getBillById = async (req, res) => {
     res.json(bill);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
-  }
-};
-
-const payBill = async (req, res) => {
-  try {
-    const { paymentAmount } = req.body;
-    const bill = await Bill.findById(req.params.id);
-    if (!bill) {
-      return res.status(404).json({ message: "Bill not found" });
-    }
-
-    if (bill.status === "paid") {
-      return res.status(400).json({ message: "Bill already paid" });
-    }
-
-    if (paymentAmount <= 0 || paymentAmount > bill.amountDue) {
-      return res.status(400).json({ message: "Invalid payment amount" });
-    }
-
-    bill.paidAmount += paymentAmount;
-    bill.amountDue -= paymentAmount;
-
-    if (bill.amountDue === 0) {
-      bill.status = "paid";
-    } else {
-      bill.status = "partial";
-    }
-
-    // Restore customer's balanceCreditLimit
-    const customer = await Customer.findById(bill.customer);
-    customer.balanceCreditLimit += paymentAmount;
-    await customer.save();
-
-    await bill.save();
-
-    res.json({ message: "Payment successful", bill });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -232,5 +195,7 @@ module.exports = {
   generateBill,
   getAllBills,
   getBillById,
-  payBill,getCustomerBills,getCustomerBillById,createInvoiceBasedBill
+  getCustomerBills,
+  getCustomerBillById,
+  createInvoiceBasedBill
 };
