@@ -10,7 +10,7 @@ const {
   acceptPayment,             // NEW - for admin accept
   rejectPayment,             // NEW - for admin reject
   getAdminWalletMoney,
-  markAsReceived,            // Optional - keep if still needed
+  markAsReceived, generatePaymentReceipt           // Optional - keep if still needed
 } = require("../controllers/walletController");
 
 // ────────────────────────────────────────────────
@@ -34,5 +34,7 @@ router.post("/admin/reject-payment", protect, rejectPayment);
 
 // Optional: Keep if you still want manual mark-received (fallback)
 router.post("/admin/mark-received", protect, markAsReceived);
+
+router.get('/receipt/:transactionId', protect, generatePaymentReceipt);
 
 module.exports = router;

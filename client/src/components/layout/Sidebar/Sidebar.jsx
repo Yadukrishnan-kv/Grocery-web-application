@@ -39,6 +39,7 @@ const MENU_PERMISSIONS = {
   'paymentRequestsdelivery': 'menu.paymentRequestsdelivery',
   'paymentRequestssales': 'menu.paymentRequestssales',
   'billWallet': 'menu.billWallet',
+  'AdminOrderRequests': 'menu.admin.order.requests',
 
 
 
@@ -84,6 +85,8 @@ const navItems = [
       { id: 'OrdersReport', label: 'Orders Report', path: '/OrderReports/list' }
     ]
   },
+         { id: 'AdminOrderRequests', label: ' Order Requests', icon: '📋', path: '/admin/AdminOrderRequests' },
+
   { 
     id: 'Deliveries', 
     label: 'Deliveries', 

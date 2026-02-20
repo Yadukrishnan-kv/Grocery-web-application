@@ -92,18 +92,16 @@ const acceptPaymentRequest = async (req, res) => {
     const bill = await Bill.findById(paymentRequest.bill);
     if (!bill) return res.status(404).json({ message: "Bill not found" });
 
-    // Cap payment to remaining due (prevents negative amountDue)
     const actualPayment = Math.min(paymentRequest.amount, bill.amountDue);
 
-    // If nothing left to pay → still record transaction but don't change bill
     if (actualPayment <= 0) {
-      // Still create transaction record (for audit/history)
+      // Still record even if bill fully paid
       await BillTransaction.create({
         bill: bill._id,
         customer: paymentRequest.customer,
         recipient: req.user._id,
         recipientType: paymentRequest.recipientType,
-        amount: actualPayment, // will be 0
+        amount: actualPayment,
         method: paymentRequest.method,
         chequeDetails: paymentRequest.chequeDetails,
         status: "received",
@@ -114,23 +112,21 @@ const acceptPaymentRequest = async (req, res) => {
       await paymentRequest.save();
 
       return res.json({
-        message: "Request accepted, but bill already fully paid (no change to amount due)",
+        message: "Request accepted, but bill already fully paid",
         actualPaid: 0,
         remainingDue: bill.amountDue,
       });
     }
 
-    // Normal case: there is amount left to pay
+    // Update bill
     bill.paidAmount += actualPayment;
     bill.amountDue -= actualPayment;
-
-    // Safety: never allow negative
     if (bill.amountDue < 0) bill.amountDue = 0;
 
     bill.status = bill.amountDue <= 0 ? "paid" : "partial";
     await bill.save();
 
-    // Create transaction record
+    // Create transaction (delivery/sales wallet credited)
     await BillTransaction.create({
       bill: bill._id,
       customer: paymentRequest.customer,
@@ -143,21 +139,26 @@ const acceptPaymentRequest = async (req, res) => {
       paymentRequest: paymentRequest._id,
     });
 
-    // Mark request as accepted
+    // ✅ RESTORE CREDIT LIMIT to customer
+    const customer = await Customer.findById(paymentRequest.customer);
+    if (customer) {
+      customer.balanceCreditLimit += actualPayment;
+      await customer.save();
+      console.log(`Credit limit restored by ${actualPayment} for customer ${customer._id}`);
+    }
+
+    // Mark request accepted
     paymentRequest.status = "accepted";
     await paymentRequest.save();
 
     res.json({
-      message: "Payment request accepted successfully",
+      message: "Payment request accepted successfully – credit limit restored",
       actualPaid: actualPayment,
       remainingDue: bill.amountDue,
     });
   } catch (error) {
     console.error("Accept payment request error:", error);
-    res.status(500).json({
-      message: "Failed to accept payment request",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Failed to accept payment request" });
   }
 };
 

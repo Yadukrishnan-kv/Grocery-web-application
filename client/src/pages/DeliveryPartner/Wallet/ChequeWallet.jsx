@@ -4,7 +4,7 @@ import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "react-hot-toast";
-import "./Wallet.css"; // Reuse same CSS
+import "./Wallet.css";
 import axios from "axios";
 
 const ChequeWallet = () => {
@@ -17,6 +17,7 @@ const ChequeWallet = () => {
   const [activeItem, setActiveItem] = useState("Cheque Wallet");
   const [user, setUser] = useState(null);
   const [payingTxId, setPayingTxId] = useState(null);
+  const [printingTxId, setPrintingTxId] = useState(null);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [txToConfirm, setTxToConfirm] = useState(null);
@@ -26,7 +27,7 @@ const ChequeWallet = () => {
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) return window.location.href = "/login";
+      if (!token) return (window.location.href = "/login");
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -41,9 +42,12 @@ const ChequeWallet = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      const response = await axios.get(`${backendUrl}/api/wallet/delivery/cheque-wallet`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        `${backendUrl}/api/wallet/delivery/cheque-wallet`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setWalletData(response.data);
     } catch (error) {
       console.error("Error fetching cheque wallet:", error);
@@ -81,10 +85,58 @@ const ChequeWallet = () => {
       fetchChequeWallet();
     } catch (error) {
       console.error("Error requesting pay cheque to admin:", error);
-      toast.error("Failed to send request");
+      toast.error(error.response?.data?.message || "Failed to send request");
     } finally {
       setPayingTxId(null);
       setTxToConfirm(null);
+    }
+  };
+
+  const handlePrintReceipt = async (transactionId) => {
+    try {
+      setPrintingTxId(transactionId);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Please login again to print receipt");
+        return;
+      }
+
+      const response = await axios.get(
+        `${backendUrl}/api/wallet/receipt/${transactionId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const newWindow = window.open(url, "_blank");
+      if (newWindow) {
+        newWindow.focus();
+      } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `cheque-receipt-${transactionId.slice(-8)}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.info("Popup blocked → receipt downloaded instead");
+      }
+
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+      console.error("Receipt error:", err);
+      if (err.response?.status === 401) {
+        toast.error("Session expired. Please login again.");
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      } else {
+        toast.error("Failed to generate receipt");
+      }
+    } finally {
+      setPrintingTxId(null);
     }
   };
 
@@ -106,9 +158,7 @@ const ChequeWallet = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main
-        className={`wallet-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
-      >
+      <main className={`wallet-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="wallet-container-wrapper">
           <div className="wallet-container">
             <h2 className="wallet-page-title">Cheque Wallet</h2>
@@ -117,7 +167,7 @@ const ChequeWallet = () => {
               <div className="wallet-total">
                 <h3>Total Cheque Collected</h3>
                 <div className="total-amount">
-                  <img src={DirhamSymbol} alt="AED" width={30} height={30} style={{marginTop:"5px"}}/>
+                  <img src={DirhamSymbol} alt="AED" width={30} height={30} style={{ marginTop: "5px" }} />
                   <span>{walletData.totalAmount.toFixed(2)}</span>
                 </div>
               </div>
@@ -170,7 +220,11 @@ const ChequeWallet = () => {
                         <td>{new Date(tx.date).toLocaleDateString()}</td>
                         <td>
                           <span className={`wallet-status-badge wallet-status-${tx.status}`}>
-                            {tx.status === "received" ? "Pending" : tx.status === "pending" ? "Pending Approval" : "Paid to Admin"}
+                            {tx.status === "received"
+                              ? "Pending"
+                              : tx.status === "pending"
+                              ? "Pending Approval"
+                              : "Paid to Admin"}
                           </span>
                         </td>
                         <td>
@@ -188,6 +242,13 @@ const ChequeWallet = () => {
                               Pending
                             </button>
                           )}
+                          <button
+                            className="wallet-print-receipt-btn"
+                            onClick={() => handlePrintReceipt(tx._id)}
+                            disabled={printingTxId === tx._id}
+                          >
+                            {printingTxId === tx._id ? "Generating..." : "Print Receipt"}
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -205,13 +266,19 @@ const ChequeWallet = () => {
           <div className="confirm-modal">
             <h3 className="confirm-title">Confirm Cheque Payment Request to Admin</h3>
             <p className="confirm-text">
-              Are you sure you want to request approval for handing over the cheque of AED {walletData.transactions.find(t => t._id === txToConfirm)?.amount?.toFixed(2) || "0.00"} to the admin?
+              Are you sure you want to request approval for handing over the cheque of AED{" "}
+              {walletData.transactions.find((t) => t._id === txToConfirm)?.amount?.toFixed(2) || "0.00"} to the
+              admin?
             </p>
             <div className="confirm-actions">
               <button className="confirm-cancel" onClick={() => setShowConfirmModal(false)}>
                 No, Cancel
               </button>
-              <button className="confirm-confirm" onClick={confirmRequestPayChequeToAdmin} disabled={payingTxId === txToConfirm}>
+              <button
+                className="confirm-confirm"
+                onClick={confirmRequestPayChequeToAdmin}
+                disabled={payingTxId === txToConfirm}
+              >
                 {payingTxId === txToConfirm ? "Processing..." : "Yes, Request"}
               </button>
             </div>

@@ -1,0 +1,254 @@
+/* =========================================
+   Admin Order Requests Page - Matches OrderList style
+   ========================================= */
+
+.admin-requests-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.admin-requests-main {
+  flex: 1;
+  padding: 1.5rem;
+  transition: margin-left 0.3s ease;
+  overflow-y: auto;
+  margin-top: 64px; /* Matches your header height */
+}
+
+@media (min-width: 768px) {
+  .admin-requests-main.sidebar-open {
+    margin-left: 240px;
+  }
+}
+
+.admin-requests-container {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.admin-requests-header {
+  padding: 2rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-requests-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* Empty state */
+.admin-requests-empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #64748b;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+/* Table wrapper for scroll */
+.admin-requests-table-wrapper {
+  overflow-x: auto;
+  padding: 0 2rem 2rem;
+}
+
+/* Table */
+.admin-requests-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1200px; /* Forces scroll on small screens */
+}
+
+.admin-requests-table th,
+.admin-requests-table td {
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.admin-requests-table th {
+  background: linear-gradient(90deg, #f8fafc, #f1f5f9);
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-requests-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.admin-requests-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Customer cell with extra info */
+.admin-requests-customer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-requests-customer-info strong {
+  color: #1e293b;
+}
+
+.admin-requests-customer-info span {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+/* Products column - same style as OrderList */
+.admin-requests-products-cell {
+  max-width: 300px;
+}
+
+.admin-requests-products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-requests-product-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(79, 70, 229, 0.04);
+  border: 1px solid rgba(79, 70, 229, 0.12);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.admin-requests-product-name {
+  font-weight: 500;
+  color: #1e293b;
+  flex: 1;
+}
+
+.admin-requests-product-qty {
+  font-weight: 700;
+  color: #4f46e5;
+}
+
+.admin-requests-product-unit {
+  color: #64748b;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.admin-requests-no-products {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Total cell with AED symbol */
+.admin-requests-total-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.admin-requests-payment {
+  text-transform: capitalize;
+  font-weight: 500;
+}
+
+/* Actions */
+.admin-requests-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.admin-requests-approve-btn,
+.admin-requests-reject-btn {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-requests-approve-btn {
+  background: #10b981;
+  color: white;
+}
+
+.admin-requests-approve-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.admin-requests-reject-btn {
+  background: #ef4444;
+  color: white;
+}
+
+.admin-requests-reject-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+/* Loading */
+.admin-requests-loading {
+  text-align: center;
+  padding: 6rem 2rem;
+  color: #64748b;
+  font-size: 1.25rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .admin-requests-table {
+    min-width: 1100px;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-requests-main {
+    padding: 1.25rem;
+  }
+
+  .admin-requests-title {
+    font-size: 1.5rem;
+  }
+
+  .admin-requests-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .admin-requests-approve-btn,
+  .admin-requests-reject-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-requests-main {
+    padding: 1rem;
+  }
+
+  .admin-requests-table th,
+  .admin-requests-table td {
+    padding: 1rem;
+    font-size: 0.875rem;
+  }
+}

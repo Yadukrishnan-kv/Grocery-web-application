@@ -1,12 +1,13 @@
+// models/Customer.js
 const { Schema, model } = require("mongoose");
 
 const customerSchema = new Schema(
   {
     user: {
-    type: Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     name: {
       type: String,
       required: [true, "Customer name is required"],
@@ -66,6 +67,14 @@ const customerSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// Virtual for used credit (for easy calculation)
+customerSchema.virtual("usedCredit").get(function() {
+  return this.creditLimit - this.balanceCreditLimit;
+});
+
+customerSchema.set("toObject", { virtuals: true });
+customerSchema.set("toJSON", { virtuals: true });
 
 const Customer = model("Customer", customerSchema);
 module.exports = Customer;

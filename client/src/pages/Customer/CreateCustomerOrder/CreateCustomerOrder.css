@@ -233,3 +233,96 @@
     width: 100%;
   }
 }
+/* Additional styles for Price & Total fields */
+
+.item-field {
+  flex: 1;
+  min-width: 120px;
+}
+
+.readonly-input {
+  background-color: #f1f5f9;
+  color: #4b5563;
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+}
+
+.order-item-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  align-items: flex-end;
+}
+
+@media (max-width: 768px) {
+  .order-item-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .item-field {
+    width: 100%;
+  }
+}
+/* Grand Total Section */
+.grand-total-section {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f1f5f9;
+  border-radius: 8px;
+  text-align: right;
+}
+
+.grand-total-section label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-right: 1rem;
+}
+
+.grand-total-input {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #1e293b;
+  background: white;
+  border: 1px solid #cbd5e1;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  width: 180px;
+  text-align: right;
+}
+
+/* Previous Price Field */
+.prev-price {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.prev-price-input {
+  background: #fefce8 !important;
+  color: #854d0e;
+  font-weight: 600;
+}
+
+/* Readonly inputs styling */
+.readonly-input {
+  background-color: #f8fafc;
+  color: #4b5563;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+}
+
+.Remarks-input{
+   width: 95%;
+      height: 80px;
+
+ 
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #1f2937;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}

@@ -300,3 +300,38 @@
   box-shadow: none;
   transform: none;
 }
+.wallet-print-receipt-btn {
+  margin-left: 10px;
+  padding: 6px 12px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.wallet-print-receipt-btn:hover {
+  background: #2563eb;
+}
+.wallet-print-receipt-btn {
+  margin-left: 10px;
+  padding: 6px 12px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.wallet-print-receipt-btn:hover {
+  background: #2563eb;
+}
+
+.wallet-print-receipt-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}

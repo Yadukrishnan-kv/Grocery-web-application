@@ -41,6 +41,7 @@ import ChequeWallet from "../pages/DeliveryPartner/Wallet/ChequeWallet";
 import PaymentRequestsDelivery from "../pages/DeliveryPartner/PaymentRequestsDelivery/PaymentRequestsDelivery";
 import PaymentRequestsSales from "../pages/Salesmanpages/PaymentRequestsSales/PaymentRequestsSales";
 import BillWallet from "../pages/BillWallet/BillWallet";
+import AdminOrderRequests from "../pages/Sales/Orders/OrderList/AdminOrderRequests";
 function Dom() {
   return (
     <div>
@@ -145,6 +146,10 @@ function Dom() {
              <Route 
               path="/admin/BillWallet" 
               element={<BillWallet />} 
+            />
+             <Route 
+              path="/admin/AdminOrderRequests" 
+              element={<AdminOrderRequests />} 
             />
 
           </Routes>

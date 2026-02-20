@@ -80,6 +80,7 @@ const getPermissions = async (req, res) => {
         "menu.customer.requests",
         "menu.wallet.money",
         'menu.billWallet',
+        'menu.admin.order.requests',
         
         // Note: menu.deliveries is excluded for Admin
       ];

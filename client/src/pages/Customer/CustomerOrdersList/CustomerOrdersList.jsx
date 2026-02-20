@@ -8,7 +8,8 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 const CustomerOrdersList = () => {
-  const [orders, setOrders] = useState([]);
+  const [realOrders, setRealOrders] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Orders");
@@ -35,19 +36,23 @@ const CustomerOrdersList = () => {
     }
   }, [backendUrl]);
 
-  const fetchCustomerOrders = useCallback(async () => {
+  const fetchCustomerHistory = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${backendUrl}/api/orders/my-orders`, // ← Updated endpoint (matches your backend route)
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const res = await axios.get(`${backendUrl}/api/orders/customer-history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setRealOrders(res.data.realOrders || []);
+
+      // Only keep pending + rejected requests (approved ones are now real orders)
+      const filteredRequests = (res.data.requests || []).filter(
+        (req) => req.status === "pending" || req.status === "rejected"
       );
-      setOrders(response.data);
-    } catch (error) {
-      console.error("Error fetching customer orders:", error);
-      toast.error("Failed to load your orders");
+      setRequests(filteredRequests);
+    } catch (err) {
+      console.error("Error fetching customer history:", err);
+      toast.error("Failed to load your order history");
     } finally {
       setLoading(false);
     }
@@ -55,43 +60,55 @@ const CustomerOrdersList = () => {
 
   useEffect(() => {
     fetchCurrentUser();
-    fetchCustomerOrders();
-  }, [fetchCurrentUser, fetchCustomerOrders]);
+    fetchCustomerHistory();
+  }, [fetchCurrentUser, fetchCustomerHistory]);
 
   const handleCreateOrder = () => {
     window.location.href = "/customer/create-order";
   };
 
-  // Filter orders
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
+  // Combine real orders + pending/rejected requests into one list
+  const filteredItems = useMemo(() => {
+    const allItems = [
+      ...realOrders.map((order) => ({ ...order, type: "order" })),
+      ...requests.map((req) => ({ ...req, type: "request" })),
+    ];
+
+    return allItems.filter((item) => {
       const matchesSearch =
         !searchTerm.trim() ||
-        order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.orderItems?.some(item =>
+        item.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.orderItems?.some((item) =>
           item.product?.productName?.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
+      const itemStatus = item.type === "order" ? item.status : item.status;
+
       const matchesStatus =
         statusFilter === "all" ||
-        order.status?.toLowerCase() === statusFilter.toLowerCase();
+        (statusFilter === "pending_approval" &&
+          item.type === "request" &&
+          itemStatus === "pending") ||
+        (statusFilter === "rejected" &&
+          item.type === "request" &&
+          itemStatus === "rejected") ||
+        (item.type === "order" && itemStatus?.toLowerCase() === statusFilter.toLowerCase());
 
       return matchesSearch && matchesStatus;
     });
-  }, [orders, searchTerm, statusFilter]);
+  }, [realOrders, requests, searchTerm, statusFilter]);
 
   const clearSearch = () => setSearchTerm("");
 
-  // Helper to get assignment status display text
-  const getAssignmentStatusDisplay = (order) => {
-    if (!order.assignedTo) return "Not Assigned";
-    if (order.assignmentStatus === "accepted") return "Accepted";
-    if (order.assignmentStatus === "rejected") return "Rejected";
-    if (order.assignmentStatus === "assigned") return "Assigned";
+  const getAssignmentStatusDisplay = (item) => {
+    if (item.type === "request") return "N/A"; // Requests don't have assignment
+    if (!item.assignedTo) return "Not Assigned";
+    if (item.assignmentStatus === "accepted") return "Accepted";
+    if (item.assignmentStatus === "rejected") return "Rejected";
+    if (item.assignmentStatus === "assigned") return "Assigned";
     return "Pending";
   };
 
-  // Format date as DD/MM/YYYY
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
@@ -99,6 +116,22 @@ const CustomerOrdersList = () => {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
+  };
+
+  const getStatusDisplay = (item) => {
+    if (item.type === "request") {
+      if (item.status === "pending") return "Pending Approval";
+      if (item.status === "rejected") return "Rejected";
+    }
+    return item.status?.charAt(0).toUpperCase() + item.status?.slice(1) || "Pending";
+  };
+
+  const getStatusClass = (item) => {
+    if (item.type === "request") {
+      if (item.status === "pending") return "pending-approval";
+      if (item.status === "rejected") return "rejected";
+    }
+    return item.status?.toLowerCase() || "pending";
   };
 
   if (!user) {
@@ -126,6 +159,7 @@ const CustomerOrdersList = () => {
           <div className="customer-orders-container">
             <div className="customer-orders-header-section">
               <h2 className="customer-orders-page-title">My Orders</h2>
+
               <div className="customer-orders-controls-group">
                 {/* Status Filter */}
                 <div className="customer-orders-filter-group">
@@ -143,6 +177,8 @@ const CustomerOrdersList = () => {
                   >
                     <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
+                    <option value="pending_approval">Pending Approval</option>
+                    <option value="rejected">Rejected</option>
                     <option value="partial_delivered">Partially Delivered</option>
                     <option value="delivered">Delivered</option>
                     <option value="cancelled">Cancelled</option>
@@ -182,7 +218,7 @@ const CustomerOrdersList = () => {
 
             {loading ? (
               <div className="customer-orders-loading">Loading orders...</div>
-            ) : filteredOrders.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
               <div className="customer-orders-no-data">
                 No orders found
                 {statusFilter !== "all" ? ` with status "${statusFilter}"` : ""}
@@ -206,26 +242,37 @@ const CustomerOrdersList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.map((order, index) => {
-                      const totalOrdered = order.orderItems?.reduce((sum, item) => sum + item.orderedQuantity, 0) || 0;
-                      const totalDelivered = order.orderItems?.reduce((sum, item) => sum + item.deliveredQuantity, 0) || 0;
-                      const grandTotal = order.orderItems?.reduce((sum, item) => sum + item.totalAmount, 0)?.toFixed(2) || "0.00";
+                    {filteredItems.map((item, index) => {
+                      const isRequest = item.type === "request";
+
+                      // For real orders
+                      const totalOrdered = isRequest
+                        ? item.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0
+                        : item.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0;
+
+                      const totalDelivered = isRequest
+                        ? 0 // Requests have no delivered qty
+                        : item.orderItems?.reduce((sum, it) => sum + it.deliveredQuantity, 0) || 0;
+
+                      const grandTotal = isRequest
+                        ? item.grandTotal?.toFixed(2) || "0.00"
+                        : item.orderItems?.reduce((sum, it) => sum + it.totalAmount, 0)?.toFixed(2) ||
+                          "0.00";
 
                       return (
-                        <tr key={order._id}>
+                        <tr key={item._id}>
                           <td>{index + 1}</td>
 
-                          {/* Multi-product display */}
                           <td className="products-cell">
-                            {order.orderItems?.length > 0 ? (
+                            {item.orderItems?.length > 0 ? (
                               <div className="products-list">
-                                {order.orderItems.map((item, i) => (
+                                {item.orderItems.map((oi, i) => (
                                   <div key={i} className="product-tag">
                                     <span className="product-name">
-                                      {item.product?.productName || "Unknown"}
+                                      {oi.product?.productName || "Unknown"}
                                     </span>
-                                    <span className="product-qty">× {item.orderedQuantity}</span>
-                                    <span className="product-unit">{item.unit || ""}</span>
+                                    <span className="product-qty">× {oi.orderedQuantity}</span>
+                                    <span className="product-unit">{oi.unit || ""}</span>
                                   </div>
                                 ))}
                               </div>
@@ -256,31 +303,36 @@ const CustomerOrdersList = () => {
                             </div>
                           </td>
 
-                          <td>{order.remarks || "-"}</td>
+                          <td>{item.remarks || "-"}</td>
 
                           <td>
-                            {order.payment?.charAt(0).toUpperCase() +
-                              order.payment?.slice(1) || "N/A"}
+                            {item.payment?.charAt(0).toUpperCase() +
+                              item.payment?.slice(1) || "N/A"}
                           </td>
 
                           <td>
                             <span
-                              className={`customer-orders-assignment-badge customer-orders-assignment-${order.assignmentStatus?.toLowerCase() || "pending"}`}
+                              className={`customer-orders-assignment-badge customer-orders-assignment-${
+                                isRequest ? "pending" : (item.assignmentStatus?.toLowerCase() || "pending")
+                              }`}
                             >
-                              {getAssignmentStatusDisplay(order)}
+                              {isRequest ? "N/A" : getAssignmentStatusDisplay(item)}
                             </span>
                           </td>
 
                           <td>
                             <span
-                              className={`customer-orders-status-badge customer-orders-status-${order.status?.toLowerCase() || "pending"}`}
+                              className={`customer-orders-status-badge customer-orders-status-${getStatusClass(item)}`}
                             >
-                              {order.status?.charAt(0).toUpperCase() +
-                                order.status?.slice(1) || "Pending"}
+                              {getStatusDisplay(item)}
                             </span>
                           </td>
 
-                          <td>{formatDate(order.orderDate)}</td>
+                          <td>
+                            {isRequest
+                              ? formatDate(item.requestedAt)
+                              : formatDate(item.orderDate)}
+                          </td>
                         </tr>
                       );
                     })}

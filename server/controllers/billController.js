@@ -148,20 +148,32 @@ const getCustomerBillById = async (req, res) => {
 // billController.js (or wherever createInvoiceBasedBill is defined)
 const createInvoiceBasedBill = async (order) => {
   try {
-    const customer = await Customer.findById(order.customer);
-    if (!customer || customer.statementType !== "invoice-based") {
-      return null; // Skip if not invoice-based
+    // Step 1: Prevent duplicate bill creation
+    const existingBill = await Bill.findOne({ orders: order._id });
+    if (existingBill) {
+      console.log(`Bill already exists for order ${order._id} → skipping`);
+      return existingBill; // Return existing instead of creating new
     }
 
-    // Calculate total used amount from this delivery
+    const customer = await Customer.findById(order.customer);
+    if (!customer || customer.statementType !== "invoice-based") {
+      return null; // Not invoice-based → skip
+    }
+
+    // Calculate total used (only delivered quantity!)
     const totalUsed = order.orderItems.reduce((sum, item) => {
-      return sum + (item.deliveredQuantity * item.price);
+      const deliveredQty = item.deliveredQuantity || item.orderedQuantity || 0;
+      return sum + (deliveredQty * item.price);
     }, 0);
 
-    // Use delivery date as cycle start/end (for per-delivery invoices)
+    if (totalUsed <= 0) {
+      console.log(`Order ${order._id} has no delivered value → no bill created`);
+      return null;
+    }
+
     const deliveryDate = order.deliveredAt || new Date();
 
-    // Calculate due date using customer's dueDays
+    // Due date based on customer's dueDays
     const dueDate = new Date(deliveryDate);
     if (customer.dueDays) {
       dueDate.setDate(dueDate.getDate() + customer.dueDays);
@@ -170,24 +182,24 @@ const createInvoiceBasedBill = async (order) => {
     const bill = await Bill.create({
       customer: order.customer,
       cycleStart: deliveryDate,
-      cycleEnd: deliveryDate, // single delivery invoice
-      totalUsed: totalUsed || 0,              // ← FIXED: always set a number
-      amountDue: totalUsed || 0,
+      cycleEnd: deliveryDate,
+      totalUsed,
+      amountDue: totalUsed,
       dueDate,
       paidAmount: 0,
       status: "pending",
       orders: [order._id],
     });
 
-    // Optional: link bill back to order
+    // Link bill back to order (prevents future duplicate checks from failing)
     order.bill = bill._id;
     await order.save();
 
-    console.log(`Invoice-based bill created for order ${order._id}: ${bill._id}`);
+    console.log(`✅ Invoice-based bill created for order ${order._id}: ${bill._id}`);
     return bill;
   } catch (error) {
     console.error("Error creating invoice-based bill:", error);
-    return null; // Don't crash the delivery flow
+    return null;
   }
 };
 

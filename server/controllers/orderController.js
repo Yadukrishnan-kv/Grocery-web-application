@@ -6,6 +6,9 @@ const CompanySettings = require("../models/CompanySettings");
 const InvoiceCounter = require('../models/InvoiceCounter');
 const { createInvoiceBasedBill } = require('../controllers/billController');  // ← import it
 const PaymentTransaction = require("../models/PaymentTransaction");
+const Bill = require("../models/Bill");
+const OrderRequest = require('../models/OrderRequest');
+const mongoose = require('mongoose');
 
 const PDFDocument = require('pdfkit');
 
@@ -13,22 +16,37 @@ const createOrder = async (req, res) => {
   try {
     let { customerId, orderItems, payment, remarks } = req.body;
 
-    // Auto-set customerId for Customer role
+    // Auto-set customerId for Customer role (if customer is placing order themselves)
     if (req.user.role === "Customer") {
       const customerProfile = await Customer.findOne({ user: req.user._id });
       if (!customerProfile) {
-        return res.status(404).json({ message: "Your customer profile not found. Contact admin." });
+        return res.status(404).json({ message: "Your customer profile not found." });
       }
       customerId = customerProfile._id;
     } else if (!customerId) {
-      return res.status(400).json({ message: "Customer ID is required for admin-created orders" });
+      return res.status(400).json({ message: "Customer ID is required" });
     }
 
     const customer = await Customer.findById(customerId);
     if (!customer) return res.status(404).json({ message: "Customer not found" });
 
+    // Credit limit & overdue checks (existing logic)
+    if (customer.billingType === "Credit limit") {
+      if (customer.balanceCreditLimit <= 0) {
+        return res.status(403).json({ message: "Insufficient credit limit or zero balance." });
+      }
+      const overdueBill = await Bill.findOne({
+        customer: customer._id,
+        status: "overdue",
+      });
+      if (overdueBill) {
+        return res.status(403).json({ message: "Customer has overdue bills." });
+      }
+    }
+
+    // Validate items
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
-      return res.status(400).json({ message: "At least one product is required" });
+      return res.status(400).json({ message: "At least one product required" });
     }
 
     let grandTotal = 0;
@@ -36,10 +54,7 @@ const createOrder = async (req, res) => {
 
     for (const item of orderItems) {
       const product = await Product.findById(item.productId);
-      if (!product) return res.status(404).json({ message: `Product ${item.productId} not found` });
-
-      // NO STOCK CHECK ANYMORE – as per your request
-      // if (product.quantity < item.orderedQuantity) { ... } ← REMOVED
+      if (!product) return res.status(404).json({ message: `Product not found: ${item.productId}` });
 
       const itemTotal = product.price * item.orderedQuantity;
       grandTotal += itemTotal;
@@ -51,32 +66,49 @@ const createOrder = async (req, res) => {
         deliveredQuantity: 0,
         price: product.price,
         totalAmount: itemTotal,
-        remarks: item.remarks || '',
+        remarks: item.remarks || "",
       });
-
-      // NO STOCK REDUCTION ANYMORE – as per your request
-      // product.quantity -= item.orderedQuantity;
-      // await product.save(); ← REMOVED
     }
 
-    // Handle credit payment (still keep this check)
+    // Credit deduction (only if approved later – but deduct now and revert if rejected)
+    let creditDeducted = false;
     if (payment === "credit") {
       if (customer.balanceCreditLimit < grandTotal) {
         return res.status(400).json({ message: "Insufficient credit balance" });
       }
       customer.balanceCreditLimit -= grandTotal;
       await customer.save();
+      creditDeducted = true;
+    }
+
+    // Determine initial status
+    let initialStatus = "pending";
+
+    // If created by Salesman AND this is customer's FIRST order → pending approval
+    const isSalesman = ["Salesman", "Sales Person", "delivery partner", "Delivery Man"].includes(req.user.role);
+    const orderCount = await Order.countDocuments({ customer: customerId });
+
+    if (isSalesman && orderCount === 0) {
+      initialStatus = "pending_approval";
     }
 
     const order = await Order.create({
       customer: customerId,
       orderItems: processedItems,
       payment,
-      remarks: remarks || '',
+      remarks: remarks || "",
       orderDate: req.body.orderDate || new Date(),
+      createdBy: req.user._id,
+      status: initialStatus,
+      approvalStatus: initialStatus === "pending_approval" ? "pending" : undefined,
     });
 
-    res.status(201).json(order);
+    res.status(201).json({
+      message: initialStatus === "pending_approval"
+        ? "Order created successfully. Waiting for admin approval."
+        : "Order created successfully.",
+      order,
+    });
   } catch (error) {
     console.error("Create order error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -207,7 +239,6 @@ const deleteOrder = async (req, res) => {
 const deliverOrder = async (req, res) => {
   try {
     const { deliveredItems, deliveredAt, paymentMethod, chequeDetails } = req.body;
-    // deliveredItems: [{ product: productId, quantity: number }]
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -238,15 +269,8 @@ const deliverOrder = async (req, res) => {
       grandDeliveryAmount += qtyToDeliver * orderItem.price;
     }
 
-    // Payment handling (same as before)
-    if (paymentMethod === "credit") {
-      const customer = await Customer.findById(order.customer);
-      if (customer.balanceCreditLimit < grandDeliveryAmount) {
-        return res.status(400).json({ message: "Insufficient credit balance" });
-      }
-      customer.balanceCreditLimit -= grandDeliveryAmount;
-      await customer.save();
-    } else if (paymentMethod === "cash" || paymentMethod === "cheque") {
+    // Payment handling – ONLY for cash/cheque (NO CREDIT DEDUCTION HERE)
+    if (paymentMethod === "cash" || paymentMethod === "cheque") {
       await PaymentTransaction.create({
         order: order._id,
         deliveryMan: req.user._id,
@@ -256,20 +280,23 @@ const deliverOrder = async (req, res) => {
       });
     }
 
-    // Update status if fully delivered
+    // For credit orders – DO NOTHING to balanceCreditLimit here
+    // (It was already deducted at order creation)
+
+    // Update status
     const totalOrdered = order.orderItems.reduce((sum, i) => sum + i.orderedQuantity, 0);
     const totalDelivered = order.orderItems.reduce((sum, i) => sum + i.deliveredQuantity, 0);
     if (totalDelivered >= totalOrdered) {
       order.status = "delivered";
     } else {
-      order.status = "partial_delivered"; // optional new status
+      order.status = "partial_delivered";
     }
 
     order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
 
     await order.save();
 
-    // Optional: create invoice if fully delivered and invoice-based
+    // Create invoice if applicable (no deduction here)
     const customer = await Customer.findById(order.customer);
     if (order.status === "delivered" && customer?.statementType === "invoice-based") {
       await createInvoiceBasedBill(order);
@@ -796,7 +823,280 @@ const getCustomerOrderById = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+const markOrderDelivered = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId);
 
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.status !== "pending") return res.status(400).json({ message: "Order not pending" });
+
+    // Mark delivered
+    order.status = "delivered";
+    order.deliveredAt = new Date();
+    await order.save();
+
+    // Create bill (invoice-based or monthly) – no credit deduction
+    const bill = await createInvoiceBasedBill(order);
+    if (bill) {
+      order.bill = bill._id;
+      await order.save();
+    }
+
+    res.json({ message: "Order marked as delivered", order });
+  } catch (error) {
+    console.error("Mark delivered error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const getlastorderdetails = async (req, res) => {
+  const { customerId, productId } = req.query;
+
+  if (!customerId || !productId) {
+    return res.status(400).json({ message: "customerId and productId required" });
+  }
+
+  try {
+    const latestOrder = await Order.findOne({
+      customer: customerId,
+      "orderItems.product": productId,
+    })
+      .sort({ orderDate: -1 }) // most recent first
+      .select("orderItems");
+
+    if (!latestOrder) {
+      return res.json({ price: null }); // no previous purchase
+    }
+
+    const item = latestOrder.orderItems.find(
+      (i) => i.product.toString() === productId
+    );
+
+    res.json({ price: item ? item.price : null });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+const createOrderRequest = async (req, res) => {
+  try {
+    const { orderItems, payment, remarks } = req.body;
+
+    if (!req.user || req.user.role !== 'Customer') {
+      return res.status(403).json({ message: 'Only customers can create order requests' });
+    }
+
+    const customerProfile = await Customer.findOne({ user: req.user._id });
+    if (!customerProfile) {
+      return res.status(404).json({ message: 'Customer profile not found' });
+    }
+
+    // Check if this is really first order
+    const existingOrderCount = await Order.countDocuments({ customer: customerProfile._id });
+    if (existingOrderCount > 0) {
+      return res.status(400).json({ message: 'This is not your first order. Use normal order creation.' });
+    }
+
+    // Credit/overdue checks
+    if (customerProfile.billingType === 'Credit limit') {
+      if (customerProfile.balanceCreditLimit <= 0) {
+        return res.status(403).json({ message: 'Credit limit fully used or zero.' });
+      }
+      const overdue = await Bill.findOne({ customer: customerProfile._id, status: 'overdue' });
+      if (overdue) {
+        return res.status(403).json({ message: 'You have overdue bills.' });
+      }
+    }
+
+    let grandTotal = 0;
+    const processedItems = [];
+
+    for (const item of orderItems) {
+      const product = await Product.findById(item.productId);
+      if (!product) return res.status(404).json({ message: `Product not found: ${item.productId}` });
+
+      const itemTotal = product.price * item.orderedQuantity;
+      grandTotal += itemTotal;
+
+      processedItems.push({
+        product: item.productId,
+        unit: product.unit,
+        orderedQuantity: item.orderedQuantity,
+        price: product.price,
+        totalAmount: itemTotal,
+        remarks: item.remarks || '',
+      });
+    }
+
+    // Credit check (but don't deduct yet — only on approval)
+    if (payment === 'credit' && customerProfile.balanceCreditLimit < grandTotal) {
+      return res.status(400).json({ message: 'Insufficient credit balance' });
+    }
+
+    const request = await OrderRequest.create({
+      customer: customerProfile._id,
+      customerUser: req.user._id,
+      orderItems: processedItems,
+      payment,
+      remarks: remarks || '',
+      grandTotal,
+      status: 'pending',
+    });
+
+    res.status(201).json({
+      message: 'Order request sent successfully. Waiting for admin approval.',
+      requestId: request._id,
+    });
+  } catch (error) {
+    console.error('Order request error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Admin: Get all pending order requests
+const getPendingOrderRequests = async (req, res) => {
+  try {
+    if (req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Admin access only' });
+    }
+
+    const requests = await OrderRequest.find({ status: 'pending' })
+      .populate('customer', 'name email phoneNumber address pincode')
+      .populate('customerUser', 'username')
+      .populate('orderItems.product', 'productName price unit')
+      .sort({ requestedAt: -1 });
+
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Admin: Approve request → create real order + deduct credit
+const approveOrderRequest = async (req, res) => {
+  try {
+    if (req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Admin access only' });
+    }
+
+    const request = await OrderRequest.findById(req.params.requestId);
+    if (!request) return res.status(404).json({ message: 'Request not found' });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ message: 'Request already processed' });
+    }
+
+    const customer = await Customer.findById(request.customer);
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+
+    // Final credit check before deducting
+    if (request.payment === 'credit' && customer.balanceCreditLimit < request.grandTotal) {
+      return res.status(400).json({ message: 'Insufficient credit balance now' });
+    }
+
+    // Deduct credit if credit payment
+    if (request.payment === 'credit') {
+      customer.balanceCreditLimit -= request.grandTotal;
+      await customer.save();
+    }
+
+    // Create real order
+    const newOrder = await Order.create({
+      customer: request.customer,
+      orderItems: request.orderItems.map(item => ({
+        ...item.toObject(),
+        deliveredQuantity: 0,
+      })),
+      payment: request.payment,
+      remarks: request.remarks,
+      orderDate: new Date(),
+      createdBy: request.customerUser,
+      status: 'pending',
+    });
+
+    // Mark request as approved
+    request.status = 'approved';
+    request.approvedBy = req.user._id;
+    request.approvedAt = new Date();
+    await request.save();
+
+    res.json({ message: 'Order request approved and placed', order: newOrder });
+  } catch (error) {
+    console.error('Approve request error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Admin: Reject request
+const rejectOrderRequest = async (req, res) => {
+  try {
+    if (req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Admin access only' });
+    }
+
+    const { reason } = req.body;
+    const request = await OrderRequest.findById(req.params.requestId);
+    if (!request) return res.status(404).json({ message: 'Request not found' });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ message: 'Request already processed' });
+    }
+
+    request.status = 'rejected';
+    request.rejectionReason = reason || 'No reason provided';
+    request.approvedBy = req.user._id;
+    request.approvedAt = new Date();
+    await request.save();
+
+    res.json({ message: 'Order request rejected', request });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Customer: Get their order requests + real orders
+const getCustomerOrderHistory = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'Customer') {
+      return res.status(403).json({ message: 'Customer access only' });
+    }
+
+    const customer = await Customer.findOne({ user: req.user._id });
+    if (!customer) return res.status(404).json({ message: 'Profile not found' });
+
+    // Real orders
+    const realOrders = await Order.find({ customer: customer._id })
+      .populate('orderItems.product', 'productName price unit')
+      .sort({ orderDate: -1 });
+
+    // Order requests (pending/approved/rejected)
+    const requests = await OrderRequest.find({ customer: customer._id })
+      .populate('orderItems.product', 'productName price unit')
+      .sort({ requestedAt: -1 });
+
+    res.json({ realOrders, requests });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+// Check if this is the customer's first order
+const checkFirstOrder = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+      return res.status(400).json({ message: "Invalid customer ID format" });
+    }
+
+    const count = await Order.countDocuments({ customer: customerId });
+
+    res.json({ isFirst: count === 0 });
+  } catch (error) {
+    console.error("Check first order error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 module.exports = {
   createOrder,
   getAllOrders,
@@ -810,5 +1110,11 @@ module.exports = {
   assignOrderToDeliveryMan,
   getMyAssignedOrders,
   acceptAssignedOrder,
-  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders,getOrderInvoice
+  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders,getOrderInvoice,markOrderDelivered,getlastorderdetails,
+  createOrderRequest,
+  getPendingOrderRequests,
+  approveOrderRequest,
+  rejectOrderRequest,
+  getCustomerOrderHistory,
+  checkFirstOrder
 };

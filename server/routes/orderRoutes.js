@@ -15,7 +15,9 @@ const {
   assignOrderToDeliveryMan,
   getMyAssignedOrders,
   acceptAssignedOrder,
-  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders,getOrderInvoice
+  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,
+  getMyOrders,getOrderInvoice,getlastorderdetails,checkFirstOrder,
+  getPendingOrderRequests,approveOrderRequest,rejectOrderRequest,getCustomerOrderHistory,createOrderRequest
 } = require("../controllers/orderController");
 
 
@@ -41,5 +43,12 @@ router.get("/customerorders", getCustomerOrders);
 router.get("/customerorder/:id", getCustomerOrderById);
 router.get("/my-orders", getMyOrders);
 router.get('/invoice/:id', getOrderInvoice);
-
+router.get('/previous-price', getlastorderdetails); 
+// Check if first order for customer
+router.get("/check-first-order/:customerId", protect, checkFirstOrder);
+router.post("/order-request", createOrderRequest);
+router.get("/pending-requests", protect, getPendingOrderRequests);
+router.post("/approve-request/:requestId", protect, approveOrderRequest);
+router.post("/reject-request/:requestId", protect, rejectOrderRequest);
+router.get("/customer-history", protect, getCustomerOrderHistory);
 module.exports = router;
