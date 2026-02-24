@@ -3,14 +3,14 @@ const Product = require("../models/Product");
 const Customer = require("../models/Customer");
 const User = require("../models/User");
 const CompanySettings = require("../models/CompanySettings");
-const InvoiceCounter = require('../models/InvoiceCounter');
-const { createInvoiceBasedBill } = require('../controllers/billController');  // ← import it
+const InvoiceCounter = require("../models/InvoiceCounter");
+const { createInvoiceBasedBill } = require("../controllers/billController"); // ← import it
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Bill = require("../models/Bill");
-const OrderRequest = require('../models/OrderRequest');
-const mongoose = require('mongoose');
+const OrderRequest = require("../models/OrderRequest");
+const mongoose = require("mongoose");
 
-const PDFDocument = require('pdfkit');
+const PDFDocument = require("pdfkit");
 
 const createOrder = async (req, res) => {
   try {
@@ -20,7 +20,9 @@ const createOrder = async (req, res) => {
     if (req.user.role === "Customer") {
       const customerProfile = await Customer.findOne({ user: req.user._id });
       if (!customerProfile) {
-        return res.status(404).json({ message: "Your customer profile not found." });
+        return res
+          .status(404)
+          .json({ message: "Your customer profile not found." });
       }
       customerId = customerProfile._id;
     } else if (!customerId) {
@@ -28,19 +30,28 @@ const createOrder = async (req, res) => {
     }
 
     const customer = await Customer.findById(customerId);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
 
     // Credit limit & overdue checks (existing logic)
     if (customer.billingType === "Credit limit") {
       if (customer.balanceCreditLimit <= 0) {
-        return res.status(403).json({ message: "Insufficient credit limit or zero balance." });
+        return res
+          .status(403)
+          .json({ message: "Insufficient credit limit or zero balance." });
       }
+
+      // NEW: Block if any bill is overdue
       const overdueBill = await Bill.findOne({
         customer: customer._id,
         status: "overdue",
       });
+
       if (overdueBill) {
-        return res.status(403).json({ message: "Customer has overdue bills." });
+        return res.status(403).json({
+          message:
+            "Cannot place order - you have overdue bills. Please clear dues first.",
+        });
       }
     }
 
@@ -54,7 +65,10 @@ const createOrder = async (req, res) => {
 
     for (const item of orderItems) {
       const product = await Product.findById(item.productId);
-      if (!product) return res.status(404).json({ message: `Product not found: ${item.productId}` });
+      if (!product)
+        return res
+          .status(404)
+          .json({ message: `Product not found: ${item.productId}` });
 
       const itemTotal = product.price * item.orderedQuantity;
       grandTotal += itemTotal;
@@ -85,7 +99,12 @@ const createOrder = async (req, res) => {
     let initialStatus = "pending";
 
     // If created by Salesman AND this is customer's FIRST order → pending approval
-    const isSalesman = ["Salesman", "Sales Person", "delivery partner", "Delivery Man"].includes(req.user.role);
+    const isSalesman = [
+      "Salesman",
+      "Sales Person",
+      "delivery partner",
+      "Delivery Man",
+    ].includes(req.user.role);
     const orderCount = await Order.countDocuments({ customer: customerId });
 
     if (isSalesman && orderCount === 0) {
@@ -100,13 +119,15 @@ const createOrder = async (req, res) => {
       orderDate: req.body.orderDate || new Date(),
       createdBy: req.user._id,
       status: initialStatus,
-      approvalStatus: initialStatus === "pending_approval" ? "pending" : undefined,
+      approvalStatus:
+        initialStatus === "pending_approval" ? "pending" : undefined,
     });
 
     res.status(201).json({
-      message: initialStatus === "pending_approval"
-        ? "Order created successfully. Waiting for admin approval."
-        : "Order created successfully.",
+      message:
+        initialStatus === "pending_approval"
+          ? "Order created successfully. Waiting for admin approval."
+          : "Order created successfully.",
       order,
     });
   } catch (error) {
@@ -115,12 +136,11 @@ const createOrder = async (req, res) => {
   }
 };
 
-
 const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find()
       .populate("customer", "name email phoneNumber address pincode")
-      .populate("orderItems.product", "productName price unit")   // ← FIXED
+      .populate("orderItems.product", "productName price unit") // ← FIXED
       .populate("assignedTo", "username")
       .sort({ orderDate: -1 });
     res.json(orders);
@@ -132,8 +152,11 @@ const getAllOrders = async (req, res) => {
 const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("orderItems.product", "productName price quantity unit");   // ← FIXED
+      .populate(
+        "customer",
+        "name email phoneNumber address pincode balanceCreditLimit",
+      )
+      .populate("orderItems.product", "productName price quantity unit"); // ← FIXED
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.json(order);
   } catch (error) {
@@ -149,7 +172,9 @@ const updateOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
     if (order.status !== "pending") {
-      return res.status(400).json({ message: "Cannot update non-pending order" });
+      return res
+        .status(400)
+        .json({ message: "Cannot update non-pending order" });
     }
 
     // For simplicity, assume updating quantity requires adjusting inventory and credit
@@ -166,7 +191,9 @@ const updateOrder = async (req, res) => {
     // Apply new
     if (orderedQuantity !== undefined) {
       if (product.quantity < orderedQuantity) {
-        return res.status(400).json({ message: "Insufficient product quantity" });
+        return res
+          .status(400)
+          .json({ message: "Insufficient product quantity" });
       }
       order.orderedQuantity = orderedQuantity;
       order.totalAmount = order.price * orderedQuantity;
@@ -238,7 +265,8 @@ const deleteOrder = async (req, res) => {
 
 const deliverOrder = async (req, res) => {
   try {
-    const { deliveredItems, deliveredAt, paymentMethod, chequeDetails } = req.body;
+    const { deliveredItems, deliveredAt, paymentMethod, chequeDetails } =
+      req.body;
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -253,7 +281,9 @@ const deliverOrder = async (req, res) => {
     for (const inputItem of deliveredItems) {
       const orderItem = order.orderItems.id(inputItem.product);
       if (!orderItem) {
-        return res.status(400).json({ message: `Product ${inputItem.product} not found in order` });
+        return res
+          .status(400)
+          .json({ message: `Product ${inputItem.product} not found in order` });
       }
 
       const qtyToDeliver = Number(inputItem.quantity);
@@ -261,7 +291,7 @@ const deliverOrder = async (req, res) => {
 
       if (qtyToDeliver <= 0 || qtyToDeliver > remaining) {
         return res.status(400).json({
-          message: `Invalid quantity for ${orderItem.product.productName || "product"}: max ${remaining}`
+          message: `Invalid quantity for ${orderItem.product.productName || "product"}: max ${remaining}`,
         });
       }
 
@@ -284,8 +314,14 @@ const deliverOrder = async (req, res) => {
     // (It was already deducted at order creation)
 
     // Update status
-    const totalOrdered = order.orderItems.reduce((sum, i) => sum + i.orderedQuantity, 0);
-    const totalDelivered = order.orderItems.reduce((sum, i) => sum + i.deliveredQuantity, 0);
+    const totalOrdered = order.orderItems.reduce(
+      (sum, i) => sum + i.orderedQuantity,
+      0,
+    );
+    const totalDelivered = order.orderItems.reduce(
+      (sum, i) => sum + i.deliveredQuantity,
+      0,
+    );
     if (totalDelivered >= totalOrdered) {
       order.status = "delivered";
     } else {
@@ -298,7 +334,10 @@ const deliverOrder = async (req, res) => {
 
     // Create invoice if applicable (no deduction here)
     const customer = await Customer.findById(order.customer);
-    if (order.status === "delivered" && customer?.statementType === "invoice-based") {
+    if (
+      order.status === "delivered" &&
+      customer?.statementType === "invoice-based"
+    ) {
       await createInvoiceBasedBill(order);
     }
 
@@ -329,8 +368,9 @@ const cancelOrder = async (req, res) => {
     if (order.payment === "credit") {
       const customer = await Customer.findById(order.customer);
       const remainingAmount = order.orderItems.reduce(
-        (sum, item) => sum + (item.orderedQuantity - item.deliveredQuantity) * item.price,
-        0
+        (sum, item) =>
+          sum + (item.orderedQuantity - item.deliveredQuantity) * item.price,
+        0,
       );
       customer.balanceCreditLimit += remainingAmount;
       await customer.save();
@@ -345,13 +385,14 @@ const cancelOrder = async (req, res) => {
   }
 };
 
-
-
 // Helper to get or initialize counter
 const getOrInitCounter = async () => {
   let counter = await InvoiceCounter.findOne();
   if (!counter) {
-    counter = await InvoiceCounter.create({ deliveredCount: 0, pendingCount: 0 });
+    counter = await InvoiceCounter.create({
+      deliveredCount: 0,
+      pendingCount: 0,
+    });
   }
   return counter;
 };
@@ -359,14 +400,18 @@ const getOrInitCounter = async () => {
 const getDeliveredInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("orderItems.product", "productName price unit");  // ← FIXED HERE
+      .populate(
+        "customer",
+        "name email phoneNumber address pincode balanceCreditLimit",
+      )
+      .populate("orderItems.product", "productName price unit"); // ← FIXED HERE
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.totalDeliveredQuantity === 0) {  // Use virtual if you have it, or calculate
+    if (order.totalDeliveredQuantity === 0) {
+      // Use virtual if you have it, or calculate
       return res.status(400).json({ message: "No delivered quantity" });
     }
 
@@ -384,19 +429,19 @@ const getDeliveredInvoice = async (req, res) => {
     const invoiceNo = order.deliveredInvoiceNumber;
 
     const filename = `delivered-invoice-${order._id.toString().slice(-8)}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    const doc = new PDFDocument({ size: 'A4', margin: 0 });
+    const doc = new PDFDocument({ size: "A4", margin: 0 });
     doc.pipe(res);
 
     // IMPORTANT: Your generateStyledInvoicePDF is still using old single-product destructuring!
     // Update it too (see below)
-    await generateStyledInvoicePDF(doc, order, 'DELIVERED INVOICE', invoiceNo);
+    await generateStyledInvoicePDF(doc, order, "DELIVERED INVOICE", invoiceNo);
 
     doc.end();
   } catch (error) {
-    console.error('Error generating delivered invoice:', error);
+    console.error("Error generating delivered invoice:", error);
     if (!res.headersSent) {
       res.status(500).json({ message: "Server error", error: error.message });
     }
@@ -406,15 +451,22 @@ const getDeliveredInvoice = async (req, res) => {
 const getPendingInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("orderItems.product", "productName price unit");  // ← FIXED HERE
+      .populate(
+        "customer",
+        "name email phoneNumber address pincode balanceCreditLimit",
+      )
+      .populate("orderItems.product", "productName price unit"); // ← FIXED HERE
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    const totalOrdered = order.totalOrderedQuantity || order.orderItems.reduce((s, i) => s + i.orderedQuantity, 0);
-    const totalDelivered = order.totalDeliveredQuantity || order.orderItems.reduce((s, i) => s + i.deliveredQuantity, 0);
+    const totalOrdered =
+      order.totalOrderedQuantity ||
+      order.orderItems.reduce((s, i) => s + i.orderedQuantity, 0);
+    const totalDelivered =
+      order.totalDeliveredQuantity ||
+      order.orderItems.reduce((s, i) => s + i.deliveredQuantity, 0);
     const remaining = totalOrdered - totalDelivered;
 
     if (remaining <= 0) {
@@ -435,35 +487,39 @@ const getPendingInvoice = async (req, res) => {
     const invoiceNo = order.pendingInvoiceNumber;
 
     const filename = `pending-invoice-${order._id.toString().slice(-8)}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    const doc = new PDFDocument({ size: 'A4', margin: 0 });
+    const doc = new PDFDocument({ size: "A4", margin: 0 });
     doc.pipe(res);
 
     // Create pending version with remaining quantities
     const pendingOrder = {
       ...order.toObject(),
-      orderItems: order.orderItems.map(item => ({
+      orderItems: order.orderItems.map((item) => ({
         ...item.toObject(),
         orderedQuantity: item.orderedQuantity - item.deliveredQuantity,
         deliveredQuantity: 0,
-        totalAmount: (item.orderedQuantity - item.deliveredQuantity) * item.price
-      }))
+        totalAmount:
+          (item.orderedQuantity - item.deliveredQuantity) * item.price,
+      })),
     };
 
-    await generateStyledInvoicePDF(doc, pendingOrder, 'PENDING INVOICE', invoiceNo);
+    await generateStyledInvoicePDF(
+      doc,
+      pendingOrder,
+      "PENDING INVOICE",
+      invoiceNo,
+    );
 
     doc.end();
   } catch (error) {
-    console.error('Error generating pending invoice:', error);
+    console.error("Error generating pending invoice:", error);
     if (!res.headersSent) {
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }
 };
-
-
 
 const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const company = await CompanySettings.findOne();
@@ -474,47 +530,59 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const pageWidth = 595.28;
   const pageHeight = 841.89;
   const margin = 50;
-  const contentWidth = pageWidth - (margin * 2);
+  const contentWidth = pageWidth - margin * 2;
 
   const date = new Date(order.orderDate || order.deliveredAt || Date.now());
-  const formattedDate = date.toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
+  const formattedDate = date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 
-  doc.fontSize(12).font('Helvetica').fillColor('#000000');
+  doc.fontSize(12).font("Helvetica").fillColor("#000000");
 
   // Header
   const headerY = margin;
-  doc.fontSize(22).font('Helvetica-Bold')
-     .text(company.companyName || 'INGOUDE COMPANY', margin, headerY);
+  doc
+    .fontSize(22)
+    .font("Helvetica-Bold")
+    .text(company.companyName || "INGOUDE COMPANY", margin, headerY);
 
-  doc.fontSize(36).font('Helvetica-Bold').fillColor('#b0123b')
-     .text(invoiceType, margin, headerY + 40);
+  doc
+    .fontSize(36)
+    .font("Helvetica-Bold")
+    .fillColor("#b0123b")
+    .text(invoiceType, margin, headerY + 40);
 
   const invoiceInfoX = pageWidth - margin - 200;
-  doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000')
-     .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
-     .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
+  doc
+    .fontSize(12)
+    .font("Helvetica-Bold")
+    .fillColor("#000000")
+    .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
+    .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
 
   // Bill To / From (unchanged)
   const infoY = headerY + 120;
   const billToX = margin;
   const fromX = pageWidth - margin - 250;
 
-  doc.fontSize(14).font('Helvetica-Bold').text('Bill To:', billToX, infoY);
-  doc.fontSize(12).font('Helvetica')
-     .text(order.customer?.name || 'N/A', billToX, infoY + 25)
-     .text(order.customer?.phoneNumber || 'N/A', billToX, infoY + 45)
-     .text(order.customer?.address || 'N/A', billToX, infoY + 65)
-     .text(`Pincode: ${order.customer?.pincode || 'N/A'}`, billToX, infoY + 85);
+  doc.fontSize(14).font("Helvetica-Bold").text("Bill To:", billToX, infoY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(order.customer?.name || "N/A", billToX, infoY + 25)
+    .text(order.customer?.phoneNumber || "N/A", billToX, infoY + 45)
+    .text(order.customer?.address || "N/A", billToX, infoY + 65)
+    .text(`Pincode: ${order.customer?.pincode || "N/A"}`, billToX, infoY + 85);
 
-  doc.fontSize(14).font('Helvetica-Bold').text('From:', fromX, infoY);
-  doc.fontSize(12).font('Helvetica')
-     .text(company.companyName || 'INGOUDE COMPANY', fromX, infoY + 25)
-     .text(company.companyPhone || 'N/A', fromX, infoY + 45)
-     .text(company.companyAddress || 'N/A', fromX, infoY + 65);
+  doc.fontSize(14).font("Helvetica-Bold").text("From:", fromX, infoY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(company.companyName || "INGOUDE COMPANY", fromX, infoY + 25)
+    .text(company.companyPhone || "N/A", fromX, infoY + 45)
+    .text(company.companyAddress || "N/A", fromX, infoY + 65);
 
   // Table - now supports MULTIPLE products
   const tableY = infoY + 130;
@@ -526,31 +594,52 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const totalCol = margin + 440;
 
   // Header row
-  doc.rect(margin - 10, tableY - 5, contentWidth + 20, rowHeight)
-     .fillColor('#b0123b').fill();
-  doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold')
-     .text('Description', descCol, tableY + 10)
-     .text('Qty', qtyCol, tableY + 10, { width: 70, align: 'center' })
-     .text('Price', priceCol, tableY + 10, { width: 70, align: 'center' })
-     .text('Total', totalCol, tableY + 10, { width: 70, align: 'center' });
+  doc
+    .rect(margin - 10, tableY - 5, contentWidth + 20, rowHeight)
+    .fillColor("#b0123b")
+    .fill();
+  doc
+    .fillColor("#ffffff")
+    .fontSize(12)
+    .font("Helvetica-Bold")
+    .text("Description", descCol, tableY + 10)
+    .text("Qty", qtyCol, tableY + 10, { width: 70, align: "center" })
+    .text("Price", priceCol, tableY + 10, { width: 70, align: "center" })
+    .text("Total", totalCol, tableY + 10, { width: 70, align: "center" });
 
   // Data rows - loop through orderItems
   let currentY = tableY + rowHeight;
   let grandTotal = 0;
 
-  order.orderItems.forEach(item => {
-    const qty = invoiceType.includes('PENDING') 
-      ? (item.orderedQuantity - item.deliveredQuantity)
+  order.orderItems.forEach((item) => {
+    const qty = invoiceType.includes("PENDING")
+      ? item.orderedQuantity - item.deliveredQuantity
       : item.deliveredQuantity || item.orderedQuantity;
 
     const itemTotal = qty * item.price;
     grandTotal += itemTotal;
 
-    doc.fillColor('#000000').fontSize(12).font('Helvetica')
-       .text(item.product?.productName || 'Unknown Product', descCol, currentY + 10)
-       .text(qty.toString(), qtyCol, currentY + 10, { width: 70, align: 'center' })
-       .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 10, { width: 70, align: 'center' })
-       .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 10, { width: 70, align: 'center' });
+    doc
+      .fillColor("#000000")
+      .fontSize(12)
+      .font("Helvetica")
+      .text(
+        item.product?.productName || "Unknown Product",
+        descCol,
+        currentY + 10,
+      )
+      .text(qty.toString(), qtyCol, currentY + 10, {
+        width: 70,
+        align: "center",
+      })
+      .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 10, {
+        width: 70,
+        align: "center",
+      })
+      .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 10, {
+        width: 70,
+        align: "center",
+      });
 
     currentY += rowHeight;
   });
@@ -560,32 +649,57 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const subtotalWidth = 200;
   const subtotalX = pageWidth - margin - subtotalWidth;
 
-  doc.rect(subtotalX, subtotalY, subtotalWidth, 35)
-     .fillColor('#222222').fill();
-  doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold')
-     .text('Grand Total', subtotalX + 15, subtotalY + 12)
-     .text(`AED ${grandTotal.toFixed(2)}`, subtotalX + subtotalWidth - 20, subtotalY + 12, { align: 'right' });
+  doc.rect(subtotalX, subtotalY, subtotalWidth, 35).fillColor("#222222").fill();
+  doc
+    .fillColor("#ffffff")
+    .fontSize(12)
+    .font("Helvetica-Bold")
+    .text("Grand Total", subtotalX + 15, subtotalY + 12)
+    .text(
+      `AED ${grandTotal.toFixed(2)}`,
+      subtotalX + subtotalWidth - 20,
+      subtotalY + 12,
+      { align: "right" },
+    );
 
   // Footer - unchanged
   const footerY = subtotalY + 80;
 
-  doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
-     .text('Payment Information:', margin, footerY);
-  doc.fontSize(12).font('Helvetica')
-     .text(`Bank: ${company.bankName || 'N/A'}`, margin, footerY + 25)
-     .text(`Account: ${company.bankAccountNumber || 'N/A'}`, margin, footerY + 45)
-     .text(`Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || 'N/A'}`, margin, footerY + 65)
-     .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
+  doc
+    .fillColor("#000000")
+    .fontSize(14)
+    .font("Helvetica-Bold")
+    .text("Payment Information:", margin, footerY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(`Bank: ${company.bankName || "N/A"}`, margin, footerY + 25)
+    .text(
+      `Account: ${company.bankAccountNumber || "N/A"}`,
+      margin,
+      footerY + 45,
+    )
+    .text(
+      `Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || "N/A"}`,
+      margin,
+      footerY + 65,
+    )
+    .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
 
   const thankYouX = pageWidth - margin - 200;
-  doc.fontSize(36).font('Helvetica-Bold').fillColor('#000000')
-     .text('Thank You!', thankYouX, footerY, { width: 200, align: 'right' });
+  doc
+    .fontSize(36)
+    .font("Helvetica-Bold")
+    .fillColor("#000000")
+    .text("Thank You!", thankYouX, footerY, { width: 200, align: "right" });
 
   const bottomY = footerY + 150;
-  doc.fontSize(10).font('Helvetica-Oblique').fillColor('#666666')
-     .text('This is a system-generated invoice', margin, bottomY);
+  doc
+    .fontSize(10)
+    .font("Helvetica-Oblique")
+    .fillColor("#666666")
+    .text("This is a system-generated invoice", margin, bottomY);
 };
-
 
 const assignOrderToDeliveryMan = async (req, res) => {
   try {
@@ -593,12 +707,21 @@ const assignOrderToDeliveryMan = async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (order.assignmentStatus !== "pending_assignment" && order.assignmentStatus !== "rejected") {
-      return res.status(400).json({ message: "Order is not available for assignment" });
+    if (
+      order.assignmentStatus !== "pending_assignment" &&
+      order.assignmentStatus !== "rejected"
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Order is not available for assignment" });
     }
 
-    const deliveryMan = await User.findOne({ _id: deliveryManId, role: "Delivery Man" });
-    if (!deliveryMan) return res.status(400).json({ message: "Valid delivery man not found" });
+    const deliveryMan = await User.findOne({
+      _id: deliveryManId,
+      role: "Delivery Man",
+    });
+    if (!deliveryMan)
+      return res.status(400).json({ message: "Valid delivery man not found" });
 
     order.assignedTo = deliveryManId;
     order.assignmentStatus = "assigned";
@@ -609,7 +732,7 @@ const assignOrderToDeliveryMan = async (req, res) => {
     // Fixed populate
     const updatedOrder = await Order.findById(order._id)
       .populate("customer", "name email phoneNumber address pincode")
-      .populate("orderItems.product", "productName price unit")   // ← FIXED
+      .populate("orderItems.product", "productName price unit") // ← FIXED
       .populate("assignedTo", "username");
 
     res.json({ message: "Order assigned successfully", order: updatedOrder });
@@ -625,33 +748,42 @@ const getMyAssignedOrders = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: "Authentication required" });
     }
-    
-    const deliveryRoles = ["Delivery partner", "delivery partner", "deliveryman", "Delivery Man"];
+
+    const deliveryRoles = [
+      "Delivery partner",
+      "delivery partner",
+      "deliveryman",
+      "Delivery Man",
+    ];
     if (!deliveryRoles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Only delivery personnel can access this" });
+      return res
+        .status(403)
+        .json({ message: "Only delivery personnel can access this" });
     }
 
     const orders = await Order.find({
-    assignedTo: req.user._id,
-    assignmentStatus: { $in: ["assigned", "accepted", "rejected"] },
-  })
-    .populate("customer", "name phoneNumber address pincode")
-    .populate("orderItems.product", "productName price unit")   // ← FIXED
-    .populate("assignedTo", "username email")
-    .sort({ assignedAt: -1 });
+      assignedTo: req.user._id,
+      assignmentStatus: { $in: ["assigned", "accepted", "rejected"] },
+    })
+      .populate("customer", "name phoneNumber address pincode")
+      .populate("orderItems.product", "productName price unit") // ← FIXED
+      .populate("assignedTo", "username email")
+      .sort({ assignedAt: -1 });
 
-  res.json(orders);
+    res.json(orders);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
 // New endpoint: Generate single invoice for the order (ordered + delivered info)
 const getOrderInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
+      .populate(
+        "customer",
+        "name email phoneNumber address pincode balanceCreditLimit",
+      )
       .populate("product", "productName price");
 
     if (!order) {
@@ -659,21 +791,26 @@ const getOrderInvoice = async (req, res) => {
     }
 
     const filename = `order-invoice-${order._id.toString().slice(-8)}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    const doc = new PDFDocument({ size: 'A4', margin: 0 });
+    const doc = new PDFDocument({ size: "A4", margin: 0 });
     doc.pipe(res);
 
     // Reuse your existing PDF generator function
     // We pass the full order object (it already has orderedQuantity, deliveredQuantity, etc.)
-    await generateStyledInvoicePDF(doc, order, 'ORDER INVOICE', `ORD-${order._id.toString().slice(-6)}`);
+    await generateStyledInvoicePDF(
+      doc,
+      order,
+      "ORDER INVOICE",
+      `ORD-${order._id.toString().slice(-6)}`,
+    );
 
     doc.end();
 
     console.log(`Order invoice served for order ${order._id}`);
   } catch (error) {
-    console.error('Error generating order invoice:', error);
+    console.error("Error generating order invoice:", error);
     if (!res.headersSent) {
       res.status(500).json({ message: "Server error", error: error.message });
     }
@@ -685,20 +822,27 @@ const acceptAssignedOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
-    
+
     if (String(order.assignedTo) !== String(req.user._id)) {
-      return res.status(403).json({ message: "This order is not assigned to you" });
+      return res
+        .status(403)
+        .json({ message: "This order is not assigned to you" });
     }
-    
+
     // ✅ FIXED: Allow re-accepting rejected orders assigned to current user
-    if (order.assignmentStatus !== "assigned" && order.assignmentStatus !== "rejected") {
-      return res.status(400).json({ message: "Order cannot be accepted at this stage" });
+    if (
+      order.assignmentStatus !== "assigned" &&
+      order.assignmentStatus !== "rejected"
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Order cannot be accepted at this stage" });
     }
-    
+
     order.assignmentStatus = "accepted";
     order.acceptedAt = new Date();
     await order.save();
-    
+
     res.json({ message: "Order accepted successfully", order });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -711,21 +855,25 @@ const rejectAssignedOrder = async (req, res) => {
     const { reason } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
-    
+
     if (String(order.assignedTo) !== String(req.user._id)) {
-      return res.status(403).json({ message: "This order is not assigned to you" });
+      return res
+        .status(403)
+        .json({ message: "This order is not assigned to you" });
     }
-    
+
     if (order.assignmentStatus !== "assigned") {
-      return res.status(400).json({ message: "Order cannot be rejected at this stage" });
+      return res
+        .status(400)
+        .json({ message: "Order cannot be rejected at this stage" });
     }
-    
+
     // ✅ CRITICAL: Keep assignedTo pointing to rejecting partner (for CancelledOrdersList visibility)
     // Only change status to rejected - DO NOT clear assignedTo
     order.assignmentStatus = "rejected";
     if (reason) order.rejectionReason = reason;
     await order.save();
-    
+
     res.json({ message: "Order rejected successfully", order });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -735,8 +883,8 @@ const rejectAssignedOrder = async (req, res) => {
 const getDeliveredOrdersForAdmin = async (req, res) => {
   try {
     // Show ALL orders that have ANY delivered quantity (partial or full)
-    const orders = await Order.find({ 
-      deliveredQuantity: { $gt: 0 }  // ← This is the key change!
+    const orders = await Order.find({
+      deliveredQuantity: { $gt: 0 }, // ← This is the key change!
       // Removed status: "delivered" filter so partial deliveries are included
     })
       .populate("customer", "name email phoneNumber address pincode")
@@ -754,16 +902,20 @@ const getDeliveredOrdersForAdmin = async (req, res) => {
 const getMyOrders = async (req, res) => {
   try {
     if (!req.user || req.user.role !== "Customer") {
-      return res.status(403).json({ message: "Access denied - Customers only" });
+      return res
+        .status(403)
+        .json({ message: "Access denied - Customers only" });
     }
 
     const customer = await Customer.findOne({ user: req.user._id });
     if (!customer) {
-      return res.status(404).json({ message: "Your customer profile not found." });
+      return res
+        .status(404)
+        .json({ message: "Your customer profile not found." });
     }
 
     const orders = await Order.find({ customer: customer._id })
-      .populate("orderItems.product", "productName price unit quantity")   // ← FIXED HERE
+      .populate("orderItems.product", "productName price unit quantity") // ← FIXED HERE
       .populate("assignedTo", "username email")
       .sort({ orderDate: -1 });
 
@@ -786,7 +938,7 @@ const getCustomerOrders = async (req, res) => {
     }
 
     const orders = await Order.find({ customer: customer._id })
-      .populate("orderItems.product", "productName price unit")   // ← FIXED HERE
+      .populate("orderItems.product", "productName price unit") // ← FIXED HERE
       .sort({ orderDate: -1 });
 
     res.json(orders);
@@ -810,8 +962,11 @@ const getCustomerOrderById = async (req, res) => {
       _id: req.params.id,
       customer: customer._id,
     })
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("orderItems.product", "productName price quantity unit")   // ← FIXED HERE
+      .populate(
+        "customer",
+        "name email phoneNumber address pincode balanceCreditLimit",
+      )
+      .populate("orderItems.product", "productName price quantity unit") // ← FIXED HERE
       .populate("assignedTo", "username");
 
     if (!order) {
@@ -829,7 +984,8 @@ const markOrderDelivered = async (req, res) => {
     const order = await Order.findById(orderId);
 
     if (!order) return res.status(404).json({ message: "Order not found" });
-    if (order.status !== "pending") return res.status(400).json({ message: "Order not pending" });
+    if (order.status !== "pending")
+      return res.status(400).json({ message: "Order not pending" });
 
     // Mark delivered
     order.status = "delivered";
@@ -854,7 +1010,9 @@ const getlastorderdetails = async (req, res) => {
   const { customerId, productId } = req.query;
 
   if (!customerId || !productId) {
-    return res.status(400).json({ message: "customerId and productId required" });
+    return res
+      .status(400)
+      .json({ message: "customerId and productId required" });
   }
 
   try {
@@ -870,7 +1028,7 @@ const getlastorderdetails = async (req, res) => {
     }
 
     const item = latestOrder.orderItems.find(
-      (i) => i.product.toString() === productId
+      (i) => i.product.toString() === productId,
     );
 
     res.json({ price: item ? item.price : null });
@@ -879,34 +1037,46 @@ const getlastorderdetails = async (req, res) => {
   }
 };
 
-
 const createOrderRequest = async (req, res) => {
   try {
     const { orderItems, payment, remarks } = req.body;
 
-    if (!req.user || req.user.role !== 'Customer') {
-      return res.status(403).json({ message: 'Only customers can create order requests' });
+    if (!req.user || req.user.role !== "Customer") {
+      return res
+        .status(403)
+        .json({ message: "Only customers can create order requests" });
     }
 
     const customerProfile = await Customer.findOne({ user: req.user._id });
     if (!customerProfile) {
-      return res.status(404).json({ message: 'Customer profile not found' });
+      return res.status(404).json({ message: "Customer profile not found" });
     }
 
     // Check if this is really first order
-    const existingOrderCount = await Order.countDocuments({ customer: customerProfile._id });
+    const existingOrderCount = await Order.countDocuments({
+      customer: customerProfile._id,
+    });
     if (existingOrderCount > 0) {
-      return res.status(400).json({ message: 'This is not your first order. Use normal order creation.' });
+      return res
+        .status(400)
+        .json({
+          message: "This is not your first order. Use normal order creation.",
+        });
     }
 
     // Credit/overdue checks
-    if (customerProfile.billingType === 'Credit limit') {
+    if (customerProfile.billingType === "Credit limit") {
       if (customerProfile.balanceCreditLimit <= 0) {
-        return res.status(403).json({ message: 'Credit limit fully used or zero.' });
+        return res
+          .status(403)
+          .json({ message: "Credit limit fully used or zero." });
       }
-      const overdue = await Bill.findOne({ customer: customerProfile._id, status: 'overdue' });
+      const overdue = await Bill.findOne({
+        customer: customerProfile._id,
+        status: "overdue",
+      });
       if (overdue) {
-        return res.status(403).json({ message: 'You have overdue bills.' });
+        return res.status(403).json({ message: "You have overdue bills." });
       }
     }
 
@@ -915,7 +1085,10 @@ const createOrderRequest = async (req, res) => {
 
     for (const item of orderItems) {
       const product = await Product.findById(item.productId);
-      if (!product) return res.status(404).json({ message: `Product not found: ${item.productId}` });
+      if (!product)
+        return res
+          .status(404)
+          .json({ message: `Product not found: ${item.productId}` });
 
       const itemTotal = product.price * item.orderedQuantity;
       grandTotal += itemTotal;
@@ -926,13 +1099,16 @@ const createOrderRequest = async (req, res) => {
         orderedQuantity: item.orderedQuantity,
         price: product.price,
         totalAmount: itemTotal,
-        remarks: item.remarks || '',
+        remarks: item.remarks || "",
       });
     }
 
     // Credit check (but don't deduct yet — only on approval)
-    if (payment === 'credit' && customerProfile.balanceCreditLimit < grandTotal) {
-      return res.status(400).json({ message: 'Insufficient credit balance' });
+    if (
+      payment === "credit" &&
+      customerProfile.balanceCreditLimit < grandTotal
+    ) {
+      return res.status(400).json({ message: "Insufficient credit balance" });
     }
 
     const request = await OrderRequest.create({
@@ -940,63 +1116,69 @@ const createOrderRequest = async (req, res) => {
       customerUser: req.user._id,
       orderItems: processedItems,
       payment,
-      remarks: remarks || '',
+      remarks: remarks || "",
       grandTotal,
-      status: 'pending',
+      status: "pending",
     });
 
     res.status(201).json({
-      message: 'Order request sent successfully. Waiting for admin approval.',
+      message: "Order request sent successfully. Waiting for admin approval.",
       requestId: request._id,
     });
   } catch (error) {
-    console.error('Order request error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Order request error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 // Admin: Get all pending order requests
 const getPendingOrderRequests = async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') {
-      return res.status(403).json({ message: 'Admin access only' });
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Admin access only" });
     }
 
-    const requests = await OrderRequest.find({ status: 'pending' })
-      .populate('customer', 'name email phoneNumber address pincode')
-      .populate('customerUser', 'username')
-      .populate('orderItems.product', 'productName price unit')
+    const requests = await OrderRequest.find({ status: "pending" })
+      .populate("customer", "name email phoneNumber address pincode")
+      .populate("customerUser", "username")
+      .populate("orderItems.product", "productName price unit")
       .sort({ requestedAt: -1 });
 
     res.json(requests);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 // Admin: Approve request → create real order + deduct credit
 const approveOrderRequest = async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') {
-      return res.status(403).json({ message: 'Admin access only' });
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Admin access only" });
     }
 
     const request = await OrderRequest.findById(req.params.requestId);
-    if (!request) return res.status(404).json({ message: 'Request not found' });
-    if (request.status !== 'pending') {
-      return res.status(400).json({ message: 'Request already processed' });
+    if (!request) return res.status(404).json({ message: "Request not found" });
+    if (request.status !== "pending") {
+      return res.status(400).json({ message: "Request already processed" });
     }
 
     const customer = await Customer.findById(request.customer);
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    if (!customer)
+      return res.status(404).json({ message: "Customer not found" });
 
     // Final credit check before deducting
-    if (request.payment === 'credit' && customer.balanceCreditLimit < request.grandTotal) {
-      return res.status(400).json({ message: 'Insufficient credit balance now' });
+    if (
+      request.payment === "credit" &&
+      customer.balanceCreditLimit < request.grandTotal
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Insufficient credit balance now" });
     }
 
     // Deduct credit if credit payment
-    if (request.payment === 'credit') {
+    if (request.payment === "credit") {
       customer.balanceCreditLimit -= request.grandTotal;
       await customer.save();
     }
@@ -1004,7 +1186,7 @@ const approveOrderRequest = async (req, res) => {
     // Create real order
     const newOrder = await Order.create({
       customer: request.customer,
-      orderItems: request.orderItems.map(item => ({
+      orderItems: request.orderItems.map((item) => ({
         ...item.toObject(),
         deliveredQuantity: 0,
       })),
@@ -1012,71 +1194,72 @@ const approveOrderRequest = async (req, res) => {
       remarks: request.remarks,
       orderDate: new Date(),
       createdBy: request.customerUser,
-      status: 'pending',
+      status: "pending",
     });
 
     // Mark request as approved
-    request.status = 'approved';
+    request.status = "approved";
     request.approvedBy = req.user._id;
     request.approvedAt = new Date();
     await request.save();
 
-    res.json({ message: 'Order request approved and placed', order: newOrder });
+    res.json({ message: "Order request approved and placed", order: newOrder });
   } catch (error) {
-    console.error('Approve request error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Approve request error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 // Admin: Reject request
 const rejectOrderRequest = async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') {
-      return res.status(403).json({ message: 'Admin access only' });
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Admin access only" });
     }
 
     const { reason } = req.body;
     const request = await OrderRequest.findById(req.params.requestId);
-    if (!request) return res.status(404).json({ message: 'Request not found' });
-    if (request.status !== 'pending') {
-      return res.status(400).json({ message: 'Request already processed' });
+    if (!request) return res.status(404).json({ message: "Request not found" });
+    if (request.status !== "pending") {
+      return res.status(400).json({ message: "Request already processed" });
     }
 
-    request.status = 'rejected';
-    request.rejectionReason = reason || 'No reason provided';
+    request.status = "rejected";
+    request.rejectionReason = reason || "No reason provided";
     request.approvedBy = req.user._id;
     request.approvedAt = new Date();
     await request.save();
 
-    res.json({ message: 'Order request rejected', request });
+    res.json({ message: "Order request rejected", request });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 // Customer: Get their order requests + real orders
 const getCustomerOrderHistory = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'Customer') {
-      return res.status(403).json({ message: 'Customer access only' });
+    if (!req.user || req.user.role !== "Customer") {
+      return res.status(403).json({ message: "Customer access only" });
     }
 
     const customer = await Customer.findOne({ user: req.user._id });
-    if (!customer) return res.status(404).json({ message: 'Profile not found' });
+    if (!customer)
+      return res.status(404).json({ message: "Profile not found" });
 
     // Real orders
     const realOrders = await Order.find({ customer: customer._id })
-      .populate('orderItems.product', 'productName price unit')
+      .populate("orderItems.product", "productName price unit")
       .sort({ orderDate: -1 });
 
     // Order requests (pending/approved/rejected)
     const requests = await OrderRequest.find({ customer: customer._id })
-      .populate('orderItems.product', 'productName price unit')
+      .populate("orderItems.product", "productName price unit")
       .sort({ requestedAt: -1 });
 
     res.json({ realOrders, requests });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Server error" });
   }
 };
 // Check if this is the customer's first order
@@ -1110,11 +1293,18 @@ module.exports = {
   assignOrderToDeliveryMan,
   getMyAssignedOrders,
   acceptAssignedOrder,
-  rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,getMyOrders,getOrderInvoice,markOrderDelivered,getlastorderdetails,
+  rejectAssignedOrder,
+  getDeliveredOrdersForAdmin,
+  getCustomerOrders,
+  getCustomerOrderById,
+  getMyOrders,
+  getOrderInvoice,
+  markOrderDelivered,
+  getlastorderdetails,
   createOrderRequest,
   getPendingOrderRequests,
   approveOrderRequest,
   rejectOrderRequest,
   getCustomerOrderHistory,
-  checkFirstOrder
+  checkFirstOrder,
 };

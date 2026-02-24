@@ -270,6 +270,78 @@ const generatePaymentReceipt = async (req, res) => {
     }
   }
 };
+const generateBulkPaymentReceipt = async (req, res) => {
+  try {
+    const { transactionIds } = req.body;
+    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+      return res.status(400).json({ message: "No transaction IDs provided" });
+    }
+
+    // Fetch all transactions
+    const transactions = await PaymentTransaction.find({ _id: { $in: transactionIds } })
+      .populate({
+        path: 'order',
+        select: 'customer orderItems deliveredInvoiceNumber pendingInvoiceNumber payment orderDate _id',
+        populate: { path: 'customer', select: 'name phoneNumber' },
+      })
+      .populate('deliveryMan', 'username')
+      .lean();
+
+    if (transactions.length !== transactionIds.length) {
+      return res.status(404).json({ message: "Some transactions not found" });
+    }
+
+    const company = (await CompanySettings.findOne()) || { companyName: 'INGOUDE COMPANY' };
+
+    const doc = new PDFDocument({ size: 'A5', margin: 40 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="bulk-receipt-${transactions.length}-tx.pdf"`);
+
+    doc.pipe(res);
+
+    transactions.forEach((tx, index) => {
+      if (index > 0) doc.addPage();
+
+      doc.fontSize(18).font('Helvetica-Bold').text(company.companyName.toUpperCase(), { align: 'center' });
+      doc.fontSize(14).moveDown(0.3).text('PAYMENT RECEIPT (Bulk)', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(11).text(`Transaction ${index + 1} of ${transactions.length}`, { align: 'center' });
+      doc.moveDown(1);
+
+      const order = tx.order || {};
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Receipt No: REC-${tx._id.toString().slice(-6)}`);
+      doc.text(`Invoice No: ${order.deliveredInvoiceNumber || order.pendingInvoiceNumber || 'N/A'}`);
+      doc.text(`Order ID: ${order._id?.toString().slice(-8) || 'N/A'}`);
+      doc.text(`Customer: ${order.customer?.name || 'N/A'}`);
+      doc.text(`Delivery Man: ${tx.deliveryMan?.username || 'N/A'}`);
+      doc.text(`Amount: AED ${tx.amount.toFixed(2)}`);
+      doc.text(`Method: ${tx.method.charAt(0).toUpperCase() + tx.method.slice(1)}`);
+      doc.text(`Date: ${new Date(tx.date).toLocaleString('en-IN')}`);
+
+      if (tx.method === 'cheque' && tx.chequeDetails) {
+        doc.moveDown(0.8);
+        doc.text('Cheque Details:', { underline: true });
+        doc.moveDown(0.3);
+        doc.text(`  • Number : ${tx.chequeDetails.number || 'N/A'}`);
+        doc.text(`  • Bank   : ${tx.chequeDetails.bank || 'N/A'}`);
+        doc.text(`  • Date   : ${tx.chequeDetails.date ? new Date(tx.chequeDetails.date).toLocaleDateString('en-IN') : 'N/A'}`);
+      }
+
+      doc.moveDown(1.5);
+      doc.fontSize(9).font('Helvetica-Oblique').fillColor('#555').text('Thank you for your payment!', { align: 'center' });
+    });
+
+    doc.end();
+  } catch (error) {
+    console.error('Bulk receipt error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Failed to generate bulk receipt' });
+    }
+  }
+};
+
 module.exports = {
   getDeliveryCashWallet,
   getDeliveryChequeWallet,
@@ -278,5 +350,5 @@ module.exports = {
   acceptPayment,
   rejectPayment,
   getAdminWalletMoney,
-  markAsReceived,generatePaymentReceipt
+  markAsReceived,generatePaymentReceipt,generateBulkPaymentReceipt
 };

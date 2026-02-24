@@ -51,7 +51,7 @@ const billTransactionSchema = new Schema(
     paymentRequest: {
       type: Schema.Types.ObjectId,
       ref: "PaymentRequest",
-      required: true,
+      required: false,
     },
   },
   { timestamps: true },

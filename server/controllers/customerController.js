@@ -15,11 +15,13 @@ const createCustomer = async (req, res) => {
       pincode,
       creditLimit,
       billingType = "Credit limit",
-      statementType,  // NEW
-      dueDays,        // NEW
+      statementType,
+      dueDays,
+      openingBalance = 0,
+      openingBalanceDueDays,
     } = req.body;
 
-    // 1. Basic validation
+    // Validation
     if (
       !name?.trim() ||
       !email?.trim() ||
@@ -28,7 +30,7 @@ const createCustomer = async (req, res) => {
       !pincode?.trim() ||
       !creditLimit
     ) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "All core fields are required" });
     }
 
     const parsedCreditLimit = parseFloat(creditLimit);
@@ -36,34 +38,43 @@ const createCustomer = async (req, res) => {
       return res.status(400).json({ message: "Invalid credit limit value" });
     }
 
-    // NEW: Validate billing config if billingType = "Credit limit"
     let parsedStatementType = null;
     let parsedDueDays = null;
     if (billingType === "Credit limit") {
       if (!statementType || !["invoice-based", "monthly"].includes(statementType)) {
-        return res.status(400).json({ message: "Invalid statement type. Must be 'invoice-based' or 'monthly'" });
+        return res.status(400).json({ message: "Invalid statement type" });
       }
       if (!dueDays || isNaN(dueDays) || parseInt(dueDays) < 0) {
-        return res.status(400).json({ message: "Due days must be a non-negative number" });
+        return res.status(400).json({ message: "Due days must be non-negative" });
       }
       parsedStatementType = statementType;
       parsedDueDays = parseInt(dueDays);
     }
 
-    // 2. Check duplicates
+    // Opening balance validation
+    const parsedOpeningBalance = parseFloat(openingBalance) || 0;
+    let parsedOpeningBalanceDueDays = null;
+    if (parsedOpeningBalance > 0) {
+      if (!openingBalanceDueDays || isNaN(openingBalanceDueDays) || parseInt(openingBalanceDueDays) < 0) {
+        return res.status(400).json({ message: "Valid due days required for opening balance > 0" });
+      }
+      parsedOpeningBalanceDueDays = parseInt(openingBalanceDueDays);
+    }
+
+    // Check duplicates
     const existingCustomer = await Customer.findOne({ email: email.trim().toLowerCase() });
     if (existingCustomer) {
-      return res.status(400).json({ message: "A customer with this email already exists" });
+      return res.status(400).json({ message: "Email already in use" });
     }
 
     const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: "This email is already registered as a user account" });
+      return res.status(400).json({ message: "Email already registered" });
     }
 
-    // 3. Create USER first
-    const defaultPassword = process.env.NODE_ENV === "production" 
-      ? crypto.randomBytes(10).toString("hex") 
+    // Create user
+    const defaultPassword = process.env.NODE_ENV === "production"
+      ? crypto.randomBytes(10).toString("hex")
       : "customer123";
 
     const user = await User.create({
@@ -73,7 +84,7 @@ const createCustomer = async (req, res) => {
       role: "Customer",
     });
 
-    // 4. Create CUSTOMER with new fields
+    // Create customer with new fields
     const customer = await Customer.create({
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -81,13 +92,33 @@ const createCustomer = async (req, res) => {
       address: address.trim(),
       pincode: pincode.trim(),
       creditLimit: parsedCreditLimit,
+      balanceCreditLimit: parsedCreditLimit - parsedOpeningBalance,
       billingType,
-      statementType: parsedStatementType,  // NEW
-      dueDays: parsedDueDays,              // NEW
+      statementType: parsedStatementType,
+      dueDays: parsedDueDays,
+      openingBalance: parsedOpeningBalance,
+      openingBalanceDueDays: parsedOpeningBalanceDueDays,
       user: user._id,
     });
 
-    // 5. Response (same as before)
+    // Create bill for opening balance if applicable
+    if (parsedOpeningBalance > 0 && parsedOpeningBalanceDueDays) {
+      const openingDueDate = new Date();
+      openingDueDate.setDate(openingDueDate.getDate() + parsedOpeningBalanceDueDays);
+
+      await Bill.create({
+        customer: customer._id,
+        cycleStart: new Date(),
+        cycleEnd: new Date(),
+        totalUsed: parsedOpeningBalance,
+        amountDue: parsedOpeningBalance,
+        dueDate: openingDueDate,
+        paidAmount: 0,
+        status: "pending",
+        orders: [],
+      });
+    }
+
     const responseData = {
       message: "Customer and login account created successfully",
       customer: {
@@ -100,8 +131,10 @@ const createCustomer = async (req, res) => {
         creditLimit: customer.creditLimit,
         balanceCreditLimit: customer.balanceCreditLimit,
         billingType: customer.billingType,
-        statementType: customer.statementType,  // NEW
-        dueDays: customer.dueDays,              // NEW
+        statementType: customer.statementType,
+        dueDays: customer.dueDays,
+        openingBalance: customer.openingBalance,
+        openingBalanceDueDays: customer.openingBalanceDueDays,
         createdAt: customer.createdAt,
       },
       note: process.env.NODE_ENV === "production"
@@ -120,16 +153,11 @@ const createCustomer = async (req, res) => {
     res.status(201).json(responseData);
   } catch (error) {
     console.error("Customer creation error:", error);
-
     if (error.name === "ValidationError") {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ message: "Validation failed", errors });
     }
-
-    res.status(500).json({
-      message: "Server error while creating customer and login account",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -157,7 +185,21 @@ const getCustomerById = async (req, res) => {
 const updateCustomer = async (req, res) => {
   try {
     const updateData = {};
-    const allowedFields = ["name", "email", "phoneNumber", "address", "pincode", "creditLimit"];
+    
+    // Allow updating these fields (expanded list)
+    const allowedFields = [
+      "name",
+      "email",
+      "phoneNumber",
+      "address",
+      "pincode",
+      "creditLimit",
+      "billingType",
+      "statementType",
+      "dueDays",
+      "openingBalance",
+      "openingBalanceDueDays",
+    ];
 
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
@@ -165,15 +207,51 @@ const updateCustomer = async (req, res) => {
       }
     });
 
-    // Check for email uniqueness if updating email
+    // Special handling for creditLimit / openingBalance changes
+    if (updateData.creditLimit !== undefined || updateData.openingBalance !== undefined) {
+      const customer = await Customer.findById(req.params.id);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      const newCreditLimit = updateData.creditLimit !== undefined 
+        ? parseFloat(updateData.creditLimit) 
+        : customer.creditLimit;
+
+      const newOpeningBalance = updateData.openingBalance !== undefined 
+        ? parseFloat(updateData.openingBalance) 
+        : customer.openingBalance;
+
+      // Validate
+      if (isNaN(newCreditLimit) || newCreditLimit < 0) {
+        return res.status(400).json({ message: "Invalid credit limit" });
+      }
+      if (newOpeningBalance < 0) {
+        return res.status(400).json({ message: "Opening balance cannot be negative" });
+      }
+      if (newOpeningBalance > newCreditLimit) {
+        return res.status(400).json({ message: "Opening balance cannot exceed credit limit" });
+      }
+
+      // Recalculate balanceCreditLimit
+      updateData.balanceCreditLimit = newCreditLimit - newOpeningBalance;
+    }
+
+    // Email uniqueness check
     if (updateData.email) {
       const existing = await Customer.findOne({
-        email: updateData.email,
+        email: updateData.email.trim().toLowerCase(),
         _id: { $ne: req.params.id }
       });
       if (existing) {
         return res.status(400).json({ message: "Email already in use" });
       }
+      updateData.email = updateData.email.trim().toLowerCase();
+    }
+
+    // If changing billingType to "Cash", clear credit-related fields
+    if (updateData.billingType === "Cash") {
+      updateData.statementType = null;
+      updateData.dueDays = null;
+      updateData.balanceCreditLimit = 0;
     }
 
     const customer = await Customer.findByIdAndUpdate(
@@ -186,8 +264,12 @@ const updateCustomer = async (req, res) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
+    // Optional: If openingBalance changed, you could create/update a bill here
+    // But for simplicity, we assume admin handles bills separately
+
     res.json(customer);
   } catch (error) {
+    console.error("Update customer error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

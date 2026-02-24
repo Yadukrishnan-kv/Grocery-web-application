@@ -523,3 +523,153 @@ button:disabled {
   border-radius: 4px;
   cursor: pointer;
 }
+/* ========== Section Header with Search ========== */
+.section-header-with-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+/* ========== Search Box ========== */
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 250px;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.search-clear:hover { color: #666; }
+
+/* ========== Bulk Action Bar ========== */
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.bulk-selection-count {
+  font-weight: 500;
+  color: #1976d2;
+  margin-right: auto;
+}
+
+.bulk-mark-btn, .bulk-pay-btn {
+  background: #2196f3;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.bulk-mark-btn:hover:not(:disabled), .bulk-pay-btn:hover:not(:disabled) {
+  background: #1976d2;
+}
+
+.bulk-mark-btn:disabled, .bulk-pay-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bulk-clear-btn {
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.bulk-clear-btn:hover { background: #eee; }
+
+/* ========== Checkboxes ========== */
+.checkbox-col {
+  width: 40px;
+  text-align: center;
+  padding: 12px 8px !important;
+}
+
+.select-all-checkbox, .bill-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #2196f3;
+}
+
+.bill-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Selected row highlight */
+.requests-table tbody tr.selected-row {
+  background-color: #e3f2fd !important;
+  border-left: 4px solid #2196f3;
+}
+
+/* ========== Table Responsive ========== */
+.table-responsive { overflow-x: auto; }
+
+/* ========== Bulk Modal ========== */
+.bulk-modal { max-width: 450px; }
+.bulk-confirm { background: #2196f3; }
+.bulk-confirm:hover:not(:disabled) { background: #1976d2; }
+
+/* ========== Utility Classes ========== */
+.text-muted { color: #6c757d; }
+.small { font-size: 12px; }
+
+/* ========== Existing Styles (keep these) ========== */
+.mark-received-btn { background-color: #17a2b8; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.mark-received-btn:hover:not(:disabled) { background-color: #138496; }
+.pay-admin-btn { background-color: #007bff; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.pay-admin-btn:hover:not(:disabled) { background-color: #0056b3; }
+.accept-btn { background-color: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.reject-btn { background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: inline-block; }
+.status-badge.status-received { background: #17a2b8; color: white; }
+.status-badge.status-pending { background: #ffc107; color: #212529; }
+.status-badge.status-paid_to_admin { background: #28a745; color: white; }
+.action-buttons { display: flex; gap: 8px; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }

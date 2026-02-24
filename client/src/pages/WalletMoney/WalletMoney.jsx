@@ -1,5 +1,5 @@
 // src/pages/Admin/WalletMoney.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../components/layout/Header/Header";
 import Sidebar from "../../components/layout/Sidebar/Sidebar";
 import "./WalletMoney.css";
@@ -15,15 +15,29 @@ const WalletMoney = () => {
   const [activeItem, setActiveItem] = useState("Wallet Money");
   const [user, setUser] = useState(null);
   const [markingTxId, setMarkingTxId] = useState(null);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
   
   // Separate filters for cash and cheque
   const [cashStatusFilter, setCashStatusFilter] = useState("all");
   const [chequeStatusFilter, setChequeStatusFilter] = useState("all");
 
+  // ✅ NEW: Search states
+  const [cashSearch, setCashSearch] = useState("");
+  const [chequeSearch, setChequeSearch] = useState("");
+
+  // ✅ NEW: Selection states
+  const [selectedCashTx, setSelectedCashTx] = useState([]);
+  const [selectedChequeTx, setSelectedChequeTx] = useState([]);
+  const [selectAllCash, setSelectAllCash] = useState(false);
+  const [selectAllCheque, setSelectAllCheque] = useState(false);
+
   // Confirmation modal states (shared for both)
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [txToMark, setTxToMark] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // "accept", "reject", or "mark-received"
+
+  // ✅ NEW: Bulk action modal
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -59,6 +73,12 @@ const WalletMoney = () => {
       // Separate cash and cheque
       setCashTransactions(allTx.filter(tx => tx.method === "cash"));
       setChequeTransactions(allTx.filter(tx => tx.method === "cheque"));
+      
+      // ✅ Reset selections after refresh
+      setSelectedCashTx([]);
+      setSelectedChequeTx([]);
+      setSelectAllCash(false);
+      setSelectAllCheque(false);
     } catch (error) {
       console.error("Error fetching wallet money:", error);
       toast.error("Failed to load wallet transactions");
@@ -71,6 +91,105 @@ const WalletMoney = () => {
     fetchCurrentUser();
     fetchWalletMoney();
   }, [fetchCurrentUser, fetchWalletMoney]);
+
+  // ────────────────────────────────────────────────
+  // ✅ Filter cash transactions by search + status
+  // ────────────────────────────────────────────────
+  const filteredCashTransactions = useMemo(() => {
+    return cashTransactions.filter(tx => {
+      // Status filter
+      if (cashStatusFilter !== "all" && tx.status !== cashStatusFilter) return false;
+      
+      // Search filter
+      if (cashSearch.trim()) {
+        const term = cashSearch.toLowerCase();
+        const matchesCustomer = tx.order?.customer?.name?.toLowerCase().includes(term);
+        const matchesDelivery = tx.deliveryMan?.username?.toLowerCase().includes(term);
+        const matchesOrder = tx.order?._id?.toLowerCase().includes(term);
+        if (!matchesCustomer && !matchesDelivery && !matchesOrder) return false;
+      }
+      return true;
+    });
+  }, [cashTransactions, cashStatusFilter, cashSearch]);
+
+  // ✅ Filter cheque transactions by search + status
+  const filteredChequeTransactions = useMemo(() => {
+    return chequeTransactions.filter(tx => {
+      // Status filter
+      if (chequeStatusFilter !== "all" && tx.status !== chequeStatusFilter) return false;
+      
+      // Search filter
+      if (chequeSearch.trim()) {
+        const term = chequeSearch.toLowerCase();
+        const matchesCustomer = tx.order?.customer?.name?.toLowerCase().includes(term);
+        const matchesDelivery = tx.deliveryMan?.username?.toLowerCase().includes(term);
+        const matchesOrder = tx.order?._id?.toLowerCase().includes(term);
+        if (!matchesCustomer && !matchesDelivery && !matchesOrder) return false;
+      }
+      return true;
+    });
+  }, [chequeTransactions, chequeStatusFilter, chequeSearch]);
+
+  // ────────────────────────────────────────────────
+  // ✅ Checkbox handlers for Cash
+  // ────────────────────────────────────────────────
+  const handleCashTxSelect = (txId) => {
+    setSelectedCashTx(prev => 
+      prev.includes(txId) 
+        ? prev.filter(id => id !== txId) 
+        : [...prev, txId]
+    );
+  };
+
+  const handleSelectAllCash = () => {
+    const receivableTx = filteredCashTransactions.filter(tx => tx.status === "received");
+    if (selectAllCash) {
+      setSelectedCashTx([]);
+    } else {
+      setSelectedCashTx(receivableTx.map(tx => tx._id));
+    }
+    setSelectAllCash(!selectAllCash);
+  };
+
+  // ✅ Checkbox handlers for Cheque
+  const handleChequeTxSelect = (txId) => {
+    setSelectedChequeTx(prev => 
+      prev.includes(txId) 
+        ? prev.filter(id => id !== txId) 
+        : [...prev, txId]
+    );
+  };
+
+  const handleSelectAllCheque = () => {
+    const receivableTx = filteredChequeTransactions.filter(tx => tx.status === "received");
+    if (selectAllCheque) {
+      setSelectedChequeTx([]);
+    } else {
+      setSelectedChequeTx(receivableTx.map(tx => tx._id));
+    }
+    setSelectAllCheque(!selectAllCheque);
+  };
+
+  // ✅ Auto-sync selectAll states
+  useEffect(() => {
+    const receivableCash = filteredCashTransactions.filter(tx => tx.status === "received");
+    if (receivableCash.length > 0 && 
+        selectedCashTx.length === receivableCash.length) {
+      setSelectAllCash(true);
+    } else {
+      setSelectAllCash(false);
+    }
+  }, [filteredCashTransactions, selectedCashTx]);
+
+  useEffect(() => {
+    const receivableCheque = filteredChequeTransactions.filter(tx => tx.status === "received");
+    if (receivableCheque.length > 0 && 
+        selectedChequeTx.length === receivableCheque.length) {
+      setSelectAllCheque(true);
+    } else {
+      setSelectAllCheque(false);
+    }
+  }, [filteredChequeTransactions, selectedChequeTx]);
 
   // ────────────────────────────────────────────────
   // Calculate totals (only "paid_to_admin" transactions)
@@ -104,6 +223,22 @@ const WalletMoney = () => {
     setTxToMark(transactionId);
     setConfirmAction("mark-received");
     setShowConfirmModal(true);
+  };
+
+  // ✅ NEW: Handle Bulk Mark as Received
+  const handleBulkMarkReceived = (type) => {
+    const selected = type === "cash" ? selectedCashTx : selectedChequeTx;
+    const filtered = type === "cash" ? filteredCashTransactions : filteredChequeTransactions;
+    
+    const receivableSelected = selected.filter(id => 
+      filtered.find(tx => tx._id === id)?.status === "received"
+    );
+    
+    if (receivableSelected.length === 0) {
+      toast.error(`Please select at least one 'Pending from Delivery' ${type} transaction`);
+      return;
+    }
+    setShowBulkModal(true);
   };
 
   const confirmActionHandler = async () => {
@@ -146,17 +281,93 @@ const WalletMoney = () => {
     }
   };
 
-  // Filter cash transactions
-  const filteredCashTransactions = cashTransactions.filter(tx => {
-    if (cashStatusFilter === "all") return true;
-    return tx.status === cashStatusFilter;
-  });
+  // ✅ NEW: Confirm Bulk Mark as Received
+  const confirmBulkMarkReceived = async () => {
+    setShowBulkModal(false);
+    setBulkProcessing(true);
 
-  // Filter cheque transactions
-  const filteredChequeTransactions = chequeTransactions.filter(tx => {
-    if (chequeStatusFilter === "all") return true;
-    return tx.status === chequeStatusFilter;
-  });
+    try {
+      const token = localStorage.getItem("token");
+      let cashSuccess = 0, cashFail = 0;
+      let chequeSuccess = 0, chequeFail = 0;
+
+      // Process Cash transactions
+      for (const txId of selectedCashTx) {
+        const tx = filteredCashTransactions.find(t => t._id === txId);
+        if (!tx || tx.status !== "received") continue;
+        try {
+          await axios.post(
+            `${backendUrl}/api/wallet/admin/mark-received`,
+            { transactionId: txId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          cashSuccess++;
+        } catch (error) {
+          console.error(`Failed to mark cash ${txId}:`, error);
+          cashFail++;
+        }
+      }
+
+      // Process Cheque transactions
+      for (const txId of selectedChequeTx) {
+        const tx = filteredChequeTransactions.find(t => t._id === txId);
+        if (!tx || tx.status !== "received") continue;
+        try {
+          await axios.post(
+            `${backendUrl}/api/wallet/admin/mark-received`,
+            { transactionId: txId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          chequeSuccess++;
+        } catch (error) {
+          console.error(`Failed to mark cheque ${txId}:`, error);
+          chequeFail++;
+        }
+      }
+
+      // Show summary
+      const totalSuccess = cashSuccess + chequeSuccess;
+      const totalFail = cashFail + chequeFail;
+      
+      if (totalSuccess > 0) {
+        toast.success(`✅ ${totalSuccess} transaction(s) marked as received!`);
+      }
+      if (totalFail > 0) {
+        toast.error(`⚠️ ${totalFail} transaction(s) failed`);
+      }
+      
+      fetchWalletMoney();
+    } catch (error) {
+      console.error("❌ Bulk mark received error:", error);
+      toast.error("Bulk operation failed");
+    } finally {
+      setBulkProcessing(false);
+      setSelectedCashTx([]);
+      setSelectedChequeTx([]);
+      setSelectAllCash(false);
+      setSelectAllCheque(false);
+    }
+  };
+
+  // ────────────────────────────────────────────────
+  // Render helper for cheque details
+  // ────────────────────────────────────────────────
+  const renderChequeDetails = (chequeDetails) => {
+    if (!chequeDetails) return "-";
+    
+    try {
+      const data = typeof chequeDetails === "string" ? JSON.parse(chequeDetails) : chequeDetails;
+      return (
+        <div className="cheque-info">
+          <div><strong>No:</strong> {data.number || "-"}</div>
+          <div><strong>Bank:</strong> {data.bank || "-"}</div>
+          <div><strong>Date:</strong> {data.date ? new Date(data.date).toLocaleDateString() : "-"}</div>
+        </div>
+      );
+    } catch (e) {
+      return <span style={{ color: "#ef4444" }}>Invalid data</span>;
+    }
+  };
 
   if (!user) {
     return <div className="wallet-money-loading">Loading...</div>;
@@ -164,18 +375,9 @@ const WalletMoney = () => {
 
   return (
     <div className="wallet-money-layout">
-      <Header
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        user={user}
-      />
-      <Sidebar
-        isOpen={sidebarOpen}
-        activeItem={activeItem}
-        onSetActiveItem={setActiveItem}
-        onClose={() => setSidebarOpen(false)}
-        user={user}
-      />
+      <Header sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} user={user} />
+      <Sidebar isOpen={sidebarOpen} activeItem={activeItem} onSetActiveItem={setActiveItem} onClose={() => setSidebarOpen(false)} user={user} />
+      
       <main className={`wallet-money-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="wallet-money-container-wrapper">
           <div className="wallet-money-container">
@@ -185,7 +387,6 @@ const WalletMoney = () => {
                 GRAND TOTAL + SUMMARY CARDS
             ────────────────────────────── */}
             <div className="wallet-summary-cards">
-              {/* Grand Total */}
               <div className="summary-card grand-total">
                 <div className="summary-icon">💰</div>
                 <h4>Total Money Collected</h4>
@@ -194,8 +395,6 @@ const WalletMoney = () => {
                   <span>{grandTotal.toFixed(2)}</span>
                 </div>
               </div>
-
-              {/* Cash Total */}
               <div className="summary-card cash">
                 <div className="summary-icon">💵</div>
                 <h4>Total Cash Collected</h4>
@@ -204,8 +403,6 @@ const WalletMoney = () => {
                   <span>{cashTotal.toFixed(2)}</span>
                 </div>
               </div>
-
-              {/* Cheque Total */}
               <div className="summary-card cheque">
                 <div className="summary-icon">📄</div>
                 <h4>Total Cheque Collected</h4>
@@ -220,14 +417,27 @@ const WalletMoney = () => {
                 CASH TRANSACTIONS TABLE
             ────────────────────────────── */}
             <div className="wallet-section">
-              <h3 className="section-title">Cash Payments Received</h3>
+              <div className="section-header-with-actions">
+                <h3 className="section-title">Cash Payments Received</h3>
+                
+                {/* ✅ Search Box for Cash */}
+                <div className="search-box">
+                  <input
+                    type="text"
+                    placeholder="Search customer, delivery, or order ID..."
+                    value={cashSearch}
+                    onChange={(e) => setCashSearch(e.target.value)}
+                    className="search-input"
+                  />
+                  {cashSearch && (
+                    <button className="search-clear" onClick={() => setCashSearch("")} title="Clear search">✕</button>
+                  )}
+                </div>
+              </div>
 
               <div className="wallet-money-filter">
                 <label>Filter Cash by Status: </label>
-                <select 
-                  value={cashStatusFilter} 
-                  onChange={(e) => setCashStatusFilter(e.target.value)}
-                >
+                <select value={cashStatusFilter} onChange={(e) => setCashStatusFilter(e.target.value)}>
                   <option value="all">All Cash</option>
                   <option value="received">Pending from Delivery</option>
                   <option value="pending">Pending Approval</option>
@@ -235,17 +445,51 @@ const WalletMoney = () => {
                 </select>
               </div>
 
+              {/* ✅ Bulk Action Bar for Cash */}
+              {selectedCashTx.length > 0 && (
+                <div className="bulk-action-bar">
+                  <span className="bulk-selection-count">
+                    {selectedCashTx.filter(id => 
+                      filteredCashTransactions.find(tx => tx._id === id)?.status === "received"
+                    ).length} transaction(s) selected
+                  </span>
+                  <button 
+                    className="bulk-mark-btn" 
+                    onClick={() => handleBulkMarkReceived("cash")} 
+                    disabled={bulkProcessing}
+                  >
+                    {bulkProcessing ? "Processing..." : "Mark Selected as Received"}
+                  </button>
+                  <button 
+                    className="bulk-clear-btn" 
+                    onClick={() => { setSelectedCashTx([]); setSelectAllCash(false); }}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              )}
+
               {loading ? (
                 <div className="wallet-money-loading">Loading cash transactions...</div>
               ) : filteredCashTransactions.length === 0 ? (
                 <div className="wallet-money-no-data">
-                  No cash transactions found {cashStatusFilter !== "all" ? `with status "${cashStatusFilter}"` : ""}
+                  No cash transactions found {cashStatusFilter !== "all" || cashSearch ? "matching your filters" : ""}
                 </div>
               ) : (
                 <div className="wallet-money-table-wrapper">
                   <table className="wallet-money-data-table">
                     <thead>
                       <tr>
+                        {/* ✅ Select All Checkbox */}
+                        <th className="checkbox-col">
+                          <input
+                            type="checkbox"
+                            checked={selectAllCash && filteredCashTransactions.filter(tx => tx.status === "received").length > 0}
+                            onChange={handleSelectAllCash}
+                            className="select-all-checkbox"
+                            title="Select all 'Pending from Delivery' cash transactions"
+                          />
+                        </th>
                         <th>No</th>
                         <th>Delivery Partner</th>
                         <th>Customer</th>
@@ -258,55 +502,58 @@ const WalletMoney = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredCashTransactions.map((tx, index) => (
-                        <tr key={tx._id}>
-                          <td>{index + 1}</td>
-                          <td>{tx.deliveryMan?.username || "N/A"}</td>
-                          <td>{tx.order?.customer?.name || "N/A"}</td>
-                          <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
-                          <td>{tx.amount.toFixed(2)}</td>
-                          <td>Cash</td>
-                          <td>{new Date(tx.date).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`wallet-money-status-badge wallet-money-status-${tx.status}`}>
-                              {tx.status === "received" ? "Pending from Delivery" : 
-                               tx.status === "pending" ? "Pending Approval" : 
-                               "Received by Admin"}
-                            </span>
-                          </td>
-                          <td>
-                            {tx.status === "received" && (
-                              <button
-                                className="wallet-money-receive-btn"
-                                onClick={() => handleMarkReceivedClick(tx._id)}
-                                disabled={markingTxId === tx._id}
-                              >
-                                {markingTxId === tx._id ? "Processing..." : "Mark as Received"}
-                              </button>
-                            )}
-                            {tx.status === "pending" && (
-                              <div className="wallet-money-action-icons">
-                                <button 
-                                  className="wallet-money-accept-btn" 
-                                  onClick={() => handleAcceptClick(tx._id)}
+                      {filteredCashTransactions.map((tx, index) => {
+                        const isReceivable = tx.status === "received";
+                        return (
+                          <tr 
+                            key={tx._id}
+                            className={selectedCashTx.includes(tx._id) ? "selected-row" : ""}
+                          >
+                            {/* ✅ Individual Checkbox */}
+                            <td className="checkbox-col">
+                              <input
+                                type="checkbox"
+                                checked={selectedCashTx.includes(tx._id)}
+                                onChange={() => handleCashTxSelect(tx._id)}
+                                className="bill-checkbox"
+                                disabled={!isReceivable}
+                                title={isReceivable ? "Select for bulk action" : `Status: ${tx.status}`}
+                              />
+                            </td>
+                            <td>{index + 1}</td>
+                            <td>{tx.deliveryMan?.username || "N/A"}</td>
+                            <td>{tx.order?.customer?.name || "N/A"}</td>
+                            <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
+                            <td>{tx.amount.toFixed(2)}</td>
+                            <td>Cash</td>
+                            <td>{new Date(tx.date).toLocaleDateString()}</td>
+                            <td>
+                              <span className={`wallet-money-status-badge wallet-money-status-${tx.status}`}>
+                                {tx.status === "received" ? "Pending from Delivery" : 
+                                 tx.status === "pending" ? "Pending Approval" : 
+                                 "Received by Admin"}
+                              </span>
+                            </td>
+                            <td>
+                              {isReceivable && (
+                                <button
+                                  className="wallet-money-receive-btn"
+                                  onClick={() => handleMarkReceivedClick(tx._id)}
                                   disabled={markingTxId === tx._id}
-                                  aria-label="Accept"
                                 >
-                                  ✓
+                                  {markingTxId === tx._id ? "Processing..." : "Mark as Received"}
                                 </button>
-                                <button 
-                                  className="wallet-money-reject-btn" 
-                                  onClick={() => handleRejectClick(tx._id)}
-                                  disabled={markingTxId === tx._id}
-                                  aria-label="Reject"
-                                >
-                                  ✗
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                              )}
+                              {tx.status === "pending" && (
+                                <div className="wallet-money-action-icons">
+                                  <button className="wallet-money-accept-btn" onClick={() => handleAcceptClick(tx._id)} disabled={markingTxId === tx._id}>✓</button>
+                                  <button className="wallet-money-reject-btn" onClick={() => handleRejectClick(tx._id)} disabled={markingTxId === tx._id}>✗</button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -317,14 +564,27 @@ const WalletMoney = () => {
                 CHEQUE TRANSACTIONS TABLE
             ────────────────────────────── */}
             <div className="wallet-section">
-              <h3 className="section-title">Cheque Payments Received</h3>
+              <div className="section-header-with-actions">
+                <h3 className="section-title">Cheque Payments Received</h3>
+                
+                {/* ✅ Search Box for Cheque */}
+                <div className="search-box">
+                  <input
+                    type="text"
+                    placeholder="Search customer, delivery, or order ID..."
+                    value={chequeSearch}
+                    onChange={(e) => setChequeSearch(e.target.value)}
+                    className="search-input"
+                  />
+                  {chequeSearch && (
+                    <button className="search-clear" onClick={() => setChequeSearch("")} title="Clear search">✕</button>
+                  )}
+                </div>
+              </div>
 
               <div className="wallet-money-filter">
                 <label>Filter Cheque by Status: </label>
-                <select 
-                  value={chequeStatusFilter} 
-                  onChange={(e) => setChequeStatusFilter(e.target.value)}
-                >
+                <select value={chequeStatusFilter} onChange={(e) => setChequeStatusFilter(e.target.value)}>
                   <option value="all">All Cheque</option>
                   <option value="received">Pending from Delivery</option>
                   <option value="pending">Pending Approval</option>
@@ -332,17 +592,51 @@ const WalletMoney = () => {
                 </select>
               </div>
 
+              {/* ✅ Bulk Action Bar for Cheque */}
+              {selectedChequeTx.length > 0 && (
+                <div className="bulk-action-bar">
+                  <span className="bulk-selection-count">
+                    {selectedChequeTx.filter(id => 
+                      filteredChequeTransactions.find(tx => tx._id === id)?.status === "received"
+                    ).length} transaction(s) selected
+                  </span>
+                  <button 
+                    className="bulk-mark-btn" 
+                    onClick={() => handleBulkMarkReceived("cheque")} 
+                    disabled={bulkProcessing}
+                  >
+                    {bulkProcessing ? "Processing..." : "Mark Selected as Received"}
+                  </button>
+                  <button 
+                    className="bulk-clear-btn" 
+                    onClick={() => { setSelectedChequeTx([]); setSelectAllCheque(false); }}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              )}
+
               {loading ? (
                 <div className="wallet-money-loading">Loading cheque transactions...</div>
               ) : filteredChequeTransactions.length === 0 ? (
                 <div className="wallet-money-no-data">
-                  No cheque transactions found {chequeStatusFilter !== "all" ? `with status "${chequeStatusFilter}"` : ""}
+                  No cheque transactions found {chequeStatusFilter !== "all" || chequeSearch ? "matching your filters" : ""}
                 </div>
               ) : (
                 <div className="wallet-money-table-wrapper">
                   <table className="wallet-money-data-table">
                     <thead>
                       <tr>
+                        {/* ✅ Select All Checkbox */}
+                        <th className="checkbox-col">
+                          <input
+                            type="checkbox"
+                            checked={selectAllCheque && filteredChequeTransactions.filter(tx => tx.status === "received").length > 0}
+                            onChange={handleSelectAllCheque}
+                            className="select-all-checkbox"
+                            title="Select all 'Pending from Delivery' cheque transactions"
+                          />
+                        </th>
                         <th>No</th>
                         <th>Delivery Partner</th>
                         <th>Customer</th>
@@ -356,84 +650,59 @@ const WalletMoney = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredChequeTransactions.map((tx, index) => (
-                        <tr key={tx._id}>
-                          <td>{index + 1}</td>
-                          <td>{tx.deliveryMan?.username || "N/A"}</td>
-                          <td>{tx.order?.customer?.name || "N/A"}</td>
-                          <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
-                          <td>{tx.amount.toFixed(2)}</td>
-                          <td>Cheque</td>
-                          <td>
-                            {tx.chequeDetails ? (
-                              (() => {
-                                if (typeof tx.chequeDetails === "object" && tx.chequeDetails !== null) {
-                                  const data = tx.chequeDetails;
-                                  return (
-                                    <div className="cheque-info">
-                                      <div><strong>Number:</strong> {data.number || "-"}</div>
-                                      <div><strong>Bank:</strong> {data.bank || "-"}</div>
-                                      <div><strong>Date:</strong> {data.date ? new Date(data.date).toLocaleDateString() : "-"}</div>
-                                    </div>
-                                  );
-                                }
-
-                                try {
-                                  const data = JSON.parse(tx.chequeDetails);
-                                  return (
-                                    <div className="cheque-info">
-                                      <div><strong>Number:</strong> {data.number || "-"}</div>
-                                      <div><strong>Bank:</strong> {data.bank || "-"}</div>
-                                      <div><strong>Date:</strong> {data.date ? new Date(data.date).toLocaleDateString() : "-"}</div>
-                                    </div>
-                                  );
-                                } catch (e) {
-                                  return <span style={{ color: "#ef4444" }}>{tx.chequeDetails || "Invalid data"}</span>;
-                                }
-                              })()
-                            ) : "-"}
-                          </td>
-                          <td>{new Date(tx.date).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`wallet-money-status-badge wallet-money-status-${tx.status}`}>
-                              {tx.status === "received" ? "Pending from Delivery" : 
-                               tx.status === "pending" ? "Pending Approval" : 
-                               "Received by Admin"}
-                            </span>
-                          </td>
-                          <td>
-                            {tx.status === "received" && (
-                              <button
-                                className="wallet-money-receive-btn"
-                                onClick={() => handleMarkReceivedClick(tx._id)}
-                                disabled={markingTxId === tx._id}
-                              >
-                                {markingTxId === tx._id ? "Processing..." : "Mark as Received"}
-                              </button>
-                            )}
-                            {tx.status === "pending" && (
-                              <div className="wallet-money-action-icons">
-                                <button 
-                                  className="wallet-money-accept-btn" 
-                                  onClick={() => handleAcceptClick(tx._id)}
+                      {filteredChequeTransactions.map((tx, index) => {
+                        const isReceivable = tx.status === "received";
+                        return (
+                          <tr 
+                            key={tx._id}
+                            className={selectedChequeTx.includes(tx._id) ? "selected-row" : ""}
+                          >
+                            {/* ✅ Individual Checkbox */}
+                            <td className="checkbox-col">
+                              <input
+                                type="checkbox"
+                                checked={selectedChequeTx.includes(tx._id)}
+                                onChange={() => handleChequeTxSelect(tx._id)}
+                                className="bill-checkbox"
+                                disabled={!isReceivable}
+                                title={isReceivable ? "Select for bulk action" : `Status: ${tx.status}`}
+                              />
+                            </td>
+                            <td>{index + 1}</td>
+                            <td>{tx.deliveryMan?.username || "N/A"}</td>
+                            <td>{tx.order?.customer?.name || "N/A"}</td>
+                            <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
+                            <td>{tx.amount.toFixed(2)}</td>
+                            <td>Cheque</td>
+                            <td>{renderChequeDetails(tx.chequeDetails)}</td>
+                            <td>{new Date(tx.date).toLocaleDateString()}</td>
+                            <td>
+                              <span className={`wallet-money-status-badge wallet-money-status-${tx.status}`}>
+                                {tx.status === "received" ? "Pending from Delivery" : 
+                                 tx.status === "pending" ? "Pending Approval" : 
+                                 "Received by Admin"}
+                              </span>
+                            </td>
+                            <td>
+                              {isReceivable && (
+                                <button
+                                  className="wallet-money-receive-btn"
+                                  onClick={() => handleMarkReceivedClick(tx._id)}
                                   disabled={markingTxId === tx._id}
-                                  aria-label="Accept"
                                 >
-                                  ✓
+                                  {markingTxId === tx._id ? "Processing..." : "Mark as Received"}
                                 </button>
-                                <button 
-                                  className="wallet-money-reject-btn" 
-                                  onClick={() => handleRejectClick(tx._id)}
-                                  disabled={markingTxId === tx._id}
-                                  aria-label="Reject"
-                                >
-                                  ✗
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                              )}
+                              {tx.status === "pending" && (
+                                <div className="wallet-money-action-icons">
+                                  <button className="wallet-money-accept-btn" onClick={() => handleAcceptClick(tx._id)} disabled={markingTxId === tx._id}>✓</button>
+                                  <button className="wallet-money-reject-btn" onClick={() => handleRejectClick(tx._id)} disabled={markingTxId === tx._id}>✗</button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -443,7 +712,7 @@ const WalletMoney = () => {
         </div>
       </main>
 
-      {/* Confirmation Modal for Accept/Reject/Mark Received */}
+      {/* Single Action Confirmation Modal */}
       {showConfirmModal && (
         <div className="confirm-modal-overlay">
           <div className="confirm-modal">
@@ -460,12 +729,7 @@ const WalletMoney = () => {
                 : "Are you sure you have received this amount from the delivery partner?"}
             </p>
             <div className="confirm-actions">
-              <button
-                className="confirm-cancel"
-                onClick={() => setShowConfirmModal(false)}
-              >
-                Cancel
-              </button>
+              <button className="confirm-cancel" onClick={() => setShowConfirmModal(false)}>Cancel</button>
               <button
                 className="confirm-confirm"
                 onClick={confirmActionHandler}
@@ -475,6 +739,45 @@ const WalletMoney = () => {
                  confirmAction === "accept" ? "Yes, Accept" :
                  confirmAction === "reject" ? "Yes, Reject" :
                  "Yes, Received"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NEW: Bulk Action Confirmation Modal */}
+      {showBulkModal && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal bulk-modal">
+            <h3 className="confirm-title">Mark Selected Transactions as Received?</h3>
+            <p className="confirm-text">
+              Are you sure you have received these amounts from delivery partners? 
+              They will be credited to the admin wallet.
+            </p>
+            <p className="text-muted small">
+              <strong>Cash:</strong> {selectedCashTx.filter(id => 
+                filteredCashTransactions.find(tx => tx._id === id)?.status === "received"
+              ).length} transaction(s) • 
+              <strong>Cheque:</strong> {selectedChequeTx.filter(id => 
+                filteredChequeTransactions.find(tx => tx._id === id)?.status === "received"
+              ).length} transaction(s)
+            </p>
+            <p className="text-muted small">
+              <strong>Total Amount:</strong> AED {(
+                [...selectedCashTx, ...selectedChequeTx]
+                  .map(id => [...filteredCashTransactions, ...filteredChequeTransactions].find(tx => tx._id === id))
+                  .filter(tx => tx?.status === "received")
+                  .reduce((sum, tx) => sum + (tx?.amount || 0), 0)
+              ).toFixed(2)}
+            </p>
+            <div className="confirm-actions">
+              <button className="confirm-cancel" onClick={() => setShowBulkModal(false)}>Cancel</button>
+              <button
+                className="confirm-confirm bulk-confirm"
+                onClick={confirmBulkMarkReceived}
+                disabled={bulkProcessing}
+              >
+                {bulkProcessing ? "Processing..." : "Yes, Mark All as Received"}
               </button>
             </div>
           </div>

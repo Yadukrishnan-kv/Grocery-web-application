@@ -530,3 +530,80 @@ button:disabled {
   border-radius: 4px;
   cursor: pointer;
 }
+/* Row highlighting */
+.data-table tbody tr.received-row {
+  background-color: #e3f2fd !important; /* Light blue for "received but not sent" */
+  border-left: 4px solid #2196f3;
+}
+
+.data-table tbody tr.pending-row {
+  background-color: #fff8e1 !important;
+  border-left: 4px solid #ffc107;
+}
+
+.data-table tbody tr.paid-row {
+  background-color: #e8f5e9 !important;
+  border-left: 4px solid #28a745;
+  opacity: 0.9;
+}
+
+/* Status badge colors */
+.status-badge.status-received {
+  background: #2196f3; /* Blue for "received but not sent" */
+  color: white;
+}
+.status-badge.status-pending {
+  background: #ffc107;
+  color: #212529;
+}
+.status-badge.status-paid_to_admin {
+  background: #28a745;
+  color: white;
+}
+
+/* Action buttons */
+.mark-received-btn {
+  background-color: #2196f3; /* Blue for direct admin mark */
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+.mark-received-btn:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+.mark-received-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.accept-btn {
+  background-color: #28a745;
+  color: white;
+}
+.reject-btn {
+  background-color: #dc3545;
+  color: white;
+}
+
+/* Summary card for received-not-sent */
+.summary-card.received-not-sent {
+  border-left: 4px solid #2196f3;
+  background: #e3f2fd;
+}
+
+/* Modal button colors */
+.confirm-mark-received {
+  background: #2196f3;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.confirm-mark-received:hover:not(:disabled) {
+  background: #1976d2;
+}

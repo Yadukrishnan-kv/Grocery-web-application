@@ -1,24 +1,26 @@
 // src/pages/Admin/CreateCustomer.jsx
-import React, { useEffect, useState, useCallback } from 'react';
-import Header from '../../../components/layout/Header/Header';
-import Sidebar from '../../../components/layout/Sidebar/Sidebar';
-import './CreateCustomer.css';
-import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import React, { useEffect, useState, useCallback } from "react";
+import Header from "../../../components/layout/Header/Header";
+import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+import "./CreateCustomer.css";
+import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
+import toast from "react-hot-toast";
 
 const CreateCustomer = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phoneNumber: '',
-    address: '',
-    pincode: '',
-    creditLimit: '',
-    billingType: 'Credit limit',
-    statementType: '',
-    dueDays: '',
+    name: "",
+    email: "",
+    phoneNumber: "",
+    address: "",
+    pincode: "",
+    creditLimit: "",
+    billingType: "Credit limit",
+    statementType: "",
+    dueDays: "",
+    openingBalance: "",
+    openingBalanceDueDays: "",
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -34,38 +36,52 @@ const CreateCustomer = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Customer name is required';
+    if (!formData.name.trim()) newErrors.name = "Customer name is required";
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Invalid email format";
     }
+    if (!formData.phoneNumber.trim())
+      newErrors.phoneNumber = "Phone number is required";
+    if (!formData.address.trim()) newErrors.address = "Address is required";
+    if (!formData.pincode.trim()) newErrors.pincode = "Pincode is required";
 
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please provide a valid email';
-    }
-
-    if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Phone number is required';
-    }
-
-    if (!formData.address.trim()) {
-      newErrors.address = 'Address is required';
-    }
-
-    if (!formData.pincode.trim()) {
-      newErrors.pincode = 'Pincode is required';
-    }
-
-    if (!formData.creditLimit || isNaN(formData.creditLimit) || parseFloat(formData.creditLimit) < 0) {
-      newErrors.creditLimit = 'Valid credit limit is required';
+    if (
+      !formData.creditLimit ||
+      isNaN(formData.creditLimit) ||
+      parseFloat(formData.creditLimit) < 0
+    ) {
+      newErrors.creditLimit = "Valid credit limit ≥ 0 required";
     }
 
     if (formData.billingType === "Credit limit") {
-      if (!formData.statementType) {
-        newErrors.statementType = 'Statement type is required for Credit limit';
+      if (!formData.statementType)
+        newErrors.statementType = "Statement type required";
+      if (
+        !formData.dueDays ||
+        isNaN(formData.dueDays) ||
+        parseInt(formData.dueDays) < 0
+      ) {
+        newErrors.dueDays = "Valid due days ≥ 0 required";
       }
-      if (!formData.dueDays || isNaN(formData.dueDays) || parseInt(formData.dueDays) < 0) {
-        newErrors.dueDays = 'Valid due days is required (non-negative number)';
+    }
+
+    // Opening balance validation
+    const openingBal = parseFloat(formData.openingBalance) || 0;
+    if (openingBal < 0) {
+      newErrors.openingBalance = "Opening balance cannot be negative";
+    }
+    if (openingBal > parseFloat(formData.creditLimit || 0)) {
+      newErrors.openingBalance = "Opening balance cannot exceed credit limit";
+    }
+    if (openingBal > 0) {
+      if (
+        !formData.openingBalanceDueDays ||
+        isNaN(formData.openingBalanceDueDays) ||
+        parseInt(formData.openingBalanceDueDays) < 0
+      ) {
+        newErrors.openingBalanceDueDays =
+          "Valid due days required when opening balance > 0";
       }
     }
 
@@ -75,33 +91,29 @@ const CreateCustomer = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
 
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) return;
 
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const config = {
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       };
 
       const submitData = {
@@ -112,94 +124,111 @@ const CreateCustomer = () => {
         pincode: formData.pincode.trim(),
         creditLimit: parseFloat(formData.creditLimit),
         billingType: formData.billingType,
-        statementType: formData.billingType === "Credit limit" ? formData.statementType : null,
-        dueDays: formData.billingType === "Credit limit" ? parseInt(formData.dueDays) : null,
+        statementType:
+          formData.billingType === "Credit limit"
+            ? formData.statementType
+            : null,
+        dueDays:
+          formData.billingType === "Credit limit"
+            ? parseInt(formData.dueDays)
+            : null,
+        openingBalance: formData.openingBalance
+          ? parseFloat(formData.openingBalance)
+          : 0,
+        openingBalanceDueDays: formData.openingBalanceDueDays
+          ? parseInt(formData.openingBalanceDueDays)
+          : null,
       };
 
       let response;
-
       if (isEdit) {
         response = await axios.put(
           `${backendUrl}/api/customers/updatecustomer/${customerId}`,
           submitData,
-          config
+          config,
         );
-        toast.success('Customer updated successfully!');
+        toast.success("Customer updated successfully!");
       } else {
         response = await axios.post(
           `${backendUrl}/api/customers/createcustomer`,
           submitData,
-          config
+          config,
         );
-        toast.success('Customer created successfully!');
+        toast.success("Customer created successfully!");
       }
 
-      // Show login credentials toast for new customers (if returned)
+      // Show login credentials for new customer (if provided by backend)
       if (!isEdit && response.data?.defaultLoginInfo) {
-        const { email, temporaryPassword, note } = response.data.defaultLoginInfo;
+        const { email, temporaryPassword, note } =
+          response.data.defaultLoginInfo;
         toast.success(
-          `Login credentials created!\nEmail: ${email}\nTemporary Password: ${temporaryPassword}\n${note || ''}`,
-          { duration: 8000, style: { whiteSpace: 'pre-line' } }
+          `Login created!\nEmail: ${email}\nTemp Password: ${temporaryPassword}\n${note || ""}`,
+          { duration: 8000, style: { whiteSpace: "pre-line" } },
         );
       }
 
-      // Navigate after toast is visible
-      setTimeout(() => {
-        navigate('/customer/list');
-      }, 2000);
+      setTimeout(() => navigate("/customer/list"), 2000);
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again.';
-      toast.error(errorMessage);
+      toast.error(err.response?.data?.message || "Failed to save customer");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchCustomerData = useCallback(async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/customers/getcustomerbyid/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  const fetchCustomerData = useCallback(
+    async (id) => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${backendUrl}/api/customers/getcustomerbyid/${id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
 
-      const customer = response.data;
-      setFormData({
-        name: customer.name,
-        email: customer.email,
-        phoneNumber: customer.phoneNumber,
-        address: customer.address,
-        pincode: customer.pincode,
-        creditLimit: customer.creditLimit.toString(),
-        billingType: customer.billingType,
-        statementType: customer.statementType || '',
-        dueDays: customer.dueDays ? customer.dueDays.toString() : '',
-      });
-      setIsEdit(true);
-      setCustomerId(id);
-    } catch (error) {
-      console.error("Failed to fetch customer data", error);
-      toast.error("Failed to load customer data");
-      navigate('/customer/list');
-    }
-  }, [backendUrl, navigate]);
+        const customer = response.data;
+        setFormData({
+          name: customer.name || "",
+          email: customer.email || "",
+          phoneNumber: customer.phoneNumber || "",
+          address: customer.address || "",
+          pincode: customer.pincode || "",
+          creditLimit: customer.creditLimit?.toString() || "",
+          billingType: customer.billingType || "Credit limit",
+          statementType: customer.statementType || "",
+          dueDays: customer.dueDays?.toString() || "",
+          openingBalance: customer.openingBalance?.toString() || "0",
+          openingBalanceDueDays:
+            customer.openingBalanceDueDays?.toString() || "",
+        });
+        setIsEdit(true);
+        setCustomerId(id);
+      } catch (error) {
+        console.error("Failed to fetch customer data", error);
+        toast.error("Failed to load customer data");
+        navigate("/customer/list");
+      }
+    },
+    [backendUrl, navigate],
+  );
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        navigate('/login');
+        navigate("/login");
         return;
       }
 
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       setUser(response.data.user || response.data);
     } catch (error) {
       console.error("Failed to load user", error);
-      localStorage.removeItem('token');
-      navigate('/login');
+      localStorage.removeItem("token");
+      navigate("/login");
     } finally {
       setLoading(false);
     }
@@ -207,7 +236,7 @@ const CreateCustomer = () => {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const editId = searchParams.get('edit');
+    const editId = searchParams.get("edit");
 
     if (editId) {
       fetchCustomerData(editId);
@@ -240,9 +269,11 @@ const CreateCustomer = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`customer-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`customer-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="customer-form-card">
-          <h1>{isEdit ? 'Edit Customer' : 'Create New Customer'}</h1>
+          <h1>{isEdit ? "Edit Customer" : "Create New Customer"}</h1>
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="customer-form-row">
@@ -259,7 +290,11 @@ const CreateCustomer = () => {
                   className="customer-input"
                 />
                 {errors.name && (
-                  <p id="name-error" className="customer-error-text" role="alert">
+                  <p
+                    id="name-error"
+                    className="customer-error-text"
+                    role="alert"
+                  >
                     {errors.name}
                   </p>
                 )}
@@ -278,7 +313,11 @@ const CreateCustomer = () => {
                   className="customer-input"
                 />
                 {errors.email && (
-                  <p id="email-error" className="customer-error-text" role="alert">
+                  <p
+                    id="email-error"
+                    className="customer-error-text"
+                    role="alert"
+                  >
                     {errors.email}
                   </p>
                 )}
@@ -295,11 +334,17 @@ const CreateCustomer = () => {
                   value={formData.phoneNumber}
                   onChange={handleChange}
                   aria-invalid={!!errors.phoneNumber}
-                  aria-describedby={errors.phoneNumber ? "phonenumber-error" : undefined}
+                  aria-describedby={
+                    errors.phoneNumber ? "phonenumber-error" : undefined
+                  }
                   className="customer-input"
                 />
                 {errors.phoneNumber && (
-                  <p id="phonenumber-error" className="customer-error-text" role="alert">
+                  <p
+                    id="phonenumber-error"
+                    className="customer-error-text"
+                    role="alert"
+                  >
                     {errors.phoneNumber}
                   </p>
                 )}
@@ -314,11 +359,17 @@ const CreateCustomer = () => {
                   value={formData.pincode}
                   onChange={handleChange}
                   aria-invalid={!!errors.pincode}
-                  aria-describedby={errors.pincode ? "pincode-error" : undefined}
+                  aria-describedby={
+                    errors.pincode ? "pincode-error" : undefined
+                  }
                   className="customer-input"
                 />
                 {errors.pincode && (
-                  <p id="pincode-error" className="customer-error-text" role="alert">
+                  <p
+                    id="pincode-error"
+                    className="customer-error-text"
+                    role="alert"
+                  >
                     {errors.pincode}
                   </p>
                 )}
@@ -338,7 +389,11 @@ const CreateCustomer = () => {
                 className="customer-textarea"
               />
               {errors.address && (
-                <p id="address-error" className="customer-error-text" role="alert">
+                <p
+                  id="address-error"
+                  className="customer-error-text"
+                  role="alert"
+                >
                   {errors.address}
                 </p>
               )}
@@ -356,11 +411,17 @@ const CreateCustomer = () => {
                   value={formData.creditLimit}
                   onChange={handleChange}
                   aria-invalid={!!errors.creditLimit}
-                  aria-describedby={errors.creditLimit ? "creditlimit-error" : undefined}
+                  aria-describedby={
+                    errors.creditLimit ? "creditlimit-error" : undefined
+                  }
                   className="customer-input"
                 />
                 {errors.creditLimit && (
-                  <p id="creditlimit-error" className="customer-error-text" role="alert">
+                  <p
+                    id="creditlimit-error"
+                    className="customer-error-text"
+                    role="alert"
+                  >
                     {errors.creditLimit}
                   </p>
                 )}
@@ -397,7 +458,11 @@ const CreateCustomer = () => {
                     <option value="monthly">Monthly Statement</option>
                   </select>
                   {errors.statementType && (
-                    <p id="statementType-error" className="customer-error-text" role="alert">
+                    <p
+                      id="statementType-error"
+                      className="customer-error-text"
+                      role="alert"
+                    >
                       {errors.statementType}
                     </p>
                   )}
@@ -413,11 +478,17 @@ const CreateCustomer = () => {
                     value={formData.dueDays}
                     onChange={handleChange}
                     aria-invalid={!!errors.dueDays}
-                    aria-describedby={errors.dueDays ? "dueDays-error" : undefined}
+                    aria-describedby={
+                      errors.dueDays ? "dueDays-error" : undefined
+                    }
                     className="customer-input"
                   />
                   {errors.dueDays && (
-                    <p id="dueDays-error" className="customer-error-text" role="alert">
+                    <p
+                      id="dueDays-error"
+                      className="customer-error-text"
+                      role="alert"
+                    >
                       {errors.dueDays}
                     </p>
                   )}
@@ -425,13 +496,64 @@ const CreateCustomer = () => {
               </div>
             )}
 
+            {/* Opening Balance Section */}
+            <div className="customer-form-row">
+              <div className="customer-form-group">
+                <label htmlFor="openingBalance">
+                  Opening Balance (AED) - Existing Due
+                </label>
+                <input
+                  id="openingBalance"
+                  name="openingBalance"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.openingBalance}
+                  onChange={handleChange}
+                  className="customer-input"
+                />
+                {errors.openingBalance && (
+                  <p className="customer-error-text">{errors.openingBalance}</p>
+                )}
+              </div>
+
+              {parseFloat(formData.openingBalance || 0) > 0 && (
+                <div className="customer-form-group">
+                  <label htmlFor="openingBalanceDueDays">
+                    Due Days for Opening Balance
+                  </label>
+                  <input
+                    id="openingBalanceDueDays"
+                    name="openingBalanceDueDays"
+                    type="number"
+                    min="0"
+                    value={formData.openingBalanceDueDays}
+                    onChange={handleChange}
+                    placeholder="e.g. 15 days"
+                    className="customer-input"
+                  />
+                  {errors.openingBalanceDueDays && (
+                    <p className="customer-error-text">
+                      {errors.openingBalanceDueDays}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
               className="customer-submit-button"
               disabled={isLoading}
               aria-busy={isLoading}
             >
-              {isLoading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Customer' : 'Create Customer')}
+              {isLoading
+                ? isEdit
+                  ? "Updating..."
+                  : "Creating..."
+                : isEdit
+                  ? "Update Customer"
+                  : "Create Customer"}
             </button>
           </form>
         </div>

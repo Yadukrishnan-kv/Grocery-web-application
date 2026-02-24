@@ -1,23 +1,23 @@
 // src/pages/Admin/CustomerList.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import Header from '../../../components/layout/Header/Header';
-import Sidebar from '../../../components/layout/Sidebar/Sidebar';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Link } from "react-router-dom";
+import Header from "../../../components/layout/Header/Header";
+import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
-import './CustomerList.css';
-import axios from 'axios';
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import "./CustomerList.css";
+import axios from "axios";
+import toast from "react-hot-toast";
 
 const CustomerList = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState('Customers');
+  const [activeItem, setActiveItem] = useState("Customers");
   const [user, setUser] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dueDaysFilter, setDueDaysFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dueDaysFilter, setDueDaysFilter] = useState("all");
 
-  // NEW: Confirmation modal for delete
+  // Delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
 
@@ -25,32 +25,35 @@ const CustomerList = () => {
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        window.location.href = '/login';
+        window.location.href = "/login";
         return;
       }
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       setUser(response.data.user || response.data);
     } catch (error) {
       console.error("Failed to load user", error);
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem("token");
+      window.location.href = "/login";
     }
   }, [backendUrl]);
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/customers/getallcustomerswithdue`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/customers/getallcustomerswithdue`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setCustomers(response.data);
     } catch (error) {
-      console.error('Error fetching customers:', error);
-      toast.error('Failed to load customers');
+      console.error("Error fetching customers:", error);
+      toast.error("Failed to load customers");
     } finally {
       setLoading(false);
     }
@@ -72,23 +75,29 @@ const CustomerList = () => {
     setShowDeleteModal(false);
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`${backendUrl}/api/customers/deletecustomer/${customerToDelete.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const token = localStorage.getItem("token");
+      await axios.delete(
+        `${backendUrl}/api/customers/deletecustomer/${customerToDelete.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
-      toast.success(`Customer "${customerToDelete.customerName}" deleted successfully!`);
+      toast.success(
+        `Customer "${customerToDelete.customerName}" deleted successfully!`,
+      );
       fetchCustomers();
     } catch (error) {
-      console.error('Error deleting customer:', error);
-      toast.error('Failed to delete customer. Please try again.');
+      console.error("Error deleting customer:", error);
+      toast.error("Failed to delete customer. Please try again.");
     } finally {
       setCustomerToDelete(null);
     }
   };
 
   const getDaysRemaining = (customer) => {
-    return customer.pendingBillDaysLeft !== undefined && customer.pendingBillDaysLeft !== null
+    return customer.pendingBillDaysLeft !== undefined &&
+      customer.pendingBillDaysLeft !== null
       ? customer.pendingBillDaysLeft
       : null;
   };
@@ -107,31 +116,36 @@ const CustomerList = () => {
     return "due-green";
   };
 
-  const clearSearch = () => setSearchTerm('');
+  const clearSearch = () => setSearchTerm("");
 
   const filteredCustomers = useMemo(() => {
-    return customers.filter(customer => {
-      const matchesSearch = !searchTerm.trim() ||
+    return customers.filter((customer) => {
+      const matchesSearch =
+        !searchTerm.trim() ||
         customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const daysLeft = getDaysRemaining(customer);
 
-      if (dueDaysFilter === 'all') return matchesSearch;
+      if (dueDaysFilter === "all") return matchesSearch;
 
-      if (dueDaysFilter === 'no-pending') {
+      if (dueDaysFilter === "no-pending") {
         return matchesSearch && daysLeft === null;
       }
-      if (dueDaysFilter === 'overdue') {
+      if (dueDaysFilter === "overdue") {
         return matchesSearch && daysLeft !== null && daysLeft < 0;
       }
-      if (dueDaysFilter === '1-5') {
-        return matchesSearch && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
+      if (dueDaysFilter === "1-5") {
+        return (
+          matchesSearch && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5
+        );
       }
-      if (dueDaysFilter === '6-15') {
-        return matchesSearch && daysLeft !== null && daysLeft > 5 && daysLeft <= 15;
+      if (dueDaysFilter === "6-15") {
+        return (
+          matchesSearch && daysLeft !== null && daysLeft > 5 && daysLeft <= 15
+        );
       }
-      if (dueDaysFilter === '16+') {
+      if (dueDaysFilter === "16+") {
         return matchesSearch && daysLeft !== null && daysLeft > 15;
       }
 
@@ -157,7 +171,9 @@ const CustomerList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`customer-list-main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`customer-list-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="customer-list-container-wrapper">
           <div className="customer-list-container">
             <div className="customer-list-header-section">
@@ -173,14 +189,20 @@ const CustomerList = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                   {searchTerm && (
-                    <button className="customer-list-search-clear" onClick={clearSearch}>
+                    <button
+                      className="customer-list-search-clear"
+                      onClick={clearSearch}
+                    >
                       ×
                     </button>
                   )}
                 </div>
 
                 <div className="customer-list-filter-group">
-                  <label htmlFor="dueDaysFilter" className="customer-list-filter-label">
+                  <label
+                    htmlFor="dueDaysFilter"
+                    className="customer-list-filter-label"
+                  >
                     Due Days:
                   </label>
                   <select
@@ -198,7 +220,10 @@ const CustomerList = () => {
                   </select>
                 </div>
 
-                <Link to="/customer/create" className="customer-list-create-button">
+                <Link
+                  to="/customer/create"
+                  className="customer-list-create-button"
+                >
                   Create Customer
                 </Link>
               </div>
@@ -209,8 +234,8 @@ const CustomerList = () => {
             ) : filteredCustomers.length === 0 ? (
               <div className="customer-list-no-data">
                 No customers found
-                {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
-                {dueDaysFilter !== 'all' ? ` with due filter` : ''}
+                {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
+                {dueDaysFilter !== "all" ? ` with due filter` : ""}
               </div>
             ) : (
               <div className="customer-list-table-wrapper">
@@ -225,6 +250,8 @@ const CustomerList = () => {
                       <th scope="col">Pincode</th>
                       <th scope="col">Credit Limit</th>
                       <th scope="col">Balance</th>
+                      <th scope="col">Opening Balance</th>
+                      <th scope="col">Opening Due Days</th>
                       <th scope="col">Billing Type</th>
                       <th scope="col">Statement Type</th>
                       <th scope="col">Due Days</th>
@@ -239,48 +266,101 @@ const CustomerList = () => {
                       const dueStatusText = getDueStatusText(daysLeft);
                       const dueClass = getDueClass(daysLeft);
 
+                      // NEW: Show "-" when no opening balance/due days
+                      const openingBalanceDisplay =
+                        customer.openingBalance > 0
+                          ? customer.openingBalance.toFixed(2)
+                          : "-";
+                      const openingDueDaysDisplay =
+                        customer.openingBalanceDueDays
+                          ? `${customer.openingBalanceDueDays} days`
+                          : "-";
+
                       return (
                         <tr key={customer._id}>
                           <td>{index + 1}</td>
-                          <td>{customer.name}</td>
-                          <td>{customer.email}</td>
-                          <td>{customer.phoneNumber}</td>
-                          <td>{customer.address}</td>
-                          <td>{customer.pincode}</td>
+                          <td>{customer.name || "-"}</td>
+                          <td>{customer.email || "-"}</td>
+                          <td>{customer.phoneNumber || "-"}</td>
+                          <td>{customer.address || "-"}</td>
+                          <td>{customer.pincode || "-"}</td>
+
                           <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
                               <img
                                 src={DirhamSymbol}
-                                alt="Dirham Symbol"
+                                alt="AED"
                                 width={15}
                                 height={15}
                                 style={{ paddingTop: "3px" }}
                               />
-                              <span>{customer.creditLimit?.toFixed(2) || "0.00"}</span>
+                              <span>
+                                {customer.creditLimit?.toFixed(2) || "0.00"}
+                              </span>
                             </div>
                           </td>
+
                           <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
                               <img
                                 src={DirhamSymbol}
-                                alt="Dirham Symbol"
+                                alt="AED"
                                 width={15}
                                 height={15}
                                 style={{ paddingTop: "3px" }}
                               />
-                              <span>{customer.balanceCreditLimit?.toFixed(2) || "0.00"}</span>
+                              <span>
+                                {customer.balanceCreditLimit?.toFixed(2) ||
+                                  "0.00"}
+                              </span>
                             </div>
                           </td>
-                          <td>{customer.billingType}</td>
+
+                          {/* NEW COLUMNS */}
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="AED"
+                                width={15}
+                                height={15}
+                                style={{ paddingTop: "3px" }}
+                              />
+                              <span>{openingBalanceDisplay}</span>
+                            </div>
+                          </td>
+
+                          <td>{openingDueDaysDisplay}</td>
+
+                          <td>{customer.billingType || "-"}</td>
                           <td>
                             {customer.statementType
-                              ? customer.statementType.charAt(0).toUpperCase() + customer.statementType.slice(1)
-                              : 'N/A'}
+                              ? customer.statementType.charAt(0).toUpperCase() +
+                                customer.statementType.slice(1)
+                              : "-"}
                           </td>
-                          <td>{customer.dueDays || 'N/A'}</td>
-                          <td className={dueClass}>
-                            {dueStatusText}
-                          </td>
+                          <td>{customer.dueDays || "-"}</td>
+
+                          <td className={dueClass}>{dueStatusText}</td>
+
                           <td>
                             <Link
                               to={`/customer/create?edit=${customer._id}`}
@@ -292,7 +372,9 @@ const CustomerList = () => {
                           <td>
                             <button
                               className="customer-list-icon-button customer-list-delete-button"
-                              onClick={() => handleDeleteClick(customer._id, customer.name)}
+                              onClick={() =>
+                                handleDeleteClick(customer._id, customer.name)
+                              }
                             >
                               🗑️
                             </button>
@@ -314,22 +396,19 @@ const CustomerList = () => {
           <div className="confirm-modal">
             <h3 className="confirm-title">Delete Customer</h3>
             <p className="confirm-text">
-              Are you sure you want to delete 
+              Are you sure you want to delete
               <strong> "{customerToDelete.customerName}"</strong>?
             </p>
             <p className="confirm-warning">This action cannot be undone.</p>
 
             <div className="confirm-actions">
-              <button 
+              <button
                 className="confirm-cancel"
                 onClick={() => setShowDeleteModal(false)}
               >
                 Cancel
               </button>
-              <button 
-                className="confirm-delete"
-                onClick={confirmDelete}
-              >
+              <button className="confirm-delete" onClick={confirmDelete}>
                 Delete Customer
               </button>
             </div>

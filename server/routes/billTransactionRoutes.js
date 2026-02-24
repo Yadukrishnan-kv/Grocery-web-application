@@ -10,6 +10,7 @@ const {
   adminReject,
   getAdminPending,
   getAdminAll,
+  adminMarkReceived,
 } = require("../controllers/billTransactionController");
 
 // Delivery/Sales routes
@@ -21,5 +22,6 @@ router.get("/admin-all", protect, getAdminAll);
 router.get("/admin-pending", protect,  getAdminPending);
 router.post("/admin-accept/:id", protect,  adminAccept);  // ✅ :id
 router.post("/admin-reject/:id", protect,  adminReject);  // ✅ :id
+router.post("/admin-mark-received/:id", protect, adminMarkReceived);
 
 module.exports = router;

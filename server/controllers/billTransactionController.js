@@ -175,6 +175,39 @@ const getAdminAll = async (req, res) => {
   }
 };
 
+const adminMarkReceived = async (req, res) => {
+  try {
+    const { id } = req.params; // BillTransaction._id
+
+    const tx = await BillTransaction.findById(id);
+    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+
+    // Only allow direct mark for "received" status (not yet sent to admin)
+    if (tx.status !== "received") {
+      return res.status(400).json({ 
+        message: `Can only mark 'received' transactions (current: ${tx.status})` 
+      });
+    }
+
+    // Directly update to paid_to_admin (no BillAdminRequest needed)
+    tx.status = "paid_to_admin";
+    await tx.save();
+
+    console.log("✅ Admin direct mark - Transaction:", tx._id, "→ paid_to_admin");
+
+    res.json({ 
+      message: "Payment marked as received – amount credited to admin wallet",
+      transactionId: tx._id,
+      amount: tx.amount,
+      method: tx.method,
+    });
+  } catch (error) {
+    console.error("❌ Admin mark received error:", error);
+    res.status(500).json({ message: "Server error: " + error.message });
+  }
+};
+
+
 module.exports = {
   getMyTransactions,
   payToAdmin,
@@ -182,4 +215,5 @@ module.exports = {
   adminReject,
   getAdminPending,
   getAdminAll,
+  adminMarkReceived,
 };

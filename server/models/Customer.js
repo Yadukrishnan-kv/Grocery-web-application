@@ -64,6 +64,17 @@ const customerSchema = new Schema(
       min: 0,
       default: null,  
     },
+
+    openingBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    openingBalanceDueDays: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
   },
   { timestamps: true }
 );
