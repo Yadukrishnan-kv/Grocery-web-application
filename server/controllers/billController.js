@@ -3,7 +3,7 @@ const Bill = require("../models/Bill");
 const Order = require("../models/Order");
 const Customer = require("../models/Customer");
 const BillTransaction = require("../models/BillTransaction");
-
+const PDFDocument = require("pdfkit");
 const moment = require("moment"); 
 
 const generateBill = async (req, res) => {
@@ -218,70 +218,148 @@ const getAllPendingBills = async (req, res) => {
 const markBillReceived = async (req, res) => {
   try {
     const { billId, amount, method, chequeDetails } = req.body;
-    
-    // Validate user role
-    if (!req.user || (req.user.role !== "Delivery Man" && req.user.role !== "Sales Man")) {
+
+    // Role check
+    if (!req.user || !["Delivery Man", "Sales Man"].includes(req.user.role)) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // ✅ FIX: Populate customer to access ._id
     const bill = await Bill.findById(billId).populate("customer");
     if (!bill) return res.status(404).json({ message: "Bill not found" });
 
     const actualPayment = Math.min(amount, bill.amountDue);
     if (actualPayment <= 0) {
-      return res.status(400).json({ message: "Invalid payment amount" });
+      return res.status(400).json({ message: "Invalid amount" });
     }
 
     // Update bill
-    bill.paidAmount = (bill.paidAmount || 0) + actualPayment;
+    bill.paidAmount += actualPayment;
     bill.amountDue -= actualPayment;
     if (bill.amountDue < 0) bill.amountDue = 0;
     bill.status = bill.amountDue <= 0 ? "paid" : "partial";
     await bill.save();
 
-    // ✅ FIX: Create BillTransaction with CORRECT fields
-    const transaction = await BillTransaction.create({
+    // Create transaction → delivery/sales wallet
+    await BillTransaction.create({
       bill: bill._id,
-      customer: bill.customer._id,  // ✅ Use ._id (ObjectId), not object
+      customer: bill.customer._id,
       recipient: req.user._id,
       recipientType: req.user.role === "Delivery Man" ? "delivery" : "sales",
       amount: actualPayment,
       method,
       chequeDetails: method === "cheque" ? chequeDetails : undefined,
-      status: "received",  // ✅ Shows in delivery wallet
-      paymentRequest: null,  // ✅ Now allowed because model field is optional
+      status: "received",
     });
 
-    console.log("✅ BillTransaction created:", {
-      _id: transaction._id,
-      recipient: transaction.recipient,
-      recipientType: transaction.recipientType,
-      status: transaction.status,
-      amount: transaction.amount,
-      customer: transaction.customer,
-    });
-
-    // ✅ Restore customer credit limit
-    const customer = await Customer.findById(bill.customer._id);
-    if (customer) {
-      customer.balanceCreditLimit = (customer.balanceCreditLimit || 0) + actualPayment;
+    // Restore credit limit
+    const customer = bill.customer; // already populated
+    if (customer && customer.billingType === "Credit limit") {
+      customer.balanceCreditLimit += actualPayment;
       await customer.save();
-      console.log("✅ Credit limit restored:", actualPayment, "for customer:", customer._id);
     }
 
-    res.json({ 
-      message: "Bill marked as received – amount credited to your wallet",
-      transactionId: transaction._id,
-      newBillStatus: bill.status,
+    res.json({
+      message: "Payment received – bill updated & credit restored",
+      newStatus: bill.status,
       remainingDue: bill.amountDue,
     });
   } catch (error) {
-    console.error("❌ Mark received error:", error);
-    res.status(500).json({ 
-      message: "Server error: " + error.message,
-      errors: error.errors ? Object.values(error.errors).map(e => e.message) : undefined
-    });
+    console.error("Mark received error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getBillReceipt = async (req, res) => {
+  try {
+    // Optional: Keep auth check if you want
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized, no token provided" });
+    }
+
+    const bill = await Bill.findById(req.params.id)
+      .populate("customer", "name email phoneNumber address pincode");
+
+    if (!bill) {
+      return res.status(404).json({ message: "Bill not found" });
+    }
+
+    const filename = `receipt_${bill._id.toString().slice(-8)}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    doc.pipe(res);
+
+    // ─── Receipt Content (Bill Details Only) ────────────────────────
+    const pageWidth = doc.page.width;
+    const margin = 50;
+
+    // Title
+    doc
+      .fontSize(24)
+      .font("Helvetica-Bold")
+      .fillColor("#1e293b")
+      .text("PAYMENT RECEIPT", { align: "center" });
+
+    doc.moveDown(0.5);
+
+    // Receipt & Date
+    doc
+      .fontSize(12)
+      .font("Helvetica")
+      .text(`Receipt No: REC-${bill._id.toString().slice(-8)}`, { align: "center" })
+      .text(`Date: ${new Date(bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString()}`, { align: "center" });
+
+    doc.moveDown(1.5);
+
+    // Customer Details
+    doc
+      .fontSize(14)
+      .font("Helvetica-Bold")
+      .text("Customer Details:");
+    doc
+      .fontSize(12)
+      .font("Helvetica")
+      .text(`Name: ${bill.customer?.name || "N/A"}`)
+      .text(`Phone: ${bill.customer?.phoneNumber || "N/A"}`)
+      .text(`Address: ${bill.customer?.address || "N/A"}`)
+      .text(`Pincode: ${bill.customer?.pincode || "N/A"}`)
+      .moveDown(1);
+
+    // Bill Summary
+    doc
+      .fontSize(14)
+      .font("Helvetica-Bold")
+      .text("Bill Summary:");
+    doc
+      .fontSize(12)
+      .font("Helvetica")
+      .text(`Bill ID: ${bill._id.toString().slice(-8)}`)
+      .text(`Total Amount Due: AED ${bill.amountDue?.toFixed(2) || "0.00"}`)
+      .text(`Paid Amount: AED ${bill.paidAmount?.toFixed(2) || "0.00"}`)
+      .text(`Remaining Due: AED ${bill.amountDue?.toFixed(2) || "0.00"}`)
+      .moveDown(1);
+
+    // Footer
+    doc.moveDown(3);
+    doc
+      .fontSize(10)
+      .font("Helvetica-Oblique")
+      .fillColor("#6b7280")
+      .text("Thank you for your payment!", { align: "center" })
+      .text("This is a computer-generated receipt.", { align: "center" });
+
+    doc.end();
+
+    console.log(`Receipt generated for bill ${bill._id}`);
+  } catch (error) {
+    console.error("Receipt generation error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        message: "Failed to generate receipt", 
+        error: error.message 
+      });
+    }
   }
 };
 module.exports = {
@@ -292,5 +370,5 @@ module.exports = {
   getCustomerBillById,
   createInvoiceBasedBill,
   getAllPendingBills,
-  markBillReceived,
+  markBillReceived,getBillReceipt
 };

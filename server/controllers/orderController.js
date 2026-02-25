@@ -265,8 +265,7 @@ const deleteOrder = async (req, res) => {
 
 const deliverOrder = async (req, res) => {
   try {
-    const { deliveredItems, deliveredAt, paymentMethod, chequeDetails } =
-      req.body;
+    const { deliveredItems, deliveredAt, paymentMethod, chequeDetails } = req.body;
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -277,71 +276,79 @@ const deliverOrder = async (req, res) => {
 
     let grandDeliveryAmount = 0;
 
-    // Validate and update each item
+    // Update delivered quantities
     for (const inputItem of deliveredItems) {
       const orderItem = order.orderItems.id(inputItem.product);
       if (!orderItem) {
-        return res
-          .status(400)
-          .json({ message: `Product ${inputItem.product} not found in order` });
+        return res.status(400).json({ message: `Product not in order` });
       }
 
       const qtyToDeliver = Number(inputItem.quantity);
       const remaining = orderItem.orderedQuantity - orderItem.deliveredQuantity;
 
       if (qtyToDeliver <= 0 || qtyToDeliver > remaining) {
-        return res.status(400).json({
-          message: `Invalid quantity for ${orderItem.product.productName || "product"}: max ${remaining}`,
-        });
+        return res.status(400).json({ message: `Invalid quantity for ${orderItem.product}` });
       }
 
       orderItem.deliveredQuantity += qtyToDeliver;
       grandDeliveryAmount += qtyToDeliver * orderItem.price;
     }
 
-    // Payment handling – ONLY for cash/cheque (NO CREDIT DEDUCTION HERE)
+    // Handle cash/cheque payment immediately (no bill generation needed)
     if (paymentMethod === "cash" || paymentMethod === "cheque") {
+      // Create transaction in delivery man's wallet
       await PaymentTransaction.create({
         order: order._id,
         deliveryMan: req.user._id,
         amount: grandDeliveryAmount,
         method: paymentMethod,
         chequeDetails: paymentMethod === "cheque" ? chequeDetails : undefined,
+        status: "received",           // Directly received – no pending
       });
+
+      // Restore full credit (since customer paid cash/cheque)
+      const customer = await Customer.findById(order.customer);
+      if (customer && customer.billingType === "Credit limit") {
+        // Restore the delivered portion only
+        customer.balanceCreditLimit += grandDeliveryAmount;
+        await customer.save();
+      }
+
+      // No bill should be created for this delivered portion
     }
 
-    // For credit orders – DO NOTHING to balanceCreditLimit here
-    // (It was already deducted at order creation)
+    // Update order status
+    const totalOrdered = order.orderItems.reduce((s, i) => s + i.orderedQuantity, 0);
+    const totalDelivered = order.orderItems.reduce((s, i) => s + i.deliveredQuantity, 0);
 
-    // Update status
-    const totalOrdered = order.orderItems.reduce(
-      (sum, i) => sum + i.orderedQuantity,
-      0,
-    );
-    const totalDelivered = order.orderItems.reduce(
-      (sum, i) => sum + i.deliveredQuantity,
-      0,
-    );
-    if (totalDelivered >= totalOrdered) {
-      order.status = "delivered";
-    } else {
-      order.status = "partial_delivered";
-    }
-
+    order.status = totalDelivered >= totalOrdered ? "delivered" : "partial_delivered";
     order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
 
     await order.save();
 
-    // Create invoice if applicable (no deduction here)
+    // Only create invoice-based bill if:
+    // - It's credit order
+    // - Not fully paid in cash/cheque this time
     const customer = await Customer.findById(order.customer);
     if (
-      order.status === "delivered" &&
+      order.payment === "credit" &&
+      paymentMethod !== "cash" &&
+      paymentMethod !== "cheque" &&
       customer?.statementType === "invoice-based"
     ) {
-      await createInvoiceBasedBill(order);
+      const bill = await createInvoiceBasedBill(order);
+      if (bill) {
+        order.bill = bill._id;
+        await order.save();
+      }
     }
 
-    res.json(order);
+    res.json({
+      message: paymentMethod === "cash" || paymentMethod === "cheque"
+        ? "Delivery recorded & cash/cheque received – credit restored"
+        : "Delivery recorded successfully",
+      order,
+    });
   } catch (error) {
     console.error("Deliver order error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -1280,6 +1287,264 @@ const checkFirstOrder = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+const packOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { packedItems } = req.body;
+
+    // Fix: match the exact role string from your DB
+    if (req.user.role.trim() !== "Store kepper") {
+      return res.status(403).json({ message: "Only Store kepper can pack orders" });
+    }
+
+    const order = await Order.findById(orderId).populate("customer");
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (order.status !== "pending" && order.status !== "assigned") {
+      return res.status(400).json({ message: "Order not in packable state" });
+    }
+
+    let totalPacked = 0;
+    let allFullyPacked = true;
+
+    for (const pack of packedItems) {
+      const item = order.orderItems.id(pack.product);
+      if (!item) continue;
+
+      // Fix: use packedQuantity field (you introduced it earlier)
+      const maxPack = item.orderedQuantity - (item.packedQuantity || 0);
+      const qty = Number(pack.packedQuantity);
+
+      if (qty > maxPack || qty < 0) {
+        return res.status(400).json({ message: `Invalid pack qty for ${item.product}` });
+      }
+
+      item.packedQuantity = (item.packedQuantity || 0) + qty; // Update packedQuantity
+      totalPacked += qty;
+
+      if (item.packedQuantity < item.orderedQuantity) {
+        allFullyPacked = false;
+      }
+    }
+
+    order.packedBy = req.user._id;
+    order.packedAt = new Date();
+    order.packedStatus = allFullyPacked ? "fully_packed" : "partially_packed";
+
+    if (allFullyPacked) {
+      order.status = "ready_to_deliver";
+    }
+
+    await order.save();
+
+    res.json({
+      message: "Order packed successfully",
+      order,
+      nextStep: allFullyPacked ? "Ready for delivery" : "Continue packing"
+    });
+  } catch (error) {
+    console.error("Pack order error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+const getPendingForPacking = async (req, res) => {
+  try {
+    const orders = await Order.find({
+      status: "pending",
+      packedAt: null,
+    })
+      .populate("customer", "name email phoneNumber")
+      .populate("orderItems.product", "productName unit price")
+      .populate("assignedTo", "username")
+      .sort({ orderDate: -1 });
+
+    res.json(orders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+const getPackedToday = async (req, res) => {
+  const { date } = req.query;
+  const start = new Date(date);
+  start.setHours(0,0,0,0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+
+  const count = await Order.countDocuments({
+    packedAt: { $gte: start, $lt: end },
+  });
+  res.json({ count });
+};
+
+const getReadyToDeliver = async (req, res) => {
+  const count = await Order.countDocuments({
+    packedStatus: "fully_packed",
+    status: { $ne: "delivered" },
+  });
+  res.json({ count });
+};
+
+const getPackedInvoice = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("customer", "name email phoneNumber address pincode")
+      .populate("orderItems.product", "productName price unit");
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    
+    // Only allow if order has been packed
+    if (!order.packedAt) {
+      return res.status(400).json({ message: "Order not yet packed" });
+    }
+
+    const filename = `packed-invoice-${order._id.toString().slice(-8)}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ size: "A4", margin: 0 });
+    doc.pipe(res);
+
+    // Generate invoice using packedQuantity instead of deliveredQuantity
+    await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", `PACK-${order._id.toString().slice(-6)}`);
+    
+    doc.end();
+  } catch (error) {
+    console.error("Error generating packed invoice:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Server error", error: error.message });
+    }
+  }
+};
+const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
+  const company = await CompanySettings.findOne();
+  if (!company) throw new Error("Company invoice settings not configured.");
+
+  const pageWidth = 595.28;
+  const margin = 50;
+  const headerY = margin; // ← Fixed: define headerY here
+
+  const date = new Date(order.packedAt || Date.now());
+  const formattedDate = date.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+
+  // Header
+  doc.fontSize(22).font("Helvetica-Bold").text(company.companyName || "INGOUDE COMPANY", margin, headerY);
+  doc.fontSize(36).font("Helvetica-Bold").fillColor("#b0123b").text(invoiceType, margin, headerY + 40);
+
+  // Invoice info
+  const invoiceInfoX = pageWidth - margin - 200;
+  doc.fontSize(12).font("Helvetica-Bold").fillColor("#000000")
+    .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
+    .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
+
+  // Bill To / From
+  const infoY = headerY + 120;
+  const billToX = margin;
+  const fromX = pageWidth - margin - 250;
+
+  doc.fontSize(14).font("Helvetica-Bold").text("Bill To:", billToX, infoY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(order.customer?.name || "N/A", billToX, infoY + 25)
+    .text(order.customer?.phoneNumber || "N/A", billToX, infoY + 45)
+    .text(order.customer?.address || "N/A", billToX, infoY + 65)
+    .text(`Pincode: ${order.customer?.pincode || "N/A"}`, billToX, infoY + 85);
+
+  doc.fontSize(14).font("Helvetica-Bold").text("From:", fromX, infoY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(company.companyName || "INGOUDE COMPANY", fromX, infoY + 25)
+    .text(company.companyPhone || "N/A", fromX, infoY + 45)
+    .text(company.companyAddress || "N/A", fromX, infoY + 65);
+
+  // Table Header
+  const tableY = infoY + 130; // adjusted from margin + 150 to keep spacing consistent
+  const rowHeight = 40;
+  const descCol = margin;
+  const qtyCol = margin + 280;
+  const priceCol = margin + 360;
+  const totalCol = margin + 440;
+
+  doc.rect(margin - 10, tableY - 5, pageWidth - margin * 2 + 20, rowHeight)
+    .fillColor("#b0123b").fill();
+
+  doc.fillColor("#ffffff").fontSize(12).font("Helvetica-Bold")
+    .text("Description", descCol, tableY + 10)
+    .text("Packed Qty", qtyCol, tableY + 10, { width: 70, align: "center" })
+    .text("Price", priceCol, tableY + 10, { width: 70, align: "center" })
+    .text("Total", totalCol, tableY + 10, { width: 70, align: "center" });
+
+  // Data rows
+  let currentY = tableY + rowHeight;
+  let grandTotal = 0;
+
+  order.orderItems.forEach((item) => {
+    const qty = item.packedQuantity || 0;
+    const itemTotal = qty * item.price;
+    grandTotal += itemTotal;
+
+    doc.fillColor("#000000").fontSize(12).font("Helvetica")
+      .text(item.product?.productName || "Unknown Product", descCol, currentY + 10)
+      .text(qty.toString(), qtyCol, currentY + 10, { width: 70, align: "center" })
+      .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 10, { width: 70, align: "center" })
+      .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 10, { width: 70, align: "center" });
+
+    currentY += rowHeight;
+  });
+
+  // Grand Total
+  const subtotalY = currentY + 40;
+  const subtotalWidth = 200;
+  const subtotalX = pageWidth - margin - subtotalWidth;
+
+  doc.rect(subtotalX, subtotalY, subtotalWidth, 35).fillColor("#222222").fill();
+  doc
+    .fillColor("#ffffff")
+    .fontSize(12)
+    .font("Helvetica-Bold")
+    .text("Grand Total", subtotalX + 15, subtotalY + 12)
+    .text(`AED ${grandTotal.toFixed(2)}`, subtotalX + subtotalWidth - 20, subtotalY + 12, { align: "right" });
+
+  // Footer (unchanged)
+  const footerY = subtotalY + 80;
+
+  doc
+    .fillColor("#000000")
+    .fontSize(14)
+    .font("Helvetica-Bold")
+    .text("Payment Information:", margin, footerY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(`Bank: ${company.bankName || "N/A"}`, margin, footerY + 25)
+    .text(`Account: ${company.bankAccountNumber || "N/A"}`, margin, footerY + 45)
+    .text(
+      `Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || "N/A"}`,
+      margin,
+      footerY + 65
+    )
+    .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
+
+  const thankYouX = pageWidth - margin - 200;
+  doc
+    .fontSize(36)
+    .font("Helvetica-Bold")
+    .fillColor("#000000")
+    .text("Thank You!", thankYouX, footerY, { width: 200, align: "right" });
+
+  const bottomY = footerY + 150;
+  doc
+    .fontSize(10)
+    .font("Helvetica-Oblique")
+    .fillColor("#666666")
+    .text("This is a system-generated invoice", margin, bottomY);
+};
 module.exports = {
   createOrder,
   getAllOrders,
@@ -1306,5 +1571,5 @@ module.exports = {
   approveOrderRequest,
   rejectOrderRequest,
   getCustomerOrderHistory,
-  checkFirstOrder,
+  checkFirstOrder,packOrder,getPendingForPacking,getPackedToday,getReadyToDeliver,getPackedInvoice
 };

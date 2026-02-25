@@ -607,3 +607,100 @@ button:disabled {
 .confirm-mark-received:hover:not(:disabled) {
   background: #1976d2;
 }
+/* Two table sections */
+.table-section {
+  margin-bottom: 40px;
+}
+
+.table-section h3 {
+  font-size: 1.4rem;
+  margin-bottom: 16px;
+  color: #1e293b;
+}
+
+/* Bulk action bar */
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f1f5f9;
+  padding: 12px;
+  border-radius: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.bulk-accept-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.bulk-reject-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.bulk-mark-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.bulk-clear-btn {
+  background: #6b7280;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Search */
+.search-box-wrapper {
+  margin: 16px 0;
+  max-width: 500px;
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 40px 10px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.search-clear {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+/* Checkbox column */
+.checkbox-col {
+  width: 50px;
+  text-align: center;
+}
+
+/* Row styles */
+.pending-row { background: #fef3c7; }
+.received-row { background: #dbeafe; }
+.paid-row { background: #d1fae5; }
+.selected-row { background: #e0f2fe !important; }

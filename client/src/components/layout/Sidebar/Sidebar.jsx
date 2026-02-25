@@ -40,6 +40,7 @@ const MENU_PERMISSIONS = {
   'paymentRequestssales': 'menu.paymentRequestssales',
   'billWallet': 'menu.billWallet',
   'AdminOrderRequests': 'menu.admin.order.requests',
+  'storekeeperpacked': 'menu.storekeeper.packed.orders'
 
 
 
@@ -159,6 +160,8 @@ const navItems = [
   { id: 'ChequeWallet', label: 'Cheque Wallet', icon: '💰', path: '/delivery/wallet/cheque' },
   { id: 'paymentRequestsdelivery', label: 'Payment Requests', icon: '💰', path: '/delivery/payment-requests' },
   { id: 'paymentRequestssales', label: 'Payment Requests', icon: '💰', path: '/sales/payment-requests' },
+  { id: 'storekeeperpacked', label: 'Packed Orders', icon: '📦', path: '/storekeeper/packed-orders' },
+
 
   
 ];
@@ -187,7 +190,9 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
       item.id !== 'CashWallet' &&
       item.id !== 'ChequeWallet' &&
       item.id !== 'paymentRequestsdelivery' &&
-      item.id !== 'paymentRequestssales'
+      item.id !== 'paymentRequestssales' &&
+      item.id !== 'storekeeperpacked'
+
     );
   }
 

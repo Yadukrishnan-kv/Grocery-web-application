@@ -42,6 +42,7 @@ import PaymentRequestsDelivery from "../pages/DeliveryPartner/PaymentRequestsDel
 import PaymentRequestsSales from "../pages/Salesmanpages/PaymentRequestsSales/PaymentRequestsSales";
 import BillWallet from "../pages/BillWallet/BillWallet";
 import AdminOrderRequests from "../pages/Sales/Orders/OrderList/AdminOrderRequests";
+import PackOrders from "../pages/Storekeeper/PackOrders/PackOrders";
 function Dom() {
   return (
     <div>
@@ -150,6 +151,10 @@ function Dom() {
              <Route 
               path="/admin/AdminOrderRequests" 
               element={<AdminOrderRequests />} 
+            />
+             <Route 
+              path="/storekeeper/packed-orders" 
+              element={<PackOrders />} 
             />
 
           </Routes>

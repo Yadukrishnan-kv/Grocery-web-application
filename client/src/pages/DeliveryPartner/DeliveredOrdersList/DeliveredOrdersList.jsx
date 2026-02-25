@@ -4,8 +4,8 @@ import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "react-hot-toast";
-import "./DeliveredOrdersList.css";
 import axios from "axios";
+import "./DeliveredOrdersList.css";
 
 const DeliveredOrdersList = () => {
   const [orders, setOrders] = useState([]);
@@ -13,17 +13,19 @@ const DeliveredOrdersList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Delivered Orders");
   const [user, setUser] = useState(null);
-  const [deliveringOrderId, setDeliveringOrderId] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [currentOrder, setCurrentOrder] = useState(null);
-  const [deliveryInputs, setDeliveryInputs] = useState({}); // { productSubdocId: quantity }
+  const [deliveryInputs, setDeliveryInputs] = useState({});
   const [paymentMethod, setPaymentMethod] = useState("credit");
   const [chequeNumber, setChequeNumber] = useState("");
   const [chequeBank, setChequeBank] = useState("");
   const [chequeDate, setChequeDate] = useState("");
+
+  const [deliveringOrderId, setDeliveringOrderId] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const fractionalUnits = ["kg", "gram", "liter", "ml", "meter", "cm", "inch"];
@@ -48,7 +50,16 @@ const DeliveredOrdersList = () => {
       const res = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setOrders(res.data.filter(o => o.assignmentStatus === "accepted"));
+      // Show only accepted + ready to deliver (fully packed)
+      setOrders(
+        res.data.filter(
+          (o) =>
+            o.assignmentStatus === "accepted" &&
+            (o.packedStatus === "fully_packed" || o.status === "ready_to_deliver") &&
+            o.status !== "delivered" &&
+            o.status !== "cancelled"
+        )
+      );
     } catch (err) {
       toast.error("Failed to load orders");
     } finally {
@@ -61,11 +72,15 @@ const DeliveredOrdersList = () => {
     fetchAcceptedOrders();
   }, [fetchCurrentUser, fetchAcceptedOrders]);
 
-  // Open modal and initialize inputs for each product
+  // Open modal only if ready
   const openDeliveryModal = (order) => {
+    if (order.status !== "ready_to_deliver" && order.packedStatus !== "fully_packed") {
+      return toast.error("Order not ready for delivery yet. Awaiting storekeeper packing.");
+    }
+
     const inputs = {};
-    order.orderItems.forEach(item => {
-      inputs[item._id] = ""; // use subdocument _id as key
+    order.orderItems.forEach((item) => {
+      inputs[item._id] = "";
     });
 
     setCurrentOrder(order);
@@ -78,24 +93,23 @@ const DeliveredOrdersList = () => {
   };
 
   const handleQuantityChange = (productSubId, value) => {
-    // Allow empty string (to clear input)
     if (value === "" || (!isNaN(value) && Number(value) >= 0)) {
-      setDeliveryInputs(prev => ({ ...prev, [productSubId]: value }));
+      setDeliveryInputs((prev) => ({ ...prev, [productSubId]: value }));
     }
   };
 
   const getProductRemaining = (item) => {
     const inputQty = Number(deliveryInputs[item._id] || 0);
-    return item.orderedQuantity - item.deliveredQuantity - inputQty;
+    return (item.packedQuantity || 0) - (item.deliveredQuantity || 0) - inputQty;
   };
 
   const validateDelivery = () => {
     for (const item of currentOrder.orderItems) {
       const qty = Number(deliveryInputs[item._id] || 0);
-      const max = item.orderedQuantity - item.deliveredQuantity;
+      const max = (item.packedQuantity || 0) - (item.deliveredQuantity || 0);
 
       if (qty > max) {
-        return `Cannot deliver more than remaining (${max} ${item.unit || ""}) for ${item.product?.productName || "product"}`;
+        return `Cannot deliver more than remaining packed (${max} ${item.unit || ""}) for ${item.product?.productName || "product"}`;
       }
       if (qty < 0 || (qty > 0 && isNaN(qty))) {
         return "Invalid quantity entered";
@@ -108,9 +122,8 @@ const DeliveredOrdersList = () => {
     const error = validateDelivery();
     if (error) return toast.error(error);
 
-    // Prepare delivered items (only those with quantity > 0)
     const deliveredItems = currentOrder.orderItems
-      .map(item => {
+      .map((item) => {
         const qty = Number(deliveryInputs[item._id] || 0);
         return qty > 0 ? { product: item._id, quantity: qty } : null;
       })
@@ -158,20 +171,47 @@ const DeliveredOrdersList = () => {
     }
   };
 
+  // Download Packed Invoice
+  const downloadPackedInvoice = async (orderId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${backendUrl}/api/orders/packed-invoice/${orderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `packed_invoice_${orderId.slice(-8)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Packed invoice downloaded");
+    } catch (err) {
+      toast.error("Failed to download packed invoice");
+    }
+  };
+
   const getDeliveryStatus = (order) => {
     const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
     const totalDelivered = order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
 
-    if (totalDelivered === 0) return "Not Delivered";
+    if (order.packedStatus !== "fully_packed") return "Awaiting Packing";
+    if (totalDelivered === 0) return "Ready to Deliver";
     if (totalDelivered < totalOrdered) return "Partially Delivered";
     return "Fully Delivered";
   };
 
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
-      const matchesSearch = !searchTerm.trim() ||
+    return orders.filter((order) => {
+      const matchesSearch =
+        !searchTerm.trim() ||
         order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "all" ||
+      const matchesStatus =
+        statusFilter === "all" ||
         getDeliveryStatus(order).toLowerCase().replace(" ", "-") === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -215,10 +255,12 @@ const DeliveredOrdersList = () => {
                 <select
                   id="statusFilter"
                   value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value)}
+                  onChange={(e) => setStatusFilter(e.target.value)}
                   className="delivered-orders-status-filter"
                 >
                   <option value="all">All Statuses</option>
+                  <option value="awaiting-packing">Awaiting Packing</option>
+                  <option value="ready-to-deliver">Ready to Deliver</option>
                   <option value="not-delivered">Not Delivered</option>
                   <option value="partially-delivered">Partially Delivered</option>
                   <option value="fully-delivered">Fully Delivered</option>
@@ -231,10 +273,13 @@ const DeliveredOrdersList = () => {
                   className="delivered-orders-search-input"
                   placeholder="Search by customer name..."
                   value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 {searchTerm && (
-                  <button className="delivered-orders-search-clear" onClick={() => setSearchTerm("")}>
+                  <button
+                    className="delivered-orders-search-clear"
+                    onClick={() => setSearchTerm("")}
+                  >
                     ×
                   </button>
                 )}
@@ -258,6 +303,7 @@ const DeliveredOrdersList = () => {
                       <th>Customer</th>
                       <th>Products</th>
                       <th>Total Ordered</th>
+                      <th>Packed Qty</th> {/* NEW */}
                       <th>Total Delivered</th>
                       <th>Remaining</th>
                       <th>Grand Total</th>
@@ -270,9 +316,11 @@ const DeliveredOrdersList = () => {
                   <tbody>
                     {filteredOrders.map((order, index) => {
                       const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
+                      const packedQty = order.orderItems?.reduce((s, i) => s + (i.packedQuantity || 0), 0) || 0;
                       const totalDelivered = order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
-                      const remaining = totalOrdered - totalDelivered;
+                      const remaining = packedQty - totalDelivered;
                       const grandTotal = order.orderItems?.reduce((s, i) => s + i.totalAmount, 0)?.toFixed(2) || "0.00";
+                      const isReady = order.status === "ready_to_deliver" || order.packedStatus === "fully_packed";
 
                       return (
                         <tr key={order._id}>
@@ -296,6 +344,7 @@ const DeliveredOrdersList = () => {
                           </td>
 
                           <td>{totalOrdered}</td>
+                          <td>{packedQty} (packed)</td> {/* NEW */}
                           <td>{totalDelivered}</td>
                           <td>{remaining}</td>
 
@@ -317,7 +366,14 @@ const DeliveredOrdersList = () => {
                           <td>{formatDate(order.orderDate)}</td>
 
                           <td>
-                            {remaining > 0 ? (
+                            <button
+                              className="invoice-btn"
+                              onClick={() => downloadPackedInvoice(order._id)}
+                            >
+                              Download Invoice
+                            </button>
+
+                            {isReady ? (
                               <button
                                 className="deliver-btn"
                                 onClick={() => openDeliveryModal(order)}
@@ -326,7 +382,7 @@ const DeliveredOrdersList = () => {
                                 {deliveringOrderId === order._id ? "Delivering..." : "Deliver"}
                               </button>
                             ) : (
-                              <span className="completed-text">Completed</span>
+                              <span className="completed-text">Awaiting Packing</span>
                             )}
                           </td>
                         </tr>
@@ -339,74 +395,71 @@ const DeliveredOrdersList = () => {
           </div>
         </div>
 
-        {/* ────────────────────────────────────────────────
-            Per-Product Delivery Modal
-        ──────────────────────────────────────────────── */}
+        {/* Delivery Modal – unchanged but kept for completeness */}
         {showDeliveryModal && currentOrder && (
           <div className="delivery-modal-overlay">
             <div className="delivery-modal">
               <h3>Deliver Order #{currentOrder._id.toString().slice(-8)}</h3>
 
-             <div className="products-delivery-list">
-  {currentOrder.orderItems.map(item => {
-    const remaining = getProductRemaining(item); 
+              <div className="products-delivery-list">
+                {currentOrder.orderItems.map((item) => {
+                  const remaining = getProductRemaining(item);
 
-    return (
-      <div key={item._id} className="product-delivery-row">
-        <div className="product-info">
-          <strong>{item.product?.productName || "Unknown Product"}</strong>
-          <div>Ordered: {item.orderedQuantity} {item.unit || ""}</div>
-          <div>Already Delivered: {item.deliveredQuantity} {item.unit || ""}</div>
-        </div>
+                  return (
+                    <div key={item._id} className="product-delivery-row">
+                      <div className="product-info">
+                        <strong>{item.product?.productName || "Unknown Product"}</strong>
+                        <div>Ordered: {item.orderedQuantity} {item.unit || ""}</div>
+                        <div>Packed: {item.packedQuantity || 0} {item.unit || ""}</div>
+                        <div>Already Delivered: {item.deliveredQuantity} {item.unit || ""}</div>
+                      </div>
 
-        <div className="quantity-input-group">
-          <label>Deliver Now:</label>
-          <input
-            type="number"
-            min="0"
-            max={item.orderedQuantity - item.deliveredQuantity}
-            step={fractionalUnits.includes(item.unit?.toLowerCase()) ? "0.01" : "1"}
-            value={deliveryInputs[item._id] || ""}
-            onChange={e => handleQuantityChange(item._id, e.target.value)}
-            placeholder="0"
-          />
-          <span className={`remaining-text ${remaining < 0 ? "negative" : ""}`}>
-            Remaining: {remaining >= 0 ? remaining : "Over-delivered!"}
-            {item.unit ? ` ${item.unit}` : ""}
-          </span>
-        </div>
-      </div>
-    );
-  })}
-</div>
+                      <div className="quantity-input-group">
+                        <label>Deliver Now:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={item.packedQuantity - item.deliveredQuantity}
+                          step={fractionalUnits.includes(item.unit?.toLowerCase()) ? "0.01" : "1"}
+                          value={deliveryInputs[item._id] || ""}
+                          onChange={(e) => handleQuantityChange(item._id, e.target.value)}
+                          placeholder="0"
+                        />
+                        <span className={`remaining-text ${remaining < 0 ? "negative" : ""}`}>
+                          Remaining: {remaining >= 0 ? remaining : "Over-delivered!"}
+                          {item.unit ? ` ${item.unit}` : ""}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-              {/* Payment Method */}
               <div className="payment-section">
                 <label>Payment Method</label>
-                <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
                   <option value="credit">Credit</option>
                   <option value="cash">Cash</option>
                   <option value="cheque">Cheque</option>
                 </select>
               </div>
 
-              {/* Cheque Details */}
               {paymentMethod === "cheque" && (
                 <div className="cheque-details">
                   <input
                     placeholder="Cheque Number"
                     value={chequeNumber}
-                    onChange={e => setChequeNumber(e.target.value)}
+                    onChange={(e) => setChequeNumber(e.target.value)}
                   />
                   <input
                     placeholder="Bank Name"
                     value={chequeBank}
-                    onChange={e => setChequeBank(e.target.value)}
+                    onChange={(e) => setChequeBank(e.target.value)}
                   />
                   <input
                     type="date"
                     value={chequeDate}
-                    onChange={e => setChequeDate(e.target.value)}
+                    onChange={(e) => setChequeDate(e.target.value)}
                   />
                 </div>
               )}

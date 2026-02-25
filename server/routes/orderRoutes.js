@@ -17,7 +17,7 @@ const {
   acceptAssignedOrder,
   rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,
   getMyOrders,getOrderInvoice,getlastorderdetails,checkFirstOrder,
-  getPendingOrderRequests,approveOrderRequest,rejectOrderRequest,getCustomerOrderHistory,createOrderRequest
+  getPendingOrderRequests,approveOrderRequest,rejectOrderRequest,getCustomerOrderHistory,createOrderRequest,packOrder,getPendingForPacking,getPackedToday,getReadyToDeliver,getPackedInvoice
 } = require("../controllers/orderController");
 
 
@@ -51,4 +51,12 @@ router.get("/pending-requests", protect, getPendingOrderRequests);
 router.post("/approve-request/:requestId", protect, approveOrderRequest);
 router.post("/reject-request/:requestId", protect, rejectOrderRequest);
 router.get("/customer-history", protect, getCustomerOrderHistory);
+router.post("/pack/:orderId", protect, packOrder);
+// routes/orderRoutes.js
+
+router.get("/pending-for-packing", protect, getPendingForPacking);
+// routes/orderRoutes.js
+router.get("/packed-today", protect, getPackedToday);
+router.get("/ready-to-deliver", protect, getReadyToDeliver);
+router.get("/packed-invoice/:id", protect, getPackedInvoice);
 module.exports = router;

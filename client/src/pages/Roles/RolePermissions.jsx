@@ -57,7 +57,8 @@ const RolePermissions = () => {
     ChequeWallet: "menu.ChequeWallet",  
     WalletMoney: "menu.wallet.money",
     paymentRequestsdelivery: "menu.paymentRequestsdelivery",
-    paymentRequestssales: "menu.paymentRequestssales",  
+    paymentRequestssales: "menu.paymentRequestssales",
+    storekeeperpacked: "menu.storekeeper.packed.orders"  
   };
 
   const fetchRole = useCallback(async () => {

@@ -135,6 +135,9 @@ const getPermissions = async (req, res) => {
       } else if (permission === "menu.wallet.money") {
         expandedPermissions.push("menu.wallet.money");
       }
+       else if (permission === "menu.storekeeper.packed.orders") {
+        expandedPermissions.push("menu.storekeeper.packed.orders");
+      }
       
       
       

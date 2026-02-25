@@ -11,6 +11,8 @@ const orderItemSchema = new Schema({
     trim: true,
     default: '',
   },
+    packedQuantity: { type: Number, default: 0, min: 0 },
+
   orderedQuantity: {
     type: Number,
     required: [true, "Ordered quantity is required"],
@@ -53,7 +55,7 @@ const orderSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "delivered", "cancelled", "partial_delivered"],
+      enum: ["pending", "delivered", "cancelled", "partial_delivered"," ready_to_deliver"],
       default: "pending",
     },
     payment: {
@@ -96,9 +98,37 @@ const orderSchema = new Schema(
       type: String,
       default: null,
     },
+    packedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    packedAt: {
+      type: Date,
+      default: null,
+    },
+
+    packedStatus: {
+      type: String,
+      enum: ["not_packed","ready_to_deliver", "partially_packed", "fully_packed"],
+      default: "not_packed",
+    },
   },
   { timestamps: true }
 );
+// Add virtual for remaining to pack
+orderItemSchema.virtual('remainingToPack').get(function() {
+  return this.orderedQuantity - this.packedQuantity;
+});
+
+// Add virtual for remaining to deliver
+orderItemSchema.virtual('remainingToDeliver').get(function() {
+  return this.packedQuantity - this.deliveredQuantity;
+});
+
+// Ensure virtuals are included in JSON output
+orderSchema.set('toJSON', { virtuals: true });
+orderSchema.set('toObject', { virtuals: true });
 
 // Virtual for total ordered quantity (sum of all items)
 orderSchema.virtual('totalOrderedQuantity').get(function () {

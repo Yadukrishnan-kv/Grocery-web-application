@@ -709,3 +709,36 @@
     max-width: none;
   }
 }
+/* VAT & Amount Columns Styling */
+.amount-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.vat-amount {
+  color: #166534; /* green for VAT */
+}
+
+.final-amount {
+  color: #10b981;
+  font-weight: 700;
+  font-size: 1.05em;
+}
+
+/* Table Column Widths (optional - adjust as needed) */
+th:nth-child(5), td:nth-child(5) { width: 110px; } /* Total excl. VAT */
+th:nth-child(6), td:nth-child(6) { width: 90px; }  /* VAT */
+th:nth-child(7), td:nth-child(7) { width: 130px; } /* Final Total */
+
+/* Responsive: stack amounts on small screens */
+@media (max-width: 1024px) {
+  .order-list-data-table {
+    font-size: 0.9rem;
+  }
+  .amount-cell img {
+    width: 14px;
+    height: 14px;
+  }
+}

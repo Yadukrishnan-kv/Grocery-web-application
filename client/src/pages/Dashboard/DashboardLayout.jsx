@@ -19,17 +19,22 @@ const DashboardLayout = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
 
-  // Customer-specific stats
+  // Customer stats
   const [customerTotalOrders, setCustomerTotalOrders] = useState(0);
   const [customerDeliveredOrders, setCustomerDeliveredOrders] = useState(0);
   const [creditLimit, setCreditLimit] = useState(0);
   const [usedCredit, setUsedCredit] = useState(0);
 
-  // Delivery-specific stats
+  // Delivery stats
   const [assignedOrders, setAssignedOrders] = useState(0);
   const [acceptedOrders, setAcceptedOrders] = useState(0);
   const [deliveredOrders, setDeliveredOrders] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
+
+  // Storekeeper stats
+  const [pendingToPack, setPendingToPack] = useState(0);
+  const [packedToday, setPackedToday] = useState(0);
+  const [readyToDeliver, setReadyToDeliver] = useState(0);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -56,6 +61,7 @@ const DashboardLayout = () => {
     }
   }, [backendUrl, navigate]);
 
+  // Admin / Salesman Stats
   const fetchAdminSalesmanStats = useCallback(async () => {
     try {
       setStatsLoading(true);
@@ -79,7 +85,7 @@ const DashboardLayout = () => {
 
       const orders = ordersRes.data || [];
       setTotalOrders(orders.length);
-      const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+      const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || o.grandTotal || 0), 0);
       setRevenue(totalRevenue);
 
       setTotalProducts(productsRes.data.length || 0);
@@ -91,6 +97,7 @@ const DashboardLayout = () => {
     }
   }, [backendUrl]);
 
+  // Customer Stats
   const fetchCustomerStats = useCallback(async () => {
     try {
       setStatsLoading(true);
@@ -101,38 +108,31 @@ const DashboardLayout = () => {
 
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      // Get logged-in customer's profile (personalized)
       const profileRes = await axios.get(`${backendUrl}/api/customers/my-profile`, config);
       const customer = profileRes.data;
 
       if (!customer) {
-        setStatsError('Your customer profile not found - contact admin');
-        setCustomerTotalOrders(0);
-        setCustomerDeliveredOrders(0);
-        setCreditLimit(0);
-        setUsedCredit(0);
+        setStatsError('Your customer profile not found');
         return;
       }
 
-      setCreditLimit(customer.creditLimit || 0);
-      // Used credit = total credit - remaining balance (adjust field names if different)
+      setCreditLimit(customer.creditLimit || customer.balanceCreditLimit || 0);
       setUsedCredit((customer.creditLimit || 0) - (customer.balanceCreditLimit || 0));
 
-      // Get customer's orders
       const ordersRes = await axios.get(`${backendUrl}/api/orders/my-orders`, config);
       const myOrders = ordersRes.data || [];
 
       setCustomerTotalOrders(myOrders.length);
       setCustomerDeliveredOrders(myOrders.filter(o => o.status?.toLowerCase() === 'delivered').length);
-
     } catch (error) {
       console.error('Customer stats error:', error);
-      setStatsError(error.response?.data?.message || 'Failed to load your statistics');
+      setStatsError('Failed to load your statistics');
     } finally {
       setStatsLoading(false);
     }
   }, [backendUrl]);
 
+  // Delivery Man Stats
   const fetchDeliveryManStats = useCallback(async () => {
     try {
       setStatsLoading(true);
@@ -150,10 +150,43 @@ const DashboardLayout = () => {
       setAcceptedOrders(myOrders.filter(o => o.assignmentStatus?.toLowerCase() === 'accepted').length);
       setDeliveredOrders(myOrders.filter(o => o.status?.toLowerCase() === 'delivered').length);
       setPendingOrders(myOrders.filter(o => o.status?.toLowerCase() === 'pending').length);
-
     } catch (error) {
       console.error('Delivery stats error:', error);
       setStatsError('Failed to load delivery statistics');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [backendUrl]);
+
+  // Storekeeper Stats
+  const fetchStorekeeperStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      setStatsError(null);
+
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      // Pending to pack
+      const pendingRes = await axios.get(`${backendUrl}/api/orders/pending-for-packing`, config);
+      setPendingToPack(pendingRes.data.length || 0);
+
+      // Packed today
+      const today = new Date().toISOString().split('T')[0];
+      const packedTodayRes = await axios.get(
+        `${backendUrl}/api/orders/packed-today?date=${today}`,
+        config
+      );
+      setPackedToday(packedTodayRes.data.length || 0);
+
+      // Ready to deliver
+      const readyRes = await axios.get(`${backendUrl}/api/orders/ready-to-deliver`, config);
+      setReadyToDeliver(readyRes.data.length || 0);
+    } catch (error) {
+      console.error('Storekeeper stats error:', error);
+      setStatsError('Failed to load packing statistics');
     } finally {
       setStatsLoading(false);
     }
@@ -171,27 +204,62 @@ const DashboardLayout = () => {
 
     const role = user.role.toLowerCase().trim();
 
-    if (role.includes('admin')) {
+    if (role.includes('admin') || role.includes('sales')) {
       fetchAdminSalesmanStats();
-    } else if (role.includes('sales')) {
-      fetchAdminSalesmanStats(); // Salesman sees subset of admin stats
     } else if (role.includes('customer')) {
       fetchCustomerStats();
-    } else if (role.includes('delivery')) {
+    } else if (role.includes('delivery') || role.includes('delivery man')) {
       fetchDeliveryManStats();
+    } else if (role.includes('store') || role === 'store kepper' || role === 'storekeeper') {
+      fetchStorekeeperStats();
     } else {
       setStatsError(`Dashboard not configured for role: ${user.role}`);
       setStatsLoading(false);
     }
-  }, [user, fetchAdminSalesmanStats, fetchCustomerStats, fetchDeliveryManStats]);
+  }, [
+    user,
+    fetchAdminSalesmanStats,
+    fetchCustomerStats,
+    fetchDeliveryManStats,
+    fetchStorekeeperStats,
+  ]);
+
+  const goToPackOrders = () => {
+    navigate('/pack-orders'); // ← make sure this route exists in your router
+  };
 
   if (loading) {
-    return <div className="loading">Loading user information...</div>;
+    return <div className="loading">Loading dashboard...</div>;
   }
 
   if (!user) {
     return null;
   }
+
+  const renderStorekeeperDashboard = () => (
+    <div className="stats-grid">
+      <div className="stat-card">
+        <div className="stat-icon">📦</div>
+        <h3>Pending to Pack</h3>
+        <p>{pendingToPack.toLocaleString()}</p>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon">🔧</div>
+        <h3>Packed Today</h3>
+        <p>{packedToday.toLocaleString()}</p>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon">🚚</div>
+        <h3>Ready to Deliver</h3>
+        <p>{readyToDeliver.toLocaleString()}</p>
+      </div>
+      <div className="stat-card quick-action">
+        <button className="quick-action-btn" onClick={goToPackOrders}>
+          Go to Pack Orders →
+        </button>
+      </div>
+    </div>
+  );
 
   const renderAdminSalesmanStats = () => (
     <div className="stats-grid">
@@ -288,7 +356,7 @@ const DashboardLayout = () => {
         <div className="dashboard-content">
           <div className="page-header">
             <h2>Dashboard</h2>
-            <p>Welcome back, <span className="user-name">{user.username}</span></p>
+            <p>Welcome back, <span className="user-name">{user.username || user.name || 'User'}</span></p>
           </div>
 
           {statsError ? (
@@ -300,11 +368,17 @@ const DashboardLayout = () => {
               ))}
             </div>
           ) : (
-            <>
-              {(user.role.toLowerCase().includes('admin') || user.role.toLowerCase().includes('sales')) && renderAdminSalesmanStats()}
+            <div className="stats-container">
+              {(user.role.toLowerCase().includes('admin') || user.role.toLowerCase().includes('sales')) &&
+                renderAdminSalesmanStats()}
               {user.role.toLowerCase().includes('customer') && renderCustomerStats()}
-              {(user.role.toLowerCase().includes('delivery')) && renderDeliveryManStats()}
-            </>
+              {(user.role.toLowerCase().includes('delivery') || user.role.toLowerCase().includes('delivery man')) &&
+                renderDeliveryManStats()}
+              {(user.role.toLowerCase().includes('store') || 
+                user.role.toLowerCase() === 'store kepper' || 
+                user.role.toLowerCase() === 'storekeeper') &&
+                renderStorekeeperDashboard()}
+            </div>
           )}
         </div>
       </main>

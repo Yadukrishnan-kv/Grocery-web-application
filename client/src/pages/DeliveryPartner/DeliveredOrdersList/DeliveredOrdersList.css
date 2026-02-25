@@ -976,3 +976,45 @@
     padding: 28px;
   }
 }
+/* Additional styles for new columns & buttons */
+.invoice-btn {
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.invoice-btn:hover {
+  background: #7c3aed;
+}
+
+.deliver-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.deliver-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.packed-qty-cell {
+  font-weight: 600;
+  color: #059669;
+}
+
+.remaining-cell {
+  font-weight: 500;
+}
+
+/* Highlight ready rows */
+tr.ready-to-deliver {
+  background-color: #ecfdf5;
+}

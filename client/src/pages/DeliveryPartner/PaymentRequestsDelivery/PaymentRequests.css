@@ -673,3 +673,27 @@ button:disabled {
 .status-badge.status-paid_to_admin { background: #28a745; color: white; }
 .action-buttons { display: flex; gap: 8px; }
 button:disabled { opacity: 0.6; cursor: not-allowed; }
+/* Bulk action bar buttons */
+.bulk-accept-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.bulk-reject-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.bulk-accept-btn:hover, .bulk-reject-btn:hover {
+  opacity: 0.9;
+}
