@@ -207,6 +207,113 @@ const adminMarkReceived = async (req, res) => {
   }
 };
 
+// Generate bulk receipt PDF for multiple transactions
+const generateBulkReceipt = async (req, res) => {
+  try {
+    const { transactionIds } = req.body; // Array of transaction IDs
+    
+    if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
+      return res.status(400).json({ message: "Invalid transaction IDs" });
+    }
+
+    // Fetch all transactions
+    const transactions = await BillTransaction.find({ _id: { $in: transactionIds } })
+      .populate("customer", "name address")
+      .populate("bill", "_id totalUsed amountDue paidAmount")
+      .populate("recipient", "username");
+
+    if (transactions.length === 0) {
+      return res.status(404).json({ message: "No transactions found" });
+    }
+
+    // Verify all transactions belong to the current user
+    const allOwned = transactions.every(tx => String(tx.recipient._id) === String(req.user._id));
+    if (!allOwned) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Generate PDF with PDFKit
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument({ margin: 40 });
+
+    // Set response headers
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="bulk-receipt.pdf"');
+
+    // Handle stream errors
+    doc.on("error", (err) => {
+      console.error("PDF generation error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Error generating PDF" });
+      }
+    });
+
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(20).font("Helvetica-Bold").text("BULK RECEIPT", { align: "center" });
+    doc.fontSize(10).font("Helvetica").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
+    doc.moveDown();
+
+    // Recipient info
+    doc.fontSize(12).font("Helvetica-Bold").text("Recipient:");
+    doc.fontSize(10).font("Helvetica").text(`Name: ${transactions[0].recipient.username}`);
+    doc.moveDown();
+
+    // Table header
+    const tableX = doc.x;
+    const colWidth = 100;
+    const row1Y = doc.y;
+
+    doc.font("Helvetica-Bold").fontSize(9);
+    doc.text("Customer", tableX, row1Y, { width: colWidth });
+    doc.text("Bill ID", tableX + colWidth, row1Y, { width: colWidth });
+    doc.text("Amount", tableX + colWidth * 2, row1Y, { width: colWidth });
+    doc.text("Method", tableX + colWidth * 3, row1Y, { width: colWidth });
+
+    doc.moveTo(tableX, row1Y + 15).lineTo(tableX + colWidth * 4, row1Y + 15).stroke();
+    doc.moveDown(1.5);
+
+    // Table rows
+    let totalAmount = 0;
+    doc.font("Helvetica").fontSize(9);
+
+    transactions.forEach((tx, idx) => {
+      const rowY = doc.y;
+      doc.text(tx.customer?.name || "N/A", tableX, rowY, { width: colWidth });
+      
+      // Fix: Convert _id to string before slicing
+      const billId = tx.bill?._id ? String(tx.bill._id).slice(-8) : "N/A";
+      doc.text(billId, tableX + colWidth, rowY, { width: colWidth });
+      
+      doc.text(tx.amount?.toFixed(2) || "0.00", tableX + colWidth * 2, rowY, { width: colWidth });
+      doc.text(tx.method?.charAt(0).toUpperCase() + (tx.method?.slice(1) || ""), tableX + colWidth * 3, rowY, { width: colWidth });
+
+      totalAmount += tx.amount || 0;
+      doc.moveDown();
+    });
+
+    doc.moveTo(tableX, doc.y).lineTo(tableX + colWidth * 4, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    // Total
+    doc.font("Helvetica-Bold").fontSize(11);
+    doc.text(`TOTAL AMOUNT: AED ${totalAmount.toFixed(2)}`, { align: "right" });
+    doc.moveDown();
+
+    // Footer
+    doc.fontSize(9).font("Helvetica");
+    doc.text("This is a bulk receipt covering all transactions listed above.", { align: "center" });
+    doc.text(`Total Transactions: ${transactions.length}`, { align: "center" });
+
+    doc.end();
+  } catch (error) {
+    console.error("Generate bulk receipt error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Server error" });
+    }
+  }
+};
 
 module.exports = {
   getMyTransactions,
@@ -216,4 +323,5 @@ module.exports = {
   getAdminPending,
   getAdminAll,
   adminMarkReceived,
+  generateBulkReceipt,
 };

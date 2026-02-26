@@ -371,6 +371,38 @@ const PaymentRequestsDelivery = () => {
     setShowBulkPayModal(true);
   };
 
+  const downloadBulkReceipt = async () => {
+    if (selectedWalletTx.length === 0) {
+      toast.error("Please select at least one transaction");
+      return;
+    }
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.post(
+        `${backendUrl}/api/bill-transactions/bulk-receipt`,
+        { transactionIds: selectedWalletTx },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+
+      // Create a blob URL and trigger download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `bulk-receipt-${Date.now()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success("Bulk receipt downloaded");
+    } catch (error) {
+      console.error("Download bulk receipt error:", error);
+      toast.error("Failed to download receipt");
+    }
+  };
+
   const handleBulkAcceptRequests = (type) => { // type: "cash" or "cheque"
     const selected = type === "cash" ? selectedCashRequests : selectedChequeRequests;
     if (selected.length === 0) {
@@ -653,6 +685,9 @@ const PaymentRequestsDelivery = () => {
             {selectedWalletTx.length > 0 && (
               <div className="bulk-action-bar">
                 <span>{selectedWalletTx.length} selected</span>
+                <button className="bulk-receipt-btn" onClick={downloadBulkReceipt} disabled={bulkProcessing}>
+                  {bulkProcessing ? "Processing..." : "Download Bulk Receipt"}
+                </button>
                 <button className="bulk-pay-btn" onClick={handleBulkPayToAdmin} disabled={bulkProcessing}>
                   {bulkProcessing ? "Processing..." : "Pay Selected to Admin"}
                 </button>

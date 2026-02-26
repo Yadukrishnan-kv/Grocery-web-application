@@ -590,7 +590,7 @@ button:disabled {
   margin-right: auto;
 }
 
-.bulk-mark-btn, .bulk-pay-btn {
+.bulk-mark-btn, .bulk-pay-btn, .bulk-receipt-btn {
   background: #2196f3;
   color: white;
   border: none;
@@ -602,11 +602,11 @@ button:disabled {
   transition: background 0.2s;
 }
 
-.bulk-mark-btn:hover:not(:disabled), .bulk-pay-btn:hover:not(:disabled) {
+.bulk-mark-btn:hover:not(:disabled), .bulk-pay-btn:hover:not(:disabled), .bulk-receipt-btn:hover:not(:disabled) {
   background: #1976d2;
 }
 
-.bulk-mark-btn:disabled, .bulk-pay-btn:disabled {
+.bulk-mark-btn:disabled, .bulk-pay-btn:disabled, .bulk-receipt-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

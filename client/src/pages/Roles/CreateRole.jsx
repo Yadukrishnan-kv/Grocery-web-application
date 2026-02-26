@@ -57,7 +57,11 @@ const CreateRole = () => {
     WalletMoney: "menu.wallet.money",
     paymentRequestsdelivery: "menu.paymentRequestsdelivery",
     paymentRequestssales: "menu.paymentRequestssales",
-    storekeeperpacked: "menu.storekeeper.packed.orders"
+    storekeeperpacked: "menu.storekeeper.packed.orders",
+   
+      SalesPendingOrders: "menu.sales.pending",
+      SalesOutstandingReport: "menu.sales.outstanding"
+    
 
 
 

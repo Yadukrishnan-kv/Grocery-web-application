@@ -34,6 +34,8 @@ import ChangePassword from "../pages/Profile/ChangePassword";
 import CompanySettings from "../pages/Settings/CompanySettings/CompanySettings";
 import CreateCustomerRequest from "../pages/Salesmanpages/CreateCustomerRequest/CreateCustomerRequest";
 import MyCustomerRequests from "../pages/Salesmanpages/MyCustomerRequests/MyCustomerRequests";
+import SalesmanPendingOrders from "../pages/Salesmanpages/PendingOrders/PendingOrders";
+import OutstandingReport from "../pages/Salesmanpages/OutstandingReport/OutstandingReport";
 import PendingCustomerRequests from "../pages/Customer/PendingCustomerRequests/PendingCustomerRequests";
 import Wallet from "../pages/DeliveryPartner/Wallet/Wallet";
 import WalletMoney from "../pages/WalletMoney/WalletMoney";
@@ -43,6 +45,7 @@ import PaymentRequestsSales from "../pages/Salesmanpages/PaymentRequestsSales/Pa
 import BillWallet from "../pages/BillWallet/BillWallet";
 import AdminOrderRequests from "../pages/Sales/Orders/OrderList/AdminOrderRequests";
 import PackOrders from "../pages/Storekeeper/PackOrders/PackOrders";
+import PendingOrders from "../pages/DeliveryPartner/PendingOrders/PendingOrders";
 function Dom() {
   return (
     <div>
@@ -127,6 +130,8 @@ function Dom() {
               path="/sales/customer-requests/my"
               element={<MyCustomerRequests />}
             />
+            <Route path="/sales/pending-orders" element={<SalesmanPendingOrders />} />
+            <Route path="/sales/outstanding-report" element={<OutstandingReport />} />
             <Route
               path="/admin/customer-requests/pending"
               element={<PendingCustomerRequests />}
@@ -156,6 +161,11 @@ function Dom() {
               path="/storekeeper/packed-orders" 
               element={<PackOrders />} 
             />
+             <Route 
+              path="/PendingOrdersForPacking" 
+              element={<PendingOrders />} 
+            />
+            
 
           </Routes>
         </BrowserRouter>

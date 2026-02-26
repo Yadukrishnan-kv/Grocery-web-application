@@ -118,6 +118,30 @@ const PackOrders = () => {
     }
   };
 
+  // ✅ NEW: Download unified invoice showing Ordered/Packed/Delivered
+  const downloadUnifiedInvoice = async (orderId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${backendUrl}/api/orders/unified-invoice/${orderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `unified-invoice-${orderId.slice(-8)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Invoice downloaded");
+    } catch (err) {
+      toast.error("Failed to download invoice");
+    }
+  };
+
   const closeModal = () => {
     setSelectedOrder(null);
     setPackInputs({});
@@ -222,7 +246,6 @@ const PackOrders = () => {
               <div className="order-list-table-wrapper">
                 <table className="order-list-data-table">
                   <thead>
-                    <tr>
                       <th>No</th>
                       <th>Customer</th>
                       <th>Products</th>
@@ -231,7 +254,6 @@ const PackOrders = () => {
                       <th>Status</th>
                       <th>Order Date</th>
                       <th>Actions</th>
-                    </tr>
                   </thead>
                   <tbody>
                     {filteredOrders.map((order, index) => (
@@ -277,6 +299,16 @@ const PackOrders = () => {
                         <td>{formatDate(order.orderDate)}</td>
 
                         <td>
+                          {/* ✅ Show download invoice button if already packed */}
+                          {order.packedStatus && order.packedStatus !== "not_packed" && (
+                            <button
+                              className="order-list-icon-button order-list-view-button"
+                              onClick={() => downloadUnifiedInvoice(order._id)}
+                              style={{ marginRight: "8px" }}
+                            >
+                              Invoice
+                            </button>
+                          )}
                           <button
                             className="order-list-icon-button order-list-edit-button"
                             onClick={() => openPackModal(order)}

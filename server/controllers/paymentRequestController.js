@@ -27,11 +27,12 @@ const createPaymentRequest = async (req, res) => {
     const recipient = await User.findById(recipientId);
     if (!recipient) return res.status(404).json({ message: "Recipient not found" });
 
-    if (recipientType === "delivery" && recipient.role !== "Delivery Man") {
+    const recipientRole = (recipient.role || "").toString().toLowerCase();
+    if (recipientType === "delivery" && !recipientRole.includes("delivery")) {
       return res.status(400).json({ message: "Invalid delivery man" });
     }
 
-    if (recipientType === "sales" && recipient.role !== "Sales Man") {
+    if (recipientType === "sales" && !recipientRole.includes("sales")) {
       return res.status(400).json({ message: "Invalid sales man" });
     }
 
@@ -58,7 +59,8 @@ const createPaymentRequest = async (req, res) => {
 
 const getMyPaymentRequests = async (req, res) => {
   try {
-    if (!req.user || (req.user.role !== "Delivery Man" && req.user.role !== "Sales Man")) {
+    const role = (req.user && req.user.role) ? String(req.user.role).toLowerCase() : "";
+    if (!req.user || (!role.includes("delivery") && !role.includes("sales"))) {
       return res.status(403).json({ message: "Access denied" });
     }
 

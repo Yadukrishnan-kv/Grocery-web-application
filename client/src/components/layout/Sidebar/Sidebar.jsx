@@ -23,6 +23,7 @@ const MENU_PERMISSIONS = {
   'OrderArrived': 'menu.deliveries.arrived',
   'AcceptedOrders': 'menu.deliveries.accepted',
   'DeliveredOrders': 'menu.deliveries.delivered',
+  'PendingOrdersForPacking': 'menu.deliveries.PendingOrdersForPacking',
   'CancelledOrders': 'menu.deliveries.cancelled',
   'CustomerOrders': 'menu.customer.orders',
   'CustomerOrderReports': 'menu.customer.order.reports',
@@ -41,6 +42,9 @@ const MENU_PERMISSIONS = {
   'billWallet': 'menu.billWallet',
   'AdminOrderRequests': 'menu.admin.order.requests',
   'storekeeperpacked': 'menu.storekeeper.packed.orders'
+  ,
+  'SalesPendingOrders': 'menu.sales.pending',
+  'SalesOutstandingReport': 'menu.sales.outstanding'
 
 
 
@@ -84,6 +88,8 @@ const navItems = [
     subItems: [
       { id: 'Orders', label: 'Orders', path: '/order/list' },
       { id: 'OrdersReport', label: 'Orders Report', path: '/OrderReports/list' }
+      , { id: 'SalesPendingOrders', label: 'Pending Orders', path: '/sales/pending-orders' }
+      , { id: 'SalesOutstandingReport', label: 'Outstanding Report', path: '/sales/outstanding-report' }
     ]
   },
          { id: 'AdminOrderRequests', label: ' Order Requests', icon: '📋', path: '/admin/AdminOrderRequests' },
@@ -96,6 +102,7 @@ const navItems = [
       { id: 'OrderArrived', label: 'Order arrived', path: '/Orderarrived/list' },
       { id: 'AcceptedOrders', label: 'Accepted Orders', path: '/AccepetdOrders/list' },
       { id: 'DeliveredOrders', label: 'Delivered Orders', path: '/DeliveredOrders/list' },
+      { id: 'PendingOrdersForPacking', label: 'Pending Orders', path: '/PendingOrdersForPacking' },
       { id: 'CancelledOrders', label: 'Cancelled Orders', path: '/CancelledOrders/list' }
     ]
   },
@@ -191,7 +198,9 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
       item.id !== 'ChequeWallet' &&
       item.id !== 'paymentRequestsdelivery' &&
       item.id !== 'paymentRequestssales' &&
-      item.id !== 'storekeeperpacked'
+      item.id !== 'storekeeperpacked' &&
+      item.id !== 'SalesPendingOrders' &&
+      item.id !== 'SalesOutstandingReport'
 
     );
   }

@@ -84,16 +84,8 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // Credit deduction (only if approved later – but deduct now and revert if rejected)
-    let creditDeducted = false;
-    if (payment === "credit") {
-      if (customer.balanceCreditLimit < grandTotal) {
-        return res.status(400).json({ message: "Insufficient credit balance" });
-      }
-      customer.balanceCreditLimit -= grandTotal;
-      await customer.save();
-      creditDeducted = true;
-    }
+    // ✅ NO credit deduction at order creation
+    // Credit will be deducted ONLY when storekeeper packs items
 
     // Determine initial status
     let initialStatus = "pending";
@@ -273,10 +265,9 @@ const deliverOrder = async (req, res) => {
     if (order.status === "delivered" || order.status === "cancelled") {
       return res.status(400).json({ message: "Order cannot be delivered" });
     }
-
     let grandDeliveryAmount = 0;
 
-    // Update delivered quantities
+    // ✅ Update delivered quantities
     for (const inputItem of deliveredItems) {
       const orderItem = order.orderItems.id(inputItem.product);
       if (!orderItem) {
@@ -284,17 +275,20 @@ const deliverOrder = async (req, res) => {
       }
 
       const qtyToDeliver = Number(inputItem.quantity);
-      const remaining = orderItem.orderedQuantity - orderItem.deliveredQuantity;
+      // ✅ Can only deliver what's been packed, minus what's already delivered
+      const packedRemaining = (orderItem.packedQuantity || 0) - (orderItem.deliveredQuantity || 0);
 
-      if (qtyToDeliver <= 0 || qtyToDeliver > remaining) {
-        return res.status(400).json({ message: `Invalid quantity for ${orderItem.product}` });
+      if (qtyToDeliver <= 0 || qtyToDeliver > packedRemaining) {
+        return res.status(400).json({ 
+          message: `Invalid quantity for ${orderItem.product?.productName || "product"}. Packed: ${orderItem.packedQuantity}, Already delivered: ${orderItem.deliveredQuantity}` 
+        });
       }
 
       orderItem.deliveredQuantity += qtyToDeliver;
       grandDeliveryAmount += qtyToDeliver * orderItem.price;
     }
 
-    // Handle cash/cheque payment immediately (no bill generation needed)
+    // ✅ Handle cash/cheque payment immediately (no bill generation needed)
     if (paymentMethod === "cash" || paymentMethod === "cheque") {
       // Create transaction in delivery man's wallet
       await PaymentTransaction.create({
@@ -306,10 +300,9 @@ const deliverOrder = async (req, res) => {
         status: "received",           // Directly received – no pending
       });
 
-      // Restore full credit (since customer paid cash/cheque)
+      // ✅ Restore credit for delivered amount only (not full packed amount)
       const customer = await Customer.findById(order.customer);
       if (customer && customer.billingType === "Credit limit") {
-        // Restore the delivered portion only
         customer.balanceCreditLimit += grandDeliveryAmount;
         await customer.save();
       }
@@ -317,18 +310,24 @@ const deliverOrder = async (req, res) => {
       // No bill should be created for this delivered portion
     }
 
-    // Update order status
+    // ✅ Calculate totals for status updates
     const totalOrdered = order.orderItems.reduce((s, i) => s + i.orderedQuantity, 0);
     const totalDelivered = order.orderItems.reduce((s, i) => s + i.deliveredQuantity, 0);
+    const totalPacked = order.orderItems.reduce((s, i) => s + (i.packedQuantity || 0), 0);
 
+    // ✅ Set status correctly:
+    // - "delivered" only when everything ordered has been delivered
+    // - "partial_delivered" otherwise (even if all packed items are delivered)
+    //   so that remaining un‑packed quantity can still be packed later.
     order.status = totalDelivered >= totalOrdered ? "delivered" : "partial_delivered";
     order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
 
     await order.save();
 
-    // Only create invoice-based bill if:
+    // ✅ Only create invoice-based bill if:
     // - It's credit order
     // - Not fully paid in cash/cheque this time
+    // - And customer is on invoice-based billing
     const customer = await Customer.findById(order.customer);
     if (
       order.payment === "credit" &&
@@ -345,9 +344,10 @@ const deliverOrder = async (req, res) => {
 
     res.json({
       message: paymentMethod === "cash" || paymentMethod === "cheque"
-        ? "Delivery recorded & cash/cheque received – credit restored"
-        : "Delivery recorded successfully",
+        ? `Delivery recorded & ${paymentMethod} received – credit restored: AED ${grandDeliveryAmount.toFixed(2)}`
+        : "Delivery recorded successfully. Bill generated for credit payment.",
       order,
+      amountCollected: grandDeliveryAmount,
     });
   } catch (error) {
     console.error("Deliver order error:", error);
@@ -364,29 +364,37 @@ const cancelOrder = async (req, res) => {
       return res.status(400).json({ message: "Cannot cancel this order" });
     }
 
-    // Revert stock for all items
+    // Revert stock for undelivered items
     for (const item of order.orderItems) {
       const product = await Product.findById(item.product);
-      product.quantity += item.orderedQuantity - item.deliveredQuantity;
+      const undeliveredQty = item.packedQuantity - item.deliveredQuantity;
+      product.quantity += undeliveredQty;
       await product.save();
     }
 
-    // Revert credit if applicable
+    // ✅ Revert credit for PACKED but NOT delivered amount (since credit was deducted on packing)
     if (order.payment === "credit") {
       const customer = await Customer.findById(order.customer);
-      const remainingAmount = order.orderItems.reduce(
-        (sum, item) =>
-          sum + (item.orderedQuantity - item.deliveredQuantity) * item.price,
+      const creditToRestore = order.orderItems.reduce(
+        (sum, item) => {
+          const packedNotDelivered = (item.packedQuantity || 0) - (item.deliveredQuantity || 0);
+          return sum + packedNotDelivered * item.price;
+        },
         0,
       );
-      customer.balanceCreditLimit += remainingAmount;
-      await customer.save();
+      if (creditToRestore > 0) {
+        customer.balanceCreditLimit += creditToRestore;
+        await customer.save();
+      }
     }
 
     order.status = "cancelled";
     await order.save();
 
-    res.json(order);
+    res.json({
+      message: "Order cancelled successfully",
+      order
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -889,17 +897,44 @@ const rejectAssignedOrder = async (req, res) => {
 
 const getDeliveredOrdersForAdmin = async (req, res) => {
   try {
-    // Show ALL orders that have ANY delivered quantity (partial or full)
-    const orders = await Order.find({
-      deliveredQuantity: { $gt: 0 }, // ← This is the key change!
-      // Removed status: "delivered" filter so partial deliveries are included
-    })
+    // Find orders containing any delivered quantity in their items
+    const orders = await Order.find({ "orderItems.deliveredQuantity": { $gt: 0 } })
       .populate("customer", "name email phoneNumber address pincode")
-      .populate("product", "productName price")
-      .populate("assignedTo", "username") // Delivery partner info
+      .populate("orderItems.product", "productName price unit")
+      .populate("assignedTo", "username")
       .sort({ orderDate: -1 });
 
-    res.json(orders);
+    // Map to a flat structure expected by the reports frontend.
+    // For each order item that has deliveredQuantity > 0, produce one record.
+    const records = [];
+    orders.forEach((order) => {
+      const orderDate = order.orderDate;
+      (order.orderItems || []).forEach((item) => {
+        if ((item.deliveredQuantity || 0) > 0) {
+          const price = item.price || item.product?.price || 0;
+          const deliveredQty = item.deliveredQuantity || 0;
+          const orderedQty = item.orderedQuantity || 0;
+          const totalAmount = item.totalAmount || deliveredQty * price;
+
+          records.push({
+            _id: order._id,
+            orderNumber: order.orderNumber || null,
+            customer: order.customer || null,
+            product: item.product || null,
+            orderedQuantity: orderedQty,
+            deliveredQuantity: deliveredQty,
+            pendingQty: Math.max(0, orderedQty - deliveredQty),
+            price,
+            totalAmount,
+            assignedTo: order.assignedTo || null,
+            orderDate,
+            status: order.status,
+          });
+        }
+      });
+    });
+
+    res.json(records);
   } catch (error) {
     console.error("Error fetching delivered orders for admin:", error);
     res.status(500).json({ message: "Server error" });
@@ -1301,10 +1336,13 @@ const packOrder = async (req, res) => {
     const order = await Order.findById(orderId).populate("customer");
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (order.status !== "pending" && order.status !== "assigned") {
+    // ✅ Allow packing if: pending, assigned, partial_delivered (for remaining qty)
+    if (!["pending", "assigned", "partial_delivered"].includes(order.status)) {
       return res.status(400).json({ message: "Order not in packable state" });
     }
 
+    // ✅ Calculate newly packed amount for credit deduction
+    let newlyPackedAmount = 0;
     let totalPacked = 0;
     let allFullyPacked = true;
 
@@ -1313,18 +1351,34 @@ const packOrder = async (req, res) => {
       if (!item) continue;
 
       // Fix: use packedQuantity field (you introduced it earlier)
-      const maxPack = item.orderedQuantity - (item.packedQuantity || 0);
+      const previousPack = item.packedQuantity || 0;
+      const maxPack = item.orderedQuantity - previousPack;
       const qty = Number(pack.packedQuantity);
 
       if (qty > maxPack || qty < 0) {
         return res.status(400).json({ message: `Invalid pack qty for ${item.product}` });
       }
 
-      item.packedQuantity = (item.packedQuantity || 0) + qty; // Update packedQuantity
+      item.packedQuantity = previousPack + qty; // Update packedQuantity
       totalPacked += qty;
+      newlyPackedAmount += qty * item.price; // ✅ Track newly packed amount
 
       if (item.packedQuantity < item.orderedQuantity) {
         allFullyPacked = false;
+      }
+    }
+
+    // ✅ Deduct credit ONLY for newly packed amount (and ONLY if payment is credit)
+    if (order.payment === "credit" && newlyPackedAmount > 0) {
+      const customer = await Customer.findById(order.customer);
+      if (customer && customer.billingType === "Credit limit") {
+        if (customer.balanceCreditLimit < newlyPackedAmount) {
+          return res.status(400).json({ 
+            message: `Insufficient credit limit. Need ${newlyPackedAmount.toFixed(2)}, available: ${customer.balanceCreditLimit.toFixed(2)}` 
+          });
+        }
+        customer.balanceCreditLimit -= newlyPackedAmount;
+        await customer.save();
       }
     }
 
@@ -1332,16 +1386,20 @@ const packOrder = async (req, res) => {
     order.packedAt = new Date();
     order.packedStatus = allFullyPacked ? "fully_packed" : "partially_packed";
 
-    if (allFullyPacked) {
+    // ✅ Set to ready_to_deliver ONLY if fully packed AND not partially delivered yet
+    if (allFullyPacked && order.status !== "partial_delivered") {
       order.status = "ready_to_deliver";
     }
 
     await order.save();
 
     res.json({
-      message: "Order packed successfully",
+      message: allFullyPacked 
+        ? `Order fully packed. Credit deducted: AED ${newlyPackedAmount.toFixed(2)}` 
+        : `Partially packed: ${totalPacked} units. Credit deducted: AED ${newlyPackedAmount.toFixed(2)}`,
       order,
-      nextStep: allFullyPacked ? "Ready for delivery" : "Continue packing"
+      creditDeducted: newlyPackedAmount,
+      nextStep: allFullyPacked ? "Ready for delivery" : "Continue packing when stock arrives"
     });
   } catch (error) {
     console.error("Pack order error:", error);
@@ -1350,9 +1408,12 @@ const packOrder = async (req, res) => {
 };
 const getPendingForPacking = async (req, res) => {
   try {
+    // ✅ Include BOTH unpacked AND partially packed orders
     const orders = await Order.find({
-      status: "pending",
-      packedAt: null,
+      $or: [
+        { packedStatus: { $in: ["not_packed", "partially_packed"] } },
+        { status: "pending" }
+      ]
     })
       .populate("customer", "name email phoneNumber")
       .populate("orderItems.product", "productName unit price")
@@ -1397,11 +1458,16 @@ const getPackedInvoice = async (req, res) => {
 
     if (!order) return res.status(404).json({ message: "Order not found" });
     
-    // Only allow if order has been packed
-    if (!order.packedAt) {
+    // ✅ Only allow if order has been packed
+    if (!order.packedAt || !order.packedStatus) {
       return res.status(400).json({ message: "Order not yet packed" });
     }
 
+    const counter = await getOrInitCounter();
+    
+    // ✅ Generate unique invoice number for pack invoices
+    let packedInvoiceNumber = `PKD-${Date.now()}-${order._id.toString().slice(-6)}`;
+    
     const filename = `packed-invoice-${order._id.toString().slice(-8)}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -1409,8 +1475,8 @@ const getPackedInvoice = async (req, res) => {
     const doc = new PDFDocument({ size: "A4", margin: 0 });
     doc.pipe(res);
 
-    // Generate invoice using packedQuantity instead of deliveredQuantity
-    await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", `PACK-${order._id.toString().slice(-6)}`);
+    // ✅ Generate invoice using packedQuantity instead of deliveredQuantity
+    await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", packedInvoiceNumber);
     
     doc.end();
   } catch (error) {
@@ -1419,6 +1485,179 @@ const getPackedInvoice = async (req, res) => {
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }
+};
+
+// ✅ NEW UNIFIED INVOICE - Shows Ordered, Packed, Delivered quantities
+const getUnifiedInvoice = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("customer", "name email phoneNumber address pincode")
+      .populate("orderItems.product", "productName price unit");
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    
+    // ✅ Only allow if order has been packed
+    if (!order.packedAt || !order.packedStatus) {
+      return res.status(400).json({ message: "Order must be packed first to generate invoice" });
+    }
+
+    const counter = await getOrInitCounter();
+    
+    // ✅ Generate unique invoice number
+    let invoiceNumber = `INV-${Date.now()}-${order._id.toString().slice(-6)}`;
+    
+    const filename = `unified-invoice-${order._id.toString().slice(-8)}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ size: "A4", margin: 0 });
+    doc.pipe(res);
+
+    // ✅ Generate UNIFIED invoice with all quantities
+    await generateUnifiedInvoicePDF(doc, order, "INVOICE", invoiceNumber);
+    
+    doc.end();
+  } catch (error) {
+    console.error("Error generating unified invoice:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Server error", error: error.message });
+    }
+  }
+};
+
+// ✅ UNIFIED INVOICE PDF - Shows Ordered/Packed/Delivered columns
+const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
+  const company = await CompanySettings.findOne();
+  if (!company) throw new Error("Company invoice settings not configured.");
+
+  const pageWidth = 595.28;
+  const margin = 50;
+  const headerY = margin;
+
+  const date = new Date(order.packedAt || Date.now());
+  const formattedDate = date.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+
+  // Header
+  doc.fontSize(22).font("Helvetica-Bold").text(company.companyName || "INGOUDE COMPANY", margin, headerY);
+  doc.fontSize(36).font("Helvetica-Bold").fillColor("#b0123b").text(invoiceType, margin, headerY + 40);
+
+  // Invoice info
+  const invoiceInfoX = pageWidth - margin - 200;
+  doc.fontSize(12).font("Helvetica-Bold").fillColor("#000000")
+    .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
+    .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
+
+  // Bill To / From
+  const infoY = headerY + 120;
+  const billToX = margin;
+  const fromX = pageWidth - margin - 250;
+
+  doc.fontSize(14).font("Helvetica-Bold").text("Bill To:", billToX, infoY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(order.customer?.name || "N/A", billToX, infoY + 25)
+    .text(order.customer?.phoneNumber || "N/A", billToX, infoY + 45)
+    .text(order.customer?.address || "N/A", billToX, infoY + 65)
+    .text(`Pincode: ${order.customer?.pincode || "N/A"}`, billToX, infoY + 85);
+
+  doc.fontSize(14).font("Helvetica-Bold").text("From:", fromX, infoY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(company.companyName || "INGOUDE COMPANY", fromX, infoY + 25)
+    .text(company.companyPhone || "N/A", fromX, infoY + 45)
+    .text(company.companyAddress || "N/A", fromX, infoY + 65);
+
+  // ✅ Table with Ordered/Packed/Delivered columns
+  const tableY = infoY + 130;
+  const rowHeight = 45;
+
+  const descCol = margin;
+  const orderedCol = margin + 180;
+  const packedCol = margin + 250;
+  const deliveredCol = margin + 320;
+  const priceCol = margin + 390;
+  const totalCol = margin + 460;
+
+  // Header row
+  doc.rect(margin - 10, tableY - 5, pageWidth - margin * 2 + 20, rowHeight)
+    .fillColor("#b0123b").fill();
+
+  doc.fillColor("#ffffff").fontSize(11).font("Helvetica-Bold")
+    .text("Description", descCol, tableY + 5)
+    .text("Ordered", orderedCol, tableY + 5, { width: 65, align: "center" })
+    .text("Packed", packedCol, tableY + 5, { width: 65, align: "center" })
+    .text("Delivered", deliveredCol, tableY + 5, { width: 65, align: "center" })
+    .text("Price", priceCol, tableY + 5, { width: 65, align: "center" })
+    .text("Amount", totalCol, tableY + 5, { width: 70, align: "center" });
+
+  // Data rows
+  let currentY = tableY + rowHeight;
+  let amountForBilling = 0; // Amount based on packed qty
+
+  order.orderItems.forEach((item) => {
+    const ordered = item.orderedQuantity || 0;
+    const packed = item.packedQuantity || 0;
+    const delivered = item.deliveredQuantity || 0;
+    
+    // ✅ Amount is based on PACKED quantity (for credit deduction)
+    const amountThisRow = packed * item.price;
+    amountForBilling += amountThisRow;
+
+    doc.fillColor("#000000").fontSize(10).font("Helvetica")
+      .text(item.product?.productName || "Unknown Product", descCol, currentY + 8)
+      .text(ordered.toString(), orderedCol, currentY + 8, { width: 65, align: "center" })
+      .text(packed.toString(), packedCol, currentY + 8, { width: 65, align: "center" })
+      .text(delivered.toString(), deliveredCol, currentY + 8, { width: 65, align: "center" })
+      .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 8, { width: 65, align: "center" })
+      .text(`AED ${amountThisRow.toFixed(2)}`, totalCol, currentY + 8, { width: 70, align: "center" });
+
+    currentY += rowHeight;
+  });
+
+  // Grand Total (based on packed qty)
+  const subtotalY = currentY + 20;
+  const subtotalWidth = 200;
+  const subtotalX = pageWidth - margin - subtotalWidth;
+
+  doc.rect(subtotalX, subtotalY, subtotalWidth, 35).fillColor("#222222").fill();
+  doc
+    .fillColor("#ffffff")
+    .fontSize(12)
+    .font("Helvetica-Bold")
+    .text("Amount to Bill (Packed Qty)", subtotalX + 10, subtotalY + 12)
+    .text(`AED ${amountForBilling.toFixed(2)}`, subtotalX + subtotalWidth - 15, subtotalY + 12, { align: "right" });
+
+  // Footer
+  const footerY = subtotalY + 80;
+
+  doc
+    .fillColor("#000000")
+    .fontSize(14)
+    .font("Helvetica-Bold")
+    .text("Payment Information:", margin, footerY);
+  doc
+    .fontSize(12)
+    .font("Helvetica")
+    .text(`Bank: ${company.bankName || "N/A"}`, margin, footerY + 25)
+    .text(`Account: ${company.bankAccountNumber || "N/A"}`, margin, footerY + 45)
+    .text(`Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || "N/A"}`, margin, footerY + 65)
+    .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
+
+  const thankYouX = pageWidth - margin - 200;
+  doc
+    .fontSize(36)
+    .font("Helvetica-Bold")
+    .fillColor("#000000")
+    .text("Thank You!", thankYouX, footerY, { width: 200, align: "right" });
+
+  const bottomY = footerY + 150;
+  doc
+    .fontSize(10)
+    .font("Helvetica-Oblique")
+    .fillColor("#666666")
+    .text("This is a system-generated invoice. Amount shown is based on packed quantity.", margin, bottomY);
 };
 const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const company = await CompanySettings.findOne();
@@ -1571,5 +1810,12 @@ module.exports = {
   approveOrderRequest,
   rejectOrderRequest,
   getCustomerOrderHistory,
-  checkFirstOrder,packOrder,getPendingForPacking,getPackedToday,getReadyToDeliver,getPackedInvoice
+  checkFirstOrder,
+  packOrder,
+  getPendingForPacking,
+  getPackedToday,
+  getReadyToDeliver,
+  getPackedInvoice,
+  getUnifiedInvoice, // ✅ NEW unified invoice showing Ordered/Packed/Delivered
+  generateUnifiedInvoicePDF // ✅ NEW unified invoice PDF generator
 };

@@ -50,12 +50,13 @@ const DeliveredOrdersList = () => {
       const res = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Show only accepted + ready to deliver (fully packed)
+      // ✅ Show orders that are: accepted AND (partially_packed OR fully_packed)
+      // Do NOT wait for ready_to_deliver - show when packing starts
       setOrders(
         res.data.filter(
           (o) =>
             o.assignmentStatus === "accepted" &&
-            (o.packedStatus === "fully_packed" || o.status === "ready_to_deliver") &&
+            (o.packedStatus === "partially_packed" || o.packedStatus === "fully_packed") &&
             o.status !== "delivered" &&
             o.status !== "cancelled"
         )
@@ -72,10 +73,11 @@ const DeliveredOrdersList = () => {
     fetchAcceptedOrders();
   }, [fetchCurrentUser, fetchAcceptedOrders]);
 
-  // Open modal only if ready
+  // Open modal only if packed (partial or full)
   const openDeliveryModal = (order) => {
-    if (order.status !== "ready_to_deliver" && order.packedStatus !== "fully_packed") {
-      return toast.error("Order not ready for delivery yet. Awaiting storekeeper packing.");
+    // ✅ Allow delivery for BOTH partially_packed AND fully_packed orders
+    if (order.packedStatus !== "partially_packed" && order.packedStatus !== "fully_packed") {
+      return toast.error("Order not packed yet. Awaiting storekeeper packing.");
     }
 
     const inputs = {};
@@ -106,10 +108,12 @@ const DeliveredOrdersList = () => {
   const validateDelivery = () => {
     for (const item of currentOrder.orderItems) {
       const qty = Number(deliveryInputs[item._id] || 0);
-      const max = (item.packedQuantity || 0) - (item.deliveredQuantity || 0);
+      // ✅ Can only deliver up to packedQuantity (not orderedQuantity)
+      // and account for already delivered
+      const maxCanDeliver = (item.packedQuantity || 0) - (item.deliveredQuantity || 0);
 
-      if (qty > max) {
-        return `Cannot deliver more than remaining packed (${max} ${item.unit || ""}) for ${item.product?.productName || "product"}`;
+      if (qty > maxCanDeliver) {
+        return `Cannot deliver more than packed (${maxCanDeliver} ${item.unit || ""}) for ${item.product?.productName || "product"}`;
       }
       if (qty < 0 || (qty > 0 && isNaN(qty))) {
         return "Invalid quantity entered";
@@ -171,11 +175,11 @@ const DeliveredOrdersList = () => {
     }
   };
 
-  // Download Packed Invoice
-  const downloadPackedInvoice = async (orderId) => {
+  // ✅ Download unified invoice showing Ordered/Packed/Delivered
+  const downloadUnifiedInvoice = async (orderId) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get(`${backendUrl}/api/orders/packed-invoice/${orderId}`, {
+      const res = await axios.get(`${backendUrl}/api/orders/unified-invoice/${orderId}`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: "blob",
       });
@@ -183,15 +187,15 @@ const DeliveredOrdersList = () => {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `packed_invoice_${orderId.slice(-8)}.pdf`);
+      link.setAttribute("download", `unified-invoice-${orderId.slice(-8)}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
 
-      toast.success("Packed invoice downloaded");
+      toast.success("Invoice downloaded");
     } catch (err) {
-      toast.error("Failed to download packed invoice");
+      toast.error("Failed to download invoice");
     }
   };
 
@@ -199,6 +203,13 @@ const DeliveredOrdersList = () => {
     const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
     const totalDelivered = order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
 
+    // ✅ If partially_packed or fully_packed, it's ready to deliver (or being delivered)
+    if (order.packedStatus === "partially_packed") {
+      if (totalDelivered === 0) return "Ready to Deliver (Partial)";
+      if (totalDelivered < (order.orderItems?.reduce((s, i) => s + (i.packedQuantity || 0), 0) || 0))
+        return "Partially Delivered";
+    }
+    
     if (order.packedStatus !== "fully_packed") return "Awaiting Packing";
     if (totalDelivered === 0) return "Ready to Deliver";
     if (totalDelivered < totalOrdered) return "Partially Delivered";
@@ -320,7 +331,8 @@ const DeliveredOrdersList = () => {
                       const totalDelivered = order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
                       const remaining = packedQty - totalDelivered;
                       const grandTotal = order.orderItems?.reduce((s, i) => s + i.totalAmount, 0)?.toFixed(2) || "0.00";
-                      const isReady = order.status === "ready_to_deliver" || order.packedStatus === "fully_packed";
+                      // ✅ Enable deliver button if partially_packed OR fully_packed
+                      const isPacked = order.packedStatus === "partially_packed" || order.packedStatus === "fully_packed";
 
                       return (
                         <tr key={order._id}>
@@ -344,7 +356,7 @@ const DeliveredOrdersList = () => {
                           </td>
 
                           <td>{totalOrdered}</td>
-                          <td>{packedQty} (packed)</td> {/* NEW */}
+                          <td>{packedQty} (packed)</td>
                           <td>{totalDelivered}</td>
                           <td>{remaining}</td>
 
@@ -358,7 +370,7 @@ const DeliveredOrdersList = () => {
                           <td>{order.remarks || "—"}</td>
 
                           <td>
-                            <span className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(" ", "-")}`}>
+                            <span className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(/\s/g, "-")}`}>
                               {getDeliveryStatus(order)}
                             </span>
                           </td>
@@ -368,12 +380,12 @@ const DeliveredOrdersList = () => {
                           <td>
                             <button
                               className="invoice-btn"
-                              onClick={() => downloadPackedInvoice(order._id)}
+                              onClick={() => downloadUnifiedInvoice(order._id)}
                             >
                               Download Invoice
                             </button>
 
-                            {isReady ? (
+                            {isPacked ? (
                               <button
                                 className="deliver-btn"
                                 onClick={() => openDeliveryModal(order)}

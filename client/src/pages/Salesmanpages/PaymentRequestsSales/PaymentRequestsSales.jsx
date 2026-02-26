@@ -138,6 +138,45 @@ const PaymentRequestsSales = () => {
     }
   };
 
+  /* Download bulk receipt for selected wallet transactions */
+  const downloadBulkReceipt = async () => {
+    if (billTransactions.length === 0) {
+      toast.error("No wallet transactions to download");
+      return;
+    }
+    try {
+      const token = localStorage.getItem("token");
+      const selectedTxIds = billTransactions.filter(tx => tx.status === "received").map(tx => tx._id);
+      
+      if (selectedTxIds.length === 0) {
+        toast.error("No transactions ready to download");
+        return;
+      }
+
+      const response = await axios.post(
+        `${backendUrl}/api/bill-transactions/bulk-receipt`,
+        { transactionIds: selectedTxIds },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `bulk-receipt-${Date.now()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success("Bulk receipt downloaded");
+    } catch (error) {
+      console.error("Download bulk receipt error:", error);
+      toast.error("Failed to download receipt");
+    }
+  };
+
   // ─── Totals ────────────────────────────────────────────────────────────────
   const calculateTotal = (list, status = ["accepted", "received"]) =>
     list.filter(item => status.includes(item.status)).reduce((sum, item) => sum + item.amount, 0);
@@ -206,6 +245,19 @@ const PaymentRequestsSales = () => {
                 </div>
               </div>
             </div>
+
+            {billTransactions.length > 0 && (
+              <div className="bulk-action-bar" style={{ marginBottom: "15px" }}>
+                <button 
+                  className="bulk-receipt-btn" 
+                  onClick={downloadBulkReceipt} 
+                  disabled={processingId}
+                  style={{ marginRight: "10px" }}
+                >
+                  Download Bulk Receipt PDF
+                </button>
+              </div>
+            )}
 
             <table className="requests-table">
               <thead>

@@ -55,7 +55,7 @@ const orderSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "delivered", "cancelled", "partial_delivered"," ready_to_deliver"],
+      enum: ["pending", "delivered", "cancelled", "partial_delivered", "ready_to_deliver"],
       default: "pending",
     },
     payment: {
@@ -132,16 +132,19 @@ orderSchema.set('toObject', { virtuals: true });
 
 // Virtual for total ordered quantity (sum of all items)
 orderSchema.virtual('totalOrderedQuantity').get(function () {
+  if (!this.orderItems || !Array.isArray(this.orderItems)) return 0;
   return this.orderItems.reduce((sum, item) => sum + item.orderedQuantity, 0);
 });
 
 // Virtual for total delivered quantity
 orderSchema.virtual('totalDeliveredQuantity').get(function () {
+  if (!this.orderItems || !Array.isArray(this.orderItems)) return 0;
   return this.orderItems.reduce((sum, item) => sum + item.deliveredQuantity, 0);
 });
 
 // Virtual for grand total amount
 orderSchema.virtual('grandTotal').get(function () {
+  if (!this.orderItems || !Array.isArray(this.orderItems)) return 0;
   return this.orderItems.reduce((sum, item) => sum + item.totalAmount, 0);
 });
 

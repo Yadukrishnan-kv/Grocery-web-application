@@ -150,13 +150,6 @@ const getCustomerBillById = async (req, res) => {
 // billController.js (or wherever createInvoiceBasedBill is defined)
 const createInvoiceBasedBill = async (order) => {
   try {
-    // Step 1: Prevent duplicate bill creation
-    const existingBill = await Bill.findOne({ orders: order._id });
-    if (existingBill) {
-      console.log(`Bill already exists for order ${order._id} → skipping`);
-      return existingBill; // Return existing instead of creating new
-    }
-
     const customer = await Customer.findById(order.customer);
     if (!customer || customer.statementType !== "invoice-based") {
       return null; // Not invoice-based → skip
@@ -181,6 +174,28 @@ const createInvoiceBasedBill = async (order) => {
       dueDate.setDate(dueDate.getDate() + customer.dueDays);
     }
 
+    // Step 1: Check if bill already exists for this order
+    const existingBill = await Bill.findOne({ orders: order._id });
+    if (existingBill) {
+      // ✅ Update existing bill with new delivered amount (for partial deliveries)
+      const previousTotalUsed = existingBill.totalUsed || 0;
+      const paidAlready = existingBill.paidAmount || 0;
+      
+      // New delivery amount = current totalUsed - previous totalUsed
+      const additionalAmount = totalUsed - previousTotalUsed;
+      
+      existingBill.totalUsed = totalUsed;
+      existingBill.amountDue = totalUsed - paidAlready;
+      existingBill.cycleEnd = deliveryDate; // Update end date to latest delivery
+      existingBill.status = existingBill.amountDue <= 0 ? "paid" : "pending";
+      
+      await existingBill.save();
+      
+      console.log(`✅ Bill updated for order ${order._id} with additional delivery: +${additionalAmount.toFixed(2)} AED`);
+      return existingBill;
+    }
+
+    // Step 2: Create new bill if it doesn't exist
     const bill = await Bill.create({
       customer: order.customer,
       cycleStart: deliveryDate,

@@ -184,7 +184,7 @@ const changePassword = async (req, res) => {
 // controllers/userController.js (add this)
 const getDeliveryMen = async (req, res) => {
   try {
-    const deliveryMen = await User.find({ role: "Delivery Man" }).select("username _id");
+    const deliveryMen = await User.find({ role: { $regex: /delivery/i } }).select("username _id");
     res.json(deliveryMen);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -193,7 +193,7 @@ const getDeliveryMen = async (req, res) => {
 
 const getSalesMen = async (req, res) => {
   try {
-    const salesMen = await User.find({ role: "Sales Man" }).select("username _id");
+    const salesMen = await User.find({ role: { $regex: /sales/i } }).select("username _id");
     res.json(salesMen);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
