@@ -254,6 +254,7 @@ const CustomerList = () => {
                       <th scope="col">Opening Due Days</th>
                       <th scope="col">Billing Type</th>
                       <th scope="col">Statement Type</th>
+                      <th scope="col">Salesman</th>
                       <th scope="col">Due Days</th>
                       <th scope="col">Current Bill Due</th>
                       <th scope="col">Edit</th>
@@ -357,6 +358,7 @@ const CustomerList = () => {
                                 customer.statementType.slice(1)
                               : "-"}
                           </td>
+                          <td>{customer.salesman?.username || "-"}</td>
                           <td>{customer.dueDays || "-"}</td>
 
                           <td className={dueClass}>{dueStatusText}</td>

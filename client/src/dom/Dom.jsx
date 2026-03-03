@@ -46,6 +46,11 @@ import BillWallet from "../pages/BillWallet/BillWallet";
 import AdminOrderRequests from "../pages/Sales/Orders/OrderList/AdminOrderRequests";
 import PackOrders from "../pages/Storekeeper/PackOrders/PackOrders";
 import PendingOrders from "../pages/DeliveryPartner/PendingOrders/PendingOrders";
+import SalesmanCustomers from "../pages/Salesmanpages/SalesmanCustomers/SalesmanCustomers";
+import CustomerOutstandingDetails from "../pages/Salesmanpages/OutstandingReport/CustomerOutstandingDetails";
+import ReceiptReport from "../pages/Salesmanpages/ReceiptReport/ReceiptReport";
+import ReceiptDetails from "../pages/Salesmanpages/ReceiptReport/ReceiptDetails";
+import StorekeeperOrders from "../pages/Storekeeper/StorekeeperOrders/StorekeeperOrders";
 function Dom() {
   return (
     <div>
@@ -130,8 +135,24 @@ function Dom() {
               path="/sales/customer-requests/my"
               element={<MyCustomerRequests />}
             />
-            <Route path="/sales/pending-orders" element={<SalesmanPendingOrders />} />
-            <Route path="/sales/outstanding-report" element={<OutstandingReport />} />
+            <Route path="/sales/customers" element={<SalesmanCustomers />} />
+            <Route
+              path="/sales/pending-orders"
+              element={<SalesmanPendingOrders />}
+            />
+            <Route
+              path="/sales/outstanding-report"
+              element={<OutstandingReport />}
+            />
+            <Route
+              path="/sales/outstanding/:customerId"
+              element={<CustomerOutstandingDetails />}
+            />
+            <Route path="/sales/ReceiptReport" element={<ReceiptReport />} />
+            <Route
+              path="/sales/receipts/:receiptId"
+              element={<ReceiptDetails />}
+            />
             <Route
               path="/admin/customer-requests/pending"
               element={<PendingCustomerRequests />}
@@ -141,33 +162,32 @@ function Dom() {
 
             <Route path="/admin/wallet-money" element={<WalletMoney />} />
 
-            <Route 
-              path="/delivery/payment-requests" 
-              element={<PaymentRequestsDelivery />} 
+            <Route
+              path="/delivery/payment-requests"
+              element={<PaymentRequestsDelivery />}
             />
-            <Route 
-              path="/sales/payment-requests" 
-              element={<PaymentRequestsSales />} 
+            <Route
+              path="/sales/payment-requests"
+              element={<PaymentRequestsSales />}
             />
-             <Route 
-              path="/admin/BillWallet" 
-              element={<BillWallet />} 
+            <Route path="/admin/BillWallet" element={<BillWallet />} />
+            <Route
+              path="/admin/AdminOrderRequests"
+              element={<AdminOrderRequests />}
             />
-             <Route 
-              path="/admin/AdminOrderRequests" 
-              element={<AdminOrderRequests />} 
+            <Route path="/storekeeper/packed-orders" element={<PackOrders />} />
+            <Route
+              path="/PendingOrdersForPacking"
+              element={<PendingOrders />}
             />
-             <Route 
-              path="/storekeeper/packed-orders" 
-              element={<PackOrders />} 
-            />
-             <Route 
-              path="/PendingOrdersForPacking" 
-              element={<PendingOrders />} 
-            />
-            
-
+              <Route 
+  path="/storekeeper/all-orders" 
+  element={
+      <StorekeeperOrders />
+  } 
+/>
           </Routes>
+        
         </BrowserRouter>
       </PermissionProvider>
     </div>

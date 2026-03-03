@@ -153,6 +153,10 @@ const MyCustomerRequests = () => {
                       <th scope="col">Phone</th>
                       <th scope="col">Credit Limit</th>
                       <th scope="col">Billing Type</th>
+                      <th scope="col">Statement Type</th>
+                      <th scope="col">Due Days</th>
+                      <th scope="col">Opening Balance</th>
+                      <th scope="col">Opening Due Days</th>
                       <th scope="col">Status</th>
                       <th scope="col">Created</th>
                       {requests.some(r => r.status === 'rejected') && <th scope="col">Reason</th>}
@@ -183,6 +187,23 @@ const MyCustomerRequests = () => {
                                                     />
                                                     <span>{request.creditLimit.toFixed(2)}</span></div></td>
                         <td>{request.billingType}</td>
+                        <td>
+                          {request.statementType
+                            ? request.statementType.charAt(0).toUpperCase() +
+                              request.statementType.slice(1)
+                            : "-"}
+                        </td>
+                        <td>{request.dueDays || "-"}</td>
+                        <td>
+                          {request.openingBalance > 0
+                            ? request.openingBalance.toFixed(2)
+                            : "-"}
+                        </td>
+                        <td>
+                          {request.openingBalanceDueDays
+                            ? `${request.openingBalanceDueDays} days`
+                            : "-"}
+                        </td>
                         <td>
                           <span className={`requests-status-badge requests-status-${request.status}`}>
                             {request.status === 'pending' ? 'Pending' :

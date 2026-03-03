@@ -13,7 +13,12 @@ const {
   getMyCustomerRequests,
   getPendingCustomerRequests,
   acceptCustomerRequest,
-  rejectCustomerRequest,getAllCustomersWithDue
+  rejectCustomerRequest,
+  getAllCustomersWithDue,
+  getMyCustomers,
+  getMyCustomersWithDue,
+  getCustomerOutstandingDetails,
+  getCustomerReceipts
 } = require("../controllers/customerController");
 
 router.use(protect); 
@@ -30,5 +35,9 @@ router.get("/customer-requests/pending", protect, getPendingCustomerRequests);
 router.post("/customer-requests/accept/:id", protect, acceptCustomerRequest);
 router.post("/customer-requests/reject/:id", protect, rejectCustomerRequest);
 router.get('/getallcustomerswithdue', protect, getAllCustomersWithDue);
+router.get('/my-customers', protect, getMyCustomers);
+router.get('/my-customers-with-due', protect, getMyCustomersWithDue);
+router.get('/outstanding/:customerId', protect, getCustomerOutstandingDetails);
+router.get('/receipts', protect, getCustomerReceipts);
 
 module.exports = router;

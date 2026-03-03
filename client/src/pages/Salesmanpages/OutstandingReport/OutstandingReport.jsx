@@ -3,11 +3,13 @@ import axios from "axios";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import "./OutstandingReport.css";
+import { useNavigate } from "react-router-dom";
 
 const OutstandingReport = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [rows, setRows] = useState([]);
+  const navigate = useNavigate();
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -39,8 +41,8 @@ const OutstandingReport = () => {
         const token = localStorage.getItem("token");
         const backend = process.env.REACT_APP_BACKEND_IP || "";
         const url = backend
-          ? `${backend}/api/customers/getallcustomerswithdue`
-          : `/api/customers/getallcustomerswithdue`;
+          ? `${backend}/api/customers/my-customers-with-due`
+          : `/api/customers/my-customers-with-due`;
         const res = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -76,7 +78,7 @@ const OutstandingReport = () => {
                     <th>No</th>
                     <th>Customer</th>
                     <th>Credit Limit</th>
-                    <th>Used</th>
+                    <th>Outstanding</th>
                     <th>Balance</th>
                     <th>Pending Days</th>
                   </tr>
@@ -88,8 +90,12 @@ const OutstandingReport = () => {
                     </tr>
                   ) : (
                     rows.map((r, idx) => (
-                      <tr key={r._id}>
-                        <td>{idx + 1}</td>
+ <tr 
+    key={r._id} 
+    className="clickable-row"  // ← Add this class for hover effect
+    onClick={() => navigate(`/sales/outstanding/${r._id}`)}  // ← Add navigation
+    style={{ cursor: 'pointer' }}
+  >                        <td>{idx + 1}</td>
                         <td>{r.name}</td>
                         <td>{(r.creditLimit || 0).toFixed(2)}</td>
                         <td>{(r.usedCredit || (r.creditLimit - r.balanceCreditLimit) || 0).toFixed(2)}</td>

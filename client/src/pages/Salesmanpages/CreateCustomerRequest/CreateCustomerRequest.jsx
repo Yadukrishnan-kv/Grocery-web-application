@@ -18,6 +18,8 @@ const CreateCustomerRequest = () => {
     billingType: 'Credit limit',
     statementType: '',
     dueDays: '',
+    openingBalance: '',
+    openingBalanceDueDays: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +48,25 @@ const CreateCustomerRequest = () => {
       if (!formData.statementType) newErrors.statementType = 'Statement type is required for Credit limit';
       if (!formData.dueDays || isNaN(formData.dueDays) || parseInt(formData.dueDays) < 0) {
         newErrors.dueDays = 'Valid due days is required (non-negative number)';
+      }
+    }
+
+    // Opening balance validation
+    const openingBal = parseFloat(formData.openingBalance) || 0;
+    if (openingBal < 0) {
+      newErrors.openingBalance = 'Opening balance cannot be negative';
+    }
+    if (openingBal > parseFloat(formData.creditLimit || 0)) {
+      newErrors.openingBalance = 'Opening balance cannot exceed credit limit';
+    }
+    if (openingBal > 0) {
+      if (
+        !formData.openingBalanceDueDays ||
+        isNaN(formData.openingBalanceDueDays) ||
+        parseInt(formData.openingBalanceDueDays) < 0
+      ) {
+        newErrors.openingBalanceDueDays =
+          'Valid due days required when opening balance > 0';
       }
     }
 
@@ -95,6 +116,12 @@ const CreateCustomerRequest = () => {
         billingType: formData.billingType,
         statementType: formData.billingType === "Credit limit" ? formData.statementType : null,
         dueDays: formData.billingType === "Credit limit" ? parseInt(formData.dueDays) : null,
+        openingBalance: formData.openingBalance
+          ? parseFloat(formData.openingBalance)
+          : 0,
+        openingBalanceDueDays: formData.openingBalanceDueDays
+          ? parseInt(formData.openingBalanceDueDays)
+          : null,
       };
 
       await axios.post(
@@ -320,6 +347,51 @@ const CreateCustomerRequest = () => {
                 </div>
               </div>
             )}
+
+            {/* Opening Balance Section */}
+            <div className="customer-form-row">
+              <div className="customer-form-group">
+                <label htmlFor="openingBalance">
+                  Opening Balance (AED) - Existing Due
+                </label>
+                <input
+                  id="openingBalance"
+                  name="openingBalance"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.openingBalance}
+                  onChange={handleChange}
+                  className="customer-input"
+                />
+                {errors.openingBalance && (
+                  <p className="customer-error-text">{errors.openingBalance}</p>
+                )}
+              </div>
+
+              {parseFloat(formData.openingBalance || 0) > 0 && (
+                <div className="customer-form-group">
+                  <label htmlFor="openingBalanceDueDays">
+                    Due Days for Opening Balance
+                  </label>
+                  <input
+                    id="openingBalanceDueDays"
+                    name="openingBalanceDueDays"
+                    type="number"
+                    min="0"
+                    value={formData.openingBalanceDueDays}
+                    onChange={handleChange}
+                    placeholder="e.g. 15 days"
+                    className="customer-input"
+                  />
+                  {errors.openingBalanceDueDays && (
+                    <p className="customer-error-text">
+                      {errors.openingBalanceDueDays}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
             {errors.submit && (
               <div className="customer-error-banner" role="alert">

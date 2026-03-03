@@ -33,7 +33,7 @@ const DeliveredOrdersList = () => {
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) return window.location.href = "/login";
+      if (!token) return (window.location.href = "/login");
       const res = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -47,19 +47,23 @@ const DeliveredOrdersList = () => {
   const fetchAcceptedOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get(
+        `${backendUrl}/api/orders/my-assigned-orders`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       // ✅ Show orders that are: accepted AND (partially_packed OR fully_packed)
       // Do NOT wait for ready_to_deliver - show when packing starts
       setOrders(
         res.data.filter(
           (o) =>
             o.assignmentStatus === "accepted" &&
-            (o.packedStatus === "partially_packed" || o.packedStatus === "fully_packed") &&
+            (o.packedStatus === "partially_packed" ||
+              o.packedStatus === "fully_packed") &&
             o.status !== "delivered" &&
-            o.status !== "cancelled"
-        )
+            o.status !== "cancelled",
+        ),
       );
     } catch (err) {
       toast.error("Failed to load orders");
@@ -76,7 +80,10 @@ const DeliveredOrdersList = () => {
   // Open modal only if packed (partial or full)
   const openDeliveryModal = (order) => {
     // ✅ Allow delivery for BOTH partially_packed AND fully_packed orders
-    if (order.packedStatus !== "partially_packed" && order.packedStatus !== "fully_packed") {
+    if (
+      order.packedStatus !== "partially_packed" &&
+      order.packedStatus !== "fully_packed"
+    ) {
       return toast.error("Order not packed yet. Awaiting storekeeper packing.");
     }
 
@@ -102,7 +109,9 @@ const DeliveredOrdersList = () => {
 
   const getProductRemaining = (item) => {
     const inputQty = Number(deliveryInputs[item._id] || 0);
-    return (item.packedQuantity || 0) - (item.deliveredQuantity || 0) - inputQty;
+    return (
+      (item.packedQuantity || 0) - (item.deliveredQuantity || 0) - inputQty
+    );
   };
 
   const validateDelivery = () => {
@@ -110,7 +119,8 @@ const DeliveredOrdersList = () => {
       const qty = Number(deliveryInputs[item._id] || 0);
       // ✅ Can only deliver up to packedQuantity (not orderedQuantity)
       // and account for already delivered
-      const maxCanDeliver = (item.packedQuantity || 0) - (item.deliveredQuantity || 0);
+      const maxCanDeliver =
+        (item.packedQuantity || 0) - (item.deliveredQuantity || 0);
 
       if (qty > maxCanDeliver) {
         return `Cannot deliver more than packed (${maxCanDeliver} ${item.unit || ""}) for ${item.product?.productName || "product"}`;
@@ -162,7 +172,7 @@ const DeliveredOrdersList = () => {
           paymentMethod,
           chequeDetails,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       toast.success("Delivery recorded successfully!");
@@ -176,40 +186,49 @@ const DeliveredOrdersList = () => {
   };
 
   // ✅ Download unified invoice showing Ordered/Packed/Delivered
-  const downloadUnifiedInvoice = async (orderId) => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(`${backendUrl}/api/orders/unified-invoice/${orderId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: "blob",
-      });
+  const downloadUnifiedInvoice = async (orderId, invoiceNumber) => {
+  try {
+    const token = localStorage.getItem("token");
+    const filename = invoiceNumber
+      ? `invoice-${invoiceNumber}.pdf`
+      : `invoice-${orderId.slice(-8)}.pdf`;
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `unified-invoice-${orderId.slice(-8)}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+    const res = await axios.get(`${backendUrl}/api/orders/unified-invoice/${orderId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      responseType: "blob",
+    });
 
-      toast.success("Invoice downloaded");
-    } catch (err) {
-      toast.error("Failed to download invoice");
-    }
-  };
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    toast.success("Invoice downloaded");
+  } catch (err) {
+    toast.error("Failed to download invoice");
+  }
+};
 
   const getDeliveryStatus = (order) => {
-    const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
-    const totalDelivered = order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
+    const totalOrdered =
+      order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
+    const totalDelivered =
+      order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
 
     // ✅ If partially_packed or fully_packed, it's ready to deliver (or being delivered)
     if (order.packedStatus === "partially_packed") {
       if (totalDelivered === 0) return "Ready to Deliver (Partial)";
-      if (totalDelivered < (order.orderItems?.reduce((s, i) => s + (i.packedQuantity || 0), 0) || 0))
+      if (
+        totalDelivered <
+        (order.orderItems?.reduce((s, i) => s + (i.packedQuantity || 0), 0) ||
+          0)
+      )
         return "Partially Delivered";
     }
-    
+
     if (order.packedStatus !== "fully_packed") return "Awaiting Packing";
     if (totalDelivered === 0) return "Ready to Deliver";
     if (totalDelivered < totalOrdered) return "Partially Delivered";
@@ -223,7 +242,8 @@ const DeliveredOrdersList = () => {
         order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus =
         statusFilter === "all" ||
-        getDeliveryStatus(order).toLowerCase().replace(" ", "-") === statusFilter;
+        getDeliveryStatus(order).toLowerCase().replace(" ", "-") ===
+          statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
@@ -253,14 +273,19 @@ const DeliveredOrdersList = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main className={`delivered-orders-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
+      <main
+        className={`delivered-orders-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
+      >
         <div className="delivered-orders-container-wrapper">
           <div className="delivered-orders-container">
             <h2 className="delivered-orders-page-title">Deliver Orders</h2>
 
             <div className="delivered-orders-controls-group">
               <div className="delivered-orders-filter-group">
-                <label htmlFor="statusFilter" className="delivered-orders-filter-label">
+                <label
+                  htmlFor="statusFilter"
+                  className="delivered-orders-filter-label"
+                >
                   Filter by Status:
                 </label>
                 <select
@@ -273,7 +298,9 @@ const DeliveredOrdersList = () => {
                   <option value="awaiting-packing">Awaiting Packing</option>
                   <option value="ready-to-deliver">Ready to Deliver</option>
                   <option value="not-delivered">Not Delivered</option>
-                  <option value="partially-delivered">Partially Delivered</option>
+                  <option value="partially-delivered">
+                    Partially Delivered
+                  </option>
                   <option value="fully-delivered">Fully Delivered</option>
                 </select>
               </div>
@@ -302,7 +329,8 @@ const DeliveredOrdersList = () => {
             ) : filteredOrders.length === 0 ? (
               <div className="delivered-orders-no-data">
                 No orders found
-                {statusFilter !== "all" && ` with status "${statusFilter.replace("-", " ")}"`}
+                {statusFilter !== "all" &&
+                  ` with status "${statusFilter.replace("-", " ")}"`}
                 {searchTerm.trim() && ` matching "${searchTerm}"`}
               </div>
             ) : (
@@ -326,13 +354,30 @@ const DeliveredOrdersList = () => {
                   </thead>
                   <tbody>
                     {filteredOrders.map((order, index) => {
-                      const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
-                      const packedQty = order.orderItems?.reduce((s, i) => s + (i.packedQuantity || 0), 0) || 0;
-                      const totalDelivered = order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
+                      const totalOrdered =
+                        order.orderItems?.reduce(
+                          (s, i) => s + i.orderedQuantity,
+                          0,
+                        ) || 0;
+                      const packedQty =
+                        order.orderItems?.reduce(
+                          (s, i) => s + (i.packedQuantity || 0),
+                          0,
+                        ) || 0;
+                      const totalDelivered =
+                        order.orderItems?.reduce(
+                          (s, i) => s + i.deliveredQuantity,
+                          0,
+                        ) || 0;
                       const remaining = packedQty - totalDelivered;
-                      const grandTotal = order.orderItems?.reduce((s, i) => s + i.totalAmount, 0)?.toFixed(2) || "0.00";
+                      const grandTotal =
+                        order.orderItems
+                          ?.reduce((s, i) => s + i.totalAmount, 0)
+                          ?.toFixed(2) || "0.00";
                       // ✅ Enable deliver button if partially_packed OR fully_packed
-                      const isPacked = order.packedStatus === "partially_packed" || order.packedStatus === "fully_packed";
+                      const isPacked =
+                        order.packedStatus === "partially_packed" ||
+                        order.packedStatus === "fully_packed";
 
                       return (
                         <tr key={order._id}>
@@ -344,9 +389,15 @@ const DeliveredOrdersList = () => {
                               <div className="products-list">
                                 {order.orderItems.map((item, i) => (
                                   <div key={i} className="product-tag">
-                                    <span className="product-name">{item.product?.productName || "—"}</span>
-                                    <span className="product-qty">× {item.orderedQuantity}</span>
-                                    <span className="product-unit">{item.unit || ""}</span>
+                                    <span className="product-name">
+                                      {item.product?.productName || "—"}
+                                    </span>
+                                    <span className="product-qty">
+                                      × {item.orderedQuantity}
+                                    </span>
+                                    <span className="product-unit">
+                                      {item.unit || ""}
+                                    </span>
                                   </div>
                                 ))}
                               </div>
@@ -361,8 +412,20 @@ const DeliveredOrdersList = () => {
                           <td>{remaining}</td>
 
                           <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <img src={DirhamSymbol} alt="AED" width={18} height={20} style={{ paddingTop: "2px" }} />
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                              }}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="AED"
+                                width={18}
+                                height={20}
+                                style={{ paddingTop: "2px" }}
+                              />
                               <span>{grandTotal}</span>
                             </div>
                           </td>
@@ -370,7 +433,9 @@ const DeliveredOrdersList = () => {
                           <td>{order.remarks || "—"}</td>
 
                           <td>
-                            <span className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(/\s/g, "-")}`}>
+                            <span
+                              className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(/\s/g, "-")}`}
+                            >
                               {getDeliveryStatus(order)}
                             </span>
                           </td>
@@ -380,7 +445,12 @@ const DeliveredOrdersList = () => {
                           <td>
                             <button
                               className="invoice-btn"
-                              onClick={() => downloadUnifiedInvoice(order._id)}
+                              onClick={() =>
+                                downloadUnifiedInvoice(
+                                  order._id,
+                                  order.invoiceNumber,
+                                )
+                              }
                             >
                               Download Invoice
                             </button>
@@ -391,10 +461,14 @@ const DeliveredOrdersList = () => {
                                 onClick={() => openDeliveryModal(order)}
                                 disabled={deliveringOrderId === order._id}
                               >
-                                {deliveringOrderId === order._id ? "Delivering..." : "Deliver"}
+                                {deliveringOrderId === order._id
+                                  ? "Delivering..."
+                                  : "Deliver"}
                               </button>
                             ) : (
-                              <span className="completed-text">Awaiting Packing</span>
+                              <span className="completed-text">
+                                Awaiting Packing
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -420,10 +494,19 @@ const DeliveredOrdersList = () => {
                   return (
                     <div key={item._id} className="product-delivery-row">
                       <div className="product-info">
-                        <strong>{item.product?.productName || "Unknown Product"}</strong>
-                        <div>Ordered: {item.orderedQuantity} {item.unit || ""}</div>
-                        <div>Packed: {item.packedQuantity || 0} {item.unit || ""}</div>
-                        <div>Already Delivered: {item.deliveredQuantity} {item.unit || ""}</div>
+                        <strong>
+                          {item.product?.productName || "Unknown Product"}
+                        </strong>
+                        <div>
+                          Ordered: {item.orderedQuantity} {item.unit || ""}
+                        </div>
+                        <div>
+                          Packed: {item.packedQuantity || 0} {item.unit || ""}
+                        </div>
+                        <div>
+                          Already Delivered: {item.deliveredQuantity}{" "}
+                          {item.unit || ""}
+                        </div>
                       </div>
 
                       <div className="quantity-input-group">
@@ -432,13 +515,22 @@ const DeliveredOrdersList = () => {
                           type="number"
                           min="0"
                           max={item.packedQuantity - item.deliveredQuantity}
-                          step={fractionalUnits.includes(item.unit?.toLowerCase()) ? "0.01" : "1"}
+                          step={
+                            fractionalUnits.includes(item.unit?.toLowerCase())
+                              ? "0.01"
+                              : "1"
+                          }
                           value={deliveryInputs[item._id] || ""}
-                          onChange={(e) => handleQuantityChange(item._id, e.target.value)}
+                          onChange={(e) =>
+                            handleQuantityChange(item._id, e.target.value)
+                          }
                           placeholder="0"
                         />
-                        <span className={`remaining-text ${remaining < 0 ? "negative" : ""}`}>
-                          Remaining: {remaining >= 0 ? remaining : "Over-delivered!"}
+                        <span
+                          className={`remaining-text ${remaining < 0 ? "negative" : ""}`}
+                        >
+                          Remaining:{" "}
+                          {remaining >= 0 ? remaining : "Over-delivered!"}
                           {item.unit ? ` ${item.unit}` : ""}
                         </span>
                       </div>
@@ -449,7 +541,10 @@ const DeliveredOrdersList = () => {
 
               <div className="payment-section">
                 <label>Payment Method</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
                   <option value="credit">Credit</option>
                   <option value="cash">Cash</option>
                   <option value="cheque">Cheque</option>
@@ -477,7 +572,10 @@ const DeliveredOrdersList = () => {
               )}
 
               <div className="modal-actions">
-                <button className="cancel-btn" onClick={() => setShowDeliveryModal(false)}>
+                <button
+                  className="cancel-btn"
+                  onClick={() => setShowDeliveryModal(false)}
+                >
                   Cancel
                 </button>
                 <button
@@ -485,7 +583,9 @@ const DeliveredOrdersList = () => {
                   onClick={proceedWithDelivery}
                   disabled={deliveringOrderId === currentOrder._id}
                 >
-                  {deliveringOrderId === currentOrder._id ? "Submitting..." : "Confirm Delivery"}
+                  {deliveringOrderId === currentOrder._id
+                    ? "Submitting..."
+                    : "Confirm Delivery"}
                 </button>
               </div>
             </div>

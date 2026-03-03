@@ -1,0 +1,598 @@
+/* src/pages/salesman/CustomerOutstandingDetails.css */
+.customer-outstanding-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.customer-outstanding-main {
+  flex: 1;
+  padding: 1.5rem;
+  transition: margin-left 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  overflow-y: auto;
+  margin-top: 64px;
+}
+
+@media (min-width: 768px) {
+  .customer-outstanding-main.sidebar-open {
+    margin-left: 240px;
+  }
+}
+
+.customer-outstanding-wrapper {
+  width: 98%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.customer-outstanding-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  padding: 2rem;
+}
+
+/* Header */
+.customer-outstanding-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 1.5rem;
+}
+
+.btn-back {
+  background: #f1f5f9;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  color: #475569;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.customer-info {
+  flex: 1;
+}
+
+.customer-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.25rem 0;
+}
+
+.customer-meta {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.customer-badges {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.billing-badge, .statement-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.billing-badge.credit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.billing-badge.cash {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statement-badge {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Summary Cards */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-card {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.card-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.card-value {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.card-outstanding .card-value { color: #dc2626; }
+.card-credit .card-value { color: #16a34a; }
+.card-overdue .card-value { color: #dc2626; }
+
+/* Credit Progress */
+.credit-progress-section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-fill.warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.progress-fill.critical {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+/* Bills Section */
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 1rem 0;
+}
+
+.bills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bill-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: visible;
+  background: white;
+  margin-bottom: 1rem;
+}
+
+.bill-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  gap: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.bill-main-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.bill-invoice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.invoice-number {
+  font-weight: 600;
+  color: #0f172a;
+  font-family: monospace;
+}
+
+.opening-badge {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.bill-dates {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.bill-stats {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  text-align: right;
+}
+
+.bill-amount {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.amount-due {
+  font-weight: 700;
+  color: #dc2626;
+  font-size: 1.125rem;
+}
+
+.amount-total {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.bill-due {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.due-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-ok { background: #dcfce7; color: #166534; }
+.status-warning { background: #fef3c7; color: #92400e; }
+.status-overdue { background: #fee2e2; color: #991b1b; }
+.status-neutral { background: #f1f5f9; color: #64748b; }
+
+.due-date {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-pending { background: #fef3c7; color: #92400e; }
+.badge-overdue { background: #fee2e2; color: #991b1b; }
+.badge-partial { background: #dbeafe; color: #1e40af; }
+.badge-paid { background: #dcfce7; color: #166534; }
+.badge-neutral { background: #f1f5f9; color: #64748b; }
+
+/* Bill Details */
+.bill-details {
+  padding: 1rem 1.25rem 1.25rem;
+  background: #f8fafc;
+}
+
+.payment-progress {
+  margin: 1rem 0;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.progress-track {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-paid {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: 3px;
+}
+
+/* Orders Table - FULL WIDTH */
+.orders-list {
+  margin: 1rem 0;
+  width: 100%;
+}
+
+
+
+
+.orders-table-full {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.orders-table-full th {
+  background: linear-gradient(90deg, #f8fafc, #f1f5f9);
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #334155;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.orders-table-full td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.orders-table-full tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Order Link */
+.order-link {
+  color: #4f46e5;
+  text-decoration: none;
+  font-family: monospace;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.order-link:hover {
+  color: #4338ca;
+  text-decoration: underline;
+}
+
+/* Order Items Preview - Full Width */
+.order-items-preview-full {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  max-width: 250px;
+}
+
+.item-chip-full {
+  background: #f1f5f9;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.item-more-full {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+/* Order Amount */
+.order-amount-full {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+/* Order Status Badges */
+.order-status {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.order-status.pending { background: #fef3c7; color: #92400e; }
+.order-status.delivered { background: #dcfce7; color: #166534; }
+.order-status.partial_delivered { background: #dbeafe; color: #1e40af; }
+.order-status.cancelled { background: #fee2e2; color: #991b1b; }
+.order-status.ready_to_deliver { background: #e0e7ff; color: #3730a3; }
+
+/* Payment Badge */
+.payment-badge {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.payment-badge.credit { background: #dbeafe; color: #1e40af; }
+.payment-badge.cash { background: #dcfce7; color: #166534; }
+
+/* Bill Actions */
+.bill-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-action {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn-view {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-view:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.btn-record {
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  color: white;
+}
+
+.btn-record:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+/* Empty States */
+.no-bills {
+  text-align: center;
+  padding: 3rem;
+  color: #64748b;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px dashed #e2e8f0;
+}
+
+.customer-outstanding-error {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #64748b;
+}
+
+.customer-outstanding-error h2 {
+  color: #0f172a;
+  margin-bottom: 1rem;
+}
+
+/* Loading */
+.order-list-loading {
+  text-align: center;
+  padding: 3rem;
+  color: #64748b;
+}
+
+/* ────────────────────────────────────────────────
+   RESPONSIVE - Full width on mobile
+───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .customer-outstanding-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .bill-header {
+    flex-wrap: wrap;
+  }
+  
+  .bill-stats {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e2e8f0;
+  }
+  
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .bill-actions {
+    flex-direction: column;
+  }
+  
+  .btn-action {
+    width: 100%;
+  }
+
+  /* Full-width table responsive */
+  .orders-table-full {
+    min-width: 800px;
+    font-size: 0.8125rem;
+  }
+  
+  .orders-table-full th,
+  .orders-table-full td {
+    padding: 0.75rem 0.875rem;
+  }
+  
+  .order-items-preview-full {
+    max-width: 180px;
+  }
+  
+  .item-chip-full {
+    max-width: 140px;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .orders-table-full {
+    min-width: 700px;
+    font-size: 0.75rem;
+  }
+  
+  .orders-table-full th,
+  .orders-table-full td {
+    padding: 0.625rem 0.75rem;
+  }
+  
+  .order-items-preview-full {
+    max-width: 150px;
+  }
+  
+  .item-chip-full {
+    max-width: 120px;
+  }
+}

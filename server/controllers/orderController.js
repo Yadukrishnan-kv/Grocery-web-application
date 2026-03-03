@@ -415,39 +415,31 @@ const getOrInitCounter = async () => {
 const getDeliveredInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate(
-        "customer",
-        "name email phoneNumber address pincode balanceCreditLimit",
-      )
-      .populate("orderItems.product", "productName price unit"); // ← FIXED HERE
-
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
+      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
+      .populate("orderItems.product", "productName price unit");
+    
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    
     if (order.totalDeliveredQuantity === 0) {
-      // Use virtual if you have it, or calculate
       return res.status(400).json({ message: "No delivered quantity" });
     }
-
-    // Invoice is generated when order is packed - cannot create now
+    
+    // ✅✅✅ USE EXISTING INVOICE NUMBER (DEL-XX) ✅✅✅
     if (!order.invoiceNumber) {
       return res.status(400).json({ message: "Invoice will be generated after order is packed" });
     }
-
-    const invoiceNo = order.invoiceNumber;
-
-    const filename = `delivered-invoice-${order._id.toString().slice(-8)}.pdf`;
+    
+    const invoiceNo = order.invoiceNumber; // ← Use existing DEL-XX
+    const filename = `delivered-invoice-${invoiceNo}.pdf`;
+    
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
+    
     const doc = new PDFDocument({ size: "A4", margin: 0 });
     doc.pipe(res);
-
-    // IMPORTANT: Your generateStyledInvoicePDF is still using old single-product destructuring!
-    // Update it too (see below)
+    
     await generateStyledInvoicePDF(doc, order, "DELIVERED INVOICE", invoiceNo);
-
+    
     doc.end();
   } catch (error) {
     console.error("Error generating delivered invoice:", error);
@@ -456,7 +448,6 @@ const getDeliveredInvoice = async (req, res) => {
     }
   }
 };
-
 const getPendingInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
@@ -1316,7 +1307,6 @@ const packOrder = async (req, res) => {
     const { orderId } = req.params;
     const { packedItems } = req.body;
 
-    // Fix: match the exact role string from your DB
     if (req.user.role.trim() !== "Store kepper") {
       return res.status(403).json({ message: "Only Store kepper can pack orders" });
     }
@@ -1324,12 +1314,10 @@ const packOrder = async (req, res) => {
     const order = await Order.findById(orderId).populate("customer");
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    // ✅ Allow packing if: pending, assigned, partial_delivered (for remaining qty)
     if (!["pending", "assigned", "partial_delivered"].includes(order.status)) {
       return res.status(400).json({ message: "Order not in packable state" });
     }
 
-    // ✅ Calculate newly packed amount for credit deduction
     let newlyPackedAmount = 0;
     let totalPacked = 0;
     let allFullyPacked = true;
@@ -1338,7 +1326,6 @@ const packOrder = async (req, res) => {
       const item = order.orderItems.id(pack.product);
       if (!item) continue;
 
-      // Fix: use packedQuantity field (you introduced it earlier)
       const previousPack = item.packedQuantity || 0;
       const maxPack = item.orderedQuantity - previousPack;
       const qty = Number(pack.packedQuantity);
@@ -1347,22 +1334,22 @@ const packOrder = async (req, res) => {
         return res.status(400).json({ message: `Invalid pack qty for ${item.product}` });
       }
 
-      item.packedQuantity = previousPack + qty; // Update packedQuantity
+      item.packedQuantity = previousPack + qty;
       totalPacked += qty;
-      newlyPackedAmount += qty * item.price; // ✅ Track newly packed amount
+      newlyPackedAmount += qty * item.price;
 
       if (item.packedQuantity < item.orderedQuantity) {
         allFullyPacked = false;
       }
     }
 
-    // ✅ Deduct credit ONLY for newly packed amount (and ONLY if payment is credit)
+    // ✅ Deduct credit for newly packed amount
     if (order.payment === "credit" && newlyPackedAmount > 0) {
       const customer = await Customer.findById(order.customer);
       if (customer && customer.billingType === "Credit limit") {
         if (customer.balanceCreditLimit < newlyPackedAmount) {
-          return res.status(400).json({ 
-            message: `Insufficient credit limit. Need ${newlyPackedAmount.toFixed(2)}, available: ${customer.balanceCreditLimit.toFixed(2)}` 
+          return res.status(400).json({
+            message: `Insufficient credit limit. Need ${newlyPackedAmount.toFixed(2)}, available: ${customer.balanceCreditLimit.toFixed(2)}`
           });
         }
         customer.balanceCreditLimit -= newlyPackedAmount;
@@ -1374,20 +1361,23 @@ const packOrder = async (req, res) => {
     order.packedAt = new Date();
     order.packedStatus = allFullyPacked ? "fully_packed" : "partially_packed";
 
-    // ✅ Generate invoice number when order is fully packed with DEL_ format ✅
+    // ✅✅✅ GENERATE INVOICE NUMBER ONCE - ONLY IF NOT ALREADY SET ✅✅✅
     if (allFullyPacked && !order.invoiceNumber) {
       try {
-        const counter = await getOrInitCounter();
-        counter.invoiceCount += 1;
-        await counter.save();
+        const counter = await InvoiceCounter.findOneAndUpdate(
+          {},
+          { $inc: { invoiceCount: 1 } },
+          { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        // Format: DEL-01, DEL-02, ... DEL-99, DEL-100, etc.
         order.invoiceNumber = `DEL-${String(counter.invoiceCount).padStart(2, '0')}`;
+        console.log(`✅ Invoice number generated for order ${order._id}: ${order.invoiceNumber}`);
       } catch (invoiceErr) {
         console.error("Invoice generation error:", invoiceErr);
-        // Don't fail the packing operation if invoice generation fails
+        // Don't fail packing if invoice generation fails - will retry next time
       }
     }
 
-    // ✅ Set to ready_to_deliver ONLY if fully packed AND not partially delivered yet
     if (allFullyPacked && order.status !== "partial_delivered") {
       order.status = "ready_to_deliver";
     }
@@ -1395,13 +1385,15 @@ const packOrder = async (req, res) => {
     await order.save();
 
     res.json({
-      message: allFullyPacked 
-        ? `Order fully packed. Credit deducted: AED ${newlyPackedAmount.toFixed(2)}` 
+      message: allFullyPacked
+        ? `Order fully packed. Credit deducted: AED ${newlyPackedAmount.toFixed(2)}`
         : `Partially packed: ${totalPacked} units. Credit deducted: AED ${newlyPackedAmount.toFixed(2)}`,
       order,
       creditDeducted: newlyPackedAmount,
+      invoiceNumber: order.invoiceNumber, // ← Return invoice number in response
       nextStep: allFullyPacked ? "Ready for delivery" : "Continue packing when stock arrives"
     });
+
   } catch (error) {
     console.error("Pack order error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -1411,6 +1403,39 @@ const getPendingForPacking = async (req, res) => {
   try {
     // ✅ Include BOTH unpacked AND partially packed orders
     const orders = await Order.find({
+      $or: [
+        { packedStatus: { $in: ["not_packed", "partially_packed"] } },
+        { status: "pending" }
+      ]
+    })
+      .populate("customer", "name email phoneNumber")
+      .populate("orderItems.product", "productName unit price")
+      .populate("assignedTo", "username")
+      .sort({ orderDate: -1 });
+
+    res.json(orders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// NEW: Get pending orders for a salesman's customers only
+const getMyPendingOrders = async (req, res) => {
+  try {
+    if (req.user.role !== "Sales man") {
+      return res.status(403).json({ message: "Only salesmen can access this" });
+    }
+
+    // Get all customers assigned to this salesman
+    const mySalesmanCustomers = await Customer.find({ salesman: req.user._id })
+      .select("_id");
+
+    const customerIds = mySalesmanCustomers.map(c => c._id);
+
+    // Get pending orders for those customers
+    const orders = await Order.find({
+      customer: { $in: customerIds },
       $or: [
         { packedStatus: { $in: ["not_packed", "partially_packed"] } },
         { status: "pending" }
@@ -1456,28 +1481,25 @@ const getPackedInvoice = async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode")
       .populate("orderItems.product", "productName price unit");
-
+    
     if (!order) return res.status(404).json({ message: "Order not found" });
     
-    // ✅ Only allow if order has been packed
     if (!order.packedAt || !order.packedStatus) {
       return res.status(400).json({ message: "Order not yet packed" });
     }
-
-    const counter = await getOrInitCounter();
     
-    // ✅ Generate unique invoice number for pack invoices
-    let packedInvoiceNumber = `PKD-${Date.now()}-${order._id.toString().slice(-6)}`;
+    // ✅✅✅ USE EXISTING INVOICE NUMBER (DEL-XX) ✅✅✅
+    const invoiceNumber = order.invoiceNumber || `DEL-${order._id.toString().slice(-6).toUpperCase()}`;
     
-    const filename = `packed-invoice-${order._id.toString().slice(-8)}.pdf`;
+    const filename = `packed-invoice-${invoiceNumber}.pdf`;
+    
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
+    
     const doc = new PDFDocument({ size: "A4", margin: 0 });
     doc.pipe(res);
-
-    // ✅ Generate invoice using packedQuantity instead of deliveredQuantity
-    await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", packedInvoiceNumber);
+    
+    await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", invoiceNumber);
     
     doc.end();
   } catch (error) {
@@ -1494,30 +1516,30 @@ const getUnifiedInvoice = async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode")
       .populate("orderItems.product", "productName price unit");
-
+    
     if (!order) return res.status(404).json({ message: "Order not found" });
     
     // ✅ Only allow if order has been packed
     if (!order.packedAt || !order.packedStatus) {
       return res.status(400).json({ message: "Order must be packed first to generate invoice" });
     }
-
-    const counter = await getOrInitCounter();
     
-    // ✅ Generate unique invoice number
-    let invoiceNumber = `INV-${Date.now()}-${order._id.toString().slice(-6)}`;
+    // ✅✅✅ USE EXISTING INVOICE NUMBER (DEL-XX) - DO NOT GENERATE NEW ONE ✅✅✅
+    const invoiceNumber = order.invoiceNumber || `DEL-${order._id.toString().slice(-6).toUpperCase()}`;
     
-    const filename = `unified-invoice-${order._id.toString().slice(-8)}.pdf`;
+    const filename = `unified-invoice-${invoiceNumber}.pdf`;
+    
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
+    
     const doc = new PDFDocument({ size: "A4", margin: 0 });
     doc.pipe(res);
-
-    // ✅ Generate UNIFIED invoice with all quantities
+    
+    // ✅✅✅ PASS THE CONSISTENT INVOICE NUMBER TO PDF GENERATOR ✅✅✅
     await generateUnifiedInvoicePDF(doc, order, "INVOICE", invoiceNumber);
     
     doc.end();
+    
   } catch (error) {
     console.error("Error generating unified invoice:", error);
     if (!res.headersSent) {
@@ -1530,29 +1552,44 @@ const getUnifiedInvoice = async (req, res) => {
 const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const company = await CompanySettings.findOne();
   if (!company) throw new Error("Company invoice settings not configured.");
-
+  
   const pageWidth = 595.28;
   const margin = 50;
   const headerY = margin;
-
+  
   const date = new Date(order.packedAt || Date.now());
-  const formattedDate = date.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-
-  // Header
-  doc.fontSize(22).font("Helvetica-Bold").text(company.companyName || "INGOUDE COMPANY", margin, headerY);
-  doc.fontSize(36).font("Helvetica-Bold").fillColor("#b0123b").text(invoiceType, margin, headerY + 40);
-
-  // Invoice info
+  const formattedDate = date.toLocaleDateString("en-US", { 
+    day: "numeric", 
+    month: "long", 
+    year: "numeric" 
+  });
+  
+  // ─── Header ───────────────────────────────────────────────────────
+  doc
+    .fontSize(22)
+    .font("Helvetica-Bold")
+    .text(company.companyName || "INGOUDE COMPANY", margin, headerY);
+  
+  doc
+    .fontSize(36)
+    .font("Helvetica-Bold")
+    .fillColor("#b0123b")
+    .text(invoiceType, margin, headerY + 40);
+  
+  // ─── Invoice Number & Date (FIXED: Use passed invoiceNo) ───────
   const invoiceInfoX = pageWidth - margin - 200;
-  doc.fontSize(12).font("Helvetica-Bold").fillColor("#000000")
-    .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
+  doc
+    .fontSize(12)
+    .font("Helvetica-Bold")
+    .fillColor("#000000")
+    .text(`Invoice No: ${invoiceNo}`, invoiceInfoX, headerY)  // ✅ Uses DEL-XX
     .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
-
-  // Bill To / From
+  
+  // ─── Bill To / From ───────────────────────────────────────────────
   const infoY = headerY + 120;
   const billToX = margin;
   const fromX = pageWidth - margin - 250;
-
+  
   doc.fontSize(14).font("Helvetica-Bold").text("Bill To:", billToX, infoY);
   doc
     .fontSize(12)
@@ -1561,7 +1598,7 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     .text(order.customer?.phoneNumber || "N/A", billToX, infoY + 45)
     .text(order.customer?.address || "N/A", billToX, infoY + 65)
     .text(`Pincode: ${order.customer?.pincode || "N/A"}`, billToX, infoY + 85);
-
+  
   doc.fontSize(14).font("Helvetica-Bold").text("From:", fromX, infoY);
   doc
     .fontSize(12)
@@ -1569,34 +1606,38 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     .text(company.companyName || "INGOUDE COMPANY", fromX, infoY + 25)
     .text(company.companyPhone || "N/A", fromX, infoY + 45)
     .text(company.companyAddress || "N/A", fromX, infoY + 65);
-
-  // ✅ Table with Ordered/Packed/Delivered columns
+  
+  // ─── Table with Ordered/Packed/Delivered columns ─────────────────
   const tableY = infoY + 130;
   const rowHeight = 45;
-
   const descCol = margin;
   const orderedCol = margin + 180;
   const packedCol = margin + 250;
   const deliveredCol = margin + 320;
   const priceCol = margin + 390;
   const totalCol = margin + 460;
-
+  
   // Header row
-  doc.rect(margin - 10, tableY - 5, pageWidth - margin * 2 + 20, rowHeight)
-    .fillColor("#b0123b").fill();
-
-  doc.fillColor("#ffffff").fontSize(11).font("Helvetica-Bold")
+  doc
+    .rect(margin - 10, tableY - 5, pageWidth - margin * 2 + 20, rowHeight)
+    .fillColor("#b0123b")
+    .fill();
+  
+  doc
+    .fillColor("#ffffff")
+    .fontSize(11)
+    .font("Helvetica-Bold")
     .text("Description", descCol, tableY + 5)
     .text("Ordered", orderedCol, tableY + 5, { width: 65, align: "center" })
     .text("Packed", packedCol, tableY + 5, { width: 65, align: "center" })
     .text("Delivered", deliveredCol, tableY + 5, { width: 65, align: "center" })
     .text("Price", priceCol, tableY + 5, { width: 65, align: "center" })
     .text("Amount", totalCol, tableY + 5, { width: 70, align: "center" });
-
+  
   // Data rows
   let currentY = tableY + rowHeight;
-  let amountForBilling = 0; // Amount based on packed qty
-
+  let amountForBilling = 0;
+  
   order.orderItems.forEach((item) => {
     const ordered = item.orderedQuantity || 0;
     const packed = item.packedQuantity || 0;
@@ -1605,60 +1646,81 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     // ✅ Amount is based on PACKED quantity (for credit deduction)
     const amountThisRow = packed * item.price;
     amountForBilling += amountThisRow;
-
-    doc.fillColor("#000000").fontSize(10).font("Helvetica")
+    
+    doc
+      .fillColor("#000000")
+      .fontSize(10)
+      .font("Helvetica")
       .text(item.product?.productName || "Unknown Product", descCol, currentY + 8)
       .text(ordered.toString(), orderedCol, currentY + 8, { width: 65, align: "center" })
       .text(packed.toString(), packedCol, currentY + 8, { width: 65, align: "center" })
       .text(delivered.toString(), deliveredCol, currentY + 8, { width: 65, align: "center" })
       .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 8, { width: 65, align: "center" })
       .text(`AED ${amountThisRow.toFixed(2)}`, totalCol, currentY + 8, { width: 70, align: "center" });
-
+    
     currentY += rowHeight;
   });
-
+  
   // Grand Total (based on packed qty)
   const subtotalY = currentY + 20;
-  const subtotalWidth = 200;
+  const subtotalWidth = 220;
   const subtotalX = pageWidth - margin - subtotalWidth;
-
-  doc.rect(subtotalX, subtotalY, subtotalWidth, 35).fillColor("#222222").fill();
+  
+  doc
+    .rect(subtotalX, subtotalY, subtotalWidth, 40)
+    .fillColor("#222222")
+    .fill();
+  
   doc
     .fillColor("#ffffff")
     .fontSize(12)
     .font("Helvetica-Bold")
-    .text("Amount to Bill (Packed Qty)", subtotalX + 10, subtotalY + 12)
-    .text(`AED ${amountForBilling.toFixed(2)}`, subtotalX + subtotalWidth - 15, subtotalY + 12, { align: "right" });
-
-  // Footer
+    .text("Total Amount (Packed Qty)", subtotalX + 15, subtotalY + 12)
+    .text(
+      `AED ${amountForBilling.toFixed(2)}`,
+      subtotalX + subtotalWidth - 20,
+      subtotalY + 12,
+      { align: "right" }
+    );
+  
+  // ─── Footer ───────────────────────────────────────────────────────
   const footerY = subtotalY + 80;
-
+  
   doc
     .fillColor("#000000")
     .fontSize(14)
     .font("Helvetica-Bold")
     .text("Payment Information:", margin, footerY);
+  
   doc
     .fontSize(12)
     .font("Helvetica")
     .text(`Bank: ${company.bankName || "N/A"}`, margin, footerY + 25)
     .text(`Account: ${company.bankAccountNumber || "N/A"}`, margin, footerY + 45)
-    .text(`Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || "N/A"}`, margin, footerY + 65)
+    .text(
+      `Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || "N/A"}`,
+      margin,
+      footerY + 65
+    )
     .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
-
+  
   const thankYouX = pageWidth - margin - 200;
   doc
     .fontSize(36)
     .font("Helvetica-Bold")
     .fillColor("#000000")
     .text("Thank You!", thankYouX, footerY, { width: 200, align: "right" });
-
+  
   const bottomY = footerY + 150;
   doc
     .fontSize(10)
     .font("Helvetica-Oblique")
     .fillColor("#666666")
-    .text("This is a system-generated invoice. Amount shown is based on packed quantity.", margin, bottomY);
+    .text(
+      `This invoice uses reference number: ${invoiceNo}`,
+      margin,
+      bottomY
+    );
 };
 const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const company = await CompanySettings.findOne();
@@ -1785,6 +1847,30 @@ const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     .fillColor("#666666")
     .text("This is a system-generated invoice", margin, bottomY);
 };
+
+const getAllOrdersForStorekeeper = async (req, res) => {
+  try {
+    // Verify storekeeper role
+    if (req.user.role.trim() !== "Store kepper") {
+      return res.status(403).json({ message: "Only Store kepper can access this" });
+    }
+
+    // Fetch ALL orders with full details
+    const orders = await Order.find()
+      .populate("customer", "name email phoneNumber address pincode")
+      .populate("orderItems.product", "productName price unit")
+      .populate("packedBy", "username")
+      .populate("assignedTo", "username")
+      .sort({ orderDate: -1 });
+
+    res.json(orders);
+  } catch (error) {
+    console.error("Get all orders for storekeeper error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
 module.exports = {
   createOrder,
   getAllOrders,
@@ -1814,9 +1900,11 @@ module.exports = {
   checkFirstOrder,
   packOrder,
   getPendingForPacking,
+  getMyPendingOrders,
   getPackedToday,
   getReadyToDeliver,
   getPackedInvoice,
   getUnifiedInvoice, // ✅ NEW unified invoice showing Ordered/Packed/Delivered
-  generateUnifiedInvoicePDF // ✅ NEW unified invoice PDF generator
+  generateUnifiedInvoicePDF, // ✅ NEW unified invoice PDF generator
+getAllOrdersForStorekeeper
 };

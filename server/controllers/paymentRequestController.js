@@ -63,12 +63,16 @@ const getMyPaymentRequests = async (req, res) => {
     if (!req.user || (!role.includes("delivery") && !role.includes("sales"))) {
       return res.status(403).json({ message: "Access denied" });
     }
-
+    
     const requests = await PaymentRequest.find({ recipient: req.user._id })
-      .populate("bill", "amountDue totalUsed dueDate status")
+      .populate("bill", "amountDue totalUsed dueDate status invoiceNumber")  // ✅ Include invoiceNumber
       .populate("customer", "name")
+      .populate({
+        path: "bill.orders",  // ✅ Populate orders to get invoiceNumber
+        select: "invoiceNumber"
+      })
       .sort({ createdAt: -1 });
-
+    
     res.json(requests);
   } catch (error) {
     console.error("Get payment requests error:", error);

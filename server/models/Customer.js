@@ -75,6 +75,11 @@ const customerSchema = new Schema(
       min: 0,
       default: null,
     },
+    salesman: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      // not required for legacy customers but assigned when created by admin or salesman
+    },
   },
   { timestamps: true }
 );

@@ -21,6 +21,7 @@ const CreateCustomer = () => {
     dueDays: "",
     openingBalance: "",
     openingBalanceDueDays: "",
+    salesmanId: "",
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -28,6 +29,7 @@ const CreateCustomer = () => {
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
   const [customerId, setCustomerId] = useState(null);
+  const [salesmen, setSalesmen] = useState([]);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -138,6 +140,7 @@ const CreateCustomer = () => {
         openingBalanceDueDays: formData.openingBalanceDueDays
           ? parseInt(formData.openingBalanceDueDays)
           : null,
+        salesmanId: formData.salesmanId || null,
       };
 
       let response;
@@ -234,6 +237,19 @@ const CreateCustomer = () => {
     }
   }, [navigate, backendUrl]);
 
+  const fetchSalesmen = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/api/users/sales-men`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSalesmen(response.data);
+    } catch (error) {
+      console.error("Failed to load salesmen", error);
+      toast.error("Failed to load salesmen list");
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const editId = searchParams.get("edit");
@@ -245,7 +261,8 @@ const CreateCustomer = () => {
 
   useEffect(() => {
     fetchCurrentUser();
-  }, [fetchCurrentUser]);
+    fetchSalesmen();
+  }, [fetchCurrentUser, fetchSalesmen]);
 
   if (loading) {
     return <div className="customer-loading">Loading user information...</div>;
@@ -540,6 +557,29 @@ const CreateCustomer = () => {
                 </div>
               )}
             </div>
+
+            {/* NEW: Salesman Dropdown (only for admin) */}
+            {user?.role === "Admin" && (
+              <div className="customer-form-row">
+                <div className="customer-form-group">
+                  <label htmlFor="salesmanId">Assign Salesman</label>
+                  <select
+                    id="salesmanId"
+                    name="salesmanId"
+                    value={formData.salesmanId}
+                    onChange={handleChange}
+                    className="customer-select"
+                  >
+                    <option value="">Select Salesman (Optional)</option>
+                    {salesmen.map((salesman) => (
+                      <option key={salesman._id} value={salesman._id}>
+                        {salesman.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"

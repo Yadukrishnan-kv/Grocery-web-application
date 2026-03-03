@@ -1,43 +1,78 @@
-// src/pages/Delivery/PaymentRequestsDelivery.jsx
-import React, { useState, useEffect, useCallback } from "react";
+// src/pages/Sales/PaymentRequestsSales.jsx
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "react-hot-toast";
 import axios from "axios";
-import '../../DeliveryPartner/PaymentRequestsDelivery/PaymentRequests.css' // create or reuse existing CSS
+import "../../DeliveryPartner/PaymentRequestsDelivery/PaymentRequestsDelivery";
 
 const PaymentRequestsSales = () => {
-  const [requests, setRequests] = useState([]);              // Incoming customer requests
+  const [requests, setRequests] = useState([]);
   const [cashRequests, setCashRequests] = useState([]);
   const [chequeRequests, setChequeRequests] = useState([]);
 
-  const [billTransactions, setBillTransactions] = useState([]); // Accepted payments (bill wallet)
+  const [billTransactions, setBillTransactions] = useState([]);
   const [cashTx, setCashTx] = useState([]);
   const [chequeTx, setChequeTx] = useState([]);
+
+  const [pendingBills, setPendingBills] = useState([]);
+  
+  // ─── Pending Bills ────────────────────────────────────────────────
+  const [pendingSearch, setPendingSearch] = useState("");
+  const [selectedPendingBills, setSelectedPendingBills] = useState([]);
+  const [selectAllPending, setSelectAllPending] = useState(false);
+  
+  // ─── Wallet Transactions ──────────────────────────────────────────
+  const [walletSearch, setWalletSearch] = useState("");
+  const [selectedWalletTx, setSelectedWalletTx] = useState([]);
+  const [selectAllWallet, setSelectAllWallet] = useState(false);
+  
+  // ─── Cash Requests ────────────────────────────────────────────────
+  const [selectedCashRequests, setSelectedCashRequests] = useState([]);
+  const [selectAllCashRequests, setSelectAllCashRequests] = useState(false);
+  
+  // ─── Cheque Requests ──────────────────────────────────────────────
+  const [selectedChequeRequests, setSelectedChequeRequests] = useState([]);
+  const [selectAllChequeRequests, setSelectAllChequeRequests] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Payment Requests");
   const [user, setUser] = useState(null);
   const [processingId, setProcessingId] = useState(null);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
 
-  // Confirmation modal
+  // Modals
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [itemToProcess, setItemToProcess] = useState(null);
-  const [confirmAction, setConfirmAction] = useState(null); // "accept", "reject", "pay-admin"
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [showMarkModal, setShowMarkModal] = useState(false);
+  const [billToMark, setBillToMark] = useState(null);
+  const [markAmount, setMarkAmount] = useState("");
+  const [markMethod, setMarkMethod] = useState("cash");
+  const [markChequeDetails, setMarkChequeDetails] = useState({ number: "", bank: "", date: "" });
+  const [showBulkMarkModal, setShowBulkMarkModal] = useState(false);
+  const [bulkMarkMethod, setBulkMarkMethod] = useState("cash");
+  const [bulkMarkChequeDetails, setBulkMarkChequeDetails] = useState({ number: "", bank: "", date: "" });
+  const [showBulkPayModal, setShowBulkPayModal] = useState(false);
+  const [showBulkRequestModal, setShowBulkRequestModal] = useState(false);
+  const [bulkRequestAction, setBulkRequestAction] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
+  // ────────────────────────────────────────────────
+  // Fetch Data
+  // ────────────────────────────────────────────────
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) return window.location.href = "/login";
-      const response = await axios.get(`${backendUrl}/api/auth/me`, {
+      const res = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setUser(response.data.user || response.data);
-    } catch (error) {
+      setUser(res.data.user || res.data);
+    } catch (err) {
       localStorage.removeItem("token");
       window.location.href = "/login";
     }
@@ -48,17 +83,16 @@ const PaymentRequestsSales = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
 
-      // 1. Incoming customer payment requests
+      // Incoming payment requests (sales only)
       const reqRes = await axios.get(`${backendUrl}/api/payment-requests/my-requests`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const allReq = reqRes.data;
-      const myRequests = allReq.filter(r => r.recipientType === "sales");
+      const myRequests = reqRes.data.filter(r => r.recipientType === "sales");
       setRequests(myRequests);
       setCashRequests(myRequests.filter(r => r.method === "cash"));
       setChequeRequests(myRequests.filter(r => r.method === "cheque"));
 
-      // 2. Accepted bill transactions (my bill wallet - for paying to admin)
+      // My bill transactions (wallet)
       const txRes = await axios.get(`${backendUrl}/api/bill-transactions/my-transactions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -67,8 +101,23 @@ const PaymentRequestsSales = () => {
       setCashTx(myTx.filter(t => t.method === "cash"));
       setChequeTx(myTx.filter(t => t.method === "cheque"));
 
-    } catch (error) {
-      console.error("Error fetching data:", error);
+      // Pending bills
+      const billsRes = await axios.get(`${backendUrl}/api/bills/all-pending`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPendingBills(billsRes.data);
+
+      // Reset all selections
+      setSelectedPendingBills([]);
+      setSelectAllPending(false);
+      setSelectedWalletTx([]);
+      setSelectAllWallet(false);
+      setSelectedCashRequests([]);
+      setSelectAllCashRequests(false);
+      setSelectedChequeRequests([]);
+      setSelectAllChequeRequests(false);
+    } catch (err) {
+      console.error("Fetch error:", err);
       toast.error("Failed to load data");
     } finally {
       setLoading(false);
@@ -80,8 +129,222 @@ const PaymentRequestsSales = () => {
     fetchData();
   }, [fetchCurrentUser, fetchData]);
 
-  // ─── Handlers ──────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────
+  // Filters
+  // ────────────────────────────────────────────────
+  const filteredPendingBills = useMemo(() => {
+    if (!pendingSearch.trim()) return pendingBills;
+    const term = pendingSearch.toLowerCase();
+    return pendingBills.filter(bill =>
+      bill.customer?.name?.toLowerCase().includes(term) ||
+      bill._id?.toLowerCase().includes(term)
+    );
+  }, [pendingBills, pendingSearch]);
 
+  const filteredWalletTx = useMemo(() => {
+    if (!walletSearch.trim()) return billTransactions;
+    const term = walletSearch.toLowerCase();
+    return billTransactions.filter(tx =>
+      tx.customer?.name?.toLowerCase().includes(term) ||
+      tx.bill?._id?.toLowerCase().includes(term)
+    );
+  }, [billTransactions, walletSearch]);
+
+  const filteredCashRequests = useMemo(() => cashRequests, [cashRequests]);
+  const filteredChequeRequests = useMemo(() => chequeRequests, [chequeRequests]);
+
+  // ────────────────────────────────────────────────
+  // Selection Handlers
+  // ────────────────────────────────────────────────
+  const handlePendingBillSelect = (billId) => {
+    setSelectedPendingBills(prev =>
+      prev.includes(billId) ? prev.filter(id => id !== billId) : [...prev, billId]
+    );
+  };
+  const handleSelectAllPending = () => {
+    if (selectAllPending) {
+      setSelectedPendingBills([]);
+    } else {
+      setSelectedPendingBills(filteredPendingBills.map(b => b._id));
+    }
+    setSelectAllPending(!selectAllPending);
+  };
+
+  const handleWalletTxSelect = (txId) => {
+    setSelectedWalletTx(prev =>
+      prev.includes(txId) ? prev.filter(id => id !== txId) : [...prev, txId]
+    );
+  };
+  const handleSelectAllWallet = () => {
+    if (selectAllWallet) {
+      setSelectedWalletTx([]);
+    } else {
+      setSelectedWalletTx(
+        filteredWalletTx.filter(tx => tx.status === "received").map(tx => tx._id)
+      );
+    }
+    setSelectAllWallet(!selectAllWallet);
+  };
+
+  const handleCashRequestSelect = (reqId) => {
+    setSelectedCashRequests(prev =>
+      prev.includes(reqId) ? prev.filter(id => id !== reqId) : [...prev, reqId]
+    );
+  };
+  const handleSelectAllCashRequests = () => {
+    if (selectAllCashRequests) {
+      setSelectedCashRequests([]);
+    } else {
+      setSelectedCashRequests(filteredCashRequests.map(r => r._id));
+    }
+    setSelectAllCashRequests(!selectAllCashRequests);
+  };
+
+  const handleChequeRequestSelect = (reqId) => {
+    setSelectedChequeRequests(prev =>
+      prev.includes(reqId) ? prev.filter(id => id !== reqId) : [...prev, reqId]
+    );
+  };
+  const handleSelectAllChequeRequests = () => {
+    if (selectAllChequeRequests) {
+      setSelectedChequeRequests([]);
+    } else {
+      setSelectedChequeRequests(filteredChequeRequests.map(r => r._id));
+    }
+    setSelectAllChequeRequests(!selectAllChequeRequests);
+  };
+
+  // Auto-sync select all
+  useEffect(() => {
+    if (filteredPendingBills.length > 0 && selectedPendingBills.length === filteredPendingBills.length) {
+      setSelectAllPending(true);
+    } else {
+      setSelectAllPending(false);
+    }
+  }, [filteredPendingBills, selectedPendingBills]);
+
+  useEffect(() => {
+    const readyTx = filteredWalletTx.filter(tx => tx.status === "received");
+    if (readyTx.length > 0 && selectedWalletTx.length === readyTx.length) {
+      setSelectAllWallet(true);
+    } else {
+      setSelectAllWallet(false);
+    }
+  }, [filteredWalletTx, selectedWalletTx]);
+
+  useEffect(() => {
+    if (filteredCashRequests.length > 0 && selectedCashRequests.length === filteredCashRequests.length) {
+      setSelectAllCashRequests(true);
+    } else {
+      setSelectAllCashRequests(false);
+    }
+  }, [filteredCashRequests, selectedCashRequests]);
+
+  useEffect(() => {
+    if (filteredChequeRequests.length > 0 && selectedChequeRequests.length === filteredChequeRequests.length) {
+      setSelectAllChequeRequests(true);
+    } else {
+      setSelectAllChequeRequests(false);
+    }
+  }, [filteredChequeRequests, selectedChequeRequests]);
+
+  // ────────────────────────────────────────────────
+  // ✅✅✅ DOWNLOAD RECEIPT - Single Transaction ✅✅✅
+  // ────────────────────────────────────────────────
+  const downloadReceipt = async (billId, invoiceNumber) => {
+    if (!billId) {
+      toast.error("No bill associated");
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Please login again");
+      return;
+    }
+    try {
+      const response = await fetch(`${backendUrl}/api/bills/receipt/${billId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/pdf",
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Server error ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      
+      // ✅✅✅ USE INVOICE NUMBER IN FILENAME ✅✅✅
+      link.download = invoiceNumber 
+        ? `receipt-${invoiceNumber}.pdf` 
+        : `receipt_${billId.slice(-8)}.pdf`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Receipt downloaded");
+    } catch (error) {
+      console.error("Receipt download failed:", error);
+      toast.error("Failed to download receipt: " + error.message);
+    }
+  };
+
+  // ────────────────────────────────────────────────
+  // ✅✅✅ DOWNLOAD BULK RECEIPT ✅✅✅
+  // ────────────────────────────────────────────────
+  const downloadBulkReceipt = async () => {
+    if (selectedWalletTx.length === 0) {
+      toast.error("Please select at least one transaction");
+      return;
+    }
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Get invoice numbers for selected transactions
+      const selectedTransactions = filteredWalletTx.filter(tx => 
+        selectedWalletTx.includes(tx._id) && tx.status === "received"
+      );
+      
+      // Use first invoice number or fallback to timestamp
+      const firstInvoice = selectedTransactions[0]?.order?.invoiceNumber || 
+                          selectedTransactions[0]?.invoiceNumber;
+
+      const response = await axios.post(
+        `${backendUrl}/api/bill-transactions/bulk-receipt`,
+        { transactionIds: selectedWalletTx },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      
+      // ✅✅✅ USE INVOICE NUMBER IN BULK FILENAME ✅✅✅
+      link.setAttribute("download", firstInvoice 
+        ? `bulk-receipt-${firstInvoice}.pdf` 
+        : `bulk-receipt-${Date.now()}.pdf`);
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Bulk receipt downloaded");
+    } catch (error) {
+      console.error("Download bulk receipt error:", error);
+      toast.error("Failed to download receipt");
+    }
+  };
+
+  // ────────────────────────────────────────────────
+  // Single Actions
+  // ────────────────────────────────────────────────
   const handleAcceptClick = (reqId) => {
     setItemToProcess(reqId);
     setConfirmAction("accept");
@@ -100,37 +363,90 @@ const PaymentRequestsSales = () => {
     setShowConfirmModal(true);
   };
 
+  const handleMarkReceivedClick = (billId, amountDue) => {
+    setBillToMark({ id: billId, amountDue });
+    setMarkAmount(amountDue.toFixed(2));
+    setMarkMethod("cash");
+    setMarkChequeDetails({ number: "", bank: "", date: "" });
+    setShowMarkModal(true);
+  };
+
+  // ────────────────────────────────────────────────
+  // Bulk Actions
+  // ────────────────────────────────────────────────
+  const handleBulkMarkReceived = () => {
+    if (selectedPendingBills.length === 0) {
+      toast.error("Please select at least one bill");
+      return;
+    }
+    setBulkMarkMethod("cash");
+    setBulkMarkChequeDetails({ number: "", bank: "", date: "" });
+    setShowBulkMarkModal(true);
+  };
+
+  const handleBulkPayToAdmin = () => {
+    const readyTx = filteredWalletTx.filter(tx => tx.status === "received");
+    const selectedReady = selectedWalletTx.filter(id => readyTx.some(tx => tx._id === id));
+    if (selectedReady.length === 0) {
+      toast.error("No 'Ready to Pay' transactions selected");
+      return;
+    }
+    setShowBulkPayModal(true);
+  };
+
+  const handleBulkAcceptRequests = (type) => {
+    const selected = type === "cash" ? selectedCashRequests : selectedChequeRequests;
+    if (selected.length === 0) {
+      toast.error(`Please select at least one ${type} request`);
+      return;
+    }
+    setBulkRequestAction("accept");
+    setShowBulkRequestModal(true);
+  };
+
+  const handleBulkRejectRequests = (type) => {
+    const selected = type === "cash" ? selectedCashRequests : selectedChequeRequests;
+    if (selected.length === 0) {
+      toast.error(`Please select at least one ${type} request`);
+      return;
+    }
+    setBulkRequestAction("reject");
+    setShowBulkRequestModal(true);
+  };
+
+  // ────────────────────────────────────────────────
+  // Confirm Handlers
+  // ────────────────────────────────────────────────
   const confirmActionHandler = async () => {
     if (!itemToProcess) return;
-
     setShowConfirmModal(false);
     setProcessingId(itemToProcess);
-
     try {
       const token = localStorage.getItem("token");
       let endpoint = "";
-      let successMessage = "";
-
-      if (confirmAction === "accept") {
-        endpoint = `${backendUrl}/api/payment-requests/accept/${itemToProcess}`;
-        successMessage = "Payment request accepted successfully";
-      } else if (confirmAction === "reject") {
-        endpoint = `${backendUrl}/api/payment-requests/reject/${itemToProcess}`;
-        successMessage = "Payment request rejected";
-      } else if (confirmAction === "pay-admin") {
-        endpoint = `${backendUrl}/api/bill-transactions/pay-to-admin/${itemToProcess}`;
-        successMessage = "Payment request sent to admin";
+      let successMsg = "";
+      switch (confirmAction) {
+        case "accept":
+          endpoint = `${backendUrl}/api/payment-requests/accept/${itemToProcess}`;
+          successMsg = "Payment request accepted";
+          break;
+        case "reject":
+          endpoint = `${backendUrl}/api/payment-requests/reject/${itemToProcess}`;
+          successMsg = "Payment request rejected";
+          break;
+        case "pay-admin":
+          endpoint = `${backendUrl}/api/bill-transactions/pay-to-admin/${itemToProcess}`;
+          successMsg = "Payment sent to admin";
+          break;
+        default:
+          return;
       }
-
-      await axios.post(endpoint, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      toast.success(successMessage);
+      await axios.post(endpoint, {}, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success(successMsg);
       fetchData();
-    } catch (error) {
-      console.error(`Error ${confirmAction}:`, error);
-      toast.error(`Failed to ${confirmAction.replace("-", " ")}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Action failed");
     } finally {
       setProcessingId(null);
       setItemToProcess(null);
@@ -138,54 +454,162 @@ const PaymentRequestsSales = () => {
     }
   };
 
-  /* Download bulk receipt for selected wallet transactions */
-  const downloadBulkReceipt = async () => {
-    if (billTransactions.length === 0) {
-      toast.error("No wallet transactions to download");
+  const confirmMarkReceived = async () => {
+    const amount = parseFloat(markAmount);
+    if (isNaN(amount) || amount <= 0 || amount > billToMark.amountDue) {
+      toast.error("Invalid amount");
       return;
     }
+    if (markMethod === "cheque" && (!markChequeDetails.number || !markChequeDetails.bank || !markChequeDetails.date)) {
+      toast.error("Complete cheque details");
+      return;
+    }
+    setShowMarkModal(false);
+    setProcessingId(billToMark.id);
     try {
       const token = localStorage.getItem("token");
-      const selectedTxIds = billTransactions.filter(tx => tx.status === "received").map(tx => tx._id);
-      
-      if (selectedTxIds.length === 0) {
-        toast.error("No transactions ready to download");
-        return;
-      }
-
-      const response = await axios.post(
-        `${backendUrl}/api/bill-transactions/bulk-receipt`,
-        { transactionIds: selectedTxIds },
+      await axios.post(
+        `${backendUrl}/api/bills/mark-received`,
         {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        }
+          billId: billToMark.id,
+          amount,
+          method: markMethod,
+          chequeDetails: markMethod === "cheque" ? markChequeDetails : undefined,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `bulk-receipt-${Date.now()}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success("Bulk receipt downloaded");
-    } catch (error) {
-      console.error("Download bulk receipt error:", error);
-      toast.error("Failed to download receipt");
+      toast.success("Bill marked as received");
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to mark bill");
+    } finally {
+      setProcessingId(null);
+      setBillToMark(null);
+      setMarkAmount("");
     }
   };
 
-  // ─── Totals ────────────────────────────────────────────────────────────────
-  const calculateTotal = (list, status = ["accepted", "received"]) =>
-    list.filter(item => status.includes(item.status)).reduce((sum, item) => sum + item.amount, 0);
+  const confirmBulkMarkReceived = async () => {
+    if (bulkMarkMethod === "cheque" && (!bulkMarkChequeDetails.number || !bulkMarkChequeDetails.bank || !bulkMarkChequeDetails.date)) {
+      toast.error("Complete cheque details");
+      return;
+    }
+    setShowBulkMarkModal(false);
+    setBulkProcessing(true);
+    try {
+      const token = localStorage.getItem("token");
+      let success = 0, fail = 0;
+      for (const billId of selectedPendingBills) {
+        const bill = pendingBills.find(b => b._id === billId);
+        if (!bill || bill.status !== "pending") continue;
+        try {
+          await axios.post(
+            `${backendUrl}/api/bills/mark-received`,
+            {
+              billId,
+              amount: bill.amountDue,
+              method: bulkMarkMethod,
+              chequeDetails: bulkMarkMethod === "cheque" ? {
+                ...bulkMarkChequeDetails,
+                number: `${bulkMarkChequeDetails.number}-${bill._id.slice(-4)}`
+              } : undefined,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          success++;
+        } catch (err) {
+          fail++;
+        }
+      }
+      if (success > 0) toast.success(`${success} bill(s) marked as received`);
+      if (fail > 0) toast.error(`${fail} failed`);
+      fetchData();
+    } catch (err) {
+      toast.error("Bulk operation failed");
+    } finally {
+      setBulkProcessing(false);
+      setSelectedPendingBills([]);
+      setSelectAllPending(false);
+    }
+  };
 
-  const cashTotalRequests   = calculateTotal(cashRequests, ["accepted"]);
+  const confirmBulkPayToAdmin = async () => {
+    setShowBulkPayModal(false);
+    setBulkProcessing(true);
+    try {
+      const token = localStorage.getItem("token");
+      let success = 0, fail = 0;
+      for (const txId of selectedWalletTx) {
+        const tx = filteredWalletTx.find(t => t._id === txId);
+        if (!tx || tx.status !== "received") continue;
+        try {
+          await axios.post(
+            `${backendUrl}/api/bill-transactions/pay-to-admin/${txId}`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          success++;
+        } catch (err) {
+          fail++;
+        }
+      }
+      if (success > 0) toast.success(`${success} payment(s) sent to admin`);
+      if (fail > 0) toast.error(`${fail} failed`);
+      fetchData();
+    } catch (err) {
+      toast.error("Bulk pay failed");
+    } finally {
+      setBulkProcessing(false);
+      setSelectedWalletTx([]);
+      setSelectAllWallet(false);
+    }
+  };
+
+  const confirmBulkRequestAction = async () => {
+    setShowBulkRequestModal(false);
+    setBulkProcessing(true);
+    try {
+      const token = localStorage.getItem("token");
+      let success = 0, fail = 0;
+      const selectedIds = bulkRequestAction === "accept"
+        ? [...selectedCashRequests, ...selectedChequeRequests]
+        : [...selectedCashRequests, ...selectedChequeRequests];
+      for (const reqId of selectedIds) {
+        const req = requests.find(r => r._id === reqId);
+        if (!req || req.status !== "pending") continue;
+        try {
+          const endpoint = bulkRequestAction === "accept"
+            ? `${backendUrl}/api/payment-requests/accept/${reqId}`
+            : `${backendUrl}/api/payment-requests/reject/${reqId}`;
+          await axios.post(endpoint, {}, { headers: { Authorization: `Bearer ${token}` } });
+          success++;
+        } catch (err) {
+          fail++;
+        }
+      }
+      if (success > 0) toast.success(`${success} request(s) ${bulkRequestAction === "accept" ? "accepted" : "rejected"}`);
+      if (fail > 0) toast.error(`${fail} failed`);
+      fetchData();
+    } catch (err) {
+      toast.error("Bulk request action failed");
+    } finally {
+      setBulkProcessing(false);
+      setSelectedCashRequests([]);
+      setSelectedChequeRequests([]);
+      setSelectAllCashRequests(false);
+      setSelectAllChequeRequests(false);
+      setBulkRequestAction(null);
+    }
+  };
+
+  // Totals
+  const calculateTotal = (list, statuses = ["received", "pending"]) =>
+    list.filter(t => statuses.includes(t.status)).reduce((sum, t) => sum + t.amount, 0);
+
+  const cashTotalWallet = calculateTotal(cashTx);
+  const chequeTotalWallet = calculateTotal(chequeTx);
+  const cashTotalRequests = calculateTotal(cashRequests, ["accepted"]);
   const chequeTotalRequests = calculateTotal(chequeRequests, ["accepted"]);
-
-  const cashTotalWallet     = calculateTotal(cashTx, ["received"]);
-  const chequeTotalWallet   = calculateTotal(chequeTx, ["received"]);
 
   if (!user) return <div className="requests-loading">Loading...</div>;
 
@@ -205,40 +629,34 @@ const PaymentRequestsSales = () => {
       />
       <main className={`requests-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="requests-container">
-          <h2 className="requests-page-title">Payment Requests</h2>
+          <h2 className="requests-page-title">Payment Requests (Sales)</h2>
 
-          {/* ─── Summary ──────────────────────────────────────────────────────── */}
-          <div className="requests-summary">
-            <div className="summary-card">
-              <h4>Total Accepted Cash (from Customers)</h4>
-              <div className="amount">
-                <img src={DirhamSymbol} alt="AED" width={24} />
-                <span>{cashTotalRequests.toFixed(2)}</span>
-              </div>
-            </div>
-            <div className="summary-card">
-              <h4>Total Accepted Cheque (from Customers)</h4>
-              <div className="amount">
-                <img src={DirhamSymbol} alt="AED" width={24} />
-                <span>{chequeTotalRequests.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ─── My Bill Wallet – Accepted Payments (Pay to Admin) ─────────────── */}
+          {/* ─── Wallet – Accepted / Marked Payments ──────── */}
           <div className="requests-section wallet-section">
-            <h3>My Bill Wallet – Accepted Payments</h3>
+            <div className="section-header-with-actions">
+              <h3>My Accepted Payments (Wallet)</h3>
+              <div className="search-box">
+                <input
+                  type="text"
+                  placeholder="Search customer or bill ID..."
+                  value={walletSearch}
+                  onChange={e => setWalletSearch(e.target.value)}
+                  className="search-input"
+                />
+                {walletSearch && <button className="search-clear" onClick={() => setWalletSearch("")}>✕</button>}
+              </div>
+            </div>
 
             <div className="requests-summary small">
               <div className="summary-card small">
-                <h4>Cash to Pay to Admin</h4>
+                <h4>Cash Ready</h4>
                 <div className="amount">
                   <img src={DirhamSymbol} alt="AED" width={20} />
                   <span>{cashTotalWallet.toFixed(2)}</span>
                 </div>
               </div>
               <div className="summary-card small">
-                <h4>Cheque to Pay to Admin</h4>
+                <h4>Cheque Ready</h4>
                 <div className="amount">
                   <img src={DirhamSymbol} alt="AED" width={20} />
                   <span>{chequeTotalWallet.toFixed(2)}</span>
@@ -246,140 +664,382 @@ const PaymentRequestsSales = () => {
               </div>
             </div>
 
-            {billTransactions.length > 0 && (
-              <div className="bulk-action-bar" style={{ marginBottom: "15px" }}>
-                <button 
-                  className="bulk-receipt-btn" 
-                  onClick={downloadBulkReceipt} 
-                  disabled={processingId}
-                  style={{ marginRight: "10px" }}
-                >
-                  Download Bulk Receipt PDF
+            {selectedWalletTx.length > 0 && (
+              <div className="bulk-action-bar">
+                <span>{selectedWalletTx.length} selected</span>
+                <button className="bulk-receipt-btn" onClick={downloadBulkReceipt} disabled={bulkProcessing}>
+                  {bulkProcessing ? "Processing..." : "Download Bulk Receipt"}
+                </button>
+                <button className="bulk-pay-btn" onClick={handleBulkPayToAdmin} disabled={bulkProcessing}>
+                  {bulkProcessing ? "Processing..." : "Pay Selected to Admin"}
+                </button>
+                <button className="bulk-clear-btn" onClick={() => {
+                  setSelectedWalletTx([]);
+                  setSelectAllWallet(false);
+                }}>
+                  Clear
                 </button>
               </div>
             )}
 
-            <table className="requests-table">
-              <thead>
-                <tr>
-                  <th>No</th>
-                  <th>Customer</th>
-                  <th>Bill ID</th>
-                  <th>Invoice #</th>
-                  <th>Amount (AED)</th>
-                  <th>Method</th>
-                  <th>Received Date</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {billTransactions.map((tx, index) => {
-                  const invoiceNo = tx.order?.invoiceNumber || tx.invoiceNumber || "N/A";
-                  return (
-                    <tr key={tx._id}>
-                      <td>{index + 1}</td>
-                      <td>{tx.customer?.name || "N/A"}</td>
-                      <td>{tx.bill?._id?.slice(-8) || "N/A"}</td>
-                      <td><strong>{invoiceNo}</strong></td>
-                      <td>{tx.amount.toFixed(2)}</td>
-                      <td>{tx.method.charAt(0).toUpperCase() + tx.method.slice(1)}</td>
-                      <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
-                      <td>
-                        <span className={`status-badge status-${tx.status}`}>
-                          {tx.status === "received" ? "Pending to Admin" : "Paid to Admin"}
-                        </span>
-                      </td>
-                      <td>
-                        {tx.status === "received" && (
-                          <button
-                            className="pay-admin-btn"
-                            onClick={() => handlePayToAdminClick(tx._id)}
-                            disabled={processingId === tx._id}
-                          >
-                            {processingId === tx._id ? "Sending..." : "Pay to Admin"}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ─── Incoming Customer Requests ───────────────────────────────────── */}
-          {loading ? (
-            <div className="requests-loading">Loading payment requests...</div>
-          ) : requests.length === 0 ? (
-            <div className="requests-no-data">No payment requests received yet</div>
-          ) : (
-            <>
-              <div className="requests-section">
-                <h3>Cash Payment Requests from Customers</h3>
+            {loading ? (
+              <div className="loading">Loading wallet...</div>
+            ) : filteredWalletTx.length === 0 ? (
+              <div className="no-data">No transactions yet</div>
+            ) : (
+              <div className="table-responsive">
                 <table className="requests-table">
                   <thead>
                     <tr>
+                      <th className="checkbox-col">
+                        <input
+                          type="checkbox"
+                          checked={selectAllWallet}
+                          onChange={handleSelectAllWallet}
+                        />
+                      </th>
                       <th>No</th>
                       <th>Customer</th>
-                      <th>Bill ID</th>
-                      <th>Amount (AED)</th>
+                      <th>Invoice #</th> {/* ✅✅✅ REPLACED Bill ID with Invoice # ✅✅✅ */}
+                      <th>Amount</th>
                       <th>Method</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredWalletTx.map((tx, idx) => {
+                      const isReady = tx.status === "received";
+                      const hasBill = !!tx.bill?._id;
+                      
+                      // ✅✅✅ USE ORDER'S INVOICE NUMBER (DEL-XX) ✅✅✅
+                      const invoiceNo = tx.order?.invoiceNumber || tx.invoiceNumber || "N/A";
+                      
+                      return (
+                        <tr key={tx._id} className={selectedWalletTx.includes(tx._id) ? "selected-row" : ""}>
+                          <td className="checkbox-col">
+                            <input
+                              type="checkbox"
+                              checked={selectedWalletTx.includes(tx._id)}
+                              onChange={() => handleWalletTxSelect(tx._id)}
+                              disabled={!isReady}
+                            />
+                          </td>
+                          <td>{idx + 1}</td>
+                          <td>{tx.customer?.name || "—"}</td>
+                          
+                          {/* ✅✅✅ SHOW INVOICE # INSTEAD OF BILL ID ✅✅✅ */}
+                          <td>
+                            <strong className="invoice-number-cell">{invoiceNo}</strong>
+                          </td>
+                          
+                          <td>{tx.amount.toFixed(2)}</td>
+                          <td>{tx.method?.charAt(0).toUpperCase() + tx.method?.slice(1) || "—"}</td>
+                          <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
+                          <td>
+                            <span className={`status-badge status-${tx.status}`}>
+                              {tx.status === "received" ? "Ready to Pay" :
+                               tx.status === "pending" ? "Sent to Admin" :
+                               tx.status === "paid_to_admin" ? "Paid to Admin" : tx.status}
+                            </span>
+                          </td>
+                          <td className="actions-col">
+                            {isReady && (
+                              <button className="pay-admin-btn" onClick={() => handlePayToAdminClick(tx._id)}>
+                                Pay to Admin
+                              </button>
+                            )}
+                            {hasBill && (
+                              <button
+                                className="download-receipt-btn"
+                                onClick={() => downloadReceipt(tx.bill._id, invoiceNo)}  // ✅ Pass invoiceNo
+                                title="Download Receipt"
+                              >
+                                Receipt
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Pending Customer Bills ──────────────────────────────── */}
+          <div className="requests-section pending-bills-section">
+            <div className="section-header-with-actions">
+              <h3>Pending Customer Bills</h3>
+              <div className="search-box">
+                <input
+                  type="text"
+                  placeholder="Search customer or bill ID..."
+                  value={pendingSearch}
+                  onChange={e => setPendingSearch(e.target.value)}
+                  className="search-input"
+                />
+                {pendingSearch && <button className="search-clear" onClick={() => setPendingSearch("")}>✕</button>}
+              </div>
+            </div>
+            {selectedPendingBills.length > 0 && (
+              <div className="bulk-action-bar">
+                <span>{selectedPendingBills.length} selected</span>
+                <button className="bulk-mark-btn" onClick={handleBulkMarkReceived} disabled={bulkProcessing}>
+                  {bulkProcessing ? "Processing..." : "Mark Selected as Received"}
+                </button>
+                <button className="bulk-clear-btn" onClick={() => {
+                  setSelectedPendingBills([]);
+                  setSelectAllPending(false);
+                }}>
+                  Clear
+                </button>
+              </div>
+            )}
+            {loading ? (
+              <div className="loading">Loading...</div>
+            ) : filteredPendingBills.length === 0 ? (
+              <div className="no-data">No pending bills</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="requests-table">
+                  <thead>
+                    <tr>
+                      <th className="checkbox-col">
+                        <input type="checkbox" checked={selectAllPending} onChange={handleSelectAllPending} />
+                      </th>
+                      <th>No</th>
+                      <th>Customer</th>
+                      <th>Invoice #</th> {/* ✅✅✅ REPLACED Bill ID with Invoice # ✅✅✅ */}
+                      <th>Amount Due</th>
+                      <th>Due Date</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPendingBills.map((bill, idx) => {
+                      // ✅✅✅ USE ORDER'S INVOICE NUMBER (DEL-XX) ✅✅✅
+                      const invoiceNo = bill.invoiceNumber || bill.orders?.[0]?.invoiceNumber || "N/A";
+                      
+                      return (
+                        <tr key={bill._id} className={selectedPendingBills.includes(bill._id) ? "selected-row" : ""}>
+                          <td className="checkbox-col">
+                            <input
+                              type="checkbox"
+                              checked={selectedPendingBills.includes(bill._id)}
+                              onChange={() => handlePendingBillSelect(bill._id)}
+                              disabled={bill.status !== "pending"}
+                            />
+                          </td>
+                          <td>{idx + 1}</td>
+                          <td>{bill.customer?.name || "—"}</td>
+                          
+                          {/* ✅✅✅ SHOW INVOICE # INSTEAD OF BILL ID ✅✅✅ */}
+                          <td>
+                            <strong className="invoice-number-cell">{invoiceNo}</strong>
+                          </td>
+                          
+                          <td>{bill.amountDue.toFixed(2)}</td>
+                          <td>{new Date(bill.dueDate).toLocaleDateString()}</td>
+                          <td>
+                            <span className={`status-badge status-${bill.status}`}>
+                              {bill.status}
+                            </span>
+                          </td>
+                          <td className="actions-col">
+                            {bill.status === "pending" && (
+                              <button
+                                className="mark-received-btn"
+                                onClick={() => handleMarkReceivedClick(bill._id, bill.amountDue)}
+                                disabled={processingId === bill._id}
+                              >
+                                Mark Received
+                              </button>
+                            )}
+                            {(bill.status === "paid" || bill.status === "partial") && (
+                              <button
+                                className="download-receipt-btn"
+                                onClick={() => downloadReceipt(
+                                  bill._id, 
+                                  invoiceNo  // ✅ Pass invoiceNo
+                                )}
+                              >
+                                Receipt
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Cash Payment Requests ──────────────────────────────── */}
+          <div className="requests-section">
+            <div className="section-header-with-actions">
+              <h3>Cash Payment Requests from Customers</h3>
+              <div className="search-box">
+                <input
+                  type="text"
+                  placeholder="Search customer or bill ID..."
+                  value={pendingSearch}
+                  onChange={e => setPendingSearch(e.target.value)}
+                  className="search-input"
+                />
+                {pendingSearch && <button className="search-clear" onClick={() => setPendingSearch("")}>✕</button>}
+              </div>
+            </div>
+            {selectedCashRequests.length > 0 && (
+              <div className="bulk-action-bar">
+                <span>{selectedCashRequests.length} selected</span>
+                <button className="bulk-accept-btn" onClick={() => handleBulkAcceptRequests("cash")} disabled={bulkProcessing}>
+                  {bulkProcessing ? "Processing..." : "Accept Selected"}
+                </button>
+                <button className="bulk-reject-btn" onClick={() => handleBulkRejectRequests("cash")} disabled={bulkProcessing}>
+                  {bulkProcessing ? "Processing..." : "Reject Selected"}
+                </button>
+                <button className="bulk-clear-btn" onClick={() => {
+                  setSelectedCashRequests([]);
+                  setSelectAllCashRequests(false);
+                }}>
+                  Clear
+                </button>
+              </div>
+            )}
+            {loading ? (
+              <div className="loading">Loading...</div>
+            ) : filteredCashRequests.length === 0 ? (
+              <div className="no-data">No cash requests</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="requests-table">
+                  <thead>
+                    <tr>
+                      <th className="checkbox-col">
+                        <input
+                          type="checkbox"
+                          checked={selectAllCashRequests}
+                          onChange={handleSelectAllCashRequests}
+                        />
+                      </th>
+                      <th>No</th>
+                      <th>Customer</th>
+                      <th>Invoice #</th> {/* ✅✅✅ REPLACED Bill ID with Invoice # ✅✅✅ */}
+                      <th>Amount</th>
                       <th>Date</th>
                       <th>Status</th>
                       <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cashRequests.map((req, index) => (
-                      <tr key={req._id}>
-                        <td>{index + 1}</td>
-                        <td>{req.customer?.name || "N/A"}</td>
-                        <td>{req.bill?._id?.slice(-8) || "N/A"}</td>
-                        <td>{req.amount.toFixed(2)}</td>
-                        <td>Cash</td>
-                        <td>{new Date(req.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          <span className={`status-badge status-${req.status}`}>
-                            {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                          </span>
-                        </td>
-                        <td>
-                          {req.status === "pending" && (
-                            <div className="action-buttons">
-                              <button
-                                className="accept-btn"
-                                onClick={() => handleAcceptClick(req._id)}
-                                disabled={processingId === req._id}
-                              >
-                                Accept
-                              </button>
-                              <button
-                                className="reject-btn"
-                                onClick={() => handleRejectClick(req._id)}
-                                disabled={processingId === req._id}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredCashRequests.map((req, idx) => {
+                      // ✅✅✅ USE ORDER'S INVOICE NUMBER (DEL-XX) ✅✅✅
+                      const invoiceNo = req.bill?.invoiceNumber || req.bill?.orders?.[0]?.invoiceNumber || "N/A";
+                      
+                      return (
+                        <tr key={req._id} className={selectedCashRequests.includes(req._id) ? "selected-row" : ""}>
+                          <td className="checkbox-col">
+                            <input
+                              type="checkbox"
+                              checked={selectedCashRequests.includes(req._id)}
+                              onChange={() => handleCashRequestSelect(req._id)}
+                              disabled={req.status !== "pending"}
+                            />
+                          </td>
+                          <td>{idx + 1}</td>
+                          <td>{req.customer?.name || "—"}</td>
+                          
+                          {/* ✅✅✅ SHOW INVOICE # INSTEAD OF BILL ID ✅✅✅ */}
+                          <td>
+                            <strong className="invoice-number-cell">{invoiceNo}</strong>
+                          </td>
+                          
+                          <td>{req.amount.toFixed(2)}</td>
+                          <td>{new Date(req.createdAt).toLocaleDateString()}</td>
+                          <td>
+                            <span className={`status-badge status-${req.status}`}>
+                              {req.status}
+                            </span>
+                          </td>
+                          <td>
+                            {req.status === "pending" && (
+                              <div className="action-buttons">
+                                <button className="accept-btn" onClick={() => handleAcceptClick(req._id)}>
+                                  Accept
+                                </button>
+                                <button className="reject-btn" onClick={() => handleRejectClick(req._id)}>
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
 
-              <div className="requests-section">
-                <h3>Cheque Payment Requests from Customers</h3>
+          {/* ─── Cheque Payment Requests ────────────────────────────── */}
+          <div className="requests-section">
+            <div className="section-header-with-actions">
+              <h3>Cheque Payment Requests from Customers</h3>
+              <div className="search-box">
+                <input
+                  type="text"
+                  placeholder="Search customer or bill ID..."
+                  value={pendingSearch}
+                  onChange={e => setPendingSearch(e.target.value)}
+                  className="search-input"
+                />
+                {pendingSearch && <button className="search-clear" onClick={() => setPendingSearch("")}>✕</button>}
+              </div>
+            </div>
+            {selectedChequeRequests.length > 0 && (
+              <div className="bulk-action-bar">
+                <span>{selectedChequeRequests.length} selected</span>
+                <button className="bulk-accept-btn" onClick={() => handleBulkAcceptRequests("cheque")} disabled={bulkProcessing}>
+                  {bulkProcessing ? "Processing..." : "Accept Selected"}
+                </button>
+                <button className="bulk-reject-btn" onClick={() => handleBulkRejectRequests("cheque")} disabled={bulkProcessing}>
+                  {bulkProcessing ? "Processing..." : "Reject Selected"}
+                </button>
+                <button className="bulk-clear-btn" onClick={() => {
+                  setSelectedChequeRequests([]);
+                  setSelectAllChequeRequests(false);
+                }}>
+                  Clear
+                </button>
+              </div>
+            )}
+            {loading ? (
+              <div className="loading">Loading...</div>
+            ) : filteredChequeRequests.length === 0 ? (
+              <div className="no-data">No cheque requests</div>
+            ) : (
+              <div className="table-responsive">
                 <table className="requests-table">
                   <thead>
                     <tr>
+                      <th className="checkbox-col">
+                        <input
+                          type="checkbox"
+                          checked={selectAllChequeRequests}
+                          onChange={handleSelectAllChequeRequests}
+                        />
+                      </th>
                       <th>No</th>
                       <th>Customer</th>
-                      <th>Bill ID</th>
-                      <th>Amount (AED)</th>
-                      <th>Method</th>
+                      <th>Invoice #</th> {/* ✅✅✅ REPLACED Bill ID with Invoice # ✅✅✅ */}
+                      <th>Amount</th>
                       <th>Cheque Details</th>
                       <th>Date</th>
                       <th>Status</th>
@@ -387,88 +1047,209 @@ const PaymentRequestsSales = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {chequeRequests.map((req, index) => (
-                      <tr key={req._id}>
-                        <td>{index + 1}</td>
-                        <td>{req.customer?.name || "N/A"}</td>
-                        <td>{req.bill?._id?.slice(-8) || "N/A"}</td>
-                        <td>{req.amount.toFixed(2)}</td>
-                        <td>Cheque</td>
-                        <td>
-                          {req.chequeDetails ? (
-                            <div className="cheque-info">
-                              <div>Number: {req.chequeDetails.number || "-"}</div>
-                              <div>Bank: {req.chequeDetails.bank || "-"}</div>
-                              <div>Date: {req.chequeDetails.date ? new Date(req.chequeDetails.date).toLocaleDateString() : "-"}</div>
-                            </div>
-                          ) : "-"}
-                        </td>
-                        <td>{new Date(req.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          <span className={`status-badge status-${req.status}`}>
-                            {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                          </span>
-                        </td>
-                        <td>
-                          {req.status === "pending" && (
-                            <div className="action-buttons">
-                              <button
-                                className="accept-btn"
-                                onClick={() => handleAcceptClick(req._id)}
-                                disabled={processingId === req._id}
-                              >
-                                Accept
-                              </button>
-                              <button
-                                className="reject-btn"
-                                onClick={() => handleRejectClick(req._id)}
-                                disabled={processingId === req._id}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredChequeRequests.map((req, idx) => {
+                      // ✅✅✅ USE ORDER'S INVOICE NUMBER (DEL-XX) ✅✅✅
+                      const invoiceNo = req.bill?.invoiceNumber || req.bill?.orders?.[0]?.invoiceNumber || "N/A";
+                      
+                      return (
+                        <tr key={req._id} className={selectedChequeRequests.includes(req._id) ? "selected-row" : ""}>
+                          <td className="checkbox-col">
+                            <input
+                              type="checkbox"
+                              checked={selectedChequeRequests.includes(req._id)}
+                              onChange={() => handleChequeRequestSelect(req._id)}
+                              disabled={req.status !== "pending"}
+                            />
+                          </td>
+                          <td>{idx + 1}</td>
+                          <td>{req.customer?.name || "—"}</td>
+                          
+                          {/* ✅✅✅ SHOW INVOICE # INSTEAD OF BILL ID ✅✅✅ */}
+                          <td>
+                            <strong className="invoice-number-cell">{invoiceNo}</strong>
+                          </td>
+                          
+                          <td>{req.amount.toFixed(2)}</td>
+                          <td>
+                            {req.chequeDetails ? (
+                              <div className="cheque-info">
+                                <div><strong>No:</strong> {req.chequeDetails.number || "—"}</div>
+                                <div><strong>Bank:</strong> {req.chequeDetails.bank || "—"}</div>
+                                <div><strong>Date:</strong> {req.chequeDetails.date ? new Date(req.chequeDetails.date).toLocaleDateString() : "—"}</div>
+                              </div>
+                            ) : "-"}
+                          </td>
+                          <td>{new Date(req.createdAt).toLocaleDateString()}</td>
+                          <td>
+                            <span className={`status-badge status-${req.status}`}>
+                              {req.status}
+                            </span>
+                          </td>
+                          <td>
+                            {req.status === "pending" && (
+                              <div className="action-buttons">
+                                <button className="accept-btn" onClick={() => handleAcceptClick(req._id)}>
+                                  Accept
+                                </button>
+                                <button className="reject-btn" onClick={() => handleRejectClick(req._id)}>
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </>
-          )}
+            )}
+          </div>
+
         </div>
       </main>
 
-      {/* Confirmation Modal */}
+      {/* ─── Modals ──────────────────────────────────────────────────── */}
+      {/* Confirmation Modal (single) */}
       {showConfirmModal && (
         <div className="confirm-modal-overlay">
           <div className="confirm-modal">
             <h3>
-              {confirmAction === "accept" ? "Accept Payment Request" :
-               confirmAction === "reject" ? "Reject Payment Request" :
-               "Confirm Pay to Admin"}
+              {confirmAction === "accept" ? "Accept Payment" :
+               confirmAction === "reject" ? "Reject Payment" :
+               "Pay to Admin"}
             </h3>
             <p>
-              {confirmAction === "accept" ? "Are you sure you received this payment?" :
+              {confirmAction === "accept" ? "Confirm you received this payment?" :
                confirmAction === "reject" ? "Are you sure you want to reject?" :
-               "Have you handed over this amount to admin?"}
+               "Confirm you sent this to admin?"}
             </p>
             <div className="confirm-actions">
-              <button className="cancel-btn" onClick={() => setShowConfirmModal(false)}>
-                Cancel
-              </button>
+              <button className="confirm-cancel" onClick={() => setShowConfirmModal(false)}>Cancel</button>
               <button
-                className={
-                  confirmAction === "accept" ? "accept-btn" :
-                  confirmAction === "reject" ? "reject-btn" :
-                  "pay-admin-btn"
-                }
+                className={`confirm-${confirmAction}`}
                 onClick={confirmActionHandler}
                 disabled={processingId === itemToProcess}
               >
                 {processingId === itemToProcess ? "Processing..." :
-                 confirmAction === "accept" ? "Accept" :
-                 confirmAction === "reject" ? "Reject" : "Yes, Pay to Admin"}
+                 confirmAction === "accept" ? "Yes, Accept" :
+                 confirmAction === "reject" ? "Yes, Reject" :
+                 "Yes, Send"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Mark Received Modal */}
+      {showMarkModal && billToMark && (
+        <div className="pay-modal-overlay">
+          <div className="pay-modal">
+            <h3>Mark Bill as Received</h3>
+            <div className="pay-modal-info">
+              <p><strong>Due:</strong> AED {billToMark.amountDue.toFixed(2)}</p>
+            </div>
+            <div className="pay-modal-input-group">
+              <label>Amount Received</label>
+              <input
+                type="number"
+                step="0.01"
+                value={markAmount}
+                onChange={e => setMarkAmount(e.target.value)}
+                className="pay-modal-input"
+              />
+            </div>
+            <div className="pay-modal-input-group">
+              <label>Method</label>
+              <select value={markMethod} onChange={e => setMarkMethod(e.target.value)} className="pay-modal-select">
+                <option value="cash">Cash</option>
+                <option value="cheque">Cheque</option>
+              </select>
+            </div>
+            {markMethod === "cheque" && (
+              <div className="pay-modal-cheque-group">
+                <input placeholder="Cheque No" value={markChequeDetails.number} onChange={e => setMarkChequeDetails({...markChequeDetails, number: e.target.value})} />
+                <input placeholder="Bank" value={markChequeDetails.bank} onChange={e => setMarkChequeDetails({...markChequeDetails, bank: e.target.value})} />
+                <input type="date" value={markChequeDetails.date} onChange={e => setMarkChequeDetails({...markChequeDetails, date: e.target.value})} />
+              </div>
+            )}
+            <div className="pay-modal-actions">
+              <button className="pay-modal-cancel" onClick={() => setShowMarkModal(false)}>Cancel</button>
+              <button className="pay-modal-confirm" onClick={confirmMarkReceived} disabled={processingId}>
+                {processingId ? "Processing..." : "Mark Received"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Mark Received Modal */}
+      {showBulkMarkModal && (
+        <div className="pay-modal-overlay">
+          <div className="pay-modal bulk-modal">
+            <h3>Mark {selectedPendingBills.length} Bills as Received</h3>
+            <div className="pay-modal-info">
+              <p>Total: AED {pendingBills.filter(b => selectedPendingBills.includes(b._id)).reduce((s, b) => s + b.amountDue, 0).toFixed(2)}</p>
+            </div>
+            <div className="pay-modal-input-group">
+              <label>Method (for all)</label>
+              <select value={bulkMarkMethod} onChange={e => setBulkMarkMethod(e.target.value)} className="pay-modal-select">
+                <option value="cash">Cash</option>
+                <option value="cheque">Cheque</option>
+              </select>
+            </div>
+            {bulkMarkMethod === "cheque" && (
+              <div className="pay-modal-cheque-group">
+                <input placeholder="Cheque No Prefix" value={bulkMarkChequeDetails.number} onChange={e => setBulkMarkChequeDetails({...bulkMarkChequeDetails, number: e.target.value})} />
+                <input placeholder="Bank" value={bulkMarkChequeDetails.bank} onChange={e => setBulkMarkChequeDetails({...bulkMarkChequeDetails, bank: e.target.value})} />
+                <input type="date" value={bulkMarkChequeDetails.date} onChange={e => setBulkMarkChequeDetails({...bulkMarkChequeDetails, date: e.target.value})} />
+              </div>
+            )}
+            <div className="pay-modal-actions">
+              <button className="pay-modal-cancel" onClick={() => setShowBulkMarkModal(false)}>Cancel</button>
+              <button className="pay-modal-confirm" onClick={confirmBulkMarkReceived} disabled={bulkProcessing}>
+                {bulkProcessing ? "Processing..." : "Mark All as Received"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Pay to Admin Modal */}
+      {showBulkPayModal && (
+        <div className="pay-modal-overlay">
+          <div className="pay-modal bulk-modal">
+            <h3>Pay {selectedWalletTx.length} to Admin</h3>
+            <div className="pay-modal-info">
+              <p>Total: AED {filteredWalletTx.filter(tx => selectedWalletTx.includes(tx._id)).reduce((s, tx) => s + tx.amount, 0).toFixed(2)}</p>
+            </div>
+            <div className="pay-modal-actions">
+              <button className="pay-modal-cancel" onClick={() => setShowBulkPayModal(false)}>Cancel</button>
+              <button className="pay-modal-confirm" onClick={confirmBulkPayToAdmin} disabled={bulkProcessing}>
+                {bulkProcessing ? "Processing..." : "Send to Admin"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Accept/Reject Requests Modal */}
+      {showBulkRequestModal && (
+        <div className="confirm-modal-overlay">
+          <div className="confirm-modal bulk-modal">
+            <h3>{bulkRequestAction === "accept" ? "Accept Selected Requests?" : "Reject Selected Requests?"}</h3>
+            <p>Are you sure you want to {bulkRequestAction} the selected payment requests?</p>
+            <p className="text-muted small">
+              Selected: {selectedCashRequests.length} cash + {selectedChequeRequests.length} cheque
+            </p>
+            <div className="confirm-actions">
+              <button className="confirm-cancel" onClick={() => setShowBulkRequestModal(false)}>Cancel</button>
+              <button
+                className="confirm-confirm"
+                onClick={confirmBulkRequestAction}
+                disabled={bulkProcessing}
+              >
+                {bulkProcessing ? "Processing..." : bulkRequestAction === "accept" ? "Yes, Accept All" : "Yes, Reject All"}
               </button>
             </div>
           </div>

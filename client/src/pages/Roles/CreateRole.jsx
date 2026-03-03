@@ -51,6 +51,7 @@ const CreateRole = () => {
     CustomerCreditLimit: "menu.customer.credit.limit",
     CreateCustomerRequest: "menu.customer.requests.create",
     MyCustomerRequests: "menu.customer.requests.my",
+    SalesmanCustomers: "menu.customers.salesman",
     Settings: "menu.settings",
     CashWallet: "menu.CashWallet",  
     ChequeWallet: "menu.ChequeWallet",  
@@ -58,10 +59,11 @@ const CreateRole = () => {
     paymentRequestsdelivery: "menu.paymentRequestsdelivery",
     paymentRequestssales: "menu.paymentRequestssales",
     storekeeperpacked: "menu.storekeeper.packed.orders",
-   
-      SalesPendingOrders: "menu.PendingOrders",
-      SalesOutstandingReport: "menu.OutstandingReport"
-    
+    SalesPendingOrders: "menu.PendingOrders",
+      SalesOutstandingReport: "menu.OutstandingReport",
+      SalesReceiptReport: "menu.ReceiptReport",
+      StorekeeperOrders: "menu.storekeeper.all-orders"
+      
 
 
 

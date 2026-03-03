@@ -6,16 +6,19 @@ const getMyTransactions = async (req, res) => {
   try {
     const transactions = await BillTransaction.find({ recipient: req.user._id })
       .populate("customer", "name")
-      .populate("bill", "amountDue status")
-      .populate("order", "invoiceNumber")
+      .populate("bill", "amountDue status invoiceNumber")  // ✅ Include invoiceNumber
+      .populate({
+        path: "order",  // ✅ Populate order to get invoiceNumber
+        select: "invoiceNumber"
+      })
       .sort({ createdAt: -1 });
+    
     res.json(transactions);
   } catch (error) {
     console.error("Get my transactions error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 const payToAdmin = async (req, res) => {
   try {
     const { id } = req.params;

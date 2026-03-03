@@ -697,3 +697,45 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 .bulk-accept-btn:hover, .bulk-reject-btn:hover {
   opacity: 0.9;
 }
+/* Add to PaymentRequests.css */
+
+.invoice-number-cell {
+  font-family: monospace;
+  font-weight: 600;
+  color: #0f172a;
+  background: #f1f5f9;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.invoice-number-cell:hover {
+  background: #e2e8f0;
+}
+
+/* Ensure table column has proper width */
+.requests-table td:nth-child(4),
+.requests-table th:nth-child(4) {
+  min-width: 120px;
+  text-align: center;
+}
+
+/* Receipt download button */
+.download-receipt-btn {
+  background: #f1f5f9;
+  color: #4f46e5;
+  border: 1px solid #cbd5e1;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-left: 0.5rem;
+  transition: all 0.2s;
+}
+
+.download-receipt-btn:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #4338ca;
+}

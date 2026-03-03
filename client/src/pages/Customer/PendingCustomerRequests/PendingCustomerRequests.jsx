@@ -165,6 +165,10 @@ const PendingCustomerRequests = () => {
                       <th scope="col">Phone</th>
                       <th scope="col">Credit Limit</th>
                       <th scope="col">Billing Type</th>
+                      <th scope="col">Statement Type</th>
+                      <th scope="col">Due Days</th>
+                      <th scope="col">Opening Balance</th>
+                      <th scope="col">Opening Due Days</th>
                       <th scope="col">Salesman</th>
                       <th scope="col">Created At</th>
                       <th scope="col">Actions</th>
@@ -179,6 +183,23 @@ const PendingCustomerRequests = () => {
                         <td>{request.phoneNumber}</td>
                         <td>AED{request.creditLimit.toFixed(2)}</td>
                         <td>{request.billingType}</td>
+                        <td>
+                          {request.statementType
+                            ? request.statementType.charAt(0).toUpperCase() +
+                              request.statementType.slice(1)
+                            : "-"}
+                        </td>
+                        <td>{request.dueDays || "-"}</td>
+                        <td>
+                          {request.openingBalance > 0
+                            ? `AED${request.openingBalance.toFixed(2)}`
+                            : "-"}
+                        </td>
+                        <td>
+                          {request.openingBalanceDueDays
+                            ? `${request.openingBalanceDueDays} days`
+                            : "-"}
+                        </td>
                         <td>{request.salesman?.username || 'Unknown'}</td>
                         <td>{new Date(request.createdAt).toLocaleDateString()}</td>
                         <td>

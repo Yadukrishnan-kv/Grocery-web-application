@@ -126,7 +126,7 @@ const getPermissions = async (req, res) => {
         expandedPermissions.push("menu.customer.credit.limit");
       }
       else if (permission === "menu.customer.requests") {
-        expandedPermissions.push("menu.customer.requests.create", "menu.customer.requests.my");
+        expandedPermissions.push("menu.customer.requests.create", "menu.customer.requests.my", "menu.customers.salesman");
       }
       else if (permission === "menu.CashWallet") {
         expandedPermissions.push("menu.CashWallet");
@@ -143,6 +143,12 @@ const getPermissions = async (req, res) => {
       }
         else if (permission === "menu.OutstandingReport") {
         expandedPermissions.push("menu.OutstandingReport");
+      }
+        else if (permission === "menu.ReceiptReport") {
+        expandedPermissions.push("menu.ReceiptReport");
+      }
+      else if (permission === "menu.storekeeper.all-orders") {
+        expandedPermissions.push("menu.storekeeper.all-orders");
       }
       
       

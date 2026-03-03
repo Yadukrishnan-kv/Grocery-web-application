@@ -19,6 +19,7 @@ const createCustomer = async (req, res) => {
       dueDays,
       openingBalance = 0,
       openingBalanceDueDays,
+      salesmanId,
     } = req.body;
 
     // Validation
@@ -99,6 +100,7 @@ const createCustomer = async (req, res) => {
       openingBalance: parsedOpeningBalance,
       openingBalanceDueDays: parsedOpeningBalanceDueDays,
       user: user._id,
+      salesman: salesmanId || null,
     });
 
     // Create bill for opening balance if applicable
@@ -375,6 +377,8 @@ const createCustomerRequest = async (req, res) => {
       billingType = "Credit limit",
       statementType,  // NEW
       dueDays,        // NEW
+      openingBalance = 0,
+      openingBalanceDueDays,
     } = req.body;
 
     // Validation
@@ -408,6 +412,16 @@ const createCustomerRequest = async (req, res) => {
       parsedDueDays = parseInt(dueDays);
     }
 
+    // Opening balance validation
+    const parsedOpeningBalance = parseFloat(openingBalance) || 0;
+    let parsedOpeningBalanceDueDays = null;
+    if (parsedOpeningBalance > 0) {
+      if (!openingBalanceDueDays || isNaN(openingBalanceDueDays) || parseInt(openingBalanceDueDays) < 0) {
+        return res.status(400).json({ message: "Valid due days required for opening balance > 0" });
+      }
+      parsedOpeningBalanceDueDays = parseInt(openingBalanceDueDays);
+    }
+
     // Check duplicates
     const existingCustomer = await Customer.findOne({ email: email.trim().toLowerCase() });
     const existingRequest = await CustomerRequest.findOne({
@@ -428,6 +442,8 @@ const createCustomerRequest = async (req, res) => {
       billingType,
       statementType: parsedStatementType,  // NEW
       dueDays: parsedDueDays,              // NEW
+      openingBalance: parsedOpeningBalance,
+      openingBalanceDueDays: parsedOpeningBalanceDueDays,
       salesman: req.user._id,
     });
 
@@ -510,11 +526,42 @@ const acceptCustomerRequest = async (req, res) => {
       address: request.address,
       pincode: request.pincode,
       creditLimit: request.creditLimit,
-      balanceCreditLimit: request.creditLimit,
+      balanceCreditLimit: request.creditLimit - (request.openingBalance || 0),
       billingType: request.billingType,
       statementType: request.statementType,  // NEW — copy from request
       dueDays: request.dueDays,              // NEW — copy from request
+      openingBalance: request.openingBalance || 0,
+      openingBalanceDueDays: request.openingBalanceDueDays || null,
+      salesman: request.salesman,            // NEW — copy from request
     });
+
+    // Create bill for opening balance if applicable
+    if ((request.openingBalance || 0) > 0 && request.openingBalanceDueDays) {
+      const openingDueDate = new Date();
+      openingDueDate.setDate(openingDueDate.getDate() + request.openingBalanceDueDays);
+
+      // Generate OB invoice number: OB-YYYYMMDD-XXXX
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const timestamp = String(now.getTime()).slice(-4); // Last 4 digits of timestamp
+      const invoiceNumber = `OB-${year}${month}${day}-${timestamp}`;
+
+      await Bill.create({
+        customer: customer._id,
+        cycleStart: new Date(),
+        cycleEnd: new Date(),
+        totalUsed: request.openingBalance,
+        amountDue: request.openingBalance,
+        dueDate: openingDueDate,
+        paidAmount: 0,
+        status: "pending",
+        orders: [],
+        invoiceNumber,
+        isOpeningBalance: true,
+      });
+    }
 
     request.status = "accepted";
     await request.save();
@@ -533,11 +580,10 @@ const acceptCustomerRequest = async (req, res) => {
         billingType: customer.billingType,
         statementType: customer.statementType,  // NEW
         dueDays: customer.dueDays,              // NEW
+        openingBalance: customer.openingBalance,
+        openingBalanceDueDays: customer.openingBalanceDueDays,
         createdAt: customer.createdAt,
       },
-      
-
-   
     }
 
     res.status(201).json(responseData);
@@ -583,7 +629,9 @@ function getDaysRemaining(dueDate) {
 
 const getAllCustomersWithDue = async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ name: 1 });
+    const customers = await Customer.find()
+      .populate("salesman", "username email")
+      .sort({ name: 1 });
 
     const customersWithDue = await Promise.all(
       customers.map(async (customer) => {
@@ -611,6 +659,259 @@ const getAllCustomersWithDue = async (req, res) => {
   }
 };
 
+// NEW: Get all customers for a salesman
+const getMyCustomers = async (req, res) => {
+  try {
+    // If user is salesman, get customers assigned to them
+    if (req.user.role !== "Sales man") {
+      return res.status(403).json({ message: "Only salesmen can access this" });
+    }
+
+    const customers = await Customer.find({ salesman: req.user._id })
+      .sort({ name: 1 });
+
+    res.json(customers);
+  } catch (error) {
+    console.error("Error in getMyCustomers:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// NEW: Get all customers with outstanding balances for a salesman
+const getMyCustomersWithDue = async (req, res) => {
+  try {
+    if (req.user.role !== "Sales man") {
+      return res.status(403).json({ message: "Only salesmen can access this" });
+    }
+
+    const customers = await Customer.find({ salesman: req.user._id })
+      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType openingBalance')
+      .sort({ name: 1 });
+
+    const customersWithDetails = await Promise.all(
+      customers.map(async (customer) => {
+        // Get latest pending bill for due date info
+        const latestPendingBill = await Bill.findOne({
+          customer: customer._id,
+          status: "pending"
+        }).sort({ cycleEnd: -1 });
+
+        // Get total outstanding amount from all pending bills
+        const pendingBills = await Bill.find({
+          customer: customer._id,
+          status: "pending"
+        });
+        
+        const totalOutstanding = pendingBills.reduce((sum, bill) => 
+          sum + (bill.amountDue - bill.paidAmount), 0);
+
+        const daysLeft = latestPendingBill
+          ? Math.ceil((new Date(latestPendingBill.dueDate) - new Date()) / (1000 * 60 * 60 * 24))
+          : null;
+
+        return {
+          _id: customer._id,
+          name: customer.name,
+          email: customer.email,
+          phoneNumber: customer.phoneNumber,
+          address: customer.address,
+          pincode: customer.pincode,
+          creditLimit: customer.creditLimit,
+          balanceCreditLimit: customer.balanceCreditLimit,
+          usedCredit: customer.creditLimit - customer.balanceCreditLimit,
+          billingType: customer.billingType,
+          openingBalance: customer.openingBalance,
+          totalOutstanding,
+          pendingBillDaysLeft: daysLeft,
+          pendingDueDate: latestPendingBill?.dueDate,
+          createdAt: customer.createdAt
+        };
+      })
+    );
+
+    res.json(customersWithDetails);
+  } catch (error) {
+    console.error("Error in getMyCustomersWithDue:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const getCustomerOutstandingDetails = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    
+    // Verify salesman can only access their assigned customers
+    if (req.user.role === "Sales man") {
+      const customer = await Customer.findOne({ 
+        _id: customerId, 
+        salesman: req.user._id 
+      });
+      if (!customer) {
+        return res.status(403).json({ message: "Access denied - Customer not assigned to you" });
+      }
+    }
+
+    // Fetch customer with full details
+    const customer = await Customer.findById(customerId)
+      .populate("salesman", "username email");
+    
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    // Fetch all pending bills for this customer
+    const pendingBills = await Bill.find({
+      customer: customerId,
+      status: { $in: ["pending", "overdue", "partial", "pending_payment"] }
+    })
+    .populate({
+      path: "orders",
+      populate: {
+        path: "orderItems.product",
+        select: "productName unit"
+      }
+    })
+    .sort({ dueDate: 1 });
+
+    // Calculate totals
+    const totalOutstanding = pendingBills.reduce((sum, bill) => 
+      sum + (bill.amountDue - bill.paidAmount), 0);
+    
+    const totalBills = pendingBills.length;
+    const overdueBills = pendingBills.filter(bill => 
+      bill.status === "overdue" || new Date() > new Date(bill.dueDate)
+    ).length;
+
+    // Format bills with computed fields
+    const formattedBills = pendingBills.map(bill => {
+      const remainingDue = bill.amountDue - bill.paidAmount;
+      const daysLeft = Math.ceil((new Date(bill.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+      
+      return {
+        _id: bill._id,
+        invoiceNumber: bill.invoiceNumber || `BILL-${bill._id.toString().slice(-8)}`,
+        cycleStart: bill.cycleStart,
+        cycleEnd: bill.cycleEnd,
+        totalUsed: bill.totalUsed,
+        amountDue: bill.amountDue,
+        paidAmount: bill.paidAmount,
+        remainingDue,
+        dueDate: bill.dueDate,
+        status: bill.status,
+        daysLeft,
+        isOpeningBalance: bill.isOpeningBalance,
+        orders: bill.orders.map(order => ({
+          _id: order._id,
+          invoiceNumber: order.invoiceNumber,
+          orderDate: order.orderDate,
+          status: order.status,
+          payment: order.payment,
+          totalAmount: order.orderItems?.reduce((sum, item) => 
+            sum + (item.totalAmount || item.price * item.orderedQuantity), 0) || 0,
+          items: order.orderItems?.map(item => ({
+            product: item.product?.productName || "Unknown",
+            unit: item.product?.unit || "",
+            orderedQuantity: item.orderedQuantity,
+            deliveredQuantity: item.deliveredQuantity,
+            price: item.price,
+            totalAmount: item.totalAmount
+          })) || []
+        }))
+      };
+    });
+
+    res.json({
+      customer: {
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        phoneNumber: customer.phoneNumber,
+        address: customer.address,
+        pincode: customer.pincode,
+        creditLimit: customer.creditLimit,
+        balanceCreditLimit: customer.balanceCreditLimit,
+        usedCredit: customer.creditLimit - customer.balanceCreditLimit,
+        billingType: customer.billingType,
+        statementType: customer.statementType,
+        dueDays: customer.dueDays,
+        openingBalance: customer.openingBalance,
+        salesman: customer.salesman
+      },
+      summary: {
+        totalOutstanding,
+        totalBills,
+        overdueBills,
+        availableCredit: customer.balanceCreditLimit
+      },
+      bills: formattedBills
+    });
+
+  } catch (error) {
+    console.error("Error fetching customer outstanding details:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const getCustomerReceipts = async (req, res) => {
+  try {
+    if (req.user.role !== "Sales man") {
+      return res.status(403).json({ message: "Only salesmen can access this" });
+    }
+
+    // Get all customers assigned to this salesman
+    const myCustomers = await Customer.find({ salesman: req.user._id })
+      .select("_id name email phoneNumber");
+    
+    const customerIds = myCustomers.map(c => c._id);
+    
+    if (customerIds.length === 0) {
+      return res.json([]);
+    }
+
+    // Fetch PAID bills for these customers
+    const paidBills = await Bill.find({
+      customer: { $in: customerIds },
+      status: "paid"
+    })
+    .populate("customer", "name email phoneNumber")
+    .populate("orders", "invoiceNumber orderDate totalAmount")
+    .sort({ updatedAt: -1 });
+
+    // Format receipts with summary
+    const receipts = paidBills.map(bill => {
+      const paidDate = bill.updatedAt || bill.createdAt;
+      const totalPaid = bill.paidAmount || bill.amountDue;
+      
+      return {
+        _id: bill._id,
+        billId: bill._id,
+        invoiceNumber: bill.invoiceNumber || `BILL-${bill._id.toString().slice(-8)}`,
+        customer: bill.customer,
+        cycleStart: bill.cycleStart,
+        cycleEnd: bill.cycleEnd,
+        totalUsed: bill.totalUsed,
+        amountDue: bill.amountDue,
+        paidAmount: bill.paidAmount,
+        paidDate,
+        dueDate: bill.dueDate,
+        status: bill.status,
+        isOpeningBalance: bill.isOpeningBalance,
+        orderCount: bill.orders?.length || 0,
+        orders: bill.orders?.map(order => ({
+          _id: order._id,
+          invoiceNumber: order.invoiceNumber,
+          orderDate: order.orderDate,
+          totalAmount: order.totalAmount
+        })) || []
+      };
+    });
+
+    res.json(receipts);
+  } catch (error) {
+    console.error("Error fetching customer receipts:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 module.exports = {
   createCustomer,
@@ -625,5 +926,9 @@ module.exports = {
   getPendingCustomerRequests,
   acceptCustomerRequest,
   rejectCustomerRequest,
-  getAllCustomersWithDue
+  getAllCustomersWithDue,
+  getMyCustomers,
+  getMyCustomersWithDue,
+  getCustomerOutstandingDetails,
+  getCustomerReceipts
 };

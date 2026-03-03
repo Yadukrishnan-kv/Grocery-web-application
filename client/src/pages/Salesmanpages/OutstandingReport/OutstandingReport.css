@@ -741,3 +741,10 @@ th:nth-child(7), td:nth-child(7) { width: 130px; } /* Final Total */
     height: 14px;
   }
 }
+
+/* Add to OutstandingReport.css for row hover effect */
+.order-list-data-table tbody tr.clickable-row:hover {
+  background-color: #f1f5f9;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}

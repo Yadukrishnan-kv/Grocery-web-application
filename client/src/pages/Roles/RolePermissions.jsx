@@ -53,6 +53,7 @@ const RolePermissions = () => {
     Settings: "menu.settings",
     CreateCustomerRequest: "menu.customer.requests.create",
     MyCustomerRequests: "menu.customer.requests.my",
+    SalesmanCustomers: "menu.customers.salesman",
     CashWallet: "menu.CashWallet",  
     ChequeWallet: "menu.ChequeWallet",  
     WalletMoney: "menu.wallet.money",
@@ -61,7 +62,10 @@ const RolePermissions = () => {
     storekeeperpacked: "menu.storekeeper.packed.orders"  
     ,
     SalesPendingOrders: "menu.PendingOrders",
-    SalesOutstandingReport: "menu.OutstandingReport"
+    SalesOutstandingReport: "menu.OutstandingReport",
+    SalesReceiptReport: "menu.ReceiptReport",
+    StorekeeperOrders: "menu.storekeeper.all-orders"
+
   };
 
   const fetchRole = useCallback(async () => {

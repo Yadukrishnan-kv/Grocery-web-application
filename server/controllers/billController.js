@@ -73,7 +73,16 @@ const getBillById = async (req, res) => {
   try {
     const bill = await Bill.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit billingType")
-      .populate("orders", "product orderedQuantity totalAmount orderDate");
+      .populate({
+        path: "orders",
+        populate: {
+          path: "orderItems.product",
+          select: "productName price unit"
+        },
+        // ✅✅✅ INCLUDE invoiceNumber IN ORDER POPULATION ✅✅✅
+        select: "invoiceNumber orderDate totalAmount orderItems status payment"
+      });
+
     if (!bill) {
       return res.status(404).json({ message: "Bill not found" });
     }
@@ -86,10 +95,9 @@ const getBillById = async (req, res) => {
 
     res.json(bill);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 const getCustomerBills = async (req, res) => {
   try {
     if (!req.user || req.user.role !== "Customer") {
@@ -153,10 +161,9 @@ const createInvoiceBasedBill = async (order) => {
   try {
     const customer = await Customer.findById(order.customer);
     if (!customer || customer.statementType !== "invoice-based") {
-      return null; // Not invoice-based → skip
+      return null;
     }
 
-    // Calculate total used (only delivered quantity!)
     const totalUsed = order.orderItems.reduce((sum, item) => {
       const deliveredQty = item.deliveredQuantity || item.orderedQuantity || 0;
       return sum + (deliveredQty * item.price);
@@ -168,35 +175,34 @@ const createInvoiceBasedBill = async (order) => {
     }
 
     const deliveryDate = order.deliveredAt || new Date();
-
-    // Due date based on customer's dueDays
     const dueDate = new Date(deliveryDate);
     if (customer.dueDays) {
       dueDate.setDate(dueDate.getDate() + customer.dueDays);
     }
 
-    // Step 1: Check if bill already exists for this order
+    // Check if bill already exists for this order
     const existingBill = await Bill.findOne({ orders: order._id });
     if (existingBill) {
-      // ✅ Update existing bill with new delivered amount (for partial deliveries)
       const previousTotalUsed = existingBill.totalUsed || 0;
       const paidAlready = existingBill.paidAmount || 0;
-      
-      // New delivery amount = current totalUsed - previous totalUsed
       const additionalAmount = totalUsed - previousTotalUsed;
-      
+
       existingBill.totalUsed = totalUsed;
       existingBill.amountDue = totalUsed - paidAlready;
-      existingBill.cycleEnd = deliveryDate; // Update end date to latest delivery
+      existingBill.cycleEnd = deliveryDate;
+      
+      // ✅✅✅ SYNC INVOICE NUMBER FROM ORDER TO BILL ✅✅✅
+      if (!existingBill.invoiceNumber && order.invoiceNumber) {
+        existingBill.invoiceNumber = order.invoiceNumber;
+      }
+      
       existingBill.status = existingBill.amountDue <= 0 ? "paid" : "pending";
-      
       await existingBill.save();
-      
-      console.log(`✅ Bill updated for order ${order._id} with additional delivery: +${additionalAmount.toFixed(2)} AED`);
+      console.log(`✅ Bill updated for order ${order._id}`);
       return existingBill;
     }
 
-    // Step 2: Create new bill if it doesn't exist
+    // ✅✅✅ USE ORDER'S INVOICE NUMBER FOR NEW BILL ✅✅✅
     const bill = await Bill.create({
       customer: order.customer,
       cycleStart: deliveryDate,
@@ -207,9 +213,10 @@ const createInvoiceBasedBill = async (order) => {
       paidAmount: 0,
       status: "pending",
       orders: [order._id],
+      invoiceNumber: order.invoiceNumber || `BILL-${order._id.toString().slice(-8)}`, // ← FALLBACK
+      isOpeningBalance: false,
     });
 
-    // Link bill back to order (prevents future duplicate checks from failing)
     order.bill = bill._id;
     await order.save();
 
@@ -304,18 +311,25 @@ const getBillReceipt = async (req, res) => {
       return res.status(404).json({ message: "Bill not found" });
     }
 
-    const filename = `receipt_${bill._id.toString().slice(-8)}.pdf`;
+    // Prefer invoiceNumber from bill (which should match order's DEL-XXX)
+    const displayInvoiceNo = bill.invoiceNumber || "N/A";
+
+    // Use meaningful filename
+    const filename = displayInvoiceNo !== "N/A"
+      ? `receipt-${displayInvoiceNo}.pdf`
+      : `receipt_${bill._id.toString().slice(-8)}.pdf`;
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
     const doc = new PDFDocument({ size: "A4", margin: 50 });
     doc.pipe(res);
 
-    // ─── Receipt Content (Bill Details Only) ────────────────────────
     const pageWidth = doc.page.width;
     const margin = 50;
+    const contentWidth = pageWidth - margin * 2;
 
-    // Title
+    // ─── Title ───────────────────────────────────────────────────────
     doc
       .fontSize(24)
       .font("Helvetica-Bold")
@@ -324,45 +338,90 @@ const getBillReceipt = async (req, res) => {
 
     doc.moveDown(0.5);
 
-    // Receipt & Date
+    // ─── Receipt & Date ──────────────────────────────────────────────
     doc
       .fontSize(12)
       .font("Helvetica")
-      .text(`Receipt No: REC-${bill._id.toString().slice(-8)}`, { align: "center" })
-      .text(`Date: ${new Date(bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString()}`, { align: "center" });
+      .text(`Receipt No: REC-${displayInvoiceNo}`, { align: "center" })
+      .text(
+        `Date: ${new Date(bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString()}`,
+        { align: "center" }
+      );
 
     doc.moveDown(1.5);
 
-    // Customer Details
+    // ─── Customer Details ────────────────────────────────────────────
     doc
       .fontSize(14)
       .font("Helvetica-Bold")
       .text("Customer Details:");
+
     doc
       .fontSize(12)
       .font("Helvetica")
       .text(`Name: ${bill.customer?.name || "N/A"}`)
       .text(`Phone: ${bill.customer?.phoneNumber || "N/A"}`)
       .text(`Address: ${bill.customer?.address || "N/A"}`)
-      .text(`Pincode: ${bill.customer?.pincode || "N/A"}`)
-      .moveDown(1);
+      .text(`Pincode: ${bill.customer?.pincode || "N/A"}`);
 
-    // Bill Summary
+    doc.moveDown(1.5);
+
+    // ─── Bill Summary ────────────────────────────────────────────────
     doc
       .fontSize(14)
       .font("Helvetica-Bold")
       .text("Bill Summary:");
+
+    doc.moveDown(0.5);
+
+    const summaryStartY = doc.y;
+    const labelX = margin + 20;
+    const valueX = margin + 220;
+
     doc
       .fontSize(12)
-      .font("Helvetica")
-      .text(`Bill ID: ${bill._id.toString().slice(-8)}`)
-      .text(`Total Amount Due: AED ${bill.amountDue?.toFixed(2) || "0.00"}`)
-      .text(`Paid Amount: AED ${bill.paidAmount?.toFixed(2) || "0.00"}`)
-      .text(`Remaining Due: AED ${bill.amountDue?.toFixed(2) || "0.00"}`)
-      .moveDown(1);
+      .font("Helvetica-Bold")
+      .text("Invoice Number:", labelX, summaryStartY);
 
-    // Footer
-    doc.moveDown(3);
+    doc
+      .font("Helvetica")
+      .text(displayInvoiceNo, valueX, summaryStartY);
+
+    doc.moveDown(0.8);
+
+    doc
+      .font("Helvetica-Bold")
+      .text("Total Amount of Bill:", labelX, doc.y);
+
+    doc
+      .font("Helvetica")
+      .text(`AED ${bill.totalUsed?.toFixed(2) || "0.00"}`, valueX, doc.y);
+
+    doc.moveDown(0.8);
+
+    doc
+      .font("Helvetica-Bold")
+      .text("Paid Amount:", labelX, doc.y);
+
+    doc
+      .font("Helvetica")
+      .text(`AED ${bill.paidAmount?.toFixed(2) || "0.00"}`, valueX, doc.y);
+
+    doc.moveDown(0.8);
+
+    doc
+      .font("Helvetica-Bold")
+      .text("Remaining Due:", labelX, doc.y);
+
+    const remaining = bill.amountDue?.toFixed(2) || "0.00";
+    doc
+      .font("Helvetica")
+      .fillColor(remaining === "0.00" ? "#16a34a" : "#dc2626")
+      .text(`AED ${remaining}`, valueX, doc.y);
+
+    doc.moveDown(2);
+
+    // ─── Footer ──────────────────────────────────────────────────────
     doc
       .fontSize(10)
       .font("Helvetica-Oblique")
@@ -372,13 +431,13 @@ const getBillReceipt = async (req, res) => {
 
     doc.end();
 
-    console.log(`Receipt generated for bill ${bill._id}`);
+    console.log(`Receipt generated for bill ${bill._id} (Invoice: ${displayInvoiceNo})`);
   } catch (error) {
     console.error("Receipt generation error:", error);
     if (!res.headersSent) {
-      res.status(500).json({ 
-        message: "Failed to generate receipt", 
-        error: error.message 
+      res.status(500).json({
+        message: "Failed to generate receipt",
+        error: error.message,
       });
     }
   }

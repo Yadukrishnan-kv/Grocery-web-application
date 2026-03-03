@@ -390,19 +390,14 @@ const CustomerBillStatement = () => {
                                 <span>
                                   {bill.invoiceNumber || "N/A"}
                                   {bill.isOpeningBalance && (
-                                    <span
-                                      style={{
-                                        marginLeft: "8px",
-                                        backgroundColor: "#FFA500",
-                                        color: "white",
-                                        padding: "2px 6px",
-                                        borderRadius: "3px",
-                                        fontSize: "11px",
-                                        fontWeight: "bold",
-                                      }}
-                                    >
-                                      OB
-                                    </span>
+                                   <span>
+      {bill.invoiceNumber || 
+       bill.orders?.[0]?.invoiceNumber || 
+       `DEL-${bill._id.toString().slice(-8)}`}
+      {bill.isOpeningBalance && (
+        <span style={{ marginLeft: "8px", backgroundColor: "#FFA500", color: "white", padding: "2px 6px", borderRadius: "3px", fontSize: "11px", fontWeight: "bold" }}>OB</span>
+      )}
+    </span>
                                   )}
                                 </span>
                                 {bill.invoiceNumber && bill.status === "paid" && (

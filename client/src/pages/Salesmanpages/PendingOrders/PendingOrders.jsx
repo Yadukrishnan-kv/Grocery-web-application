@@ -39,8 +39,8 @@ const PendingOrders = () => {
         const token = localStorage.getItem("token");
         const backend = process.env.REACT_APP_BACKEND_IP || "";
         const url = backend
-          ? `${backend}/api/orders/pending-for-packing`
-          : `/api/orders/pending-for-packing`;
+          ? `${backend}/api/orders/my-pending-orders`
+          : `/api/orders/my-pending-orders`;
         const res = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
         });
