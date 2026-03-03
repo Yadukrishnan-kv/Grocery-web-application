@@ -106,6 +106,14 @@ const createCustomer = async (req, res) => {
       const openingDueDate = new Date();
       openingDueDate.setDate(openingDueDate.getDate() + parsedOpeningBalanceDueDays);
 
+      // Generate OB invoice number: OB-YYYYMMDD-XXXX
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const timestamp = String(now.getTime()).slice(-4); // Last 4 digits of timestamp
+      const invoiceNumber = `OB-${year}${month}${day}-${timestamp}`;
+
       await Bill.create({
         customer: customer._id,
         cycleStart: new Date(),
@@ -116,6 +124,8 @@ const createCustomer = async (req, res) => {
         paidAmount: 0,
         status: "pending",
         orders: [],
+        invoiceNumber,
+        isOpeningBalance: true,
       });
     }
 

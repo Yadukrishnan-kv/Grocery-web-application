@@ -90,13 +90,10 @@ const orderSchema = new Schema(
       trim: true,
       default: '',
     },
-    deliveredInvoiceNumber: {
+    invoiceNumber: {
       type: String,
       default: null,
-    },
-    pendingInvoiceNumber: {
-      type: String,
-      default: null,
+      index: true,
     },
     packedBy: {
       type: Schema.Types.ObjectId,

@@ -48,6 +48,15 @@ const billSchema = new Schema(
         ref: "Order",
       },
     ],
+    invoiceNumber: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    isOpeningBalance: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

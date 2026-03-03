@@ -205,6 +205,36 @@ const CustomerBillStatement = () => {
     setShowPayModal(true);
   };
 
+  // Handle download invoice
+  const handleDownloadInvoice = async (billId, invoiceNumber) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/bills/invoice/download/${billId}`,
+        {
+          responseType: "blob",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Create blob and download
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `bill-invoice-${invoiceNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Invoice downloaded successfully");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download invoice");
+    }
+  };
+
   // Handle cheque details change
   const handleChequeChange = (field, value) => {
     setChequeDetails((prev) => ({ ...prev, [field]: value }));
@@ -329,6 +359,7 @@ const CustomerBillStatement = () => {
                       <th scope="col">No</th>
                       <th scope="col">Cycle Start</th>
                       <th scope="col">Cycle End</th>
+                      <th scope="col">Invoice #</th>
                       <th scope="col">Total Used</th>
                       <th scope="col">Amount Due</th>
                       <th scope="col">Due Date</th>
@@ -348,6 +379,50 @@ const CustomerBillStatement = () => {
                             <td>{index + 1}</td>
                             <td>{formatDate(bill.cycleStart)}</td>
                             <td>{formatDate(bill.cycleEnd)}</td>
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                }}
+                              >
+                                <span>
+                                  {bill.invoiceNumber || "N/A"}
+                                  {bill.isOpeningBalance && (
+                                    <span
+                                      style={{
+                                        marginLeft: "8px",
+                                        backgroundColor: "#FFA500",
+                                        color: "white",
+                                        padding: "2px 6px",
+                                        borderRadius: "3px",
+                                        fontSize: "11px",
+                                        fontWeight: "bold",
+                                      }}
+                                    >
+                                      OB
+                                    </span>
+                                  )}
+                                </span>
+                                {bill.invoiceNumber && bill.status === "paid" && (
+                                  <button
+                                    onClick={() => handleDownloadInvoice(bill._id, bill.invoiceNumber)}
+                                    style={{
+                                      padding: "4px 8px",
+                                      fontSize: "11px",
+                                      backgroundColor: "#007bff",
+                                      color: "white",
+                                      border: "none",
+                                      borderRadius: "3px",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Download
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                             <td>
                               <div
                                 style={{

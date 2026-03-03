@@ -60,8 +60,8 @@ const RolePermissions = () => {
     paymentRequestssales: "menu.paymentRequestssales",
     storekeeperpacked: "menu.storekeeper.packed.orders"  
     ,
-    SalesPendingOrders: "menu.sales.pending",
-    SalesOutstandingReport: "menu.sales.outstanding",
+    SalesPendingOrders: "menu.PendingOrders",
+    SalesOutstandingReport: "menu.OutstandingReport"
   };
 
   const fetchRole = useCallback(async () => {

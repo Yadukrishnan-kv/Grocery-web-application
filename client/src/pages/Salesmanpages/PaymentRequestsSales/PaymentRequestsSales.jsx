@@ -265,6 +265,7 @@ const PaymentRequestsSales = () => {
                   <th>No</th>
                   <th>Customer</th>
                   <th>Bill ID</th>
+                  <th>Invoice #</th>
                   <th>Amount (AED)</th>
                   <th>Method</th>
                   <th>Received Date</th>
@@ -273,32 +274,36 @@ const PaymentRequestsSales = () => {
                 </tr>
               </thead>
               <tbody>
-                {billTransactions.map((tx, index) => (
-                  <tr key={tx._id}>
-                    <td>{index + 1}</td>
-                    <td>{tx.customer?.name || "N/A"}</td>
-                    <td>{tx.bill?._id?.slice(-8) || "N/A"}</td>
-                    <td>{tx.amount.toFixed(2)}</td>
-                    <td>{tx.method.charAt(0).toUpperCase() + tx.method.slice(1)}</td>
-                    <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
-                    <td>
-                      <span className={`status-badge status-${tx.status}`}>
-                        {tx.status === "received" ? "Pending to Admin" : "Paid to Admin"}
-                      </span>
-                    </td>
-                    <td>
-                      {tx.status === "received" && (
-                        <button
-                          className="pay-admin-btn"
-                          onClick={() => handlePayToAdminClick(tx._id)}
-                          disabled={processingId === tx._id}
-                        >
-                          {processingId === tx._id ? "Sending..." : "Pay to Admin"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {billTransactions.map((tx, index) => {
+                  const invoiceNo = tx.order?.invoiceNumber || tx.invoiceNumber || "N/A";
+                  return (
+                    <tr key={tx._id}>
+                      <td>{index + 1}</td>
+                      <td>{tx.customer?.name || "N/A"}</td>
+                      <td>{tx.bill?._id?.slice(-8) || "N/A"}</td>
+                      <td><strong>{invoiceNo}</strong></td>
+                      <td>{tx.amount.toFixed(2)}</td>
+                      <td>{tx.method.charAt(0).toUpperCase() + tx.method.slice(1)}</td>
+                      <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <span className={`status-badge status-${tx.status}`}>
+                          {tx.status === "received" ? "Pending to Admin" : "Paid to Admin"}
+                        </span>
+                      </td>
+                      <td>
+                        {tx.status === "received" && (
+                          <button
+                            className="pay-admin-btn"
+                            onClick={() => handlePayToAdminClick(tx._id)}
+                            disabled={processingId === tx._id}
+                          >
+                            {processingId === tx._id ? "Sending..." : "Pay to Admin"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

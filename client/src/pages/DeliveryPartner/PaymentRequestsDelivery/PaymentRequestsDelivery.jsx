@@ -719,6 +719,7 @@ const PaymentRequestsDelivery = () => {
                       <th>No</th>
                       <th>Customer</th>
                       <th>Bill ID</th>
+                      <th>Invoice #</th>
                       <th>Amount</th>
                       <th>Method</th>
                       <th>Date</th>
@@ -730,6 +731,7 @@ const PaymentRequestsDelivery = () => {
                     {filteredWalletTx.map((tx, idx) => {
                       const isReady = tx.status === "received";
                       const hasBill = !!tx.bill?._id;
+                      const invoiceNo = tx.order?.invoiceNumber || tx.invoiceNumber || "N/A";
                       return (
                         <tr key={tx._id} className={selectedWalletTx.includes(tx._id) ? "selected-row" : ""}>
                           <td className="checkbox-col">
@@ -743,6 +745,7 @@ const PaymentRequestsDelivery = () => {
                           <td>{idx + 1}</td>
                           <td>{tx.customer?.name || "—"}</td>
                           <td>{tx.bill?._id?.slice(-8) || "—"}</td>
+                          <td><strong>{invoiceNo}</strong></td>
                           <td>{tx.amount.toFixed(2)}</td>
                           <td>{tx.method?.charAt(0).toUpperCase() + tx.method?.slice(1) || "—"}</td>
                           <td>{new Date(tx.createdAt).toLocaleDateString()}</td>

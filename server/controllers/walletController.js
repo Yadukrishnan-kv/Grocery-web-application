@@ -196,7 +196,7 @@ const generatePaymentReceipt = async (req, res) => {
     const transaction = await PaymentTransaction.findById(transactionId)
       .populate({
         path: 'order',
-        select: 'customer orderItems deliveredInvoiceNumber pendingInvoiceNumber payment orderDate _id',
+        select: 'customer orderItems invoiceNumber payment orderDate _id',
         populate: [
           { path: 'customer', select: 'name phoneNumber' }, // Get customer name
         ],
@@ -239,7 +239,7 @@ const generatePaymentReceipt = async (req, res) => {
     // Receipt Details (left-aligned, clean layout)
     doc.fontSize(11).font('Helvetica');
     doc.text(`Receipt No: REC-${transaction._id.toString().slice(-6)}`);
-    doc.text(`Invoice No: ${order.deliveredInvoiceNumber || order.pendingInvoiceNumber || 'N/A'}`);
+    doc.text(`Invoice No: ${order.invoiceNumber || 'N/A'}`);
     doc.text(`Order ID: ${order._id.toString().slice(-8)}`);
     doc.text(`Customer: ${order.customer?.name || 'N/A'}`);
     doc.text(`Delivery Man: ${transaction.deliveryMan?.username || 'N/A'}`);
@@ -281,7 +281,7 @@ const generateBulkPaymentReceipt = async (req, res) => {
     const transactions = await PaymentTransaction.find({ _id: { $in: transactionIds } })
       .populate({
         path: 'order',
-        select: 'customer orderItems deliveredInvoiceNumber pendingInvoiceNumber payment orderDate _id',
+        select: 'customer orderItems invoiceNumber payment orderDate _id',
         populate: { path: 'customer', select: 'name phoneNumber' },
       })
       .populate('deliveryMan', 'username')
@@ -312,7 +312,7 @@ const generateBulkPaymentReceipt = async (req, res) => {
       const order = tx.order || {};
       doc.fontSize(11).font('Helvetica');
       doc.text(`Receipt No: REC-${tx._id.toString().slice(-6)}`);
-      doc.text(`Invoice No: ${order.deliveredInvoiceNumber || order.pendingInvoiceNumber || 'N/A'}`);
+      doc.text(`Invoice No: ${order.invoiceNumber || 'N/A'}`);
       doc.text(`Order ID: ${order._id?.toString().slice(-8) || 'N/A'}`);
       doc.text(`Customer: ${order.customer?.name || 'N/A'}`);
       doc.text(`Delivery Man: ${tx.deliveryMan?.username || 'N/A'}`);

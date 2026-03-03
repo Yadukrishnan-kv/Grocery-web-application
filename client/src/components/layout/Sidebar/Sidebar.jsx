@@ -43,8 +43,8 @@ const MENU_PERMISSIONS = {
   'AdminOrderRequests': 'menu.admin.order.requests',
   'storekeeperpacked': 'menu.storekeeper.packed.orders'
   ,
-  'SalesPendingOrders': 'menu.sales.pending',
-  'SalesOutstandingReport': 'menu.sales.outstanding'
+  'SalesPendingOrders': 'menu.PendingOrders',
+  'SalesOutstandingReport': 'menu.OutstandingReport'
 
 
 
@@ -88,11 +88,24 @@ const navItems = [
     subItems: [
       { id: 'Orders', label: 'Orders', path: '/order/list' },
       { id: 'OrdersReport', label: 'Orders Report', path: '/OrderReports/list' }
-      , { id: 'SalesPendingOrders', label: 'Pending Orders', path: '/sales/pending-orders' }
-      , { id: 'SalesOutstandingReport', label: 'Outstanding Report', path: '/sales/outstanding-report' }
+      
+      
     ]
   },
-         { id: 'AdminOrderRequests', label: ' Order Requests', icon: '📋', path: '/admin/AdminOrderRequests' },
+
+  {
+    id: 'SalesPendingOrders',
+    label: 'Pending Orders',
+    icon: '📈',
+    path: '/sales/pending-orders'
+  },
+    {
+    id: 'SalesOutstandingReport',
+    label: 'Outstanding Report',
+    icon: '📈',
+    path: '/sales/outstanding-report'
+  },
+  { id: 'AdminOrderRequests', label: ' Order Requests', icon: '📋', path: '/admin/AdminOrderRequests' },
 
   { 
     id: 'Deliveries', 

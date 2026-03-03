@@ -430,18 +430,12 @@ const getDeliveredInvoice = async (req, res) => {
       return res.status(400).json({ message: "No delivered quantity" });
     }
 
-    const counter = await getOrInitCounter();
-
-    if (!order.deliveredInvoiceNumber) {
-      counter.deliveredCount += 1;
-      await counter.save();
-
-      order.deliveredInvoiceNumber = `DEL-${counter.deliveredCount}`;
-      order.firstDeliveredInvoiceDate = new Date();
-      await order.save();
+    // Invoice is generated when order is packed - cannot create now
+    if (!order.invoiceNumber) {
+      return res.status(400).json({ message: "Invoice will be generated after order is packed" });
     }
 
-    const invoiceNo = order.deliveredInvoiceNumber;
+    const invoiceNo = order.invoiceNumber;
 
     const filename = `delivered-invoice-${order._id.toString().slice(-8)}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
@@ -488,18 +482,12 @@ const getPendingInvoice = async (req, res) => {
       return res.status(400).json({ message: "No pending quantity" });
     }
 
-    const counter = await getOrInitCounter();
-
-    if (!order.pendingInvoiceNumber) {
-      counter.pendingCount += 1;
-      await counter.save();
-
-      order.pendingInvoiceNumber = `PEN-${counter.pendingCount}`;
-      order.firstPendingInvoiceDate = new Date();
-      await order.save();
+    // Invoice is generated when order is fully packed
+    if (!order.invoiceNumber) {
+      return res.status(400).json({ message: "Invoice will be generated after order is fully packed" });
     }
 
-    const invoiceNo = order.pendingInvoiceNumber;
+    const invoiceNo = order.invoiceNumber;
 
     const filename = `pending-invoice-${order._id.toString().slice(-8)}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
@@ -1385,6 +1373,19 @@ const packOrder = async (req, res) => {
     order.packedBy = req.user._id;
     order.packedAt = new Date();
     order.packedStatus = allFullyPacked ? "fully_packed" : "partially_packed";
+
+    // ✅ Generate invoice number when order is fully packed with DEL_ format ✅
+    if (allFullyPacked && !order.invoiceNumber) {
+      try {
+        const counter = await getOrInitCounter();
+        counter.invoiceCount += 1;
+        await counter.save();
+        order.invoiceNumber = `DEL-${String(counter.invoiceCount).padStart(2, '0')}`;
+      } catch (invoiceErr) {
+        console.error("Invoice generation error:", invoiceErr);
+        // Don't fail the packing operation if invoice generation fails
+      }
+    }
 
     // ✅ Set to ready_to_deliver ONLY if fully packed AND not partially delivered yet
     if (allFullyPacked && order.status !== "partial_delivered") {

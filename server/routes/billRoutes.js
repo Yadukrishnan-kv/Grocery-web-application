@@ -9,7 +9,9 @@ const {
   getCustomerBills,
   getCustomerBillById,
   markBillReceived,
-  getAllPendingBills,getBillReceipt
+  getAllPendingBills,
+  getBillReceipt,
+  downloadBillInvoice
 } = require("../controllers/billController");
 
 
@@ -21,4 +23,5 @@ router.get("/customer-bill/:id", getCustomerBillById);
 router.post("/mark-received", protect, markBillReceived); // NEW
 router.get("/all-pending", protect, getAllPendingBills); // NEW to fetch pending bills
 router.get("/receipt/:id", getBillReceipt);
+router.get("/invoice/download/:billId", downloadBillInvoice);
 module.exports = router;

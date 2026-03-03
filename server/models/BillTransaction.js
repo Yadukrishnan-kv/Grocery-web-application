@@ -53,6 +53,16 @@ const billTransactionSchema = new Schema(
       ref: "PaymentRequest",
       required: false,
     },
+    order: {
+      type: Schema.Types.ObjectId,
+      ref: "Order",
+      required: false,
+    },
+    invoiceNumber: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   { timestamps: true },
 );

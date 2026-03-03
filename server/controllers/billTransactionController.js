@@ -7,6 +7,7 @@ const getMyTransactions = async (req, res) => {
     const transactions = await BillTransaction.find({ recipient: req.user._id })
       .populate("customer", "name")
       .populate("bill", "amountDue status")
+      .populate("order", "invoiceNumber")
       .sort({ createdAt: -1 });
     res.json(transactions);
   } catch (error) {
@@ -216,11 +217,12 @@ const generateBulkReceipt = async (req, res) => {
       return res.status(400).json({ message: "Invalid transaction IDs" });
     }
 
-    // Fetch all transactions
+    // Fetch all transactions with order and invoice info
     const transactions = await BillTransaction.find({ _id: { $in: transactionIds } })
       .populate("customer", "name address")
       .populate("bill", "_id totalUsed amountDue paidAmount")
-      .populate("recipient", "username");
+      .populate("recipient", "username")
+      .populate("order", "invoiceNumber");
 
     if (transactions.length === 0) {
       return res.status(404).json({ message: "No transactions found" });
@@ -262,16 +264,17 @@ const generateBulkReceipt = async (req, res) => {
 
     // Table header
     const tableX = doc.x;
-    const colWidth = 100;
+    const colWidth = 85;
     const row1Y = doc.y;
 
     doc.font("Helvetica-Bold").fontSize(9);
     doc.text("Customer", tableX, row1Y, { width: colWidth });
     doc.text("Bill ID", tableX + colWidth, row1Y, { width: colWidth });
-    doc.text("Amount", tableX + colWidth * 2, row1Y, { width: colWidth });
-    doc.text("Method", tableX + colWidth * 3, row1Y, { width: colWidth });
+    doc.text("Invoice #", tableX + colWidth * 2, row1Y, { width: colWidth });
+    doc.text("Amount", tableX + colWidth * 3, row1Y, { width: colWidth });
+    doc.text("Method", tableX + colWidth * 4, row1Y, { width: colWidth });
 
-    doc.moveTo(tableX, row1Y + 15).lineTo(tableX + colWidth * 4, row1Y + 15).stroke();
+    doc.moveTo(tableX, row1Y + 15).lineTo(tableX + colWidth * 5, row1Y + 15).stroke();
     doc.moveDown(1.5);
 
     // Table rows
@@ -286,14 +289,18 @@ const generateBulkReceipt = async (req, res) => {
       const billId = tx.bill?._id ? String(tx.bill._id).slice(-8) : "N/A";
       doc.text(billId, tableX + colWidth, rowY, { width: colWidth });
       
-      doc.text(tx.amount?.toFixed(2) || "0.00", tableX + colWidth * 2, rowY, { width: colWidth });
-      doc.text(tx.method?.charAt(0).toUpperCase() + (tx.method?.slice(1) || ""), tableX + colWidth * 3, rowY, { width: colWidth });
+      // Invoice number from order or transaction's invoiceNumber field
+      const invoiceNum = tx.order?.invoiceNumber || tx.invoiceNumber || "N/A";
+      doc.text(invoiceNum, tableX + colWidth * 2, rowY, { width: colWidth });
+      
+      doc.text(tx.amount?.toFixed(2) || "0.00", tableX + colWidth * 3, rowY, { width: colWidth });
+      doc.text(tx.method?.charAt(0).toUpperCase() + (tx.method?.slice(1) || ""), tableX + colWidth * 4, rowY, { width: colWidth });
 
       totalAmount += tx.amount || 0;
       doc.moveDown();
     });
 
-    doc.moveTo(tableX, doc.y).lineTo(tableX + colWidth * 4, doc.y).stroke();
+    doc.moveTo(tableX, doc.y).lineTo(tableX + colWidth * 5, doc.y).stroke();
     doc.moveDown(0.5);
 
     // Total

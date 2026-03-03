@@ -91,25 +91,17 @@ const acceptPaymentRequest = async (req, res) => {
       return res.status(400).json({ message: `Request is not pending (current: ${paymentRequest.status})` });
     }
 
-    const bill = await Bill.findById(paymentRequest.bill);
+    const bill = await Bill.findById(paymentRequest.bill).populate("customer").populate("orders");
     if (!bill) return res.status(404).json({ message: "Bill not found" });
 
     const actualPayment = Math.min(paymentRequest.amount, bill.amountDue);
 
-    if (actualPayment <= 0) {
-      // Still record even if bill fully paid
-      await BillTransaction.create({
-        bill: bill._id,
-        customer: paymentRequest.customer,
-        recipient: req.user._id,
-        recipientType: paymentRequest.recipientType,
-        amount: actualPayment,
-        method: paymentRequest.method,
-        chequeDetails: paymentRequest.chequeDetails,
-        status: "received",
-        paymentRequest: paymentRequest._id,
-      });
+    // Determine first order id if present (opening-balance bills may have none)
+    const firstOrderId = bill.orders && bill.orders.length > 0 ? bill.orders[0]._id : null;
 
+    if (actualPayment <= 0) {
+      // No amount to record (would be zero) — accept the request but skip creating a transaction
+      // Mongoose schema requires amount >= 0.01, so creating a 0-amount transaction fails validation.
       paymentRequest.status = "accepted";
       await paymentRequest.save();
 
@@ -139,17 +131,17 @@ const acceptPaymentRequest = async (req, res) => {
       chequeDetails: paymentRequest.chequeDetails,
       status: "received",
       paymentRequest: paymentRequest._id,
+      order: firstOrderId,
+      invoiceNumber: bill.invoiceNumber,
     });
 
-    // ✅ RESTORE CREDIT LIMIT to customer
-    const customer = await Customer.findById(paymentRequest.customer);
-    if (customer) {
+    // Restore credit limit (already populated)
+    const customer = bill.customer;
+    if (customer && customer.billingType === "Credit limit") {
       customer.balanceCreditLimit += actualPayment;
       await customer.save();
-      console.log(`Credit limit restored by ${actualPayment} for customer ${customer._id}`);
     }
 
-    // Mark request accepted
     paymentRequest.status = "accepted";
     await paymentRequest.save();
 

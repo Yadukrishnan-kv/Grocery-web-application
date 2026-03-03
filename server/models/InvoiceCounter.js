@@ -1,11 +1,7 @@
 const { Schema, model } = require("mongoose");
 
 const invoiceCounterSchema = new Schema({
-  deliveredCount: {
-    type: Number,
-    default: 0
-  },
-  pendingCount: {
+  invoiceCount: {
     type: Number,
     default: 0
   }
