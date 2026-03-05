@@ -200,17 +200,47 @@ const getSalesMen = async (req, res) => {
   }
 };
 
-// Export them
-module.exports = {
-  // your existing functions...
-  getDeliveryMen,
-  getSalesMen,
+
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select(
+      "username name email role phoneNumber"  // choose what you want to expose
+    );
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    // Optional: You can add authorization logic here later
+    // Example: only allow admins or the user themselves to see full details
+    // if (req.user.role !== "Admin" && req.user._id.toString() !== user._id.toString()) {
+    //   return res.status(403).json({ message: "Not authorized to view this user" });
+    // }
+
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    console.error("Error in getUserById:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
+    });
+  }
 };
+
+
 module.exports = {
   getAllUsers,
   createUser,
   updateUser,
   deleteUser,
   changePassword,
-  editProfile,getMyProfile,updateMyProfile,getDeliveryMen,getSalesMen
+  editProfile,getMyProfile,updateMyProfile,getDeliveryMen,getSalesMen,getDeliveryMen,getUserById,
+  getSalesMen,
 };

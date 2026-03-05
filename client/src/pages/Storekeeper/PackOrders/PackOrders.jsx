@@ -4,7 +4,7 @@ import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import toast from "react-hot-toast";
 import axios from "axios";
-import "./PackOrders.css"; // ← Use same CSS as OrderList (or copy styles)
+import "./PackOrders.css";
 
 const PackOrders = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -14,11 +14,9 @@ const PackOrders = () => {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [packInputs, setPackInputs] = useState({});
   const [processing, setProcessing] = useState(false);
-
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -57,8 +55,6 @@ const PackOrders = () => {
   useEffect(() => {
     fetchCurrentUser();
     fetchPendingOrders();
-
-    // Auto-refresh every 60 seconds
     const interval = setInterval(fetchPendingOrders, 60000);
     return () => clearInterval(interval);
   }, [fetchCurrentUser, fetchPendingOrders]);
@@ -84,7 +80,6 @@ const PackOrders = () => {
 
   const submitPacking = async () => {
     if (!selectedOrder) return;
-
     const packedItems = selectedOrder.orderItems
       .map((item) => ({
         product: item._id,
@@ -97,7 +92,6 @@ const PackOrders = () => {
     }
 
     setProcessing(true);
-
     try {
       const token = localStorage.getItem("token");
       await axios.post(
@@ -105,12 +99,10 @@ const PackOrders = () => {
         { packedItems },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       toast.success("Packing submitted successfully!");
       setSelectedOrder(null);
       setPackInputs({});
-
-      fetchPendingOrders(); // Refresh
+      fetchPendingOrders();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to submit packing");
     } finally {
@@ -118,24 +110,25 @@ const PackOrders = () => {
     }
   };
 
-  // ✅ NEW: Download unified invoice showing Ordered/Packed/Delivered
-  const downloadUnifiedInvoice = async (orderId) => {
+  // ✅ UPDATED: Accept invoiceNumber and use it in filename
+  const downloadUnifiedInvoice = async (orderId, invoiceNumber) => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(`${backendUrl}/api/orders/unified-invoice/${orderId}`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: "blob",
       });
-
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `unified-invoice-${orderId.slice(-8)}.pdf`);
+      // ✅ Use DEL-XX in filename
+      link.setAttribute("download", invoiceNumber 
+        ? `unified-invoice-${invoiceNumber}.pdf` 
+        : `unified-invoice-${orderId.slice(-8)}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-
       toast.success("Invoice downloaded");
     } catch (err) {
       toast.error("Failed to download invoice");
@@ -153,12 +146,10 @@ const PackOrders = () => {
         !searchTerm.trim() ||
         (order.customer?.name &&
           order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
       const matchesStatus =
         statusFilter === "all" ||
         (order.packedStatus &&
           order.packedStatus.toLowerCase() === statusFilter.toLowerCase());
-
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
@@ -177,7 +168,7 @@ const PackOrders = () => {
   if (!user) return <div className="loading">Loading...</div>;
 
   return (
-    <div className="order-list-layout"> {/* Same class as OrderList */}
+    <div className="order-list-layout">
       <Header
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -190,14 +181,11 @@ const PackOrders = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-
       <main className={`order-list-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="order-list-container-wrapper">
           <div className="order-list-container">
-            {/* Header Section – same as OrderList */}
             <div className="order-list-header-section">
               <h2 className="order-list-page-title">Pack Orders</h2>
-
               <div className="order-list-controls-group">
                 <label htmlFor="statusFilter" className="order-list-filter-label">
                   Filter by Packing Status:
@@ -213,7 +201,6 @@ const PackOrders = () => {
                   <option value="partially_packed">Partially Packed</option>
                   <option value="fully_packed">Fully Packed</option>
                 </select>
-
                 <div className="order-list-search-container">
                   <input
                     type="text"
@@ -223,10 +210,7 @@ const PackOrders = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                   {searchTerm && (
-                    <button
-                      className="order-list-search-clear"
-                      onClick={clearSearch}
-                    >
+                    <button className="order-list-search-clear" onClick={clearSearch}>
                       ×
                     </button>
                   )}
@@ -237,16 +221,14 @@ const PackOrders = () => {
             {loading ? (
               <div className="order-list-loading">Loading orders to pack...</div>
             ) : filteredOrders.length === 0 ? (
-              <div className="order-list-no-data">
-                No orders found
-                {statusFilter !== "all" && ` matching status "${statusFilter}"`}
-                {searchTerm.trim() && ` for "${searchTerm}"`}
-              </div>
+              <div className="order-list-no-data">No orders found</div>
             ) : (
               <div className="order-list-table-wrapper">
                 <table className="order-list-data-table">
                   <thead>
+                    <tr>
                       <th>No</th>
+                      {/* ✅ NEW COLUMN */}
                       <th>Customer</th>
                       <th>Products</th>
                       <th>Total Ordered</th>
@@ -254,13 +236,15 @@ const PackOrders = () => {
                       <th>Status</th>
                       <th>Order Date</th>
                       <th>Actions</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {filteredOrders.map((order, index) => (
                       <tr key={order._id}>
                         <td>{index + 1}</td>
+                        {/* ✅ DISPLAY INVOICE NUMBER */}
+                        
                         <td>{order.customer?.name || "N/A"}</td>
-
                         <td className="products-cell">
                           {order.orderItems?.length > 0 ? (
                             <div className="products-list">
@@ -278,15 +262,18 @@ const PackOrders = () => {
                             <span className="no-products">No products</span>
                           )}
                         </td>
-
                         <td>{order.totalOrderedQuantity || 0}</td>
                         <td>
-                          {order.orderItems?.reduce((sum, i) => sum + (i.packedQuantity || 0), 0) || 0}
+                          {order.orderItems?.reduce(
+                            (sum, i) => sum + (i.packedQuantity || 0),
+                            0
+                          ) || 0}
                         </td>
-
                         <td>
                           <span
-                            className={`order-list-status-badge order-list-status-${order.packedStatus?.toLowerCase() || "not_packed"}`}
+                            className={`order-list-status-badge order-list-status-${
+                              order.packedStatus?.toLowerCase() || "not_packed"
+                            }`}
                           >
                             {order.packedStatus === "fully_packed"
                               ? "Fully Packed"
@@ -295,18 +282,20 @@ const PackOrders = () => {
                               : "Not Packed"}
                           </span>
                         </td>
-
                         <td>{formatDate(order.orderDate)}</td>
-
                         <td>
-                          {/* ✅ Show download invoice button if already packed */}
+                          {/* ✅ PASS INVOICE NUMBER TO DOWNLOAD */}
                           {order.packedStatus && order.packedStatus !== "not_packed" && (
                             <button
                               className="order-list-icon-button order-list-view-button"
-                              onClick={() => downloadUnifiedInvoice(order._id)}
+                              onClick={() =>
+                                downloadUnifiedInvoice(order._id, order.invoiceNumber)
+                              }
                               style={{ marginRight: "8px" }}
+                              title={`Download Invoice ${order.invoiceNumber || "N/A"}`}
+                              disabled={!order.invoiceNumber}
                             >
-                              Invoice
+                              📄 Invoice
                             </button>
                           )}
                           <button
@@ -326,13 +315,11 @@ const PackOrders = () => {
         </div>
       </main>
 
-      {/* Packing Modal – kept your original but styled consistently */}
       {selectedOrder && (
         <div className="modal-overlay">
           <div className="pack-modal">
             <h3>Pack Order #{selectedOrder._id.toString().slice(-8)}</h3>
             <p>Customer: {selectedOrder.customer?.name || "N/A"}</p>
-
             <div className="pack-items">
               {selectedOrder.orderItems.map((item) => {
                 const max = getMaxPackable(item);
@@ -343,7 +330,6 @@ const PackOrders = () => {
                       <div>Ordered: {item.orderedQuantity} {item.unit}</div>
                       <div>Already packed: {item.packedQuantity || 0}</div>
                     </div>
-
                     <div className="pack-qty">
                       <label>Pack Qty:</label>
                       <input
@@ -360,7 +346,6 @@ const PackOrders = () => {
                 );
               })}
             </div>
-
             <div className="modal-footer">
               <button className="cancel" onClick={closeModal}>
                 Cancel

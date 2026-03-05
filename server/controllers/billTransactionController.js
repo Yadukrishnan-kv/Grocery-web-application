@@ -22,8 +22,10 @@ const getMyTransactions = async (req, res) => {
 const payToAdmin = async (req, res) => {
   try {
     const { id } = req.params;
-    const tx = await BillTransaction.findById(id);
+    // ✅ Accept method (cash/cheque) and optional chequeDetails from frontend
+    const { method, chequeDetails } = req.body; 
 
+    const tx = await BillTransaction.findById(id);
     if (!tx) return res.status(404).json({ message: "Transaction not found" });
     if (String(tx.recipient) !== String(req.user._id)) {
       return res.status(403).json({ message: "Not your transaction" });
@@ -32,12 +34,18 @@ const payToAdmin = async (req, res) => {
       return res.status(400).json({ message: "Transaction not in received state" });
     }
 
+    // ✅ Update transaction with payment method & cheque details if provided
+    if (method) tx.method = method;  // method can be "cash" OR "cheque"
+    if (chequeDetails && method === "cheque") {
+      tx.chequeDetails = chequeDetails;
+    }
+
     await BillAdminRequest.create({
       transaction: tx._id,
       sender: req.user._id,
       amount: tx.amount,
-      method: tx.method,
-      chequeDetails: tx.chequeDetails,
+      method: tx.method,  // ✅ Stores "cash" or "cheque"
+      chequeDetails: tx.chequeDetails,  // ✅ Stores cheque info if applicable
       status: "pending",
     });
 
@@ -181,41 +189,43 @@ const getAdminAll = async (req, res) => {
 
 const adminMarkReceived = async (req, res) => {
   try {
-    const { id } = req.params; // BillTransaction._id
+    const { id } = req.params;
+    // ✅ Accept method (cash/cheque) and optional chequeDetails
+    const { method, chequeDetails } = req.body;
 
     const tx = await BillTransaction.findById(id);
     if (!tx) return res.status(404).json({ message: "Transaction not found" });
-
-    // Only allow direct mark for "received" status (not yet sent to admin)
     if (tx.status !== "received") {
-      return res.status(400).json({ 
-        message: `Can only mark 'received' transactions (current: ${tx.status})` 
+      return res.status(400).json({
+        message: `Can only mark 'received' transactions (current: ${tx.status})`,
       });
     }
 
-    // Directly update to paid_to_admin (no BillAdminRequest needed)
+    // ✅ Update with selected method & cheque details
+    if (method) tx.method = method;  // "cash" or "cheque"
+    if (chequeDetails && method === "cheque") {
+      tx.chequeDetails = chequeDetails;
+    }
+
     tx.status = "paid_to_admin";
     await tx.save();
 
-    console.log("✅ Admin direct mark - Transaction:", tx._id, "→ paid_to_admin");
-
-    res.json({ 
+    res.json({
       message: "Payment marked as received – amount credited to admin wallet",
       transactionId: tx._id,
       amount: tx.amount,
-      method: tx.method,
+      method: tx.method,  // Returns "cash" or "cheque"
     });
   } catch (error) {
-    console.error("❌ Admin mark received error:", error);
+    console.error("Admin mark received error:", error);
     res.status(500).json({ message: "Server error: " + error.message });
   }
 };
-
 // Generate bulk receipt PDF for multiple transactions
 const generateBulkReceipt = async (req, res) => {
   try {
-    const { transactionIds } = req.body; // Array of transaction IDs
-    
+    const { transactionIds } = req.body;
+
     if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
       return res.status(400).json({ message: "Invalid transaction IDs" });
     }
@@ -223,7 +233,7 @@ const generateBulkReceipt = async (req, res) => {
     // Fetch all transactions with order and invoice info
     const transactions = await BillTransaction.find({ _id: { $in: transactionIds } })
       .populate("customer", "name address")
-      .populate("bill", "_id totalUsed amountDue paidAmount")
+      .populate("bill", "_id totalUsed amountDue paidAmount batchReceiptNumber invoiceNumber") // ✅ Ensure invoiceNumber is populated
       .populate("recipient", "username")
       .populate("order", "invoiceNumber");
 
@@ -237,13 +247,25 @@ const generateBulkReceipt = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
+    // Extract common batch ID if all share one
+    const commonBatch = transactions[0]?.bill?.batchReceiptNumber;
+    const allSameBatch = transactions.every(tx => tx.bill?.batchReceiptNumber === commonBatch);
+    const batchTitle = allSameBatch && commonBatch ? `BULK RECEIPT (Batch: ${commonBatch})` : "BULK RECEIPT";
+
     // Generate PDF with PDFKit
     const PDFDocument = require("pdfkit");
     const doc = new PDFDocument({ margin: 40 });
 
-    // Set response headers
+    // ✅ Improved filename: Use unique invoices or generic
+    const uniqueInvoices = [...new Set(transactions.map(tx => 
+      tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "NA"
+    ))];
+    let suggestedFilename = uniqueInvoices.length === 1 && uniqueInvoices[0] !== "NA" 
+      ? `bulk-receipt-${uniqueInvoices[0]}` 
+      : `bulk-receipt-${uniqueInvoices.length}-invoices`;
+
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", 'attachment; filename="bulk-receipt.pdf"');
+    res.setHeader("Content-Disposition", `attachment; filename="${suggestedFilename}.pdf"`);
 
     // Handle stream errors
     doc.on("error", (err) => {
@@ -252,11 +274,10 @@ const generateBulkReceipt = async (req, res) => {
         res.status(500).json({ message: "Error generating PDF" });
       }
     });
-
     doc.pipe(res);
 
     // Header
-    doc.fontSize(20).font("Helvetica-Bold").text("BULK RECEIPT", { align: "center" });
+    doc.fontSize(20).font("Helvetica-Bold").text(batchTitle, { align: "center" });
     doc.fontSize(10).font("Helvetica").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
     doc.moveDown();
 
@@ -269,36 +290,31 @@ const generateBulkReceipt = async (req, res) => {
     const tableX = doc.x;
     const colWidth = 85;
     const row1Y = doc.y;
-
     doc.font("Helvetica-Bold").fontSize(9);
     doc.text("Customer", tableX, row1Y, { width: colWidth });
-    doc.text("Bill ID", tableX + colWidth, row1Y, { width: colWidth });
+   
     doc.text("Invoice #", tableX + colWidth * 2, row1Y, { width: colWidth });
     doc.text("Amount", tableX + colWidth * 3, row1Y, { width: colWidth });
     doc.text("Method", tableX + colWidth * 4, row1Y, { width: colWidth });
-
     doc.moveTo(tableX, row1Y + 15).lineTo(tableX + colWidth * 5, row1Y + 15).stroke();
     doc.moveDown(1.5);
 
-    // Table rows
+    // Table rows - ✅ FIXED: Prioritize bill/transaction invoice over order (for partial deliveries)
     let totalAmount = 0;
     doc.font("Helvetica").fontSize(9);
-
     transactions.forEach((tx, idx) => {
       const rowY = doc.y;
       doc.text(tx.customer?.name || "N/A", tableX, rowY, { width: colWidth });
-      
-      // Fix: Convert _id to string before slicing
-      const billId = tx.bill?._id ? String(tx.bill._id).slice(-8) : "N/A";
-      doc.text(billId, tableX + colWidth, rowY, { width: colWidth });
-      
-      // Invoice number from order or transaction's invoiceNumber field
-      const invoiceNum = tx.order?.invoiceNumber || tx.invoiceNumber || "N/A";
-      doc.text(invoiceNum, tableX + colWidth * 2, rowY, { width: colWidth });
-      
-      doc.text(tx.amount?.toFixed(2) || "0.00", tableX + colWidth * 3, rowY, { width: colWidth });
-      doc.text(tx.method?.charAt(0).toUpperCase() + (tx.method?.slice(1) || ""), tableX + colWidth * 4, rowY, { width: colWidth });
 
+     
+
+      // ✅ FIXED PRIORITY: bill.invoiceNumber > tx.invoiceNumber > tx.order.invoiceNumber
+      // This ensures DEL-01 shows for its bill, even if order is shared/updated
+      const invoiceNum = tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "N/A";
+      doc.text(invoiceNum, tableX + colWidth * 2, rowY, { width: colWidth });
+
+      doc.text((tx.amount || 0).toFixed(2), tableX + colWidth * 3, rowY, { width: colWidth, align: "right" });
+      doc.text(tx.method?.charAt(0).toUpperCase() + (tx.method?.slice(1) || ""), tableX + colWidth * 4, rowY, { width: colWidth });
       totalAmount += tx.amount || 0;
       doc.moveDown();
     });
@@ -315,7 +331,6 @@ const generateBulkReceipt = async (req, res) => {
     doc.fontSize(9).font("Helvetica");
     doc.text("This is a bulk receipt covering all transactions listed above.", { align: "center" });
     doc.text(`Total Transactions: ${transactions.length}`, { align: "center" });
-
     doc.end();
   } catch (error) {
     console.error("Generate bulk receipt error:", error);

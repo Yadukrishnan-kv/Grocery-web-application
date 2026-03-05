@@ -6,6 +6,7 @@ import DirhamSymbol from "../../../Assets/aed-symbol.png";
 
 import "./OrderReports.css";
 import axios from "axios";
+import toast from "react-hot-toast";
 
 const OrderReports = () => {
   const [orders, setOrders] = useState([]);
@@ -42,27 +43,43 @@ const OrderReports = () => {
   }, [backendUrl]);
 
   const fetchDeliveredOrders = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${backendUrl}/api/orders/admin-delivered-orders`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      setOrders(response.data);
-    } catch (error) {
-      console.error("Error fetching orders with delivery:", error);
-      alert("Failed to load orders");
-    } finally {
-      setLoading(false);
+  try {
+    const token = localStorage.getItem("token");
+    let endpoint;
+    
+    // ✅ ROLE-BASED ENDPOINT SELECTION
+    if (user?.role === "Sales man") {
+      endpoint = `${backendUrl}/api/orders/salesman-delivered-orders`;
+    } else {
+      // Admin sees all delivered orders
+      endpoint = `${backendUrl}/api/orders/admin-delivered-orders`;
     }
-  }, [backendUrl]);
+    
+    const response = await axios.get(endpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setOrders(response.data);
+  } catch (error) {
+    console.error("Error fetching orders with delivery:", error);
+    toast.error("Failed to load orders");
+  } finally {
+    setLoading(false);
+  }
+}, [backendUrl, user]);
 
+  // ==================== FIXED INFINITE LOOP ====================
+  // Fetch user independently
   useEffect(() => {
     fetchCurrentUser();
-    fetchDeliveredOrders();
-  }, [fetchCurrentUser, fetchDeliveredOrders]);
+  }, [fetchCurrentUser]);
+
+  // Only fetch orders AFTER user is loaded → no circular dependency
+  useEffect(() => {
+    if (user) {
+      fetchDeliveredOrders();
+    }
+  }, [user, fetchDeliveredOrders]);
+  // ============================================================
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {

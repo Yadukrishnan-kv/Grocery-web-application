@@ -44,12 +44,19 @@ const OrderList = () => {
   const fetchOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${backendUrl}/api/orders/getallorders`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      let endpoint;
+      
+      // ✅ ROLE-BASED ENDPOINT SELECTION
+      if (user?.role === "Sales man") {
+        endpoint = `${backendUrl}/api/orders/salesman-orders`;
+      } else {
+        // Admin or other roles see all orders
+        endpoint = `${backendUrl}/api/orders/getallorders`;
+      }
+      
+      const response = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setOrders(response.data);
     } catch (error) {
       console.error("Error fetching orders:", error);
@@ -57,7 +64,7 @@ const OrderList = () => {
     } finally {
       setLoading(false);
     }
-  }, [backendUrl]);
+  }, [backendUrl, user]);
 
   const fetchDeliveryPartners = useCallback(async () => {
     try {
@@ -74,11 +81,20 @@ const OrderList = () => {
     }
   }, [backendUrl]);
 
+  // ==================== FIXED INFINITE LOOP ====================
+  // 1. Fetch user + delivery partners (independent of orders)
+  // 2. Only fetch orders AFTER user is loaded → no circular dependency
   useEffect(() => {
     fetchCurrentUser();
-    fetchOrders();
     fetchDeliveryPartners();
-  }, [fetchCurrentUser, fetchOrders, fetchDeliveryPartners]);
+  }, [fetchCurrentUser, fetchDeliveryPartners]);
+
+  useEffect(() => {
+    if (user) {
+      fetchOrders();
+    }
+  }, [user, fetchOrders]);
+  // ============================================================
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -111,7 +127,7 @@ const OrderList = () => {
       });
 
       toast.success(`Order deleted successfully!`);
-      fetchOrders();
+      fetchOrders();   // ← still works (user already exists)
     } catch (error) {
       console.error("Error deleting order:", error);
       toast.error("Failed to delete order. Please try again.");
@@ -132,7 +148,7 @@ const OrderList = () => {
       );
 
       toast.success("Delivery partner assigned successfully!");
-      fetchOrders();
+      fetchOrders();   // ← still works (user already exists)
     } catch (error) {
       console.error("Error assigning delivery partner:", error);
       toast.error("Failed to assign delivery partner. Please try again.");
@@ -234,9 +250,9 @@ const OrderList = () => {
                     <tr>
                       <th scope="col">No</th>
                       <th scope="col">Customer</th>
-                      <th scope="col">Products</th>           {/* ← Changed label */}
-                      <th scope="col">Total Qty</th>         {/* ← New */}
-                      <th scope="col">Grand Total (AED)</th> {/* ← Changed label */}
+                      <th scope="col">Products</th>
+                      <th scope="col">Total Qty</th>
+                      <th scope="col">Grand Total (AED)</th>
                       <th scope="col">Payment</th>
                       <th scope="col">Remarks</th>
                       <th scope="col">Delivery Partner</th>
@@ -253,27 +269,24 @@ const OrderList = () => {
                           <td>{index + 1}</td>
                           <td>{order.customer?.name || "N/A"}</td>
 
-                          {/* Multi-product display – keeps your original styling */}
-                         <td className="products-cell">
-                          {order.orderItems?.length > 0 ? (
-                            <div className="products-list">
-                              {order.orderItems.map((item, i) => (
-                                <div key={i} className="product-tag">
-                                  <span className="product-name">{item.product?.productName || "Unknown"}</span>
-                                  <span className="product-qty">× {item.orderedQuantity}</span>
-                                  <span className="product-unit">{item.unit || ""}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="no-products">No products</span>
-                          )}
-                        </td>
+                          <td className="products-cell">
+                            {order.orderItems?.length > 0 ? (
+                              <div className="products-list">
+                                {order.orderItems.map((item, i) => (
+                                  <div key={i} className="product-tag">
+                                    <span className="product-name">{item.product?.productName || "Unknown"}</span>
+                                    <span className="product-qty">× {item.orderedQuantity}</span>
+                                    <span className="product-unit">{item.unit || ""}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="no-products">No products</span>
+                            )}
+                          </td>
 
-                          {/* Total ordered quantity (virtual field) */}
                           <td>{order.totalOrderedQuantity || order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0}</td>
 
-                          {/* Grand total */}
                           <td>
                             <div
                               style={{
@@ -403,7 +416,6 @@ const OrderList = () => {
         </div>
       </main>
 
-      {/* Your existing delete modal – unchanged */}
       {showDeleteModal && orderToDelete && (
         <div className="confirm-modal-overlay">
           <div className="confirm-modal">

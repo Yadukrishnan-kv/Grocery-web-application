@@ -23,6 +23,7 @@ const orderItemSchema = new Schema({
     default: 0,
     min: 0,
   },
+  invoicedQuantity: { type: Number, default: 0 },
   price: {
     type: Number,
     required: [true, "Price is required"],
@@ -95,6 +96,14 @@ const orderSchema = new Schema(
       default: null,
       index: true,
     },
+     invoiceHistory: [
+      {
+        invoiceNumber: String,
+        quantity: Number,
+        amount: Number,
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     packedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

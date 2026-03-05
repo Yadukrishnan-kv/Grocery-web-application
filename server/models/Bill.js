@@ -57,6 +57,10 @@ const billSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    batchReceiptNumber: {
+  type: String,
+  default: null
+},
   },
   { timestamps: true }
 );

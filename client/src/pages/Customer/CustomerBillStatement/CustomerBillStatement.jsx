@@ -28,6 +28,7 @@ const CustomerBillStatement = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Bill Statement");
   const [user, setUser] = useState(null);
+  const [customerProfile, setCustomerProfile] = useState(null);
 
   // Payment request modal states
   const [showPayModal, setShowPayModal] = useState(false);
@@ -41,8 +42,10 @@ const CustomerBillStatement = () => {
   });
   const [recipientType, setRecipientType] = useState("delivery");
   const [recipientId, setRecipientId] = useState("");
-  const [deliveryMen, setDeliveryMen] = useState([]);
-  const [salesMen, setSalesMen] = useState([]);
+  
+  // ✅ Filtered recipients for current bill (instead of all users)
+  const [filteredDeliveryMen, setFilteredDeliveryMen] = useState([]);
+  const [filteredSalesMen, setFilteredSalesMen] = useState([]);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -89,30 +92,126 @@ const CustomerBillStatement = () => {
         statementType: response.data.statementType,
         dueDays: response.data.dueDays,
       });
+      setCustomerProfile(response.data); // ✅ Store customer profile for salesman lookup
     } catch (error) {
       console.error("Error fetching billing config:", error);
     }
   }, [backendUrl]);
 
+  // ✅ Fetch delivery men who delivered orders in this specific bill
+  const fetchDeliveryMenForBill = useCallback(async (bill) => {
+  try {
+    const token = localStorage.getItem("token");
+    
+    const billResponse = await axios.get(
+      `${backendUrl}/api/bills/getbillbyid/${bill._id}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { populate: "orders.assignedTo" }
+      }
+    );
+    
+    const billData = billResponse.data;
+    
+    const deliveryMenMap = new Map();
+    
+    if (billData.orders && Array.isArray(billData.orders)) {
+      billData.orders.forEach(order => {
+        if (order.assignedTo && order.assignedTo._id) {
+          const dm = order.assignedTo;
+          if (!deliveryMenMap.has(dm._id)) {
+            const role = (dm.role || "").toLowerCase();
+            if (role.includes("delivery") || role.includes("partner")) {
+              deliveryMenMap.set(dm._id, {
+                _id: dm._id,
+                username: dm.username || dm.name || "Unknown",
+                email: dm.email || "",
+              });
+            }
+          }
+        }
+      });
+    }
+    
+    setFilteredDeliveryMen(Array.from(deliveryMenMap.values()));
+  } catch (error) {
+    console.error("Failed to fetch delivery men for bill:", error);
+    // Fallback: show a message but don't crash modal
+    toast.error("Could not load delivery partners for this bill");
+    setFilteredDeliveryMen([]);
+  }
+}, [backendUrl]);
+
+  // ✅ Get the sales man assigned to this customer
+const getSalesManForCustomer = useCallback(async () => {
+  if (!customerProfile?.salesman) {
+    console.warn("No salesman assigned to this customer");
+    return [];
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+    
+    // ✅ Extract ID properly: handle both populated object and string ID
+    const salesmanId = typeof customerProfile.salesman === 'object' 
+      ? customerProfile.salesman._id 
+      : customerProfile.salesman;
+
+    // ✅ If already populated with details, use directly (skip API call)
+    if (typeof customerProfile.salesman === 'object' && customerProfile.salesman.username) {
+      const salesMan = customerProfile.salesman;
+      const role = (salesMan.role || "").toLowerCase();
+      if (role.includes("sales") || role.includes("salesman") || !salesMan.role) {
+        return [{
+          _id: salesMan._id,
+          username: salesMan.username || salesMan.name || "Unknown Salesman",
+          email: salesMan.email || "",
+        }];
+      }
+    }
+
+    // Fallback: fetch by ID if not fully populated
+    const response = await axios.get(
+      `${backendUrl}/api/users/${salesmanId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    const salesMan = response.data;
+    const role = (salesMan.role || "").toLowerCase();
+    if (role.includes("sales") || role.includes("salesman")) {
+      return [{
+        _id: salesMan._id,
+        username: salesMan.username || salesMan.name || "Unknown Salesman",
+        email: salesMan.email || "",
+      }];
+    }
+    return [];
+  } catch (error) {
+    console.error("Failed to fetch sales man:", error.response?.data || error.message);
+    return [];
+  }
+}, [backendUrl, customerProfile]);
   const fetchDeliveryMen = useCallback(async () => {
+  
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(`${backendUrl}/api/users/delivery-men`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setDeliveryMen(response.data);
+      // Keep for other pages if needed, but modal uses filtered list
     } catch (error) {
       toast.error("Failed to load delivery men");
     }
   }, [backendUrl]);
 
   const fetchSalesMen = useCallback(async () => {
+    // ✅ This is now only used as fallback, primary logic is in getSalesManForCustomer
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(`${backendUrl}/api/users/sales-men`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setSalesMen(response.data);
+      // Keep for other pages if needed, but modal uses filtered list
     } catch (error) {
       toast.error("Failed to load sales men");
     }
@@ -126,8 +225,8 @@ const CustomerBillStatement = () => {
           fetchCurrentUser(),
           fetchCustomerBills(),
           fetchBillingConfig(),
-          fetchDeliveryMen(),
-          fetchSalesMen(),
+          fetchDeliveryMen(), // Keep for other uses
+          fetchSalesMen(),    // Keep for other uses
         ]);
       } catch (error) {
         console.error("Error loading data:", error);
@@ -194,15 +293,34 @@ const CustomerBillStatement = () => {
     }
   };
 
-  // Open payment request modal
-  const handlePayBill = (billId, amountDue) => {
-    setBillToPay({ id: billId, amountDue });
-    setPaymentAmount("");
-    setPaymentMethod("cash");
-    setChequeDetails({ number: "", bank: "", date: "" });
-    setRecipientType("delivery");
-    setRecipientId("");
-    setShowPayModal(true);
+  // ✅ UPDATED: Open payment request modal with filtered recipients
+  const handlePayBill = async (billId, amountDue) => {
+    try {
+      // Find the bill in state
+      const bill = bills.find(b => b._id === billId);
+      if (!bill) {
+        toast.error("Bill not found");
+        return;
+      }
+
+      setBillToPay({ id: billId, amountDue });
+      setPaymentAmount("");
+      setPaymentMethod("cash");
+      setChequeDetails({ number: "", bank: "", date: "" });
+      setRecipientType("delivery");
+      setRecipientId("");
+      
+      // ✅ Fetch filtered recipients for THIS bill
+      await Promise.all([
+        fetchDeliveryMenForBill(bill),
+        getSalesManForCustomer().then(setFilteredSalesMen)
+      ]);
+      
+      setShowPayModal(true);
+    } catch (error) {
+      console.error("Error preparing payment modal:", error);
+      toast.error("Failed to load payment options");
+    }
   };
 
   // Handle download invoice
@@ -240,6 +358,15 @@ const CustomerBillStatement = () => {
     setChequeDetails((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Reset filtered recipients when modal closes
+  const closeModal = () => {
+    setShowPayModal(false);
+    setBillToPay(null);
+    setPaymentAmount("");
+    setFilteredDeliveryMen([]);
+    setFilteredSalesMen([]);
+  };
+
   // Confirm and send payment request
   const confirmSendPaymentRequest = async () => {
     const amount = parseFloat(paymentAmount);
@@ -268,7 +395,7 @@ const CustomerBillStatement = () => {
       return;
     }
 
-    setShowPayModal(false);
+    closeModal(); // ✅ Use closeModal to reset state
 
     try {
       const token = localStorage.getItem("token");
@@ -299,9 +426,6 @@ const CustomerBillStatement = () => {
     }
   };
 
-  if (!user) {
-    return <div className="customer-bills-loading">Loading...</div>;
-  }
 
   return (
     <div className="customer-bills-layout">
@@ -388,16 +512,21 @@ const CustomerBillStatement = () => {
                                 }}
                               >
                                 <span>
-                                  {bill.invoiceNumber || "N/A"}
+                                  {bill.invoiceNumber || 
+                                   bill.orders?.[0]?.invoiceNumber || 
+                                   `DEL-${bill._id.toString().slice(-8)}`}
                                   {bill.isOpeningBalance && (
-                                   <span>
-      {bill.invoiceNumber || 
-       bill.orders?.[0]?.invoiceNumber || 
-       `DEL-${bill._id.toString().slice(-8)}`}
-      {bill.isOpeningBalance && (
-        <span style={{ marginLeft: "8px", backgroundColor: "#FFA500", color: "white", padding: "2px 6px", borderRadius: "3px", fontSize: "11px", fontWeight: "bold" }}>OB</span>
-      )}
-    </span>
+                                    <span style={{ 
+                                      marginLeft: "8px", 
+                                      backgroundColor: "#FFA500", 
+                                      color: "white", 
+                                      padding: "2px 6px", 
+                                      borderRadius: "3px", 
+                                      fontSize: "11px", 
+                                      fontWeight: "bold" 
+                                    }}>
+                                      OB
+                                    </span>
                                   )}
                                 </span>
                                 {bill.invoiceNumber && bill.status === "paid" && (
@@ -524,7 +653,7 @@ const CustomerBillStatement = () => {
         </div>
       </main>
 
-      {/* Attractive Payment Request Modal */}
+      {/* Attractive Payment Request Modal - UPDATED WITH FILTERED RECIPIENTS */}
       {showPayModal && billToPay && (
         <div className="pay-modal-overlay">
           <div className="pay-modal">
@@ -594,7 +723,10 @@ const CustomerBillStatement = () => {
               <label>Recipient Type</label>
               <select
                 value={recipientType}
-                onChange={(e) => setRecipientType(e.target.value)}
+                onChange={(e) => {
+                  setRecipientType(e.target.value);
+                  setRecipientId(""); // Reset selection when type changes
+                }}
                 className="pay-modal-select"
               >
                 <option value="delivery">Delivery Man</option>
@@ -604,27 +736,42 @@ const CustomerBillStatement = () => {
 
             <div className="pay-modal-input-group">
               <label>Select Recipient</label>
-              <select
-                value={recipientId}
-                onChange={(e) => setRecipientId(e.target.value)}
-                className="pay-modal-select"
-              >
-                <option value="">Select {recipientType === "delivery" ? "Delivery Man" : "Sales Man"}</option>
-                {(recipientType === "delivery" ? deliveryMen : salesMen).map(person => (
-                  <option key={person._id} value={person._id}>
-                    {person.username}
-                  </option>
-                ))}
-              </select>
+             <select
+  value={recipientId}
+  onChange={(e) => setRecipientId(e.target.value)}
+  className="pay-modal-select"
+  disabled={
+    (recipientType === "delivery" && filteredDeliveryMen.length === 0) ||
+    (recipientType === "sales" && filteredSalesMen.length === 0)
+  }
+>
+  <option value="">
+    {recipientType === "delivery" 
+      ? (filteredDeliveryMen.length > 0 
+          ? "Select Delivery Man" 
+          : "No delivery men associated with this bill")
+      : (filteredSalesMen.length > 0 
+          ? "Select Sales Man" 
+          : "No sales man assigned to your account")}
+  </option>
+
+  {(recipientType === "delivery" ? filteredDeliveryMen : filteredSalesMen).map(person => (
+    <option key={person._id} value={person._id}>
+      {person.username} {person.email ? `(${person.email})` : ""}
+    </option>
+  ))}
+</select>
+
+<small style={{ color: "#e74c3c", fontSize: "11px", marginTop: "4px", display: "block" }}>
+  {recipientType === "sales" && filteredSalesMen.length === 0 && 
+    "Contact support or your account manager if no sales person is shown"}
+</small>
             </div>
 
             <div className="pay-modal-actions">
               <button
                 className="pay-modal-cancel"
-                onClick={() => {
-                  setShowPayModal(false);
-                  setPaymentAmount("");
-                }}
+                onClick={closeModal}
               >
                 Cancel
               </button>

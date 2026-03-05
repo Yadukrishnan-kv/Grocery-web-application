@@ -194,6 +194,25 @@ const getCustomerById = async (req, res) => {
   }
 };
 
+const getSalesmanCustomers = async (req, res) => {
+  try {
+    // Only allow salesmen to access
+    if (req.user.role !== "Sales man") {
+      return res.status(403).json({ message: "Access denied - Salesmen only" });
+    }
+
+    // Get customers assigned to this salesman
+    const customers = await Customer.find({ salesman: req.user._id })
+      .select("name email phoneNumber _id")
+      .sort({ name: 1 });
+
+    res.json(customers);
+  } catch (error) {
+    console.error("Get salesman customers error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 const updateCustomer = async (req, res) => {
   try {
     const updateData = {};
@@ -323,7 +342,7 @@ const getMyCustomerProfile = async (req, res) => {
 
     // Include new fields
     const customer = await Customer.findOne({ user: req.user._id })
-      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType statementType dueDays');
+      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType statementType dueDays salesman openingBalance openingBalanceDueDays');
 
     if (!customer) {
       return res.status(404).json({ message: "Customer profile not found" });
@@ -917,6 +936,7 @@ module.exports = {
   createCustomer,
   getAllCustomers,
   getCustomerById,
+  getSalesmanCustomers,
   updateCustomer,
   deleteCustomer,
   getMyCustomerProfile,

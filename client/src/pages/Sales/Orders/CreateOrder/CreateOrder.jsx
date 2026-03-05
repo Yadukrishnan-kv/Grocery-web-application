@@ -29,15 +29,24 @@ const CreateOrder = () => {
   const fetchCustomers = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${backendUrl}/api/customers/getallcustomers`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      let endpoint;
+      
+      // ✅ ROLE-BASED ENDPOINT SELECTION
+      if (user?.role === "Sales man") {
+        endpoint = `${backendUrl}/api/customers/salesman-customers`;
+      } else {
+        // Admin sees all customers
+        endpoint = `${backendUrl}/api/customers/getallcustomers`;
+      }
+      
+      const response = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setCustomers(response.data);
     } catch (error) {
       toast.error("Failed to load customers");
     }
-  }, [backendUrl]);
+  }, [backendUrl, user]);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -71,11 +80,20 @@ const CreateOrder = () => {
     }
   }, [backendUrl, navigate]);
 
+  // ==================== FIXED INFINITE LOOP ====================
+  // 1. Fetch user + products (independent of customers)
+  // 2. Only fetch customers AFTER user is loaded → no circular dependency
   useEffect(() => {
-    fetchCustomers();
-    fetchProducts();
     fetchCurrentUser();
-  }, [fetchCustomers, fetchProducts, fetchCurrentUser]);
+    fetchProducts();
+  }, [fetchCurrentUser, fetchProducts]);
+
+  useEffect(() => {
+    if (user) {
+      fetchCustomers();
+    }
+  }, [user, fetchCustomers]);
+  // ============================================================
 
   // Real API call for previous purchased price
   const fetchPreviousPrice = useCallback(async (customerId, productId, index) => {

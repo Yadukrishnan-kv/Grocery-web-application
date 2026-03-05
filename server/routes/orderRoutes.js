@@ -6,6 +6,8 @@ const {
   createOrder,
   getAllOrders,
   getOrderById,
+  getSalesmanOrders,
+  getSalesmanDeliveredOrders,
   updateOrder,
   deleteOrder,
   deliverOrder,
@@ -29,6 +31,8 @@ router.use(protect); // This applies auth middleware to all routes below
 router.post("/createorder", createOrder);
 router.get("/getallorders", getAllOrders);
 router.get("/getorderbyid/:id", getOrderById);
+router.get("/salesman-orders",  getSalesmanOrders)
+router.get("/salesman-delivered-orders",  getSalesmanDeliveredOrders);
 router.put("/updateorder/:id", updateOrder);
 router.delete("/deleteorder/:id", deleteOrder);
 router.post("/deliverorder/:id", deliverOrder);

@@ -5,6 +5,7 @@ const {
   createCustomer,
   getAllCustomers,
   getCustomerById,
+  getSalesmanCustomers,
   updateCustomer,
   deleteCustomer,
   getMyCustomerProfile,
@@ -25,6 +26,7 @@ router.use(protect);
 router.post("/createcustomer", createCustomer);
 router.get("/getallcustomers", getAllCustomers);
 router.get("/getcustomerbyid/:id", getCustomerById);
+router.get("/salesman-customers",  getSalesmanCustomers);
 router.put("/updatecustomer/:id", updateCustomer);
 router.delete("/deletecustomer/:id", deleteCustomer);
 router.get("/my-profile", getMyCustomerProfile);

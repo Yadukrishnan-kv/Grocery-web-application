@@ -60,9 +60,7 @@ const generateBill = async (req, res) => {
 
 const getAllBills = async (req, res) => {
   try {
-    const bills = await Bill.find()
-      .populate("customer", "name email balanceCreditLimit")
-      .sort({ cycleEnd: -1 });
+    const bills = await Bill.find().populate("customer", "name email balanceCreditLimit").sort({ cycleEnd: -1 });
     res.json(bills);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -71,23 +69,50 @@ const getAllBills = async (req, res) => {
 
 const getBillById = async (req, res) => {
   try {
-    const bill = await Bill.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit billingType")
-      .populate({
-        path: "orders",
-        populate: {
-          path: "orderItems.product",
-          select: "productName price unit"
-        },
-        // ✅✅✅ INCLUDE invoiceNumber IN ORDER POPULATION ✅✅✅
-        select: "invoiceNumber orderDate totalAmount orderItems status payment"
-      });
+    let query = Bill.findById(req.params.id)
+      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit billingType salesman");
+    
+    // ✅ Always populate orders with orderItems and product for receipt details
+    query = query.populate({
+      path: "orders",
+      populate: [
+        { path: "orderItems.product", select: "productName price unit" },
+        { path: "assignedTo", select: "username email role" }
+      ]
+    });
 
+    // Support additional dynamic populate from query param
+    if (req.query.populate) {
+      const paths = req.query.populate.split(",");
+      paths.forEach(path => {
+        if (!path.includes("orders.")) { // Avoid duplicating orders population
+          if (path.includes(".")) {
+            const [mainPath, subPath] = path.split(".");
+            query = query.populate({
+              path: mainPath,
+              populate: { path: subPath }
+            });
+          } else {
+            query = query.populate(path);
+          }
+        }
+      });
+    }
+
+    const bill = await query;
     if (!bill) {
       return res.status(404).json({ message: "Bill not found" });
     }
 
-    // Check if overdue
+    // Authorization check for customers
+    if (req.user.role === "Customer") {
+      const customer = await Customer.findOne({ user: req.user._id });
+      if (!customer || String(customer._id) !== String(bill.customer._id)) {
+        return res.status(403).json({ message: "Not authorized to view this bill" });
+      }
+    }
+
+    // Mark overdue if needed
     if (bill.status === "pending" && new Date() > bill.dueDate) {
       bill.status = "overdue";
       await bill.save();
@@ -95,33 +120,29 @@ const getBillById = async (req, res) => {
 
     res.json(bill);
   } catch (error) {
+    console.error("getBillById error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 const getCustomerBills = async (req, res) => {
   try {
     if (!req.user || req.user.role !== "Customer") {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // Step 1: Find the Customer document linked to this user
     const customer = await Customer.findOne({ user: req.user._id });
     if (!customer) {
       return res.status(404).json({ message: "Customer profile not found" });
     }
 
-    // Step 2: Find bills using the CUSTOMER _id
-    const bills = await Bill.find({ customer: customer._id })
-      .sort({ cycleEnd: -1 })
-      .populate("orders", "product orderedQuantity totalAmount orderDate status"); // optional
-
+    const bills = await Bill.find({ customer: customer._id }).sort({ cycleEnd: -1 }).populate("orders", "product orderedQuantity totalAmount orderDate status");
     res.json(bills);
   } catch (error) {
     console.error("getCustomerBills error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 const getCustomerBillById = async (req, res) => {
   try {
     if (!req.user || req.user.role !== "Customer") {
@@ -157,17 +178,21 @@ const getCustomerBillById = async (req, res) => {
 };
 
 // billController.js (or wherever createInvoiceBasedBill is defined)
-const createInvoiceBasedBill = async (order) => {
+const createInvoiceBasedBill = async (order, specificAmount = null, specificInvoiceNumber = null) => {
   try {
     const customer = await Customer.findById(order.customer);
     if (!customer || customer.statementType !== "invoice-based") {
       return null;
     }
 
-    const totalUsed = order.orderItems.reduce((sum, item) => {
-      const deliveredQty = item.deliveredQuantity || item.orderedQuantity || 0;
-      return sum + (deliveredQty * item.price);
-    }, 0);
+    // ✅ Use specific amount if provided (for partial delivery)
+    const totalUsed =
+      specificAmount !== null
+        ? specificAmount
+        : order.orderItems.reduce((sum, item) => {
+            const deliveredQty = item.deliveredQuantity || item.orderedQuantity || 0;
+            return sum + deliveredQty * item.price;
+          }, 0);
 
     if (totalUsed <= 0) {
       console.log(`Order ${order._id} has no delivered value → no bill created`);
@@ -180,29 +205,8 @@ const createInvoiceBasedBill = async (order) => {
       dueDate.setDate(dueDate.getDate() + customer.dueDays);
     }
 
-    // Check if bill already exists for this order
-    const existingBill = await Bill.findOne({ orders: order._id });
-    if (existingBill) {
-      const previousTotalUsed = existingBill.totalUsed || 0;
-      const paidAlready = existingBill.paidAmount || 0;
-      const additionalAmount = totalUsed - previousTotalUsed;
-
-      existingBill.totalUsed = totalUsed;
-      existingBill.amountDue = totalUsed - paidAlready;
-      existingBill.cycleEnd = deliveryDate;
-      
-      // ✅✅✅ SYNC INVOICE NUMBER FROM ORDER TO BILL ✅✅✅
-      if (!existingBill.invoiceNumber && order.invoiceNumber) {
-        existingBill.invoiceNumber = order.invoiceNumber;
-      }
-      
-      existingBill.status = existingBill.amountDue <= 0 ? "paid" : "pending";
-      await existingBill.save();
-      console.log(`✅ Bill updated for order ${order._id}`);
-      return existingBill;
-    }
-
-    // ✅✅✅ USE ORDER'S INVOICE NUMBER FOR NEW BILL ✅✅✅
+    // ✅ ALWAYS CREATE NEW BILL - DO NOT SEARCH FOR EXISTING
+    // This ensures DEL-01 and DEL-02 remain separate immutable records
     const bill = await Bill.create({
       customer: order.customer,
       cycleStart: deliveryDate,
@@ -213,14 +217,12 @@ const createInvoiceBasedBill = async (order) => {
       paidAmount: 0,
       status: "pending",
       orders: [order._id],
-      invoiceNumber: order.invoiceNumber || `BILL-${order._id.toString().slice(-8)}`, // ← FALLBACK
+      // ✅ Use provided invoice number (DEL-XX from pack event)
+      invoiceNumber: specificInvoiceNumber || order.invoiceNumber || `BILL-${order._id.toString().slice(-8)}`,
       isOpeningBalance: false,
     });
 
-    order.bill = bill._id;
-    await order.save();
-
-    console.log(`✅ Invoice-based bill created for order ${order._id}: ${bill._id}`);
+    console.log(`✅ New Invoice-based bill created for order ${order._id}: ${bill._id} (Inv: ${bill.invoiceNumber})`);
     return bill;
   } catch (error) {
     console.error("Error creating invoice-based bill:", error);
@@ -231,6 +233,7 @@ const getAllPendingBills = async (req, res) => {
   try {
     const bills = await Bill.find({ status: { $in: ["pending", "overdue", "partial"] } })
       .populate("customer", "name")
+      .populate("orders", "invoiceNumber")
       .sort({ dueDate: 1 });
     res.json(bills);
   } catch (error) {
@@ -240,32 +243,28 @@ const getAllPendingBills = async (req, res) => {
 
 const markBillReceived = async (req, res) => {
   try {
-    const { billId, amount, method, chequeDetails } = req.body;
-
-    // Role check
+    const { billId, amount, method, chequeDetails, batchId } = req.body; // ✅ Added batchId
     if (!req.user || !["Delivery Man", "Sales Man"].includes(req.user.role)) {
       return res.status(403).json({ message: "Access denied" });
     }
-
     const bill = await Bill.findById(billId).populate("customer").populate("orders");
     if (!bill) return res.status(404).json({ message: "Bill not found" });
-
     const actualPayment = Math.min(amount, bill.amountDue);
     if (actualPayment <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
-
-    // Get first order from bill for invoice reference
     const firstOrderId = bill.orders && bill.orders.length > 0 ? bill.orders[0]._id : null;
-
-    // Update bill
     bill.paidAmount += actualPayment;
     bill.amountDue -= actualPayment;
     if (bill.amountDue < 0) bill.amountDue = 0;
     bill.status = bill.amountDue <= 0 ? "paid" : "partial";
+    
+    // ✅ NEW: Assign batch receipt number if provided (bulk operation)
+    if (batchId) {
+      bill.batchReceiptNumber = batchId; // e.g. REC-BATCH-20250305-7842
+    }
+    
     await bill.save();
-
-    // Create transaction → delivery/sales wallet
     await BillTransaction.create({
       bill: bill._id,
       customer: bill.customer._id,
@@ -277,19 +276,18 @@ const markBillReceived = async (req, res) => {
       status: "received",
       order: firstOrderId,
       invoiceNumber: bill.invoiceNumber,
+      batchReceiptNumber: batchId || null, // ✅ Store in transaction too if needed
     });
-
-    // Restore credit limit
-    const customer = bill.customer; // already populated
+    const customer = bill.customer;
     if (customer && customer.billingType === "Credit limit") {
       customer.balanceCreditLimit += actualPayment;
       await customer.save();
     }
-
     res.json({
       message: "Payment received – bill updated & credit restored",
       newStatus: bill.status,
       remainingDue: bill.amountDue,
+      batchReceiptNumber: bill.batchReceiptNumber,
     });
   } catch (error) {
     console.error("Mark received error:", error);
@@ -299,63 +297,34 @@ const markBillReceived = async (req, res) => {
 
 const getBillReceipt = async (req, res) => {
   try {
-    // Optional: Keep auth check if you want
     if (!req.user) {
       return res.status(401).json({ message: "Not authorized, no token provided" });
     }
-
-    const bill = await Bill.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode");
-
+    const bill = await Bill.findById(req.params.id).populate("customer", "name email phoneNumber address pincode");
     if (!bill) {
       return res.status(404).json({ message: "Bill not found" });
     }
-
-    // Prefer invoiceNumber from bill (which should match order's DEL-XXX)
-    const displayInvoiceNo = bill.invoiceNumber || "N/A";
-
-    // Use meaningful filename
-    const filename = displayInvoiceNo !== "N/A"
-      ? `receipt-${displayInvoiceNo}.pdf`
-      : `receipt_${bill._id.toString().slice(-8)}.pdf`;
-
+    // ✅ Use batchReceiptNumber if available, else fall back to invoice-based
+    const displayReceiptNo = bill.batchReceiptNumber || `REC-${bill.invoiceNumber || "N/A"}`;
+    const filename = `receipt-${displayReceiptNo}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
     const doc = new PDFDocument({ size: "A4", margin: 50 });
     doc.pipe(res);
-
     const pageWidth = doc.page.width;
     const margin = 50;
-    const contentWidth = pageWidth - margin * 2;
-
-    // ─── Title ───────────────────────────────────────────────────────
-    doc
-      .fontSize(24)
-      .font("Helvetica-Bold")
-      .fillColor("#1e293b")
-      .text("PAYMENT RECEIPT", { align: "center" });
-
+    // Title
+    doc.fontSize(24).font("Helvetica-Bold").fillColor("#1e293b").text("PAYMENT RECEIPT", { align: "center" });
     doc.moveDown(0.5);
-
-    // ─── Receipt & Date ──────────────────────────────────────────────
+    // Receipt & Date - ✅ Use batch if available
     doc
       .fontSize(12)
       .font("Helvetica")
-      .text(`Receipt No: REC-${displayInvoiceNo}`, { align: "center" })
-      .text(
-        `Date: ${new Date(bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString()}`,
-        { align: "center" }
-      );
-
+      .text(`Receipt No: ${displayReceiptNo}`, { align: "center" })
+      .text(`Date: ${new Date(bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString()}`, { align: "center" });
     doc.moveDown(1.5);
-
-    // ─── Customer Details ────────────────────────────────────────────
-    doc
-      .fontSize(14)
-      .font("Helvetica-Bold")
-      .text("Customer Details:");
-
+    // Customer Details
+    doc.fontSize(14).font("Helvetica-Bold").text("Customer Details:");
     doc
       .fontSize(12)
       .font("Helvetica")
@@ -363,82 +332,39 @@ const getBillReceipt = async (req, res) => {
       .text(`Phone: ${bill.customer?.phoneNumber || "N/A"}`)
       .text(`Address: ${bill.customer?.address || "N/A"}`)
       .text(`Pincode: ${bill.customer?.pincode || "N/A"}`);
-
     doc.moveDown(1.5);
-
-    // ─── Bill Summary ────────────────────────────────────────────────
-    doc
-      .fontSize(14)
-      .font("Helvetica-Bold")
-      .text("Bill Summary:");
-
+    // Bill Summary
+    doc.fontSize(14).font("Helvetica-Bold").text("Bill Summary:");
     doc.moveDown(0.5);
-
     const summaryStartY = doc.y;
     const labelX = margin + 20;
     const valueX = margin + 220;
-
-    doc
-      .fontSize(12)
-      .font("Helvetica-Bold")
-      .text("Invoice Number:", labelX, summaryStartY);
-
-    doc
-      .font("Helvetica")
-      .text(displayInvoiceNo, valueX, summaryStartY);
-
+    doc.fontSize(12).font("Helvetica-Bold").text("Invoice Number:", labelX, summaryStartY);
+    doc.font("Helvetica").text(bill.invoiceNumber || "N/A", valueX, summaryStartY); // ✅ Keep individual invoice here
     doc.moveDown(0.8);
-
-    doc
-      .font("Helvetica-Bold")
-      .text("Total Amount of Bill:", labelX, doc.y);
-
-    doc
-      .font("Helvetica")
-      .text(`AED ${bill.totalUsed?.toFixed(2) || "0.00"}`, valueX, doc.y);
-
+    doc.font("Helvetica-Bold").text("Total Amount of Bill:", labelX, doc.y);
+    doc.font("Helvetica").text(`AED ${bill.totalUsed?.toFixed(2) || "0.00"}`, valueX, doc.y);
     doc.moveDown(0.8);
-
-    doc
-      .font("Helvetica-Bold")
-      .text("Paid Amount:", labelX, doc.y);
-
-    doc
-      .font("Helvetica")
-      .text(`AED ${bill.paidAmount?.toFixed(2) || "0.00"}`, valueX, doc.y);
-
+    doc.font("Helvetica-Bold").text("Paid Amount:", labelX, doc.y);
+    doc.font("Helvetica").text(`AED ${bill.paidAmount?.toFixed(2) || "0.00"}`, valueX, doc.y);
     doc.moveDown(0.8);
-
-    doc
-      .font("Helvetica-Bold")
-      .text("Remaining Due:", labelX, doc.y);
-
+    doc.font("Helvetica-Bold").text("Remaining Due:", labelX, doc.y);
     const remaining = bill.amountDue?.toFixed(2) || "0.00";
-    doc
-      .font("Helvetica")
-      .fillColor(remaining === "0.00" ? "#16a34a" : "#dc2626")
-      .text(`AED ${remaining}`, valueX, doc.y);
-
+    doc.font("Helvetica").fillColor(remaining === "0.00" ? "#16a34a" : "#dc2626").text(`AED ${remaining}`, valueX, doc.y);
     doc.moveDown(2);
-
-    // ─── Footer ──────────────────────────────────────────────────────
+    // Footer
     doc
       .fontSize(10)
       .font("Helvetica-Oblique")
       .fillColor("#6b7280")
       .text("Thank you for your payment!", { align: "center" })
       .text("This is a computer-generated receipt.", { align: "center" });
-
     doc.end();
-
-    console.log(`Receipt generated for bill ${bill._id} (Invoice: ${displayInvoiceNo})`);
+    console.log(`Receipt generated for bill ${bill._id} (Receipt: ${displayReceiptNo})`);
   } catch (error) {
     console.error("Receipt generation error:", error);
     if (!res.headersSent) {
-      res.status(500).json({
-        message: "Failed to generate receipt",
-        error: error.message,
-      });
+      res.status(500).json({ message: "Failed to generate receipt", error: error.message });
     }
   }
 };
@@ -447,7 +373,6 @@ const getBillReceipt = async (req, res) => {
 const downloadBillInvoice = async (req, res) => {
   try {
     const { billId } = req.params;
-    
     const bill = await Bill.findById(billId)
       .populate("customer", "name email phoneNumber address pincode")
       .populate("orders", "invoiceNumber");
@@ -456,7 +381,6 @@ const downloadBillInvoice = async (req, res) => {
       return res.status(404).json({ message: "Bill not found" });
     }
 
-    // Check authorization for customer
     if (req.user && req.user.role === "Customer") {
       const customer = await Customer.findOne({ user: req.user._id });
       if (!customer || String(customer._id) !== String(bill.customer._id)) {
@@ -464,21 +388,19 @@ const downloadBillInvoice = async (req, res) => {
       }
     }
 
-    const company = await CompanySettings.findOne() || { companyName: 'Ingoude Company' };
-    
+    const company = await CompanySettings.findOne() || { companyName: "Ingoude Company" };
     const filename = `bill-invoice-${bill.invoiceNumber || bill._id.toString().slice(-8)}.pdf`;
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
     const doc = new PDFDocument({ size: "A4", margin: 50 });
     doc.pipe(res);
 
-    // Header
     doc.fontSize(20).font("Helvetica-Bold").text(company.companyName.toUpperCase(), { align: "center" });
     doc.fontSize(14).moveDown(0.3).text("BILL INVOICE", { align: "center" });
     doc.moveDown(1);
 
-    // Invoice & Bill Info
     doc.fontSize(11).font("Helvetica-Bold").text("INVOICE DETAILS", { underline: true });
     doc.fontSize(10).font("Helvetica");
     doc.text(`Invoice Number: ${bill.invoiceNumber || "N/A"}`);
@@ -489,7 +411,6 @@ const downloadBillInvoice = async (req, res) => {
     doc.text(`Bill Date: ${new Date(bill.createdAt).toLocaleDateString()}`);
     doc.moveDown(0.5);
 
-    // Customer Info
     doc.fontSize(11).font("Helvetica-Bold").text("BILL TO", { underline: true });
     doc.fontSize(10).font("Helvetica");
     doc.text(`Name: ${bill.customer.name}`);
@@ -498,14 +419,12 @@ const downloadBillInvoice = async (req, res) => {
     doc.text(`Address: ${bill.customer.address}, ${bill.customer.pincode}`);
     doc.moveDown(1);
 
-    // Bill Details Table
     doc.fontSize(11).font("Helvetica-Bold").text("BILL DETAILS", { underline: true });
     doc.moveDown(0.5);
 
     const tableX = 50;
-    const col1 = 150; // Label width
-    const col2 = 100; // Value width
-
+    const col1 = 150;
+    const col2 = 100;
     const rows = [
       ["Cycle Start", new Date(bill.cycleStart).toLocaleDateString()],
       ["Cycle End", new Date(bill.cycleEnd).toLocaleDateString()],
@@ -524,8 +443,6 @@ const downloadBillInvoice = async (req, res) => {
     });
 
     doc.moveDown(1);
-
-    // Footer
     doc.fontSize(9).font("Helvetica").fillColor("#555");
     doc.text("Thank you for your business!", { align: "center" });
     doc.text("This is a system-generated invoice.", { align: "center" });
@@ -539,6 +456,7 @@ const downloadBillInvoice = async (req, res) => {
     }
   }
 };
+
 
 module.exports = {
   generateBill,

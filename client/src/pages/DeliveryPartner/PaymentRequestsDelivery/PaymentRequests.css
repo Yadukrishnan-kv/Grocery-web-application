@@ -739,3 +739,68 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   border-color: #94a3b8;
   color: #4338ca;
 }
+/* Search total badge - shows when filtering pending bills */
+.search-total-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  margin-top: 8px;
+  margin-left: auto;
+}
+
+.search-total-badge img {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+}
+
+/* Bulk action bar - enhanced with total amount */
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.bulk-action-bar strong {
+  color: #0f766e;
+  margin-left: 4px;
+}
+
+.bulk-action-bar img {
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+/* Bulk receipt button style */
+.bulk-receipt-btn {
+  background: #0ea5e9;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.bulk-receipt-btn:hover:not(:disabled) {
+  background: #0284c7;
+}
+
+.bulk-receipt-btn:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
