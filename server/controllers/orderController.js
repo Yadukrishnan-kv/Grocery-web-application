@@ -1321,61 +1321,75 @@ const checkFirstOrder = async (req, res) => {
 
 const packOrder = async (req, res) => {
   try {
-    const { orderId } = req.params;
-    const { packedItems } = req.body;
-
+    // 1. Authorization
     if (req.user.role.trim() !== "Store kepper") {
-      return res.status(403).json({ message: "Only Store kepper can pack orders" });
+      return res.status(403).json({ message: "Only Storekeeper can pack orders" });
     }
 
-    const order = await Order.findById(orderId).populate("customer");
-    if (!order) return res.status(404).json({ message: "Order not found" });
+    const { packedItems } = req.body; // [{ product: orderItem._id, packedQuantity: number }, ...]
+
+    const order = await Order.findById(req.params.orderId)
+      .populate("customer")
+      .populate("orderItems.product", "productName price unit");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
 
     if (!["pending", "assigned", "partial_delivered"].includes(order.status)) {
       return res.status(400).json({ message: "Order not in packable state" });
     }
 
+    // 2. Validate and calculate newly packed quantities
     let newlyPackedAmount = 0;
-    let totalPacked = 0;
+    let totalNewlyPackedQty = 0;
     let allFullyPacked = true;
-    const newlyPackedItems = [];
+    const newlyPackedItems = []; // for invoice history
 
     for (const pack of packedItems) {
-      const item = order.orderItems.id(pack.product);
-      if (!item) continue;
+      const orderItem = order.orderItems.id(pack.product); // pack.product = orderItem _id
 
-      const previousPack = item.packedQuantity || 0;
-      const maxPack = item.orderedQuantity - previousPack;
-      const qty = Number(pack.packedQuantity);
-
-      if (qty > maxPack || qty < 0) {
-        return res.status(400).json({ message: `Invalid pack qty for ${item.product}` });
+      if (!orderItem) {
+        return res.status(400).json({ message: `Invalid item ID: ${pack.product}` });
       }
 
-      item.packedQuantity = previousPack + qty;
-      totalPacked += qty;
-      newlyPackedAmount += qty * item.price;
+      const alreadyPacked = orderItem.packedQuantity || 0;
+      const maxCanPack = orderItem.orderedQuantity - alreadyPacked;
+      const qtyToPackNow = Number(pack.packedQuantity);
 
-      if (qty > 0) {
-        newlyPackedItems.push({
-          productId: item.product,
-          newlyPackedQty: qty,
-          price: item.price,
+      if (isNaN(qtyToPackNow) || qtyToPackNow < 0 || qtyToPackNow > maxCanPack) {
+        return res.status(400).json({
+          message: `Invalid pack quantity for ${orderItem.product?.productName || "item"}. Max: ${maxCanPack}`,
         });
       }
 
-      if (item.packedQuantity < item.orderedQuantity) {
+      // Update packed quantity
+      orderItem.packedQuantity = alreadyPacked + qtyToPackNow;
+
+      // Track for this packing event
+      if (qtyToPackNow > 0) {
+        newlyPackedItems.push({
+          product: orderItem.product,           // Product _id
+          quantity: qtyToPackNow,               // only this packing
+          price: orderItem.price,
+        });
+
+        newlyPackedAmount += qtyToPackNow * orderItem.price;
+        totalNewlyPackedQty += qtyToPackNow;
+      }
+
+      if (orderItem.packedQuantity < orderItem.orderedQuantity) {
         allFullyPacked = false;
       }
     }
 
-    // Deduct credit for newly packed amount
+    // 3. Credit deduction (only for newly packed this time)
     if (order.payment === "credit" && newlyPackedAmount > 0) {
       const customer = await Customer.findById(order.customer);
-      if (customer && customer.billingType === "Credit limit") {
+      if (customer?.billingType === "Credit limit") {
         if (customer.balanceCreditLimit < newlyPackedAmount) {
           return res.status(400).json({
-            message: `Insufficient credit limit. Need ${newlyPackedAmount.toFixed(2)}, available: ${customer.balanceCreditLimit.toFixed(2)}`,
+            message: `Insufficient credit. Need ${newlyPackedAmount.toFixed(2)}, available ${customer.balanceCreditLimit.toFixed(2)}`,
           });
         }
         customer.balanceCreditLimit -= newlyPackedAmount;
@@ -1383,47 +1397,37 @@ const packOrder = async (req, res) => {
       }
     }
 
+    // 4. Generate new invoice number ONLY when something new is packed
+    let newInvoiceNumber = order.invoiceNumber; // keep last one if no new packing
+
+    if (newlyPackedAmount > 0) {
+      const counter = await InvoiceCounter.findOneAndUpdate(
+        {},
+        { $inc: { invoiceCount: 1 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+
+      newInvoiceNumber = `DEL-${String(counter.invoiceCount).padStart(2, "0")}`;
+
+      // Add to immutable history - IMPORTANT: store ONLY this packing's items
+      if (!order.invoiceHistory) order.invoiceHistory = [];
+
+      order.invoiceHistory.push({
+        invoiceNumber: newInvoiceNumber,
+        quantity: totalNewlyPackedQty,
+        amount: newlyPackedAmount,
+        createdAt: new Date(),
+        items: newlyPackedItems, // ← this is what allows correct PDF later
+      });
+
+      // Update current active invoice number
+      order.invoiceNumber = newInvoiceNumber;
+    }
+
+    // 5. Update order status & packing metadata
     order.packedBy = req.user._id;
     order.packedAt = new Date();
     order.packedStatus = allFullyPacked ? "fully_packed" : "partially_packed";
-
-    // ✅ GENERATE NEW INVOICE NUMBER ON EVERY PACK EVENT
-    if (newlyPackedAmount > 0) {
-  try {
-    const counter = await InvoiceCounter.findOneAndUpdate(
-      {},
-      { $inc: { invoiceCount: 1 } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-    const newInvoiceNumber = `DEL-${String(counter.invoiceCount).padStart(2, "0")}`;
-    
-    // Save to history (immutable record)
-    if (!order.invoiceHistory) order.invoiceHistory = [];
-    order.invoiceHistory.push({
-      invoiceNumber: newInvoiceNumber,
-      quantity: totalPacked,
-      amount: newlyPackedAmount,
-      createdAt: new Date(),
-    });
-
-    // Update current invoice number
-    order.invoiceNumber = newInvoiceNumber;
-
-    // ✅✅✅ CRITICAL: Update invoicedQuantity for newly packed items
-    // This ensures NEXT invoice shows only remaining unpacked qty
-    newlyPackedItems.forEach((packItem) => {
-      const orderItem = order.orderItems.id(packItem.productId);
-      if (orderItem) {
-        // Add newly packed qty to invoicedQuantity
-        orderItem.invoicedQuantity = (orderItem.invoicedQuantity || 0) + packItem.newlyPackedQty;
-      }
-    });
-
-    console.log(`✅ Invoice ${newInvoiceNumber} generated. Updated invoicedQuantity for ${newlyPackedItems.length} items.`);
-  } catch (invoiceErr) {
-    console.error("Invoice generation error:", invoiceErr);
-  }
-}
 
     if (allFullyPacked && order.status !== "partial_delivered") {
       order.status = "ready_to_deliver";
@@ -1431,19 +1435,27 @@ const packOrder = async (req, res) => {
 
     await order.save();
 
+    // 6. Response
     res.json({
+      success: true,
       message: allFullyPacked
         ? `Order fully packed. Credit deducted: AED ${newlyPackedAmount.toFixed(2)}`
-        : `Partially packed: ${totalPacked} units. Credit deducted: AED ${newlyPackedAmount.toFixed(2)}`,
+        : `Partially packed (${totalNewlyPackedQty} units this time). Credit deducted: AED ${newlyPackedAmount.toFixed(2)}`,
       order,
-      creditDeducted: newlyPackedAmount,
-      invoiceNumber: order.invoiceNumber,
-      newlyPackedItems,
-      nextStep: allFullyPacked ? "Ready for delivery" : "Continue packing when stock arrives",
+      invoiceNumber: newInvoiceNumber,
+      newlyPacked: {
+        quantity: totalNewlyPackedQty,
+        amount: newlyPackedAmount,
+        items: newlyPackedItems,
+      },
+      nextStep: allFullyPacked ? "Ready for delivery" : "Can pack more later",
     });
   } catch (error) {
     console.error("Pack order error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({
+      message: "Server error while packing order",
+      error: error.message,
+    });
   }
 };
 const getPendingForPacking = async (req, res) => {
@@ -1558,22 +1570,22 @@ const getUnifiedInvoice = async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode")
       .populate("orderItems.product", "productName price unit");
-
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (!order.packedAt || !order.packedStatus) {
       return res.status(400).json({ message: "Order must be packed first to generate invoice" });
     }
-
-    const invoiceNumber = order.invoiceNumber || `DEL-${order._id.toString().slice(-6).toUpperCase()}`;
-    const filename = `unified-invoice-${invoiceNumber}.pdf`;
-
+    // NEW: Accept specific invoiceNumber from query (for historical)
+    const targetInvoiceNo = req.query.invoiceNumber || order.invoiceNumber;
+    if (!order.invoiceHistory.some(h => h.invoiceNumber === targetInvoiceNo)) {
+      return res.status(404).json({ message: "Specified invoice not found in order history" });
+    }
+    const filename = `unified-invoice-${targetInvoiceNo}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
     const doc = new PDFDocument({ size: "A4", margin: 0 });
     doc.pipe(res);
-
-    await generateUnifiedInvoicePDF(doc, order, "INVOICE", invoiceNumber);
+    // Pass target invoiceNo
+    await generateUnifiedInvoicePDF(doc, order, "INVOICE", targetInvoiceNo);
     doc.end();
   } catch (error) {
     console.error("Error generating unified invoice:", error);
@@ -1582,7 +1594,6 @@ const getUnifiedInvoice = async (req, res) => {
     }
   }
 };
-
 // ✅ UNIFIED INVOICE PDF - Shows Ordered/Packed/Delivered columns
 const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const company = await CompanySettings.findOne();
@@ -1611,7 +1622,6 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
   const infoY = headerY + 120;
   const billToX = margin;
   const fromX = pageWidth - margin - 250;
-
   doc.fontSize(14).font("Helvetica-Bold").text("Bill To:", billToX, infoY);
   doc
     .fontSize(12)
@@ -1620,7 +1630,6 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     .text(order.customer?.phoneNumber || "N/A", billToX, infoY + 45)
     .text(order.customer?.address || "N/A", billToX, infoY + 65)
     .text(`Pincode: ${order.customer?.pincode || "N/A"}`, billToX, infoY + 85);
-
   doc.fontSize(14).font("Helvetica-Bold").text("From:", fromX, infoY);
   doc
     .fontSize(12)
@@ -1629,13 +1638,16 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     .text(company.companyPhone || "N/A", fromX, infoY + 45)
     .text(company.companyAddress || "N/A", fromX, infoY + 65);
 
-  // ─── Table: Description | Qty (This Pack) | Price | Total ─────────────────
+  // ─── Table: S.No | Description | Qty | Price | Total ─────────────────
   const tableY = infoY + 130;
   const rowHeight = 45;
-  const descCol = margin;
-  const qtyCol = margin + 300;      // ✅ Qty column (only for THIS invoice)
-  const priceCol = margin + 380;    // ✅ Price column
-  const totalCol = margin + 460;    // ✅ Total column
+  
+  // ✅ NEW COLUMN POSITIONS with S.No
+  const snoCol = margin;                    // S.No column
+  const descCol = margin + 40;              // Description (shifted right)
+  const qtyCol = margin + 260;              // Qty
+  const priceCol = margin + 320;            // Price
+  const totalCol = margin + 380;            // Total
 
   // Header row
   doc
@@ -1644,49 +1656,56 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     .fill();
   doc
     .fillColor("#ffffff")
-    .fontSize(11)
+    .fontSize(10)
     .font("Helvetica-Bold")
-    .text("Description", descCol, tableY + 5)
-    .text("Qty", qtyCol, tableY + 5, { width: 70, align: "center" })
-    .text("Price", priceCol, tableY + 5, { width: 70, align: "center" })
-    .text("Total", totalCol, tableY + 5, { width: 70, align: "center" });
+    .text("S.No", snoCol, tableY + 8, { width: 30, align: "center" })  // ✅ S.No header
+    .text("Description", descCol, tableY + 8)
+    .text("Qty", qtyCol, tableY + 8, { width: 50, align: "center" })
+    .text("Price", priceCol, tableY + 8, { width: 50, align: "center" })
+    .text("Total", totalCol, tableY + 8, { width: 50, align: "center" });
 
-  // ─── Data rows: Show ONLY qty packed for THIS invoice number ─────────
+  // ─── NEW: Use specific history entry for this invoiceNo ─────────
+  const historyEntry = order.invoiceHistory.find(h => h.invoiceNumber === invoiceNo);
+  if (!historyEntry) throw new Error(`History entry not found for ${invoiceNo}`);
+
   let currentY = tableY + rowHeight;
   let amountForBilling = 0;
+  let serialNumber = 1;  // ✅ Start serial number at 1
 
-  order.orderItems.forEach((item) => {
-    const packed = item.packedQuantity || 0;
-    const previouslyInvoiced = item.invoicedQuantity || 0;
-    
-    // ✅✅✅ KEY: Calculate qty for THIS specific invoice only
-    // This ensures DEL-02 shows only the newly packed qty (5), not cumulative (10)
-    const qtyForThisInvoice = packed - previouslyInvoiced;
-    
-    // Skip if no new quantity for this invoice
-    if (qtyForThisInvoice <= 0) return;
+  // FIXED: Correctly find orderItem using oi.product._id (populated)
+  for (const histItem of historyEntry.items) {
+    const orderItem = order.orderItems.find(oi => oi.product._id.toString() === histItem.product.toString());
+    if (!orderItem) continue;
 
-    const amountThisRow = qtyForThisInvoice * item.price;
-    amountForBilling += amountThisRow;
+    const qty = histItem.quantity;
+    const price = histItem.price;
+    const total = qty * price;
+    amountForBilling += total;
 
     doc
       .fillColor("#000000")
       .fontSize(10)
       .font("Helvetica")
-      .text(item.product?.productName || "Unknown Product", descCol, currentY + 8)
-      // ✅ Show ONLY the qty for this invoice (not cumulative)
-      .text(qtyForThisInvoice.toString(), qtyCol, currentY + 8, { width: 70, align: "center" })
-      .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 8, { width: 70, align: "center" })
-      .text(`AED ${amountThisRow.toFixed(2)}`, totalCol, currentY + 8, { width: 70, align: "center" });
-
+      // ✅ ADD SERIAL NUMBER
+      .text(serialNumber.toString(), snoCol, currentY + 8, { width: 30, align: "center" })
+      .text(orderItem.product?.productName || "Unknown Product", descCol, currentY + 8)
+      .text(qty.toString(), qtyCol, currentY + 8, { width: 50, align: "center" })
+      .text(`AED ${price.toFixed(2)}`, priceCol, currentY + 8, { width: 50, align: "center" })
+      .text(`AED ${total.toFixed(2)}`, totalCol, currentY + 8, { width: 50, align: "center" });
+    
     currentY += rowHeight;
-  });
+    serialNumber++;  // ✅ Increment serial number
+  }
+
+  // Verify total matches history (debug)
+  if (amountForBilling !== historyEntry.amount) {
+    console.warn(`Amount mismatch for ${invoiceNo}: calculated ${amountForBilling}, history ${historyEntry.amount}`);
+  }
 
   // ─── Grand Total (for THIS invoice only) ───────────────────────────
   const subtotalY = currentY + 20;
   const subtotalWidth = 220;
   const subtotalX = pageWidth - margin - subtotalWidth;
-
   doc.rect(subtotalX, subtotalY, subtotalWidth, 40).fillColor("#222222").fill();
   doc
     .fillColor("#ffffff")
@@ -1709,10 +1728,8 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
       footerY + 65
     )
     .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
-
   const thankYouX = pageWidth - margin - 200;
   doc.fontSize(36).font("Helvetica-Bold").fillColor("#000000").text("Thank You!", thankYouX, footerY, { width: 200, align: "right" });
-
   const bottomY = footerY + 150;
   doc.fontSize(10).font("Helvetica-Oblique").fillColor("#666666").text(`Invoice Reference: ${invoiceNo}`, margin, bottomY);
 };
@@ -1722,7 +1739,7 @@ const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
 
   const pageWidth = 595.28;
   const margin = 50;
-  const headerY = margin; // ← Fixed: define headerY here
+  const headerY = margin;
 
   const date = new Date(order.packedAt || Date.now());
   const formattedDate = date.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
@@ -1759,39 +1776,47 @@ const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     .text(company.companyPhone || "N/A", fromX, infoY + 45)
     .text(company.companyAddress || "N/A", fromX, infoY + 65);
 
-  // Table Header
-  const tableY = infoY + 130; // adjusted from margin + 150 to keep spacing consistent
+  // Table Header - ✅ UPDATED WITH S.No
+  const tableY = infoY + 130;
   const rowHeight = 40;
-  const descCol = margin;
-  const qtyCol = margin + 280;
-  const priceCol = margin + 360;
-  const totalCol = margin + 440;
+  
+  // ✅ NEW COLUMN POSITIONS with S.No
+  const snoCol = margin;
+  const descCol = margin + 40;
+  const qtyCol = margin + 260;
+  const priceCol = margin + 320;
+  const totalCol = margin + 380;
 
   doc.rect(margin - 10, tableY - 5, pageWidth - margin * 2 + 20, rowHeight)
     .fillColor("#b0123b").fill();
 
-  doc.fillColor("#ffffff").fontSize(12).font("Helvetica-Bold")
-    .text("Description", descCol, tableY + 10)
-    .text("Packed Qty", qtyCol, tableY + 10, { width: 70, align: "center" })
-    .text("Price", priceCol, tableY + 10, { width: 70, align: "center" })
-    .text("Total", totalCol, tableY + 10, { width: 70, align: "center" });
+  doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold")
+    .text("S.No", snoCol, tableY + 8, { width: 30, align: "center" })  // ✅ S.No header
+    .text("Description", descCol, tableY + 8)
+    .text("Packed Qty", qtyCol, tableY + 8, { width: 50, align: "center" })
+    .text("Price", priceCol, tableY + 8, { width: 50, align: "center" })
+    .text("Total", totalCol, tableY + 8, { width: 50, align: "center" });
 
-  // Data rows
+  // Data rows - ✅ ADD SERIAL NUMBER
   let currentY = tableY + rowHeight;
   let grandTotal = 0;
+  let serialNumber = 1;  // ✅ Start at 1
 
   order.orderItems.forEach((item) => {
     const qty = item.packedQuantity || 0;
     const itemTotal = qty * item.price;
     grandTotal += itemTotal;
 
-    doc.fillColor("#000000").fontSize(12).font("Helvetica")
-      .text(item.product?.productName || "Unknown Product", descCol, currentY + 10)
-      .text(qty.toString(), qtyCol, currentY + 10, { width: 70, align: "center" })
-      .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 10, { width: 70, align: "center" })
-      .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 10, { width: 70, align: "center" });
+    doc.fillColor("#000000").fontSize(10).font("Helvetica")
+      // ✅ ADD SERIAL NUMBER
+      .text(serialNumber.toString(), snoCol, currentY + 8, { width: 30, align: "center" })
+      .text(item.product?.productName || "Unknown Product", descCol, currentY + 8)
+      .text(qty.toString(), qtyCol, currentY + 8, { width: 50, align: "center" })
+      .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 8, { width: 50, align: "center" })
+      .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 8, { width: 50, align: "center" });
 
     currentY += rowHeight;
+    serialNumber++;  // ✅ Increment
   });
 
   // Grand Total

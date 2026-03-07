@@ -11,7 +11,7 @@ import toast from "react-hot-toast";
 const CustomerOutstandingDetails = () => {
   const { customerId } = useParams();
   const navigate = useNavigate();
-  
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [customer, setCustomer] = useState(null);
@@ -21,7 +21,6 @@ const CustomerOutstandingDetails = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
-  // Fetch current user
   const fetchCurrentUser = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
@@ -40,7 +39,6 @@ const CustomerOutstandingDetails = () => {
     }
   }, [backendUrl]);
 
-  // Fetch outstanding details
   const fetchOutstandingDetails = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
@@ -65,16 +63,18 @@ const CustomerOutstandingDetails = () => {
   }, [fetchCurrentUser, fetchOutstandingDetails]);
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
     }).format(amount || 0);
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric'
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
   };
 
@@ -92,7 +92,7 @@ const CustomerOutstandingDetails = () => {
       overdue: { label: "Overdue", class: "badge-overdue" },
       partial: { label: "Partial", class: "badge-partial" },
       pending_payment: { label: "Pending Payment", class: "badge-pending" },
-      paid: { label: "Paid", class: "badge-paid" }
+      paid: { label: "Paid", class: "badge-paid" },
     };
     return map[status] || { label: status, class: "badge-neutral" };
   };
@@ -129,13 +129,9 @@ const CustomerOutstandingDetails = () => {
       <main className={`customer-outstanding-main ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="customer-outstanding-wrapper">
           <div className="customer-outstanding-container">
-            
             {/* Header Section */}
             <div className="customer-outstanding-header">
-              <button 
-                className="btn-back" 
-                onClick={() => navigate(-1)}
-              >
+              <button className="btn-back" onClick={() => navigate(-1)}>
                 ← Back
               </button>
               <div className="customer-info">
@@ -190,8 +186,14 @@ const CustomerOutstandingDetails = () => {
                   <span>{formatCurrency(customer.usedCredit)} / {formatCurrency(customer.creditLimit)} used</span>
                 </div>
                 <div className="progress-bar">
-                  <div 
-                    className={`progress-fill ${customer.usedCredit / customer.creditLimit > 0.9 ? 'critical' : customer.usedCredit / customer.creditLimit > 0.7 ? 'warning' : ''}`}
+                  <div
+                    className={`progress-fill ${
+                      customer.usedCredit / customer.creditLimit > 0.9
+                        ? "critical"
+                        : customer.usedCredit / customer.creditLimit > 0.7
+                        ? "warning"
+                        : ""
+                    }`}
                     style={{ width: `${Math.min(100, (customer.usedCredit / customer.creditLimit) * 100)}%` }}
                   />
                 </div>
@@ -201,7 +203,7 @@ const CustomerOutstandingDetails = () => {
             {/* Bills List */}
             <div className="bills-section">
               <h3 className="section-title">Pending Bills ({bills.length})</h3>
-              
+
               {bills.length === 0 ? (
                 <div className="no-bills">No pending bills found</div>
               ) : (
@@ -225,7 +227,7 @@ const CustomerOutstandingDetails = () => {
                               <span>{formatDate(bill.cycleStart)} → {formatDate(bill.cycleEnd)}</span>
                             </div>
                           </div>
-                          
+
                           <div className="bill-stats">
                             <div className="bill-amount">
                               <img src={DirhamSymbol} alt="AED" width={14} height={14} />
@@ -244,7 +246,7 @@ const CustomerOutstandingDetails = () => {
                           </div>
                         </div>
 
-                        {/* Bill Details - Always Visible */}
+                        {/* Bill Details */}
                         <div className="bill-details">
                           {/* Payment Progress */}
                           <div className="payment-progress">
@@ -253,55 +255,62 @@ const CustomerOutstandingDetails = () => {
                               <span>Remaining: {formatCurrency(bill.remainingDue)}</span>
                             </div>
                             <div className="progress-track">
-                              <div 
+                              <div
                                 className="progress-paid"
                                 style={{ width: `${(bill.paidAmount / bill.amountDue) * 100}%` }}
                               />
                             </div>
                           </div>
 
-                          {/* Orders in this Bill - FULL WIDTH TABLE */}
-                          {bill.orders.length > 0 && (
+                          {/* Orders Table - Using original full-width table style */}
+                          {bill.orders?.length > 0 && (
                             <div className="orders-list">
                               <div className="orders-table-wrapper-full">
                                 <table className="orders-table-full">
                                   <thead>
                                     <tr>
-                                      <th style={{ minWidth: '130px' }}>Invoice #</th>
-                                      <th style={{ minWidth: '110px' }}>Date</th>
-                                      <th style={{ minWidth: '220px' }}>Items</th>
-                                      <th style={{ minWidth: '110px', textAlign: 'right' }}>Amount</th>
-                                      <th style={{ minWidth: '120px' }}>Status</th>
-                                      <th style={{ minWidth: '100px' }}>Payment</th>
+                                      <th style={{ minWidth: "130px" }}>Invoice #</th>
+                                      <th style={{ minWidth: "110px" }}>Date</th>
+                                      <th style={{ minWidth: "220px" }}>Items</th>
+                                      <th style={{ minWidth: "110px", textAlign: "right" }}>Amount</th>
+                                      <th style={{ minWidth: "120px" }}>Status</th>
+                                      <th style={{ minWidth: "100px" }}>Payment</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {bill.orders.map((order) => (
                                       <tr key={order._id}>
-                                       
                                         <td>{order.invoiceNumber || "-"}</td>
                                         <td>{formatDate(order.orderDate)}</td>
                                         <td>
-                                          <div className="order-items-preview-full" title={order.items?.map(i => `${i.product} × ${i.orderedQuantity}`).join(', ')}>
+                                          <div
+                                            className="order-items-preview-full"
+                                            title={order.items?.map((i) => `${i.product} × ${i.quantity}`).join(", ")}
+                                          >
                                             {order.items?.slice(0, 3).map((item, idx) => (
                                               <span key={idx} className="item-chip-full">
-                                                {item.product} × {item.orderedQuantity}
+                                                {item.product} × {item.quantity}
                                               </span>
                                             ))}
                                             {order.items?.length > 3 && (
-                                              <span className="item-more-full" title={`${order.items.length - 3} more items`}>
+                                              <span
+                                                className="item-more-full"
+                                                title={`${order.items.length - 3} more items`}
+                                              >
                                                 +{order.items.length - 3}
                                               </span>
                                             )}
                                           </div>
                                         </td>
-                                        <td className="order-amount-full" style={{ textAlign: 'right' }}>
+                                        <td className="order-amount-full" style={{ textAlign: "right" }}>
                                           <img src={DirhamSymbol} alt="AED" width={12} height={12} />
                                           {formatCurrency(order.totalAmount)}
                                         </td>
                                         <td>
-                                          <span className={`order-status status-${order.status?.replace(/\s+/g, '_')}`}>
-                                            {order.status?.replace('_', ' ')}
+                                          <span
+                                            className={`order-status status-${order.status?.replace(/\s+/g, "_")}`}
+                                          >
+                                            {order.status?.replace("_", " ") || "Unknown"}
                                           </span>
                                         </td>
                                         <td>
@@ -316,8 +325,6 @@ const CustomerOutstandingDetails = () => {
                               </div>
                             </div>
                           )}
-
-                         
                         </div>
                       </div>
                     );
@@ -325,7 +332,6 @@ const CustomerOutstandingDetails = () => {
                 </div>
               )}
             </div>
-
           </div>
         </div>
       </main>

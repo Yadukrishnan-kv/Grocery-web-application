@@ -144,78 +144,51 @@ const CustomerBillStatement = () => {
 
   // ✅ Get the sales man assigned to this customer
 const getSalesManForCustomer = useCallback(async () => {
-  if (!customerProfile?.salesman) {
-    console.warn("No salesman assigned to this customer");
-    return [];
-  }
-
-  try {
-    const token = localStorage.getItem("token");
-    
-    // ✅ Extract ID properly: handle both populated object and string ID
-    const salesmanId = typeof customerProfile.salesman === 'object' 
-      ? customerProfile.salesman._id 
-      : customerProfile.salesman;
-
-    // ✅ If already populated with details, use directly (skip API call)
-    if (typeof customerProfile.salesman === 'object' && customerProfile.salesman.username) {
-      const salesMan = customerProfile.salesman;
-      const role = (salesMan.role || "").toLowerCase();
-      if (role.includes("sales") || role.includes("salesman") || !salesMan.role) {
-        return [{
-          _id: salesMan._id,
-          username: salesMan.username || salesMan.name || "Unknown Salesman",
-          email: salesMan.email || "",
-        }];
-      }
-    }
-
-    // Fallback: fetch by ID if not fully populated
-    const response = await axios.get(
-      `${backendUrl}/api/users/${salesmanId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    
-    const salesMan = response.data;
-    const role = (salesMan.role || "").toLowerCase();
-    if (role.includes("sales") || role.includes("salesman")) {
+  // If customerProfile already has populated salesman, use it directly
+  if (customerProfile?.salesman && typeof customerProfile.salesman === 'object') {
+    const salesMan = customerProfile.salesman;
+    // ✅ More flexible role check
+    const role = (salesMan.role || "").toLowerCase().replace(/\s+/g, '');
+    if (role.includes('sales') || role === '' || !salesMan.role) {
       return [{
         _id: salesMan._id,
         username: salesMan.username || salesMan.name || "Unknown Salesman",
         email: salesMan.email || "",
       }];
     }
-    return [];
-  } catch (error) {
-    console.error("Failed to fetch sales man:", error.response?.data || error.message);
-    return [];
   }
-}, [backendUrl, customerProfile]);
-  const fetchDeliveryMen = useCallback(async () => {
   
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${backendUrl}/api/users/delivery-men`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Keep for other pages if needed, but modal uses filtered list
-    } catch (error) {
-      toast.error("Failed to load delivery men");
-    }
-  }, [backendUrl]);
+  // If salesman is just an ID string, we can't fetch details without a working endpoint
+  // Return empty array gracefully
+  console.warn("Salesman not populated in profile or is just an ID");
+  return [];
+}, [customerProfile]);
+
+  const fetchDeliveryMen = useCallback(async () => {
+  try {
+    const token = localStorage.getItem("token");
+    // ✅ Just await, don't assign to unused variable
+    await axios.get(`${backendUrl}/api/users/delivery-men`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    // Keep for other pages if needed, but modal uses filtered list
+  } catch (error) {
+    toast.error("Failed to load delivery men");
+  }
+}, [backendUrl]);
 
   const fetchSalesMen = useCallback(async () => {
-    // ✅ This is now only used as fallback, primary logic is in getSalesManForCustomer
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${backendUrl}/api/users/sales-men`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Keep for other pages if needed, but modal uses filtered list
-    } catch (error) {
-      toast.error("Failed to load sales men");
-    }
-  }, [backendUrl]);
+  try {
+    const token = localStorage.getItem("token");
+    // ✅ Just await, don't assign to unused variable
+    await axios.get(`${backendUrl}/api/users/sales-men`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    // Keep for other pages if needed, but modal uses filtered list
+  } catch (error) {
+    toast.error("Failed to load sales men");
+  }
+}, [backendUrl]);
 
   useEffect(() => {
     const loadAllData = async () => {
@@ -757,7 +730,7 @@ const getSalesManForCustomer = useCallback(async () => {
 
   {(recipientType === "delivery" ? filteredDeliveryMen : filteredSalesMen).map(person => (
     <option key={person._id} value={person._id}>
-      {person.username} {person.email ? `(${person.email})` : ""}
+      {person.username} 
     </option>
   ))}
 </select>

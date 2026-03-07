@@ -55,14 +55,14 @@ const PackOrders = () => {
   useEffect(() => {
     fetchCurrentUser();
     fetchPendingOrders();
-    const interval = setInterval(fetchPendingOrders, 60000);
+    const interval = setInterval(fetchPendingOrders, 60000); // refresh every minute
     return () => clearInterval(interval);
   }, [fetchCurrentUser, fetchPendingOrders]);
 
   const openPackModal = (order) => {
     const inputs = {};
     order.orderItems.forEach((item) => {
-      inputs[item._id] = item.packedQuantity || 0;
+      inputs[item._id] = item.packedQuantity || 0; // show already packed as default
     });
     setSelectedOrder(order);
     setPackInputs(inputs);
@@ -80,15 +80,16 @@ const PackOrders = () => {
 
   const submitPacking = async () => {
     if (!selectedOrder) return;
+
     const packedItems = selectedOrder.orderItems
       .map((item) => ({
-        product: item._id,
+        product: item._id,                    // important: send orderItem _id
         packedQuantity: Number(packInputs[item._id] || 0),
       }))
       .filter((p) => p.packedQuantity > 0);
 
     if (packedItems.length === 0) {
-      return toast.error("Pack at least one item");
+      return toast.error("Please pack at least one item");
     }
 
     setProcessing(true);
@@ -99,6 +100,7 @@ const PackOrders = () => {
         { packedItems },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
       toast.success("Packing submitted successfully!");
       setSelectedOrder(null);
       setPackInputs({});
@@ -110,27 +112,37 @@ const PackOrders = () => {
     }
   };
 
-  // ✅ UPDATED: Accept invoiceNumber and use it in filename
+  // ────────────────────────────────────────────────────────────────
+  //  FIXED: Now correctly passes the specific invoiceNumber
+  // ────────────────────────────────────────────────────────────────
   const downloadUnifiedInvoice = async (orderId, invoiceNumber) => {
+    if (!invoiceNumber) {
+      toast.error("No invoice number available for this order yet");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get(`${backendUrl}/api/orders/unified-invoice/${orderId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: "blob",
-      });
+      const res = await axios.get(
+        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
-      // ✅ Use DEL-XX in filename
-      link.setAttribute("download", invoiceNumber 
-        ? `unified-invoice-${invoiceNumber}.pdf` 
-        : `unified-invoice-${orderId.slice(-8)}.pdf`);
+      link.setAttribute("download", `unified-invoice-${invoiceNumber}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success("Invoice downloaded");
+
+      toast.success(`Invoice ${invoiceNumber} downloaded`);
     } catch (err) {
+      console.error("Invoice download failed:", err);
       toast.error("Failed to download invoice");
     }
   };
@@ -146,10 +158,12 @@ const PackOrders = () => {
         !searchTerm.trim() ||
         (order.customer?.name &&
           order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
       const matchesStatus =
         statusFilter === "all" ||
         (order.packedStatus &&
           order.packedStatus.toLowerCase() === statusFilter.toLowerCase());
+
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
@@ -159,13 +173,14 @@ const PackOrders = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
-  if (!user) return <div className="loading">Loading...</div>;
+  if (!user) return <div className="loading">Loading user data...</div>;
 
   return (
     <div className="order-list-layout">
@@ -181,11 +196,13 @@ const PackOrders = () => {
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
+
       <main className={`order-list-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="order-list-container-wrapper">
           <div className="order-list-container">
             <div className="order-list-header-section">
               <h2 className="order-list-page-title">Pack Orders</h2>
+
               <div className="order-list-controls-group">
                 <label htmlFor="statusFilter" className="order-list-filter-label">
                   Filter by Packing Status:
@@ -201,6 +218,7 @@ const PackOrders = () => {
                   <option value="partially_packed">Partially Packed</option>
                   <option value="fully_packed">Fully Packed</option>
                 </select>
+
                 <div className="order-list-search-container">
                   <input
                     type="text"
@@ -228,7 +246,6 @@ const PackOrders = () => {
                   <thead>
                     <tr>
                       <th>No</th>
-                      {/* ✅ NEW COLUMN */}
                       <th>Customer</th>
                       <th>Products</th>
                       <th>Total Ordered</th>
@@ -242,9 +259,8 @@ const PackOrders = () => {
                     {filteredOrders.map((order, index) => (
                       <tr key={order._id}>
                         <td>{index + 1}</td>
-                        {/* ✅ DISPLAY INVOICE NUMBER */}
-                        
                         <td>{order.customer?.name || "N/A"}</td>
+
                         <td className="products-cell">
                           {order.orderItems?.length > 0 ? (
                             <div className="products-list">
@@ -262,6 +278,7 @@ const PackOrders = () => {
                             <span className="no-products">No products</span>
                           )}
                         </td>
+
                         <td>{order.totalOrderedQuantity || 0}</td>
                         <td>
                           {order.orderItems?.reduce(
@@ -269,6 +286,7 @@ const PackOrders = () => {
                             0
                           ) || 0}
                         </td>
+
                         <td>
                           <span
                             className={`order-list-status-badge order-list-status-${
@@ -282,27 +300,38 @@ const PackOrders = () => {
                               : "Not Packed"}
                           </span>
                         </td>
+
                         <td>{formatDate(order.orderDate)}</td>
-                        <td>
-                          {/* ✅ PASS INVOICE NUMBER TO DOWNLOAD */}
-                          {order.packedStatus && order.packedStatus !== "not_packed" && (
+
+                        <td className="actions-cell">
+                          {/* Invoice button – only shown when invoice exists */}
+                          {order.invoiceNumber ? (
                             <button
                               className="order-list-icon-button order-list-view-button"
                               onClick={() =>
                                 downloadUnifiedInvoice(order._id, order.invoiceNumber)
                               }
-                              style={{ marginRight: "8px" }}
-                              title={`Download Invoice ${order.invoiceNumber || "N/A"}`}
-                              disabled={!order.invoiceNumber}
+                              title={`Download Invoice ${order.invoiceNumber}`}
                             >
-                              📄 Invoice
+                              📄 Invoice ({order.invoiceNumber})
                             </button>
+                          ) : (
+                            <span className="no-invoice-text" title="Invoice generated after first packing">
+                              No Invoice Yet
+                            </span>
                           )}
+
                           <button
                             className="order-list-icon-button order-list-edit-button"
                             onClick={() => openPackModal(order)}
+                            disabled={order.packedStatus === "fully_packed"}
+                            title={
+                              order.packedStatus === "fully_packed"
+                                ? "Order already fully packed"
+                                : "Pack / Add more quantity"
+                            }
                           >
-                            Pack
+                            {order.packedStatus === "fully_packed" ? "Packed ✓" : "Pack"}
                           </button>
                         </td>
                       </tr>
@@ -315,23 +344,28 @@ const PackOrders = () => {
         </div>
       </main>
 
+      {/* Packing Modal */}
       {selectedOrder && (
         <div className="modal-overlay">
           <div className="pack-modal">
             <h3>Pack Order #{selectedOrder._id.toString().slice(-8)}</h3>
             <p>Customer: {selectedOrder.customer?.name || "N/A"}</p>
+
             <div className="pack-items">
               {selectedOrder.orderItems.map((item) => {
                 const max = getMaxPackable(item);
+                const already = item.packedQuantity || 0;
                 return (
                   <div key={item._id} className="pack-item-row">
                     <div className="item-details">
                       <strong>{item.product?.productName || "Unknown"}</strong>
                       <div>Ordered: {item.orderedQuantity} {item.unit}</div>
-                      <div>Already packed: {item.packedQuantity || 0}</div>
+                      <div>Already packed: {already} {item.unit}</div>
+                      <div className="remaining">Remaining to pack: {max} {item.unit}</div>
                     </div>
+
                     <div className="pack-qty">
-                      <label>Pack Qty:</label>
+                      <label>Pack Now:</label>
                       <input
                         type="number"
                         min="0"
@@ -339,6 +373,7 @@ const PackOrders = () => {
                         step="any"
                         value={packInputs[item._id] ?? ""}
                         onChange={(e) => handlePackQtyChange(item._id, e.target.value)}
+                        disabled={max === 0}
                       />
                       <span className="max-text">/ {max}</span>
                     </div>
@@ -346,6 +381,7 @@ const PackOrders = () => {
                 );
               })}
             </div>
+
             <div className="modal-footer">
               <button className="cancel" onClick={closeModal}>
                 Cancel

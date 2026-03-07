@@ -96,14 +96,21 @@ const orderSchema = new Schema(
       default: null,
       index: true,
     },
-     invoiceHistory: [
-      {
-        invoiceNumber: String,
-        quantity: Number,
-        amount: Number,
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
+   invoiceHistory: [
+    {
+      invoiceNumber: String,
+      quantity: Number,
+      amount: Number,
+      createdAt: { type: Date, default: Date.now },
+      items: [  
+        {
+          product: { type: Schema.Types.ObjectId, ref: "Product" },
+          quantity: Number, 
+          price: Number,     
+        }
+      ]
+    },
+  ],
     packedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

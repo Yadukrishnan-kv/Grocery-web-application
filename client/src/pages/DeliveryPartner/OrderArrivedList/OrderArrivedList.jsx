@@ -5,7 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./OrderArrivedList.css";
 import axios from "axios";
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
 
 const OrderArrivedList = () => {
   const [orders, setOrders] = useState([]);
@@ -51,12 +51,12 @@ const OrderArrivedList = () => {
 
       const response = await axios.get(
         `${backendUrl}/api/orders/my-assigned-orders`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       // Only show orders that are assigned (not yet accepted/rejected)
       const assignedOrders = response.data.filter(
-        (order) => order.assignmentStatus === "assigned"
+        (order) => order.assignmentStatus === "assigned",
       );
       setOrders(assignedOrders);
     } catch (error) {
@@ -88,7 +88,7 @@ const OrderArrivedList = () => {
       await axios.post(
         `${backendUrl}/api/orders/accept/${orderId}`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       toast.success("Order accepted successfully");
@@ -108,10 +108,12 @@ const OrderArrivedList = () => {
       await axios.post(
         `${backendUrl}/api/orders/reject/${orderId}`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      toast.success("Order rejected successfully. It has been returned for reassignment.");
+      toast.success(
+        "Order rejected successfully. It has been returned for reassignment.",
+      );
       fetchAssignedOrders();
     } catch (error) {
       console.error("Error rejecting order:", error);
@@ -161,6 +163,36 @@ const OrderArrivedList = () => {
     return `${day}/${month}/${year}`;
   };
 
+  // ✅ Added: Same invoice download function as in DeliveredOrdersList
+  const downloadUnifiedInvoice = async (orderId, invoiceNumber) => {
+    try {
+      const token = localStorage.getItem("token");
+      const filename = invoiceNumber
+        ? `invoice-${invoiceNumber}.pdf`
+        : `invoice-${orderId.slice(-8)}.pdf`;
+
+      const res = await axios.get(
+        `${backendUrl}/api/orders/unified-invoice/${orderId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        },
+      );
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Invoice downloaded");
+    } catch (err) {
+      toast.error("Failed to download invoice");
+    }
+  };
+
   if (!user) {
     return <div className="order-arrived-loading">Loading...</div>;
   }
@@ -188,7 +220,10 @@ const OrderArrivedList = () => {
 
             <div className="order-arrived-controls-group">
               <div className="order-arrived-date-filter">
-                <label htmlFor="fromDate" className="order-arrived-filter-label">
+                <label
+                  htmlFor="fromDate"
+                  className="order-arrived-filter-label"
+                >
                   From Date:
                 </label>
                 <input
@@ -248,7 +283,9 @@ const OrderArrivedList = () => {
             ) : filteredOrders.length === 0 ? (
               <div className="order-arrived-no-data">
                 No assigned orders found
-                {searchTerm || fromDate || toDate ? " matching your filters" : ""}
+                {searchTerm || fromDate || toDate
+                  ? " matching your filters"
+                  : ""}
               </div>
             ) : (
               <div className="order-arrived-table-wrapper">
@@ -257,9 +294,9 @@ const OrderArrivedList = () => {
                     <tr>
                       <th scope="col">No</th>
                       <th scope="col">Customer</th>
-                      <th scope="col">Products</th>           {/* Updated */}
-                      <th scope="col">Total Qty</th>         {/* New */}
-                      <th scope="col">Grand Total</th>       {/* Updated */}
+                      <th scope="col">Products</th>
+                      <th scope="col">Total Qty</th>
+                      <th scope="col">Grand Total</th>
                       <th scope="col">Remarks</th>
                       <th scope="col">Order Date</th>
                       <th scope="col">Actions</th>
@@ -278,7 +315,8 @@ const OrderArrivedList = () => {
                               {order.orderItems.map((item, i) => (
                                 <div key={i} className="product-tag">
                                   <span className="product-name">
-                                    {item.product?.productName || "Unknown Product"}
+                                    {item.product?.productName ||
+                                      "Unknown Product"}
                                   </span>
                                   <span className="product-qty">
                                     × {item.orderedQuantity}
@@ -297,7 +335,10 @@ const OrderArrivedList = () => {
                         {/* Total ordered quantity */}
                         <td>
                           {order.totalOrderedQuantity ||
-                            order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) ||
+                            order.orderItems?.reduce(
+                              (sum, it) => sum + it.orderedQuantity,
+                              0,
+                            ) ||
                             0}
                         </td>
 
@@ -332,6 +373,22 @@ const OrderArrivedList = () => {
 
                         <td>
                           <div className="order-arrived-action-buttons">
+                            {/* ✅ Added: Invoice Download Button (same as DeliveredOrdersList) */}
+                            {order.invoiceNumber && (
+                              <button
+                                className="invoice-btn"
+                                onClick={() =>
+                                  downloadUnifiedInvoice(
+                                    order._id,
+                                    order.invoiceNumber,
+                                  )
+                                }
+                                title={`Download Invoice ${order.invoiceNumber}`}
+                              >
+                                📄 Invoice
+                              </button>
+                            )}
+
                             <button
                               className="order-arrived-accept-button"
                               onClick={() => handleAcceptOrder(order._id)}
@@ -340,8 +397,11 @@ const OrderArrivedList = () => {
                                 rejectingOrderId === order._id
                               }
                             >
-                              {acceptingOrderId === order._id ? "Accepting..." : "Accept"}
+                              {acceptingOrderId === order._id
+                                ? "Accepting..."
+                                : "Accept"}
                             </button>
+
                             <button
                               className="order-arrived-reject-button"
                               onClick={() => handleRejectOrder(order._id)}
@@ -350,7 +410,9 @@ const OrderArrivedList = () => {
                                 rejectingOrderId === order._id
                               }
                             >
-                              {rejectingOrderId === order._id ? "Rejecting..." : "Reject"}
+                              {rejectingOrderId === order._id
+                                ? "Rejecting..."
+                                : "Reject"}
                             </button>
                           </div>
                         </td>

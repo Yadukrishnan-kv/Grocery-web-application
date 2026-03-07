@@ -340,9 +340,10 @@ const getMyCustomerProfile = async (req, res) => {
       return res.status(403).json({ message: "Access denied - Customers only" });
     }
 
-    // Include new fields
+    // ✅ ADD .populate('salesman') HERE
     const customer = await Customer.findOne({ user: req.user._id })
-      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType statementType dueDays salesman openingBalance openingBalanceDueDays');
+      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType statementType dueDays salesman openingBalance openingBalanceDueDays')
+      .populate('salesman', 'username email role'); // ← Critical addition
 
     if (!customer) {
       return res.status(404).json({ message: "Customer profile not found" });
@@ -354,7 +355,6 @@ const getMyCustomerProfile = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 const createCustomerProfile = async (req, res) => {
   try {
     const { name, phoneNumber, address, pincode } = req.body;
@@ -758,60 +758,72 @@ const getMyCustomersWithDue = async (req, res) => {
 const getCustomerOutstandingDetails = async (req, res) => {
   try {
     const { customerId } = req.params;
-    
-    // Verify salesman can only access their assigned customers
+
+    // Salesman access check
     if (req.user.role === "Sales man") {
-      const customer = await Customer.findOne({ 
-        _id: customerId, 
-        salesman: req.user._id 
+      const customerCheck = await Customer.findOne({
+        _id: customerId,
+        salesman: req.user._id,
       });
-      if (!customer) {
+      if (!customerCheck) {
         return res.status(403).json({ message: "Access denied - Customer not assigned to you" });
       }
     }
 
-    // Fetch customer with full details
     const customer = await Customer.findById(customerId)
       .populate("salesman", "username email");
-    
+
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    // Fetch all pending bills for this customer
+    // Get pending bills
     const pendingBills = await Bill.find({
       customer: customerId,
-      status: { $in: ["pending", "overdue", "partial", "pending_payment"] }
+      status: { $in: ["pending", "overdue", "partial", "pending_payment"] },
     })
-    .populate({
-      path: "orders",
-      populate: {
+      .populate({
+        path: "orders",
+        populate: [
+      {
         path: "orderItems.product",
-        select: "productName unit"
-      }
-    })
-    .sort({ dueDate: 1 });
+        select: "productName unit",
+      },
+      // NEW: Also populate product names inside invoiceHistory
+      {
+        path: "invoiceHistory.items.product",
+        select: "productName unit",
+      },
+    ],
+        
+      })
+      .sort({ dueDate: 1 });
 
-    // Calculate totals
-    const totalOutstanding = pendingBills.reduce((sum, bill) => 
-      sum + (bill.amountDue - bill.paidAmount), 0);
-    
+    const totalOutstanding = pendingBills.reduce(
+      (sum, bill) => sum + (bill.amountDue - bill.paidAmount),
+      0
+    );
+
     const totalBills = pendingBills.length;
-    const overdueBills = pendingBills.filter(bill => 
-      bill.status === "overdue" || new Date() > new Date(bill.dueDate)
+    const overdueBills = pendingBills.filter(
+      (bill) => bill.status === "overdue" || new Date() > new Date(bill.dueDate)
     ).length;
 
-    // Format bills with computed fields
-    const formattedBills = pendingBills.map(bill => {
+    // ────────────────────────────────────────────────────────────────
+    // FIXED: Show correct partial amount & qty per bill
+    // ────────────────────────────────────────────────────────────────
+    const formattedBills = pendingBills.map((bill) => {
       const remainingDue = bill.amountDue - bill.paidAmount;
-      const daysLeft = Math.ceil((new Date(bill.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
-      
+      const daysLeft = Math.ceil(
+        (new Date(bill.dueDate) - new Date()) / (1000 * 60 * 60 * 24)
+      );
+
       return {
         _id: bill._id,
         invoiceNumber: bill.invoiceNumber || `BILL-${bill._id.toString().slice(-8)}`,
         cycleStart: bill.cycleStart,
         cycleEnd: bill.cycleEnd,
-        totalUsed: bill.totalUsed,
+        totalUsed: bill.totalUsed,           // ← billed amount for this bill
         amountDue: bill.amountDue,
         paidAmount: bill.paidAmount,
         remainingDue,
@@ -819,23 +831,47 @@ const getCustomerOutstandingDetails = async (req, res) => {
         status: bill.status,
         daysLeft,
         isOpeningBalance: bill.isOpeningBalance,
-        orders: bill.orders.map(order => ({
-          _id: order._id,
-          invoiceNumber: order.invoiceNumber,
-          orderDate: order.orderDate,
-          status: order.status,
-          payment: order.payment,
-          totalAmount: order.orderItems?.reduce((sum, item) => 
-            sum + (item.totalAmount || item.price * item.orderedQuantity), 0) || 0,
-          items: order.orderItems?.map(item => ({
-            product: item.product?.productName || "Unknown",
-            unit: item.product?.unit || "",
-            orderedQuantity: item.orderedQuantity,
-            deliveredQuantity: item.deliveredQuantity,
-            price: item.price,
-            totalAmount: item.totalAmount
-          })) || []
-        }))
+
+        orders: bill.orders.map((order) => {
+          // Find the history entry matching this bill's invoice number
+          const matchingHistory = order.invoiceHistory?.find(
+            (h) => h.invoiceNumber === bill.invoiceNumber
+          );
+
+          return {
+            _id: order._id,
+            invoiceNumber: bill.invoiceNumber, // ← Use bill's invoice number (DEL-02 or DEL-03)
+            orderDate: order.orderDate,
+            status: order.status,
+            payment: order.payment,
+
+            // Prefer partial amount from history, fallback to full order
+            totalAmount:
+              matchingHistory?.amount ||
+              order.orderItems?.reduce(
+                (sum, item) => sum + (item.totalAmount || item.price * item.orderedQuantity),
+                0
+              ) ||
+              0,
+
+            items:
+              matchingHistory?.items?.map((histItem) => ({
+                product: histItem.product?.productName || "Unknown", // ← you may need to populate product name here
+                unit: "kg", // or fetch from product if needed
+                quantity: histItem.quantity, // 7 or 3
+                price: histItem.price,
+                total: histItem.quantity * histItem.price,
+              })) ||
+              order.orderItems?.map((item) => ({
+                product: item.product?.productName || "Unknown",
+                unit: item.unit || "kg",
+                quantity: item.orderedQuantity,
+                price: item.price,
+                total: item.totalAmount || item.price * item.orderedQuantity,
+              })) ||
+              [],
+          };
+        }),
       };
     });
 
@@ -854,23 +890,21 @@ const getCustomerOutstandingDetails = async (req, res) => {
         statementType: customer.statementType,
         dueDays: customer.dueDays,
         openingBalance: customer.openingBalance,
-        salesman: customer.salesman
+        salesman: customer.salesman,
       },
       summary: {
         totalOutstanding,
         totalBills,
         overdueBills,
-        availableCredit: customer.balanceCreditLimit
+        availableCredit: customer.balanceCreditLimit,
       },
-      bills: formattedBills
+      bills: formattedBills,
     });
-
   } catch (error) {
-    console.error("Error fetching customer outstanding details:", error);
+    console.error("Error in getCustomerOutstandingDetails:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 const getCustomerReceipts = async (req, res) => {
   try {
     if (req.user.role !== "Sales man") {
