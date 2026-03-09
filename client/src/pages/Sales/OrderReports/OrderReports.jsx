@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
-
 import "./OrderReports.css";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -42,38 +41,43 @@ const OrderReports = () => {
     }
   }, [backendUrl]);
 
+  // ✅ FIXED: Fetch full orders (not flattened) for salesmen
   const fetchDeliveredOrders = useCallback(async () => {
-  try {
-    const token = localStorage.getItem("token");
-    let endpoint;
-    
-    // ✅ ROLE-BASED ENDPOINT SELECTION
-    if (user?.role === "Sales man") {
-      endpoint = `${backendUrl}/api/orders/salesman-delivered-orders`;
-    } else {
-      // Admin sees all delivered orders
-      endpoint = `${backendUrl}/api/orders/admin-delivered-orders`;
+    try {
+      const token = localStorage.getItem("token");
+      let endpoint;
+      
+      // ✅ ROLE-BASED ENDPOINT SELECTION - Use regular orders endpoint
+      if (user?.role === "Sales man") {
+        endpoint = `${backendUrl}/api/orders/salesman-orders`;
+      } else {
+        // Admin sees all orders
+        endpoint = `${backendUrl}/api/orders/getallorders`;
+      }
+      
+      const response = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      // ✅ Filter for orders that have ANY delivered quantity
+      const deliveredOrders = response.data.filter(order => 
+        order.orderItems?.some(item => (item.deliveredQuantity || 0) > 0)
+      );
+      
+      setOrders(deliveredOrders);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      toast.error("Failed to load orders");
+    } finally {
+      setLoading(false);
     }
-    
-    const response = await axios.get(endpoint, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setOrders(response.data);
-  } catch (error) {
-    console.error("Error fetching orders with delivery:", error);
-    toast.error("Failed to load orders");
-  } finally {
-    setLoading(false);
-  }
-}, [backendUrl, user]);
+  }, [backendUrl, user]);
 
   // ==================== FIXED INFINITE LOOP ====================
-  // Fetch user independently
   useEffect(() => {
     fetchCurrentUser();
   }, [fetchCurrentUser]);
 
-  // Only fetch orders AFTER user is loaded → no circular dependency
   useEffect(() => {
     if (user) {
       fetchDeliveredOrders();
@@ -87,7 +91,12 @@ const OrderReports = () => {
         !searchTerm.trim() ||
         order.customer?.name
           ?.toLowerCase()
-          .includes(searchTerm.toLowerCase().trim());
+          .includes(searchTerm.toLowerCase().trim()) ||
+        order.orderItems?.some((item) =>
+          item.product?.productName
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase().trim())
+        );
 
       let matchesDate = true;
       const orderDate = new Date(order.orderDate);
@@ -128,12 +137,14 @@ const OrderReports = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Invoice downloaded");
     } catch (error) {
       console.error("Error downloading delivered invoice:", error);
       if (error.response?.status === 400) {
-        alert("No delivered quantity available for this order");
+        toast.error("No delivered quantity available for this order");
       } else {
-        alert("Failed to download delivered invoice");
+        toast.error("Failed to download delivered invoice");
       }
     } finally {
       setDownloadingOrderId(null);
@@ -146,7 +157,6 @@ const OrderReports = () => {
     setToDate("");
   };
 
-  // Helper function to format date as DD/MM/YYYY
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
@@ -207,7 +217,7 @@ const OrderReports = () => {
                   <input
                     type="text"
                     className="order-reports-search-input"
-                    placeholder="Search by customer name..."
+                    placeholder="Search by customer or product..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -254,13 +264,11 @@ const OrderReports = () => {
                   <thead>
                     <tr>
                       <th>No</th>
-                      <th>Customer</th>
-                      <th>Product</th>
-                      <th>Ordered Qty</th>
-                      <th>Delivered Qty </th>
+                      <th>Products</th> {/* ✅ Changed from "Product" to "Products" */}
+                      <th>Total Ordered Qty</th> {/* ✅ Changed */}
+                      <th>Total Delivered Qty</th> {/* ✅ Changed */}
                       <th>Pending Qty</th>
-                      <th>Price</th>
-                      <th>Total Amount</th>
+                      <th>Grand Total</th> {/* ✅ Changed */}
                       <th>Delivery Partner</th>
                       <th>Order Date</th>
                       <th>Status</th>
@@ -269,91 +277,91 @@ const OrderReports = () => {
                   </thead>
                   <tbody>
                     {filteredOrders.map((order, index) => {
-                      const pendingQty =
-                        order.orderedQuantity - order.deliveredQuantity;
-                      const isPartiallyDelivered =
-                        order.deliveredQuantity > 0 && pendingQty > 0;
-                      const isFullyDelivered = pendingQty === 0;
+                      // ✅ Calculate totals for the ENTIRE order (not per item)
+                      const totalOrdered =
+                        order.orderItems?.reduce(
+                          (sum, item) => sum + item.orderedQuantity,
+                          0,
+                        ) || 0;
+                      const totalDelivered =
+                        order.orderItems?.reduce(
+                          (sum, item) => sum + item.deliveredQuantity,
+                          0,
+                        ) || 0;
+                      const pendingQty = totalOrdered - totalDelivered;
+                      const grandTotal =
+                        order.orderItems
+                          ?.reduce((sum, item) => sum + item.totalAmount, 0)
+                          ?.toFixed(2) || "0.00";
+                      const hasDelivered = totalDelivered > 0;
 
                       return (
                         <tr key={order._id}>
                           <td>{index + 1}</td>
-                          <td>{order.customer?.name || "N/A"}</td>
-                          <td>{order.product?.productName || "N/A"}</td>
-                          <td>
-                            {order.orderedQuantity} {order.unit || ""}
+
+                          {/* ✅ Multi-product column - like Customer page */}
+                          <td className="products-cell">
+                            {order.orderItems?.length > 0 ? (
+                              <div className="products-list">
+                                {order.orderItems.map((item, i) => (
+                                  <div key={i} className="product-tag">
+                                    <span className="product-name">
+                                      {item.product?.productName || "Unknown"}
+                                    </span>
+                                    <span className="product-qty">
+                                      × {item.orderedQuantity}
+                                    </span>
+                                    <span className="product-unit">
+                                      {item.unit || ""}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="no-products">No products</span>
+                            )}
                           </td>
-                          <td>
-                            {order.deliveredQuantity} {order.unit || ""}
-                          </td>
-                          <td>
-                            {pendingQty} {order.unit || ""}
-                          </td>
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="Dirham Symbol"
-                                width={15}
-                                height={15}
-                                style={{
-                                  paddingTop: "2px",
-                                }}
-                              />
-                              <span>{order.price.toFixed(2)}</span>
-                            </div>
-                          </td>
+
+                          <td>{totalOrdered}</td>
+                          <td>{totalDelivered}</td>
+                          <td>{pendingQty}</td>
+
                           <td>
                             <div
                               style={{
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "4px",
+                                gap: "6px",
                               }}
                             >
                               <img
                                 src={DirhamSymbol}
-                                alt="Dirham Symbol"
+                                alt="AED"
                                 width={15}
                                 height={15}
-                                style={{
-                                  paddingTop: "2px",
-                                }}
                               />
-                              <span>{order.totalAmount.toFixed(2)}</span>
+                              <span>{grandTotal}</span>
                             </div>
                           </td>
+
                           <td>
                             {order.assignedTo?.username || "Not assigned"}
                           </td>
+
                           <td>{formatDate(order.orderDate)}</td>
+
                           <td>
                             <span
-                              className={`order-reports-status-badge ${
-                                isFullyDelivered
-                                  ? "order-reports-status-fully-delivered"
-                                  : isPartiallyDelivered
-                                    ? "order-reports-status-partially-delivered"
-                                    : "order-reports-status-pending"
-                              }`}
+                              className={`order-reports-status-badge order-reports-status-${order.status?.toLowerCase() || "pending"}`}
                             >
-                              {isFullyDelivered
-                                ? "Fully Delivered"
-                                : isPartiallyDelivered
-                                  ? "Partially Delivered"
-                                  : "Pending"}
+                              {order.status?.charAt(0).toUpperCase() +
+                                order.status?.slice(1) || "Pending"}
                             </span>
                           </td>
+
                           <td>
                             <div className="order-reports-action-buttons">
-                              {/* Only Delivered Invoice - no Pending Invoice */}
-                              {order.deliveredQuantity > 0 && (
+                              {hasDelivered && (
                                 <button
                                   className="order-reports-invoice-button delivered"
                                   onClick={() =>

@@ -67,6 +67,37 @@ const CustomerOrdersList = () => {
     window.location.href = "/customer/create-order";
   };
 
+  // ✅ Helper: Calculate VAT breakdown for order items
+  const calculateOrderVAT = (orderItems) => {
+    if (!orderItems || !Array.isArray(orderItems)) {
+      return { exclVat: 0, vatAmount: 0, grandTotal: 0 };
+    }
+    
+    let totalExclVat = 0;
+    let totalVatAmount = 0;
+    let totalGrand = 0;
+    
+    orderItems.forEach((item) => {
+      const qty = item.orderedQuantity || 0;
+      const price = item.price || 0;
+      const vatPercent = item.vatPercentage || 5;
+      
+      const exclVat = qty * price;
+      const vatAmount = (exclVat * vatPercent) / 100;
+      const total = exclVat + vatAmount;
+      
+      totalExclVat += exclVat;
+      totalVatAmount += vatAmount;
+      totalGrand += total;
+    });
+    
+    return {
+      exclVat: totalExclVat,
+      vatAmount: totalVatAmount,
+      grandTotal: totalGrand,
+    };
+  };
+
   // Combine real orders + pending/rejected requests into one list
   const filteredItems = useMemo(() => {
     const allItems = [
@@ -233,7 +264,10 @@ const CustomerOrdersList = () => {
                       <th scope="col">Products</th>
                       <th scope="col">Total Ordered Qty</th>
                       <th scope="col">Total Delivered Qty</th>
-                      <th scope="col">Grand Total</th>
+                      {/* ✅ UPDATED: VAT Breakdown Columns */}
+                      <th scope="col" className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
+                      <th scope="col" className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
+                      <th scope="col" className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
                       <th scope="col">Remarks</th>
                       <th scope="col">Payment</th>
                       <th scope="col">Delivery Partner</th>
@@ -254,10 +288,8 @@ const CustomerOrdersList = () => {
                         ? 0 // Requests have no delivered qty
                         : item.orderItems?.reduce((sum, it) => sum + it.deliveredQuantity, 0) || 0;
 
-                      const grandTotal = isRequest
-                        ? item.grandTotal?.toFixed(2) || "0.00"
-                        : item.orderItems?.reduce((sum, it) => sum + it.totalAmount, 0)?.toFixed(2) ||
-                          "0.00";
+                      // ✅ Calculate VAT breakdown
+                      const { exclVat, vatAmount, grandTotal } = calculateOrderVAT(item.orderItems);
 
                       return (
                         <tr key={item._id}>
@@ -284,22 +316,23 @@ const CustomerOrdersList = () => {
                           <td>{totalOrdered}</td>
                           <td>{totalDelivered}</td>
 
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="AED"
-                                width={15}
-                                height={15}
-                                style={{ paddingTop: "3px" }}
-                              />
-                              <span>{grandTotal}</span>
+                          {/* ✅ UPDATED: VAT Breakdown Display */}
+                          <td className="vat-cell">
+                            <div className="vat-amount">
+                              <img src={DirhamSymbol} alt="AED" width={12} />
+                              <span>{exclVat.toFixed(2)}</span>
+                            </div>
+                          </td>
+                          <td className="vat-cell">
+                            <div className="vat-amount vat-highlight">
+                              <img src={DirhamSymbol} alt="AED" width={12} />
+                              <span>{vatAmount.toFixed(2)}</span>
+                            </div>
+                          </td>
+                          <td className="vat-cell grand-total-cell">
+                            <div className="vat-amount grand-total-amount">
+                              <img src={DirhamSymbol} alt="AED" width={14} />
+                              <span>{grandTotal.toFixed(2)}</span>
                             </div>
                           </td>
 

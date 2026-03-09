@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../../../../components/layout/Header/Header';
 import Sidebar from '../../../../components/layout/Sidebar/Sidebar';
-import DirhamSymbol from '../../../../Assets/aed-symbol.png'; // Reuse same symbol as OrderList
+import DirhamSymbol from '../../../../Assets/aed-symbol.png';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import './AdminOrderRequests.css';
@@ -12,8 +12,7 @@ const AdminOrderRequests = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
-  // Add this state near the top of AdminOrderRequests.jsx
-const [activeItem, setActiveItem] = useState("Sales");
+  const [activeItem, setActiveItem] = useState("Sales");
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   useEffect(() => {
@@ -92,12 +91,12 @@ const [activeItem, setActiveItem] = useState("Sales");
         user={user}
       />
       <Sidebar
-  isOpen={sidebarOpen}
-  activeItem={activeItem}               // ← string, current active menu
-  onSetActiveItem={setActiveItem}   // ← pass a real state setter function
-  onClose={() => setSidebarOpen(false)}
-  user={user}
-/>
+        isOpen={sidebarOpen}
+        activeItem={activeItem}
+        onSetActiveItem={setActiveItem}
+        onClose={() => setSidebarOpen(false)}
+        user={user}
+      />
       <main className={`admin-requests-main ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="admin-requests-container">
           <div className="admin-requests-header">
@@ -117,7 +116,10 @@ const [activeItem, setActiveItem] = useState("Sales");
                     <th>Customer</th>
                     <th>Products</th>
                     <th>Total Qty</th>
-                    <th>Grand Total (AED)</th>
+                    {/* ✅ UPDATED: VAT Breakdown Columns */}
+                    <th className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
+                    <th className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
+                    <th className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
                     <th>Payment</th>
                     <th>Remarks</th>
                     <th>Requested At</th>
@@ -127,7 +129,9 @@ const [activeItem, setActiveItem] = useState("Sales");
                 <tbody>
                   {requests.map((req, index) => {
                     const totalQty = req.orderItems.reduce((sum, item) => sum + item.orderedQuantity, 0);
-                    const grandTotal = req.grandTotal.toFixed(2);
+                    
+                    // ✅ Calculate VAT breakdown for this request
+                    const { exclVat, vatAmount, grandTotal } = calculateRequestVAT(req.orderItems);
 
                     return (
                       <tr key={req._id}>
@@ -160,18 +164,27 @@ const [activeItem, setActiveItem] = useState("Sales");
                           )}
                         </td>
                         <td>{totalQty}</td>
-                        <td>
-                          <div className="admin-requests-total-cell">
-                            <img
-                              src={DirhamSymbol}
-                              alt="AED"
-                              width={15}
-                              height={15}
-                              style={{ paddingTop: '3px' }}
-                            />
-                            <span>{grandTotal}</span>
+                        
+                        {/* ✅ VAT Breakdown Display */}
+                        <td className="vat-cell">
+                          <div className="vat-amount">
+                            <img src={DirhamSymbol} alt="AED" width={12} />
+                            <span>{exclVat.toFixed(2)}</span>
                           </div>
                         </td>
+                        <td className="vat-cell">
+                          <div className="vat-amount vat-highlight">
+                            <img src={DirhamSymbol} alt="AED" width={12} />
+                            <span>{vatAmount.toFixed(2)}</span>
+                          </div>
+                        </td>
+                        <td className="vat-cell grand-total-cell">
+                          <div className="vat-amount grand-total-amount">
+                            <img src={DirhamSymbol} alt="AED" width={14} />
+                            <span>{grandTotal.toFixed(2)}</span>
+                          </div>
+                        </td>
+
                         <td className="admin-requests-payment">
                           {req.payment?.charAt(0).toUpperCase() + req.payment?.slice(1) || 'N/A'}
                         </td>
@@ -211,6 +224,37 @@ const [activeItem, setActiveItem] = useState("Sales");
       </main>
     </div>
   );
+};
+
+// ✅ Helper: Calculate VAT breakdown for order request items
+const calculateRequestVAT = (orderItems) => {
+  if (!orderItems || !Array.isArray(orderItems)) {
+    return { exclVat: 0, vatAmount: 0, grandTotal: 0 };
+  }
+  
+  let totalExclVat = 0;
+  let totalVatAmount = 0;
+  let totalGrand = 0;
+  
+  orderItems.forEach((item) => {
+    const qty = item.orderedQuantity || 0;
+    const price = item.price || 0;
+    const vatPercent = item.vatPercentage || 5; // Default to 5% if not set
+    
+    const exclVat = qty * price;
+    const vatAmount = exclVat * (vatPercent / 100);
+    const total = exclVat + vatAmount;
+    
+    totalExclVat += exclVat;
+    totalVatAmount += vatAmount;
+    totalGrand += total;
+  });
+  
+  return {
+    exclVat: totalExclVat,
+    vatAmount: totalVatAmount,
+    grandTotal: totalGrand,
+  };
 };
 
 export default AdminOrderRequests;

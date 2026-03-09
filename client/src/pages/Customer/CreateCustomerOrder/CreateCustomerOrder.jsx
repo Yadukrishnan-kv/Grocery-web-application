@@ -13,7 +13,18 @@ const CreateCustomerOrder = () => {
   const [formData, setFormData] = useState({
     payment: "credit",
     remarks: "",
-    orderItems: [{ productId: "", orderedQuantity: "", price: "", total: "", prevPrice: "" }],
+    orderItems: [
+      {
+        productId: "",
+        orderedQuantity: "",
+        price: "",
+        exclVat: "0.00",
+        vatPercentage: 5,
+        vatAmount: "0.00",
+        total: "0.00",
+        prevPrice: "",
+      },
+    ],
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -84,6 +95,31 @@ const CreateCustomerOrder = () => {
     fetchCustomerProfile();
   }, [fetchProducts, fetchCurrentUser, fetchCustomerProfile]);
 
+  // ✅ VAT Calculation Functions
+  const calculateItemVAT = (item) => {
+    const qty = parseFloat(item.orderedQuantity) || 0;
+    const price = parseFloat(item.price) || 0;
+    const vatPercent = parseFloat(item.vatPercentage) || 5;
+
+    const exclVat = qty * price;
+    const vatAmount = (exclVat * vatPercent) / 100;
+    const total = exclVat + vatAmount;
+
+    return {
+      exclVat: exclVat.toFixed(2),
+      vatAmount: vatAmount.toFixed(2),
+      total: total.toFixed(2),
+    };
+  };
+
+  const updateGrandTotal = (items = formData.orderItems) => {
+    const total = items.reduce((sum, item) => {
+      const itemTotal = parseFloat(item.total) || 0;
+      return sum + itemTotal;
+    }, 0);
+    setGrandTotal(total.toFixed(2));
+  };
+
   // Real API call for previous purchased price
   const fetchPreviousPrice = useCallback(async (productId, index) => {
     if (!customerProfile?._id || !productId) return;
@@ -115,7 +151,19 @@ const CreateCustomerOrder = () => {
   const addItem = () => {
     setFormData((prev) => ({
       ...prev,
-      orderItems: [...prev.orderItems, { productId: "", orderedQuantity: "", price: "", total: "", prevPrice: "" }],
+      orderItems: [
+        ...prev.orderItems,
+        {
+          productId: "",
+          orderedQuantity: "",
+          price: "",
+          exclVat: "0.00",
+          vatPercentage: 5,
+          vatAmount: "0.00",
+          total: "0.00",
+          prevPrice: "",
+        },
+      ],
     }));
   };
 
@@ -127,39 +175,39 @@ const CreateCustomerOrder = () => {
   };
 
   const handleItemChange = (index, field, value) => {
-    const newItems = [...formData.orderItems];
-    newItems[index][field] = value;
+    setFormData((prev) => {
+      const newItems = [...prev.orderItems];
+      newItems[index][field] = value;
 
-    if (field === "orderedQuantity" || field === "price") {
-      const qty = parseFloat(newItems[index].orderedQuantity) || 0;
-      const price = parseFloat(newItems[index].price) || 0;
-      newItems[index].total = (qty * price).toFixed(2);
-    }
+      if (field === "orderedQuantity" || field === "price" || field === "vatPercentage") {
+        const calculated = calculateItemVAT(newItems[index]);
+        newItems[index].exclVat = calculated.exclVat;
+        newItems[index].vatAmount = calculated.vatAmount;
+        newItems[index].total = calculated.total;
+      }
 
-    setFormData((prev) => ({ ...prev, orderItems: newItems }));
-    updateGrandTotal(newItems);
+      updateGrandTotal(newItems);
+      return { ...prev, orderItems: newItems };
+    });
   };
 
   const handleProductSelect = (index, productId) => {
     const selectedProduct = products.find((p) => p._id === productId);
-    const newItems = [...formData.orderItems];
-    newItems[index].productId = productId;
-    newItems[index].price = selectedProduct ? selectedProduct.price.toFixed(2) : "";
+    setFormData((prev) => {
+      const newItems = [...prev.orderItems];
+      newItems[index].productId = productId;
+      newItems[index].price = selectedProduct ? selectedProduct.price.toFixed(2) : "";
 
-    const qty = parseFloat(newItems[index].orderedQuantity) || 0;
-    const price = parseFloat(newItems[index].price) || 0;
-    newItems[index].total = (qty * price).toFixed(2);
+      const calculated = calculateItemVAT(newItems[index]);
+      newItems[index].exclVat = calculated.exclVat;
+      newItems[index].vatAmount = calculated.vatAmount;
+      newItems[index].total = calculated.total;
 
-    setFormData((prev) => ({ ...prev, orderItems: newItems }));
-    updateGrandTotal(newItems);
+      updateGrandTotal(newItems);
+      return { ...prev, orderItems: newItems };
+    });
 
-    // Fetch previous price
     fetchPreviousPrice(productId, index);
-  };
-
-  const updateGrandTotal = (items = formData.orderItems) => {
-    const total = items.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
-    setGrandTotal(total.toFixed(2));
   };
 
   const validateForm = () => {
@@ -179,71 +227,77 @@ const CreateCustomerOrder = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!validateForm()) return;
+    e.preventDefault();
+    if (!validateForm()) return;
 
-  setIsLoading(true);
+    setIsLoading(true);
 
-  try {
-    const token = localStorage.getItem('token');
+    try {
+      const token = localStorage.getItem('token');
 
-    if (!customerProfile) {
-      toast.error('Customer profile not found');
+      if (!customerProfile) {
+        toast.error('Customer profile not found');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if first order
+      const checkRes = await axios.get(
+        `${backendUrl}/api/orders/check-first-order/${customerProfile._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const isFirstOrder = checkRes.data.isFirst;
+
+      // ✅ Prepare order items with VAT data
+      const orderItemsWithVAT = formData.orderItems.map(item => ({
+        productId: item.productId,
+        orderedQuantity: parseInt(item.orderedQuantity),
+        price: parseFloat(item.price),
+        vatPercentage: parseFloat(item.vatPercentage) || 5,
+        exclVatAmount: parseFloat(item.exclVat),
+        vatAmount: parseFloat(item.vatAmount),
+        totalAmount: parseFloat(item.total),
+      }));
+
+      if (isFirstOrder) {
+        // Send as request
+        await axios.post(
+          `${backendUrl}/api/orders/order-request`,
+          {
+            orderItems: orderItemsWithVAT,
+            payment: formData.payment,
+            remarks: formData.remarks.trim(),
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        toast.success('First order request sent! Waiting for admin approval.');
+        setTimeout(() => (window.location.href = '/customer/orders'), 2000);
+      } else {
+        // Normal order
+        await axios.post(
+          `${backendUrl}/api/orders/createorder`,
+          {
+            customerId: customerProfile._id,
+            payment: formData.payment,
+            remarks: formData.remarks.trim(),
+            orderItems: orderItemsWithVAT,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        toast.success('Order placed successfully!');
+        setTimeout(() => (window.location.href = '/customer/orders'), 1500);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to process order';
+      toast.error(msg);
+    } finally {
       setIsLoading(false);
-      return;
     }
+  };
 
-    // Check if first order
-    const checkRes = await axios.get(
-      `${backendUrl}/api/orders/check-first-order/${customerProfile._id}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const isFirstOrder = checkRes.data.isFirst;
-
-    if (isFirstOrder) {
-      // Send as request
-      await axios.post(
-        `${backendUrl}/api/orders/order-request`,
-        {
-          orderItems: formData.orderItems.map(item => ({
-            productId: item.productId,
-            orderedQuantity: parseInt(item.orderedQuantity),
-          })),
-          payment: formData.payment,
-          remarks: formData.remarks.trim(),
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success('First order request sent! Waiting for admin approval.');
-      setTimeout(() => (window.location.href = '/customer/orders'), 2000);
-    } else {
-      // Normal order
-      await axios.post(
-        `${backendUrl}/api/orders/createorder`,
-        {
-          customerId: customerProfile._id,
-          payment: formData.payment,
-          remarks: formData.remarks.trim(),
-          orderItems: formData.orderItems.map(item => ({
-            productId: item.productId,
-            orderedQuantity: parseInt(item.orderedQuantity),
-          })),
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success('Order placed successfully!');
-      setTimeout(() => (window.location.href = '/customer/orders'), 1500);
-    }
-  } catch (err) {
-    const msg = err.response?.data?.message || 'Failed to process order';
-    toast.error(msg);
-  } finally {
-    setIsLoading(false);
-  }
-};
   if (loading) return <div className="create-customer-order-loading">Loading...</div>;
 
   return (
@@ -290,7 +344,7 @@ const CreateCustomerOrder = () => {
 
             <h3>Order Items</h3>
             {formData.orderItems.map((item, index) => (
-              <div key={index} className="order-item-row">
+              <div key={index} className="order-item-row vat-enabled">
                 <div className="item-field">
                   <label>Product</label>
                   <select
@@ -314,7 +368,7 @@ const CreateCustomerOrder = () => {
                   <input
                     type="number"
                     min="1"
-                    placeholder="Quantity"
+                    placeholder="Qty"
                     value={item.orderedQuantity}
                     onChange={(e) => handleItemChange(index, "orderedQuantity", e.target.value)}
                   />
@@ -334,14 +388,50 @@ const CreateCustomerOrder = () => {
                   />
                 </div>
 
-                <div className="item-field">
-                  <label>Total (AED)</label>
+                {/* ✅ VAT Fields */}
+                <div className="item-field vat-field">
+                  <label>Excl. VAT</label>
+                  <input
+                    type="text"
+                    value={item.exclVat || "0.00"}
+                    readOnly
+                    className="readonly-input vat-readonly"
+                    title="Qty × Price"
+                  />
+                </div>
+
+                <div className="item-field vat-field">
+                  <label>VAT %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={item.vatPercentage}
+                    onChange={(e) => handleItemChange(index, "vatPercentage", e.target.value)}
+                    className="vat-input"
+                  />
+                </div>
+
+                <div className="item-field vat-field">
+                  <label>VAT Amount</label>
+                  <input
+                    type="text"
+                    value={item.vatAmount || "0.00"}
+                    readOnly
+                    className="readonly-input vat-readonly"
+                    title="Excl. VAT × VAT%"
+                  />
+                </div>
+
+                <div className="item-field vat-field total-field">
+                  <label>Total (Incl. VAT)</label>
                   <input
                     type="text"
                     value={item.total || "0.00"}
                     readOnly
-                    className="readonly-input"
-                    placeholder="Auto-calculated"
+                    className="readonly-input vat-total"
+                    title="Excl. VAT + VAT Amount"
                   />
                 </div>
 
@@ -373,26 +463,27 @@ const CreateCustomerOrder = () => {
               + Add Another Product
             </button>
 
+            {/* ✅ Updated Grand Total Section with VAT Note */}
             <div className="grand-total-section">
-              <label>Grand Total (AED)</label>
+              <label>Grand Total (Incl. VAT)</label>
               <input
                 type="text"
                 value={grandTotal}
                 readOnly
                 className="grand-total-input"
               />
+              <small className="vat-note">Includes VAT for all items</small>
             </div>
 
             <div className="form-group">
               <label>Remarks (Optional)</label>
-                 <input
+              <input
                 type="text"
-                 value={formData.remarks}
-            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                 className="Remarks-input"
               />
             </div>
-              
 
             <button type="submit" className="submit-btn" disabled={isLoading}>
               {isLoading ? "Creating..." : "Create Order"}

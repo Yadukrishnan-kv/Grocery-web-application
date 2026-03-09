@@ -1214,17 +1214,15 @@ const approveOrderRequest = async (req, res) => {
     if (req.user.role !== "Admin") {
       return res.status(403).json({ message: "Admin access only" });
     }
-
     const request = await OrderRequest.findById(req.params.requestId);
     if (!request) return res.status(404).json({ message: "Request not found" });
     if (request.status !== "pending") {
       return res.status(400).json({ message: "Request already processed" });
     }
-
     const customer = await Customer.findById(request.customer);
     if (!customer)
       return res.status(404).json({ message: "Customer not found" });
-
+    
     // Final credit check before deducting
     if (
       request.payment === "credit" &&
@@ -1235,19 +1233,41 @@ const approveOrderRequest = async (req, res) => {
         .json({ message: "Insufficient credit balance now" });
     }
 
+    // ✅ FIXED: Process order items with VAT calculations (same as createOrder)
+    const processedItems = request.orderItems.map((item) => {
+      const qty = item.orderedQuantity;
+      const price = item.price;
+      const vatPercent = 5; // Default VAT % for requests, or fetch from product if needed
+      
+      const exclVatAmount = qty * price;
+      const vatAmount = (exclVatAmount * vatPercent) / 100;
+      const totalAmount = exclVatAmount + vatAmount;
+      
+      return {
+        product: item.product,
+        orderedQuantity: qty,
+        price: price,
+        vatPercentage: vatPercent,
+        exclVatAmount: parseFloat(exclVatAmount.toFixed(2)),
+        vatAmount: parseFloat(vatAmount.toFixed(2)),
+        totalAmount: parseFloat(totalAmount.toFixed(2)),
+        packedQuantity: 0,
+        deliveredQuantity: 0,
+        invoicedQuantity: 0,
+        remarks: item.remarks || "",
+      };
+    });
+
     // Deduct credit if credit payment
     if (request.payment === "credit") {
       customer.balanceCreditLimit -= request.grandTotal;
       await customer.save();
     }
 
-    // Create real order
+    // Create real order with VAT-inclusive items
     const newOrder = await Order.create({
       customer: request.customer,
-      orderItems: request.orderItems.map((item) => ({
-        ...item.toObject(),
-        deliveredQuantity: 0,
-      })),
+      orderItems: processedItems, // ✅ Now includes VAT fields
       payment: request.payment,
       remarks: request.remarks,
       orderDate: new Date(),
@@ -1277,23 +1297,25 @@ const rejectOrderRequest = async (req, res) => {
 
     const { reason } = req.body;
     const request = await OrderRequest.findById(req.params.requestId);
+    
     if (!request) return res.status(404).json({ message: "Request not found" });
     if (request.status !== "pending") {
       return res.status(400).json({ message: "Request already processed" });
     }
 
+    // ✅ FIXED: Use rejection-specific fields instead of approval fields
     request.status = "rejected";
     request.rejectionReason = reason || "No reason provided";
-    request.approvedBy = req.user._id;
-    request.approvedAt = new Date();
+    request.rejectedBy = req.user._id;    // ✅ Changed from approvedBy
+    request.rejectedAt = new Date();      // ✅ Changed from approvedAt
     await request.save();
 
     res.json({ message: "Order request rejected", request });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Reject request error:", error); // ✅ Added error logging
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 // Customer: Get their order requests + real orders
 const getCustomerOrderHistory = async (req, res) => {
   try {
