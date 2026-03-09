@@ -127,7 +127,7 @@ const OrderList = () => {
       });
 
       toast.success(`Order deleted successfully!`);
-      fetchOrders();   // ← still works (user already exists)
+      fetchOrders();
     } catch (error) {
       console.error("Error deleting order:", error);
       toast.error("Failed to delete order. Please try again.");
@@ -148,7 +148,7 @@ const OrderList = () => {
       );
 
       toast.success("Delivery partner assigned successfully!");
-      fetchOrders();   // ← still works (user already exists)
+      fetchOrders();
     } catch (error) {
       console.error("Error assigning delivery partner:", error);
       toast.error("Failed to assign delivery partner. Please try again.");
@@ -166,6 +166,17 @@ const OrderList = () => {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
+  };
+
+  // ✅ Helper to calculate VAT breakdown for an order
+  const getVatBreakdown = (order) => {
+    if (!order.orderItems || !Array.isArray(order.orderItems)) {
+      return { exclVat: 0, vatAmount: 0, grandTotal: 0 };
+    }
+    const exclVat = order.orderItems.reduce((sum, item) => sum + (item.exclVatAmount || 0), 0);
+    const vatAmount = order.orderItems.reduce((sum, item) => sum + (item.vatAmount || 0), 0);
+    const grandTotal = order.orderItems.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
+    return { exclVat, vatAmount, grandTotal };
   };
 
   if (!user) {
@@ -252,7 +263,10 @@ const OrderList = () => {
                       <th scope="col">Customer</th>
                       <th scope="col">Products</th>
                       <th scope="col">Total Qty</th>
-                      <th scope="col">Grand Total (AED)</th>
+                      {/* ✅ UPDATED: VAT Breakdown Columns */}
+                      <th scope="col" className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
+                      <th scope="col" className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
+                      <th scope="col" className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
                       <th scope="col">Payment</th>
                       <th scope="col">Remarks</th>
                       <th scope="col">Delivery Partner</th>
@@ -264,144 +278,144 @@ const OrderList = () => {
                   </thead>
                   <tbody>
                     {filteredOrders.length > 0 ? (
-                      filteredOrders.map((order, index) => (
-                        <tr key={order._id}>
-                          <td>{index + 1}</td>
-                          <td>{order.customer?.name || "N/A"}</td>
+                      filteredOrders.map((order, index) => {
+                        const { exclVat, vatAmount, grandTotal } = getVatBreakdown(order);
+                        return (
+                          <tr key={order._id}>
+                            <td>{index + 1}</td>
+                            <td>{order.customer?.name || "N/A"}</td>
 
-                          <td className="products-cell">
-                            {order.orderItems?.length > 0 ? (
-                              <div className="products-list">
-                                {order.orderItems.map((item, i) => (
-                                  <div key={i} className="product-tag">
-                                    <span className="product-name">{item.product?.productName || "Unknown"}</span>
-                                    <span className="product-qty">× {item.orderedQuantity}</span>
-                                    <span className="product-unit">{item.unit || ""}</span>
-                                  </div>
-                                ))}
+                            <td className="products-cell">
+                              {order.orderItems?.length > 0 ? (
+                                <div className="products-list">
+                                  {order.orderItems.map((item, i) => (
+                                    <div key={i} className="product-tag">
+                                      <span className="product-name">{item.product?.productName || "Unknown"}</span>
+                                      <span className="product-qty">× {item.orderedQuantity}</span>
+                                      <span className="product-unit">{item.unit || ""}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="no-products">No products</span>
+                              )}
+                            </td>
+
+                            <td>{order.totalOrderedQuantity || order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0}</td>
+
+                            {/* ✅ UPDATED: VAT Breakdown Display */}
+                            <td className="vat-cell">
+                              <div className="vat-amount">
+                                <img src={DirhamSymbol} alt="AED" width={12} />
+                                <span>{exclVat.toFixed(2)}</span>
                               </div>
-                            ) : (
-                              <span className="no-products">No products</span>
-                            )}
-                          </td>
+                            </td>
+                            <td className="vat-cell">
+                              <div className="vat-amount vat-highlight">
+                                <img src={DirhamSymbol} alt="AED" width={12} />
+                                <span>{vatAmount.toFixed(2)}</span>
+                              </div>
+                            </td>
+                            <td className="vat-cell grand-total-cell">
+                              <div className="vat-amount grand-total-amount">
+                                <img src={DirhamSymbol} alt="AED" width={14} />
+                                <span>{grandTotal.toFixed(2)}</span>
+                              </div>
+                            </td>
 
-                          <td>{order.totalOrderedQuantity || order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0}</td>
+                            <td>{order.payment || "N/A"}</td>
+                            <td title={order.remarks || ""}>
+                              {order.remarks
+                                ? order.remarks.substring(0, 30) +
+                                  (order.remarks.length > 30 ? "..." : "")
+                                : "-"}
+                            </td>
 
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="Dirham Symbol"
-                                width={15}
-                                height={15}
-                                style={{ paddingTop: "3px" }}
-                              />
-                              <span>
-                                {order.grandTotal?.toFixed(2) ||
-                                  order.orderItems?.reduce((sum, it) => sum + it.totalAmount, 0)?.toFixed(2) ||
-                                  "0.00"}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td>{order.payment || "N/A"}</td>
-                          <td title={order.remarks || ""}>
-                            {order.remarks
-                              ? order.remarks.substring(0, 30) +
-                                (order.remarks.length > 30 ? "..." : "")
-                              : "-"}
-                          </td>
-
-                          <td>
-                            {order.assignmentStatus === "pending_assignment" ||
-                            order.assignmentStatus === "rejected" ? (
-                              <select
-                                className="order-list-delivery-partner-select"
-                                onChange={(e) => {
-                                  const selectedId = e.target.value;
-                                  if (selectedId) {
-                                    handleAssignDeliveryPartner(
-                                      order._id,
-                                      selectedId
-                                    );
-                                  }
-                                }}
-                                defaultValue=""
-                              >
-                                <option value="">
-                                  {order.assignmentStatus === "rejected"
-                                    ? "Reassign Partner"
-                                    : "Assign Delivery Partner"}
-                                </option>
-                                {deliveryPartners.map((partner) => (
-                                  <option key={partner._id} value={partner._id}>
-                                    {partner.username}
+                            <td>
+                              {order.assignmentStatus === "pending_assignment" ||
+                              order.assignmentStatus === "rejected" ? (
+                                <select
+                                  className="order-list-delivery-partner-select"
+                                  onChange={(e) => {
+                                    const selectedId = e.target.value;
+                                    if (selectedId) {
+                                      handleAssignDeliveryPartner(
+                                        order._id,
+                                        selectedId
+                                      );
+                                    }
+                                  }}
+                                  defaultValue=""
+                                >
+                                  <option value="">
+                                    {order.assignmentStatus === "rejected"
+                                      ? "Reassign Partner"
+                                      : "Assign Delivery Partner"}
                                   </option>
-                                ))}
-                              </select>
-                            ) : order.assignedTo ? (
-                              <span className="order-list-assigned-partner">
-                                {order.assignedTo.username || "Assigned"}
-                              </span>
-                            ) : (
-                              <span className="order-list-not-assigned">
-                                Not Assigned
-                              </span>
-                            )}
-                          </td>
-                          <td>
-                            <span
-                              className={`order-list-assignment-badge order-list-assignment-${order.assignmentStatus?.toLowerCase() || "pending"}`}
-                            >
-                              {order.assignmentStatus === "accepted"
-                                ? "Accepted"
-                                : order.assignmentStatus === "rejected"
-                                ? "Rejected"
-                                : order.assignmentStatus === "assigned"
-                                ? "Assigned"
-                                : "Pending"}
-                            </span>
-                          </td>
-                          <td>
-                            <span
-                              className={`order-list-status-badge order-list-status-${order.status?.toLowerCase() || "pending"}`}
-                            >
-                              {order.status?.charAt(0).toUpperCase() +
-                                order.status?.slice(1) || "Pending"}
-                            </span>
-                          </td>
-                          <td>{formatDate(order.orderDate)}</td>
-                          <td>
-                            <div className="order-list-action-buttons">
-                              <Link
-                                to={`/order/create?edit=${order._id}`}
-                                className="order-list-icon-button order-list-edit-button"
-                                aria-label={`Edit order ${order._id}`}
+                                  {deliveryPartners.map((partner) => (
+                                    <option key={partner._id} value={partner._id}>
+                                      {partner.username}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : order.assignedTo ? (
+                                <span className="order-list-assigned-partner">
+                                  {order.assignedTo.username || "Assigned"}
+                                </span>
+                              ) : (
+                                <span className="order-list-not-assigned">
+                                  Not Assigned
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              <span
+                                className={`order-list-assignment-badge order-list-assignment-${order.assignmentStatus?.toLowerCase() || "pending"}`}
                               >
-                                ✎
-                              </Link>
-                              <button
-                                className="order-list-icon-button order-list-delete-button"
-                                onClick={() =>
-                                  handleDeleteClick(order._id, order._id)
-                                }
-                                aria-label={`Delete order ${order._id}`}
+                                {order.assignmentStatus === "accepted"
+                                  ? "Accepted"
+                                  : order.assignmentStatus === "rejected"
+                                  ? "Rejected"
+                                  : order.assignmentStatus === "assigned"
+                                  ? "Assigned"
+                                  : "Pending"}
+                              </span>
+                            </td>
+                            <td>
+                              <span
+                                className={`order-list-status-badge order-list-status-${order.status?.toLowerCase() || "pending"}`}
                               >
-                                🗑️
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                                {order.status?.charAt(0).toUpperCase() +
+                                  order.status?.slice(1) || "Pending"}
+                              </span>
+                            </td>
+                            <td>{formatDate(order.orderDate)}</td>
+                            <td>
+                              <div className="order-list-action-buttons">
+                                <Link
+                                  to={`/order/create?edit=${order._id}`}
+                                  className="order-list-icon-button order-list-edit-button"
+                                  aria-label={`Edit order ${order._id}`}
+                                >
+                                  ✎
+                                </Link>
+                                <button
+                                  className="order-list-icon-button order-list-delete-button"
+                                  onClick={() =>
+                                    handleDeleteClick(order._id, order._id)
+                                  }
+                                  aria-label={`Delete order ${order._id}`}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
-                        <td colSpan="13" className="order-list-no-data">
+                        <td colSpan="14" className="order-list-no-data">
                           {orders.length === 0
                             ? "No orders found"
                             : "No orders match your filters"}

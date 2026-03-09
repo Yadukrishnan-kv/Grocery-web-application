@@ -14,82 +14,64 @@ const PDFDocument = require("pdfkit");
 
 const createOrder = async (req, res) => {
   try {
-    let { customerId, orderItems, payment, remarks } = req.body;
+    const { customerId, payment, remarks, orderItems } = req.body;
 
-    if (req.user.role === "Customer") {
-      const customerProfile = await Customer.findOne({ user: req.user._id });
-      if (!customerProfile) {
-        return res.status(404).json({ message: "Your customer profile not found." });
-      }
-      customerId = customerProfile._id;
-    } else if (!customerId) {
-      return res.status(400).json({ message: "Customer ID is required" });
+    // Validation
+    if (!customerId || !payment || !orderItems || orderItems.length === 0) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const customer = await Customer.findById(customerId);
-    if (!customer) return res.status(404).json({ message: "Customer not found" });
+    // ✅ Process each order item with VAT calculations
+    const processedItems = orderItems.map((item) => {
+      const qty = parseInt(item.orderedQuantity);
+      const price = parseFloat(item.price);
+      const vatPercent = parseFloat(item.vatPercentage) || 5;
 
-    if (customer.billingType === "Credit limit") {
-      if (customer.balanceCreditLimit <= 0) {
-        return res.status(403).json({ message: "Insufficient credit limit or zero balance." });
-      }
-      const overdueBill = await Bill.findOne({ customer: customer._id, status: "overdue" });
-      if (overdueBill) {
-        return res.status(403).json({ message: "Cannot place order - you have overdue bills. Please clear dues first." });
-      }
-    }
+      const exclVatAmount = qty * price;
+      const vatAmount = (exclVatAmount * vatPercent) / 100;
+      const totalAmount = exclVatAmount + vatAmount;
 
-    if (!Array.isArray(orderItems) || orderItems.length === 0) {
-      return res.status(400).json({ message: "At least one product required" });
-    }
-
-    let grandTotal = 0;
-    const processedItems = [];
-    for (const item of orderItems) {
-      const product = await Product.findById(item.productId);
-      if (!product) return res.status(404).json({ message: `Product not found: ${item.productId}` });
-      const itemTotal = product.price * item.orderedQuantity;
-      grandTotal += itemTotal;
-      processedItems.push({
+      return {
         product: item.productId,
-        unit: product.unit,
-        orderedQuantity: item.orderedQuantity,
-        deliveredQuantity: 0,
+        orderedQuantity: qty,
+        price: price,
+        vatPercentage: vatPercent,
+        exclVatAmount: parseFloat(exclVatAmount.toFixed(2)),
+        vatAmount: parseFloat(vatAmount.toFixed(2)),
+        totalAmount: parseFloat(totalAmount.toFixed(2)),
         packedQuantity: 0,
+        deliveredQuantity: 0,
         invoicedQuantity: 0,
-        price: product.price,
-        totalAmount: itemTotal,
         remarks: item.remarks || "",
-      });
-    }
-
-    let initialStatus = "pending";
-    const isSalesman = ["Salesman", "Sales Person", "delivery partner", "Delivery Man"].includes(req.user.role);
-    const orderCount = await Order.countDocuments({ customer: customerId });
-    if (isSalesman && orderCount === 0) {
-      initialStatus = "pending_approval";
-    }
-
-    const order = await Order.create({
-      customer: customerId,
-      orderItems: processedItems,
-      payment,
-      remarks: remarks || "",
-      orderDate: req.body.orderDate || new Date(),
-      createdBy: req.user._id,
-      status: initialStatus,
-      approvalStatus: initialStatus === "pending_approval" ? "pending" : undefined,
+      };
     });
 
+    const order = new Order({
+      customer: customerId,
+      payment,
+      remarks: remarks || "",
+      orderItems: processedItems,
+      status: "pending",
+      assignmentStatus: "pending_assignment",
+    });
+
+    await order.save();
+
+    // ✅ Populate and return with VAT fields
+    const populatedOrder = await Order.findById(order._id)
+      .populate("customer", "name phone email")
+      .populate("orderItems.product", "productName unit");
+
     res.status(201).json({
-      message: initialStatus === "pending_approval" ? "Order created successfully. Waiting for admin approval." : "Order created successfully.",
-      order,
+      message: "Order created successfully",
+      order: populatedOrder,
     });
   } catch (error) {
     console.error("Create order error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: "Server error: " + error.message });
   }
 };
+
 
 const getAllOrders = async (req, res) => {
   try {
@@ -612,83 +594,114 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     .text(company.companyPhone || "N/A", fromX, infoY + 45)
     .text(company.companyAddress || "N/A", fromX, infoY + 65);
 
-  // Table - now supports MULTIPLE products
+  // Table - now supports MULTIPLE products with Serial No & VAT Columns
   const tableY = infoY + 130;
   const rowHeight = 40;
 
-  const descCol = margin;
-  const qtyCol = margin + 280;
-  const priceCol = margin + 360;
-  const totalCol = margin + 440;
+  // ✅ UPDATED: Adjusted columns for Serial No + VAT Fields
+  const snoCol = margin + 10; // S.No (25px)
+  const descCol = margin + 35; // Description (150px - narrower)
+  const qtyCol = margin + 185; // Qty (30px)
+  const exclVatCol = margin + 215; // Excl. VAT (50px)
+  const vatPctCol = margin + 265; // VAT % (30px)
+  const vatAmtCol = margin + 295; // VAT Amt (50px)
+  const totalCol = margin + 345; // Total (Incl. VAT) (70px)
+  const tableEnd = margin + 415; // End of table
 
-  // Header row
+  // Header row - ✅ Added S.No & VAT Headers
   doc
-    .rect(margin - 10, tableY - 5, contentWidth + 20, rowHeight)
+    .rect(margin, tableY - 5, tableEnd - margin + 10, rowHeight)
     .fillColor("#b0123b")
     .fill();
   doc
     .fillColor("#ffffff")
-    .fontSize(12)
+    .fontSize(8) // Smaller for more columns
     .font("Helvetica-Bold")
-    .text("Description", descCol, tableY + 10)
-    .text("Qty", qtyCol, tableY + 10, { width: 70, align: "center" })
-    .text("Price", priceCol, tableY + 10, { width: 70, align: "center" })
-    .text("Total", totalCol, tableY + 10, { width: 70, align: "center" });
+    .text("S.No", snoCol, tableY + 10, { width: 25, align: "center" })
+    .text("Description", descCol, tableY + 10, { width: 150 })
+    .text("Qty", qtyCol, tableY + 10, { width: 30, align: "center" })
+    .text("Excl. VAT", exclVatCol, tableY + 10, { width: 50, align: "center" })
+    .text("VAT %", vatPctCol, tableY + 10, { width: 30, align: "center" })
+    .text("VAT Amt", vatAmtCol, tableY + 10, { width: 50, align: "center" })
+    .text("Total (Incl. VAT)", totalCol, tableY + 10, { width: 70, align: "center" });
 
-  // Data rows - loop through orderItems
+  // Data rows - loop through orderItems with Serial No & VAT
   let currentY = tableY + rowHeight;
-  let grandTotal = 0;
+  let grandTotalExclVat = 0;
+  let grandTotalVat = 0;
+  let grandTotalInclVat = 0;
+  let serialNumber = 1;
 
   order.orderItems.forEach((item) => {
     const qty = invoiceType.includes("PENDING")
       ? item.orderedQuantity - item.deliveredQuantity
       : item.deliveredQuantity || item.orderedQuantity;
 
-    const itemTotal = qty * item.price;
-    grandTotal += itemTotal;
+    if (qty <= 0) return; // Skip zero qty rows
+
+    // ✅ VAT Calculations
+    const vatPercentage = item.vatPercentage || 5;
+    const exclVatAmount = (item.price || 0) * qty;
+    const vatAmount = exclVatAmount * (vatPercentage / 100);
+    const itemTotal = exclVatAmount + vatAmount;
+
+    grandTotalExclVat += exclVatAmount;
+    grandTotalVat += vatAmount;
+    grandTotalInclVat += itemTotal;
 
     doc
       .fillColor("#000000")
-      .fontSize(12)
+      .fontSize(8) // Smaller font for fit
       .font("Helvetica")
+      .text(serialNumber.toString(), snoCol, currentY + 10, { width: 25, align: "center" }) // ✅ Serial No
       .text(
         item.product?.productName || "Unknown Product",
         descCol,
         currentY + 10,
+        { width: 150 } // Fixed width for description
       )
       .text(qty.toString(), qtyCol, currentY + 10, {
-        width: 70,
+        width: 30,
         align: "center",
       })
-      .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 10, {
-        width: 70,
+      .text(`AED ${exclVatAmount.toFixed(2)}`, exclVatCol, currentY + 10, {
+        width: 50,
+        align: "center",
+      })
+      .text(`${vatPercentage}%`, vatPctCol, currentY + 10, {
+        width: 30,
+        align: "center",
+      })
+      .text(`AED ${vatAmount.toFixed(2)}`, vatAmtCol, currentY + 10, {
+        width: 50,
         align: "center",
       })
       .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 10, {
         width: 70,
         align: "center",
-      });
+      }); // Extra width for AED
 
     currentY += rowHeight;
+    serialNumber++; // Increment serial number
   });
 
-  // Subtotal
-  const subtotalY = currentY + 40;
-  const subtotalWidth = 200;
+  // VAT Summary & Grand Total - UPDATED: Breakdown Box
+  const subtotalY = currentY + 20;
+  const subtotalWidth = 250;
   const subtotalX = pageWidth - margin - subtotalWidth;
 
-  doc.rect(subtotalX, subtotalY, subtotalWidth, 35).fillColor("#222222").fill();
+  // VAT Breakdown Box
+  doc.rect(subtotalX, subtotalY, subtotalWidth, 60).fillColor("#f0f0f0").fill();
   doc
-    .fillColor("#ffffff")
-    .fontSize(12)
-    .font("Helvetica-Bold")
-    .text("Grand Total", subtotalX + 15, subtotalY + 12)
-    .text(
-      `AED ${grandTotal.toFixed(2)}`,
-      subtotalX + subtotalWidth - 20,
-      subtotalY + 12,
-      { align: "right" },
-    );
+    .fillColor("#000000")
+    .fontSize(9)
+    .font("Helvetica")
+    .text("Excl. VAT Subtotal:", subtotalX + 15, subtotalY + 10, { width: 120 })
+    .text(`AED ${grandTotalExclVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 10, { align: "right", width: 50 })
+    .text("VAT Amount:", subtotalX + 15, subtotalY + 25, { width: 120 })
+    .text(`AED ${grandTotalVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 25, { align: "right", width: 50 })
+    .text("Grand Total (Incl. VAT):", subtotalX + 15, subtotalY + 40, { width: 120 })
+    .text(`AED ${grandTotalInclVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 40, { align: "right", width: 50 });
 
   // Footer - unchanged
   const footerY = subtotalY + 80;
@@ -712,7 +725,7 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
       margin,
       footerY + 65,
     )
-    .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
+    .text(`Order ID: ${order._id.toString().slice(-8)}`, margin, footerY + 85); // Shortened ID
 
   const thankYouX = pageWidth - margin - 200;
   doc
@@ -727,8 +740,15 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     .font("Helvetica-Oblique")
     .fillColor("#666666")
     .text("This is a system-generated invoice", margin, bottomY);
-};
 
+  // ✅ Add line under table for clean look
+  doc
+    .strokeColor("#ddd")
+    .lineWidth(1)
+    .moveTo(margin, tableY - 2)
+    .lineTo(tableEnd, tableY - 2)
+    .stroke();
+};
 const assignOrderToDeliveryMan = async (req, res) => {
   try {
     const { deliveryManId } = req.body;
@@ -1325,38 +1345,35 @@ const packOrder = async (req, res) => {
     if (req.user.role.trim() !== "Store kepper") {
       return res.status(403).json({ message: "Only Storekeeper can pack orders" });
     }
-
-    const { packedItems } = req.body; // [{ product: orderItem._id, packedQuantity: number }, ...]
-
+    const { packedItems } = req.body;
     const order = await Order.findById(req.params.orderId)
       .populate("customer")
-      .populate("orderItems.product", "productName price unit");
-
+      .populate("orderItems.product", "productName price unit vatPercentage exclVatAmount vatAmount totalAmount");
+    
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-
     if (!["pending", "assigned", "partial_delivered"].includes(order.status)) {
       return res.status(400).json({ message: "Order not in packable state" });
     }
 
-    // 2. Validate and calculate newly packed quantities
-    let newlyPackedAmount = 0;
+    // 2. Validate and calculate newly packed quantities WITH VAT
+    let newlyPackedAmount = 0;        // ✅ Now VAT-inclusive (Grand Total)
+    let newlyPackedExclVat = 0;       // ✅ Track Excl. VAT separately
+    let newlyPackedVatAmount = 0;     // ✅ Track VAT Amount separately
     let totalNewlyPackedQty = 0;
     let allFullyPacked = true;
-    const newlyPackedItems = []; // for invoice history
+    const newlyPackedItems = [];
 
     for (const pack of packedItems) {
-      const orderItem = order.orderItems.id(pack.product); // pack.product = orderItem _id
-
+      const orderItem = order.orderItems.id(pack.product);
       if (!orderItem) {
         return res.status(400).json({ message: `Invalid item ID: ${pack.product}` });
       }
-
       const alreadyPacked = orderItem.packedQuantity || 0;
       const maxCanPack = orderItem.orderedQuantity - alreadyPacked;
       const qtyToPackNow = Number(pack.packedQuantity);
-
+      
       if (isNaN(qtyToPackNow) || qtyToPackNow < 0 || qtyToPackNow > maxCanPack) {
         return res.status(400).json({
           message: `Invalid pack quantity for ${orderItem.product?.productName || "item"}. Max: ${maxCanPack}`,
@@ -1366,15 +1383,33 @@ const packOrder = async (req, res) => {
       // Update packed quantity
       orderItem.packedQuantity = alreadyPacked + qtyToPackNow;
 
-      // Track for this packing event
+      // Track for this packing event - ✅ VAT-INCLUSIVE CALCULATION
       if (qtyToPackNow > 0) {
+        // ✅ Calculate proportional VAT-inclusive amount
+        const itemTotalWithVat = orderItem.totalAmount || (orderItem.price * orderItem.orderedQuantity);
+        const itemExclVat = orderItem.exclVatAmount || (orderItem.price * orderItem.orderedQuantity);
+        const itemVatAmount = orderItem.vatAmount || (itemExclVat * ((orderItem.vatPercentage || 5) / 100));
+        
+        // Proportional amounts based on packed quantity
+        const ratio = qtyToPackNow / orderItem.orderedQuantity;
+        const packedTotal = itemTotalWithVat * ratio;
+        const packedExclVat = itemExclVat * ratio;
+        const packedVatAmount = itemVatAmount * ratio;
+
         newlyPackedItems.push({
-          product: orderItem.product,           // Product _id
-          quantity: qtyToPackNow,               // only this packing
+          product: orderItem.product,
+          quantity: qtyToPackNow,
           price: orderItem.price,
+          vatPercentage: orderItem.vatPercentage || 5,
+          exclVatAmount: packedExclVat,
+          vatAmount: packedVatAmount,
+          totalAmount: packedTotal,
         });
 
-        newlyPackedAmount += qtyToPackNow * orderItem.price;
+        // ✅ ACCUMULATE VAT-INCLUSIVE AMOUNTS
+        newlyPackedAmount += packedTotal;           // Grand Total (Incl. VAT) ← Credit deduction uses this
+        newlyPackedExclVat += packedExclVat;        // Excl. VAT for reporting
+        newlyPackedVatAmount += packedVatAmount;    // VAT Amount for reporting
         totalNewlyPackedQty += qtyToPackNow;
       }
 
@@ -1383,44 +1418,42 @@ const packOrder = async (req, res) => {
       }
     }
 
-    // 3. Credit deduction (only for newly packed this time)
+    // 3. Credit deduction - ✅ NOW USES VAT-INCLUSIVE AMOUNT
     if (order.payment === "credit" && newlyPackedAmount > 0) {
       const customer = await Customer.findById(order.customer);
       if (customer?.billingType === "Credit limit") {
         if (customer.balanceCreditLimit < newlyPackedAmount) {
           return res.status(400).json({
-            message: `Insufficient credit. Need ${newlyPackedAmount.toFixed(2)}, available ${customer.balanceCreditLimit.toFixed(2)}`,
+            message: `Insufficient credit. Need AED ${newlyPackedAmount.toFixed(2)} (Incl. VAT), available AED ${customer.balanceCreditLimit.toFixed(2)}`,
           });
         }
+        // ✅ Deduct Grand Total (Incl. VAT) from credit limit
         customer.balanceCreditLimit -= newlyPackedAmount;
         await customer.save();
       }
     }
 
     // 4. Generate new invoice number ONLY when something new is packed
-    let newInvoiceNumber = order.invoiceNumber; // keep last one if no new packing
-
+    let newInvoiceNumber = order.invoiceNumber;
     if (newlyPackedAmount > 0) {
       const counter = await InvoiceCounter.findOneAndUpdate(
         {},
         { $inc: { invoiceCount: 1 } },
         { new: true, upsert: true, setDefaultsOnInsert: true }
       );
-
       newInvoiceNumber = `DEL-${String(counter.invoiceCount).padStart(2, "0")}`;
-
-      // Add to immutable history - IMPORTANT: store ONLY this packing's items
+      
       if (!order.invoiceHistory) order.invoiceHistory = [];
-
       order.invoiceHistory.push({
         invoiceNumber: newInvoiceNumber,
         quantity: totalNewlyPackedQty,
-        amount: newlyPackedAmount,
+        amount: newlyPackedAmount,  // ✅ VAT-inclusive amount
         createdAt: new Date(),
-        items: newlyPackedItems, // ← this is what allows correct PDF later
+        items: newlyPackedItems,
+        // ✅ Store VAT breakdown for invoice PDF
+        totalExclVat: newlyPackedExclVat,
+        totalVatAmount: newlyPackedVatAmount,
       });
-
-      // Update current active invoice number
       order.invoiceNumber = newInvoiceNumber;
     }
 
@@ -1428,24 +1461,24 @@ const packOrder = async (req, res) => {
     order.packedBy = req.user._id;
     order.packedAt = new Date();
     order.packedStatus = allFullyPacked ? "fully_packed" : "partially_packed";
-
     if (allFullyPacked && order.status !== "partial_delivered") {
       order.status = "ready_to_deliver";
     }
-
     await order.save();
 
     // 6. Response
     res.json({
       success: true,
       message: allFullyPacked
-        ? `Order fully packed. Credit deducted: AED ${newlyPackedAmount.toFixed(2)}`
-        : `Partially packed (${totalNewlyPackedQty} units this time). Credit deducted: AED ${newlyPackedAmount.toFixed(2)}`,
+        ? `Order fully packed. Credit deducted: AED ${newlyPackedAmount.toFixed(2)} (Incl. VAT)`
+        : `Partially packed (${totalNewlyPackedQty} units). Credit deducted: AED ${newlyPackedAmount.toFixed(2)} (Incl. VAT)`,
       order,
       invoiceNumber: newInvoiceNumber,
       newlyPacked: {
         quantity: totalNewlyPackedQty,
-        amount: newlyPackedAmount,
+        amount: newlyPackedAmount,           // Grand Total (Incl. VAT)
+        exclVat: newlyPackedExclVat,         // Excl. VAT
+        vatAmount: newlyPackedVatAmount,     // VAT Amount
         items: newlyPackedItems,
       },
       nextStep: allFullyPacked ? "Ready for delivery" : "Can pack more later",
@@ -1598,17 +1631,17 @@ const getUnifiedInvoice = async (req, res) => {
 const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const company = await CompanySettings.findOne();
   if (!company) throw new Error("Company invoice settings not configured.");
-
+  
   const pageWidth = 595.28;
   const margin = 50;
   const headerY = margin;
   const date = new Date(order.packedAt || Date.now());
   const formattedDate = date.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-
+  
   // ─── Header ───────────────────────────────────────────────────────
   doc.fontSize(22).font("Helvetica-Bold").text(company.companyName || "INGOUDE COMPANY", margin, headerY);
   doc.fontSize(36).font("Helvetica-Bold").fillColor("#b0123b").text(invoiceType, margin, headerY + 40);
-
+  
   // ─── Invoice Number & Date ───────
   const invoiceInfoX = pageWidth - margin - 200;
   doc
@@ -1617,7 +1650,7 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     .fillColor("#000000")
     .text(`Invoice No: ${invoiceNo}`, invoiceInfoX, headerY)
     .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
-
+  
   // ─── Bill To / From ───────────────────────────────────────────────
   const infoY = headerY + 120;
   const billToX = margin;
@@ -1637,83 +1670,125 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     .text(company.companyName || "INGOUDE COMPANY", fromX, infoY + 25)
     .text(company.companyPhone || "N/A", fromX, infoY + 45)
     .text(company.companyAddress || "N/A", fromX, infoY + 65);
-
-  // ─── Table: S.No | Description | Qty | Price | Total ─────────────────
+  
+  // ─── Table: S.No | Description | Qty | Excl. VAT | VAT % | VAT Amt | Total (Incl. VAT) ─────────────────
+  // ✅ UPDATED: New Column Positions for VAT Fields
   const tableY = infoY + 130;
   const rowHeight = 45;
+  const snoCol = margin + 10; // S.No (25px)
+  const descCol = margin + 35; // Description (150px - narrower for more columns)
+  const qtyCol = margin + 185; // Qty (30px)
+  const exclVatCol = margin + 215; // Excl. VAT (50px)
+  const vatPctCol = margin + 265; // VAT % (30px)
+  const vatAmtCol = margin + 295; // VAT Amt (50px)
+  const totalCol = margin + 345; // Total (Incl. VAT) (70px)
+  const tableEnd = margin + 415; // End of table
   
-  // ✅ NEW COLUMN POSITIONS with S.No
-  const snoCol = margin;                    // S.No column
-  const descCol = margin + 40;              // Description (shifted right)
-  const qtyCol = margin + 260;              // Qty
-  const priceCol = margin + 320;            // Price
-  const totalCol = margin + 380;            // Total
-
   // Header row
   doc
-    .rect(margin - 10, tableY - 5, pageWidth - margin * 2 + 20, rowHeight)
+    .rect(margin, tableY - 5, tableEnd - margin + 10, rowHeight)
     .fillColor("#b0123b")
     .fill();
   doc
     .fillColor("#ffffff")
-    .fontSize(10)
+    .fontSize(8) // Smaller font for more columns
     .font("Helvetica-Bold")
-    .text("S.No", snoCol, tableY + 8, { width: 30, align: "center" })  // ✅ S.No header
-    .text("Description", descCol, tableY + 8)
-    .text("Qty", qtyCol, tableY + 8, { width: 50, align: "center" })
-    .text("Price", priceCol, tableY + 8, { width: 50, align: "center" })
-    .text("Total", totalCol, tableY + 8, { width: 50, align: "center" });
-
-  // ─── NEW: Use specific history entry for this invoiceNo ─────────
-  const historyEntry = order.invoiceHistory.find(h => h.invoiceNumber === invoiceNo);
-  if (!historyEntry) throw new Error(`History entry not found for ${invoiceNo}`);
-
+    .text("S.No", snoCol, tableY + 8, { width: 25, align: "center" })
+    .text("Description", descCol, tableY + 8, { width: 150 })
+    .text("Qty", qtyCol, tableY + 8, { width: 30, align: "center" })
+    .text("Excl. VAT", exclVatCol, tableY + 8, { width: 50, align: "center" })
+    .text("VAT %", vatPctCol, tableY + 8, { width: 30, align: "center" })
+    .text("VAT Amt", vatAmtCol, tableY + 8, { width: 50, align: "center" })
+    .text("Total (Incl. VAT)", totalCol, tableY + 8, { width: 70, align: "center" });
+  
+  // ─── Process History Items (Partial Qty) ─────────
+  const historyEntry = order.invoiceHistory?.find(h => h.invoiceNumber === invoiceNo);
   let currentY = tableY + rowHeight;
-  let amountForBilling = 0;
-  let serialNumber = 1;  // ✅ Start serial number at 1
-
-  // FIXED: Correctly find orderItem using oi.product._id (populated)
-  for (const histItem of historyEntry.items) {
-    const orderItem = order.orderItems.find(oi => oi.product._id.toString() === histItem.product.toString());
-    if (!orderItem) continue;
-
-    const qty = histItem.quantity;
-    const price = histItem.price;
-    const total = qty * price;
-    amountForBilling += total;
-
-    doc
-      .fillColor("#000000")
-      .fontSize(10)
-      .font("Helvetica")
-      // ✅ ADD SERIAL NUMBER
-      .text(serialNumber.toString(), snoCol, currentY + 8, { width: 30, align: "center" })
-      .text(orderItem.product?.productName || "Unknown Product", descCol, currentY + 8)
-      .text(qty.toString(), qtyCol, currentY + 8, { width: 50, align: "center" })
-      .text(`AED ${price.toFixed(2)}`, priceCol, currentY + 8, { width: 50, align: "center" })
-      .text(`AED ${total.toFixed(2)}`, totalCol, currentY + 8, { width: 50, align: "center" });
-    
-    currentY += rowHeight;
-    serialNumber++;  // ✅ Increment serial number
+  let grandTotalExclVat = 0;
+  let grandTotalVat = 0;
+  let grandTotalInclVat = 0;
+  let serialNumber = 1;
+  
+  if (historyEntry && historyEntry.items?.length > 0) {
+    // Use history for partial qty/names (extend with VAT from orderItem)
+    for (const histItem of historyEntry.items) {
+      if (!histItem.quantity || histItem.quantity <= 0) continue;
+      const orderItem = order.orderItems.find(oi => String(oi.product._id) === String(histItem.product));
+      const qty = histItem.quantity;
+      const price = histItem.price || orderItem?.price || 0; // Excl. VAT price
+      const vatPercentage = orderItem?.vatPercentage || 5;
+      const exclVatAmount = price * qty;
+      const vatAmount = exclVatAmount * (vatPercentage / 100);
+      const totalAmount = exclVatAmount + vatAmount;
+      
+      grandTotalExclVat += exclVatAmount;
+      grandTotalVat += vatAmount;
+      grandTotalInclVat += totalAmount;
+      
+      doc
+        .fillColor("#000000")
+        .fontSize(8)
+        .font("Helvetica")
+        .text(serialNumber.toString(), snoCol, currentY + 8, { width: 25, align: "center" })
+        .text(orderItem?.product?.productName || "Unknown Product", descCol, currentY + 8, { width: 150 })
+        .text(qty.toString(), qtyCol, currentY + 8, { width: 30, align: "center" })
+        .text(`AED ${exclVatAmount.toFixed(2)}`, exclVatCol, currentY + 8, { width: 50, align: "center" })
+        .text(`${vatPercentage}%`, vatPctCol, currentY + 8, { width: 30, align: "center" })
+        .text(`AED ${vatAmount.toFixed(2)}`, vatAmtCol, currentY + 8, { width: 50, align: "center" })
+        .text(`AED ${totalAmount.toFixed(2)}`, totalCol, currentY + 8, { width: 70, align: "center" });
+      
+      currentY += rowHeight;
+      serialNumber++;
+    }
+  } else {
+    // Fallback: Use order items with delivered/packed qty
+    order.orderItems.forEach((item, idx) => {
+      const qty = item.deliveredQuantity || item.packedQuantity || item.orderedQuantity || 0;
+      if (qty <= 0) return;
+      const exclVatAmount = item.exclVatAmount || (item.price * qty);
+      const vatPercentage = item.vatPercentage || 5;
+      const vatAmount = item.vatAmount || (exclVatAmount * (vatPercentage / 100));
+      const totalAmount = item.totalAmount || (exclVatAmount + vatAmount);
+      
+      grandTotalExclVat += exclVatAmount;
+      grandTotalVat += vatAmount;
+      grandTotalInclVat += totalAmount;
+      
+      doc
+        .fillColor("#000000")
+        .fontSize(8)
+        .font("Helvetica")
+        .text((idx + 1).toString(), snoCol, currentY + 8, { width: 25, align: "center" })
+        .text(item.product?.productName || "Unknown Product", descCol, currentY + 8, { width: 150 })
+        .text(qty.toString(), qtyCol, currentY + 8, { width: 30, align: "center" })
+        .text(`AED ${exclVatAmount.toFixed(2)}`, exclVatCol, currentY + 8, { width: 50, align: "center" })
+        .text(`${vatPercentage}%`, vatPctCol, currentY + 8, { width: 30, align: "center" })
+        .text(`AED ${vatAmount.toFixed(2)}`, vatAmtCol, currentY + 8, { width: 50, align: "center" })
+        .text(`AED ${totalAmount.toFixed(2)}`, totalCol, currentY + 8, { width: 70, align: "center" });
+      
+      currentY += rowHeight;
+      serialNumber++;
+    });
   }
-
-  // Verify total matches history (debug)
-  if (amountForBilling !== historyEntry.amount) {
-    console.warn(`Amount mismatch for ${invoiceNo}: calculated ${amountForBilling}, history ${historyEntry.amount}`);
-  }
-
-  // ─── Grand Total (for THIS invoice only) ───────────────────────────
+  
+  // ─── VAT Summary & Grand Total ───────────────────────────
   const subtotalY = currentY + 20;
-  const subtotalWidth = 220;
+  const subtotalWidth = 250;
   const subtotalX = pageWidth - margin - subtotalWidth;
-  doc.rect(subtotalX, subtotalY, subtotalWidth, 40).fillColor("#222222").fill();
+  
+  // VAT Breakdown Box
+  doc.rect(subtotalX, subtotalY, subtotalWidth, 60).fillColor("#f0f0f0").fill();
   doc
-    .fillColor("#ffffff")
-    .fontSize(12)
-    .font("Helvetica-Bold")
-    .text("Total (This Invoice)", subtotalX + 15, subtotalY + 12)
-    .text(`AED ${amountForBilling.toFixed(2)}`, subtotalX + subtotalWidth - 20, subtotalY + 12, { align: "right" });
-
+    .fillColor("#000000")
+    .fontSize(9)
+    .font("Helvetica")
+    .text("Excl. VAT Subtotal:", subtotalX + 15, subtotalY + 10, { width: 120 })
+    .text(`AED ${grandTotalExclVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 10, { align: "right", width: 50 })
+    .text("VAT Amount:", subtotalX + 15, subtotalY + 25, { width: 120 })
+    .text(`AED ${grandTotalVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 25, { align: "right", width: 50 })
+    .text("Grand Total (Incl. VAT):", subtotalX + 15, subtotalY + 40, { width: 120 })
+    .text(`AED ${grandTotalInclVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 40, { align: "right", width: 50 });
+  
   // ─── Footer ───────────────────────────────────────────────────────
   const footerY = subtotalY + 80;
   doc.fillColor("#000000").fontSize(14).font("Helvetica-Bold").text("Payment Information:", margin, footerY);
@@ -1727,11 +1802,19 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
       margin,
       footerY + 65
     )
-    .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
-  const thankYouX = pageWidth - margin - 200;
-  doc.fontSize(36).font("Helvetica-Bold").fillColor("#000000").text("Thank You!", thankYouX, footerY, { width: 200, align: "right" });
-  const bottomY = footerY + 150;
+    .text(`Order ID: ${order._id.toString().slice(-8)}`, margin, footerY + 85);
+  const thankYouX = pageWidth - margin - 150;
+  doc.fontSize(28).font("Helvetica-Bold").fillColor("#000000").text("Thank You!", thankYouX, footerY, { width: 150, align: "right" });
+  const bottomY = footerY + 120;
   doc.fontSize(10).font("Helvetica-Oblique").fillColor("#666666").text(`Invoice Reference: ${invoiceNo}`, margin, bottomY);
+  
+  // ✅ Add line under table for clean look
+  doc
+    .strokeColor("#ddd")
+    .lineWidth(1)
+    .moveTo(margin, tableY - 2)
+    .lineTo(tableEnd, tableY - 2)
+    .stroke();
 };
 const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const company = await CompanySettings.findOne();

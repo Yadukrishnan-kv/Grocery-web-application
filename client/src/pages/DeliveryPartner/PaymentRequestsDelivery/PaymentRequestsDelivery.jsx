@@ -346,8 +346,23 @@ const PaymentRequestsDelivery = () => {
   // Wallet Totals
   const calculateTotal = (list, statuses = ["received", "pending"]) =>
     list.filter((t) => statuses.includes(t.status)).reduce((sum, t) => sum + t.amount, 0);
+
   const cashTotalWallet = calculateTotal(cashTx);
   const chequeTotalWallet = calculateTotal(chequeTx);
+
+  // ✅ Wallet Filtered Total (Only "received" status - Ready to Pay)
+  const filteredWalletTotal = useMemo(() => {
+    return filteredWalletTx
+      .filter((tx) => tx.status === "received")
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [filteredWalletTx]);
+
+  // ✅ Wallet Selected Total (Only "received" status - Ready to Pay)
+  const selectedWalletTotal = useMemo(() => {
+    return billTransactions
+      .filter((tx) => selectedWalletTx.includes(tx._id) && tx.status === "received")
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [billTransactions, selectedWalletTx]);
 
   // ────────────────────────────────────────────────
   // Download Receipt
@@ -850,6 +865,26 @@ const PaymentRequestsDelivery = () => {
                 )}
               </div>
             </div>
+
+            {/* ✅ Filtered Summary for Wallet (Only Ready to Pay) */}
+            {walletSearch.trim() && (
+              <div
+                className="filtered-summary"
+                style={{
+                  margin: "8px 0",
+                  fontSize: "0.95rem",
+                  color: "#475569",
+                  padding: "4px 8px",
+                  backgroundColor: "#f1f5f9",
+                }}
+              >
+                Showing <strong>{filteredWalletTx.filter(tx => tx.status === "received").length}</strong> transaction
+                {filteredWalletTx.filter(tx => tx.status === "received").length !== 1 ? "s" : ""} for "
+                <strong>{walletSearch}</strong>" — Total Amount:{" "}
+                <strong>AED {filteredWalletTotal.toFixed(2)}</strong>
+              </div>
+            )}
+
             <div className="requests-summary small">
               <div className="summary-card small">
                 <h4>Cash Ready</h4>
@@ -866,9 +901,13 @@ const PaymentRequestsDelivery = () => {
                 </div>
               </div>
             </div>
+
             {selectedWalletTx.length > 0 && (
               <div className="bulk-action-bar">
-                <span>{selectedWalletTx.length} selected</span>
+                <span>
+                  {selectedWalletTx.length} selected — Total:{" "}
+                  <strong>AED {selectedWalletTotal.toFixed(2)}</strong>
+                </span>
                 <button
                   className="bulk-receipt-btn"
                   onClick={downloadBulkReceipt}
@@ -894,6 +933,7 @@ const PaymentRequestsDelivery = () => {
                 </button>
               </div>
             )}
+
             {loading ? (
               <div className="loading">Loading wallet...</div>
             ) : filteredWalletTx.length === 0 ? (
@@ -1055,6 +1095,7 @@ const PaymentRequestsDelivery = () => {
                 </button>
               </div>
             )}
+
             {loading ? (
               <div className="loading">Loading...</div>
             ) : filteredPendingBills.length === 0 ? (
@@ -1212,6 +1253,7 @@ const PaymentRequestsDelivery = () => {
                 </button>
               </div>
             )}
+
             {loading ? (
               <div className="loading">Loading...</div>
             ) : filteredCashRequests.length === 0 ? (
@@ -1367,6 +1409,7 @@ const PaymentRequestsDelivery = () => {
                 </button>
               </div>
             )}
+
             {loading ? (
               <div className="loading">Loading...</div>
             ) : filteredChequeRequests.length === 0 ? (
@@ -1475,7 +1518,6 @@ const PaymentRequestsDelivery = () => {
       </main>
 
       {/* ─── Modals ──────────────────────────────────────────────────── */}
-
       {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="confirm-modal-overlay">

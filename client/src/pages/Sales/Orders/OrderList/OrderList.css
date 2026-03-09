@@ -742,3 +742,102 @@ th:nth-child(7), td:nth-child(7) { width: 130px; } /* Final Total */
     height: 14px;
   }
 }
+/* src/pages/Order/OrderList.css - Add these styles for VAT columns */
+
+/* VAT Column Styling */
+.order-list-data-table th.vat-col {
+  background: #f8fafc;
+  text-align: center;
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.85rem;
+  padding: 12px 8px;
+  border-right: 1px solid #e2e8f0;
+}
+
+.order-list-data-table th.vat-col small {
+  display: block;
+  font-weight: 400;
+  color: #64748b;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.order-list-data-table th.grand-total-col {
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: white;
+  border-right: none;
+}
+
+.order-list-data-table th.grand-total-col small {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.order-list-data-table td.vat-cell {
+  text-align: center;
+  padding: 10px 8px;
+  border-right: 1px solid #e2e8f0;
+  background: #fafafa;
+}
+
+.order-list-data-table td.grand-total-cell {
+  background: #eff6ff;
+  border-right: none;
+}
+
+.vat-amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #334151;
+}
+
+.vat-amount.vat-highlight {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.vat-amount.grand-total-amount {
+  color: #059669;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.vat-amount img {
+  opacity: 0.8;
+}
+
+/* Responsive: Stack VAT columns on smaller screens */
+@media (max-width: 1400px) {
+  .order-list-data-table th.vat-col,
+  .order-list-data-table td.vat-cell {
+    font-size: 0.8rem;
+    padding: 8px 4px;
+  }
+  
+  .vat-amount {
+    font-size: 0.85rem;
+  }
+  
+  .vat-amount.grand-total-amount {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 1200px) {
+  /* Hide VAT breakdown on very small screens, show only Grand Total */
+  .order-list-data-table th:nth-child(5),
+  .order-list-data-table td:nth-child(5),
+  .order-list-data-table th:nth-child(6),
+  .order-list-data-table td:nth-child(6) {
+    display: none;
+  }
+  
+  .order-list-data-table th.vat-col.grand-total-col,
+  .order-list-data-table td.vat-cell.grand-total-cell {
+    border-right: 1px solid #e2e8f0;
+  }
+}

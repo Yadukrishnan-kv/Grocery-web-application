@@ -40,9 +40,9 @@ const ReceiptDetails = () => {
   const fetchReceiptDetails = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      // Deep population: orders → orderItems → product + invoiceHistory
+      // Deep population: orders → orderItems → product + invoiceHistory + invoiceHistory.items.product
       const response = await axios.get(
-        `${backendUrl}/api/bills/getbillbyid/${receiptId}?populate=orders,orders.orderItems,orders.orderItems.product,orders.invoiceHistory,customer`,
+        `${backendUrl}/api/bills/getbillbyid/${receiptId}?populate=orders,orders.orderItems,orders.orderItems.product,orders.invoiceHistory,orders.invoiceHistory.items.product,customer`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setReceipt(response.data);
@@ -132,47 +132,38 @@ const ReceiptDetails = () => {
     );
   };
 
-  // Get items specific to THIS invoice/bill using invoiceHistory
-  const getBillItems = () => {
+  // Get formatted orders with partial details from invoiceHistory (same as outstanding)
+  const getFormattedOrders = () => {
     if (!receipt.orders?.length) return [];
 
-    const order = receipt.orders[0];
     const targetInvoice = getInvoiceNumber();
 
-    // Find matching invoice history entry
-    const historyEntry = order.invoiceHistory?.find(
-      (h) => h.invoiceNumber === targetInvoice
-    );
+    return receipt.orders.map((order) => {
+      // Find matching history for this bill's invoice
+      const matchingHistory = order.invoiceHistory?.find(
+        (h) => h.invoiceNumber === targetInvoice
+      );
 
-    if (historyEntry?.items?.length > 0) {
-      // Use historical quantities (e.g., 3 or 7) — this is the correct way
-      return historyEntry.items.map((histItem) => {
-        // Match with original order item to get product name/unit
-        const orderItem = order.orderItems?.find(
-          (oi) => String(oi.product?._id) === String(histItem.product)
-        );
-
-        return {
-          productName: orderItem?.product?.productName || "Unknown Product",
-          unit: orderItem?.unit || "kg",
-          price: histItem.price || orderItem?.price || 0,
-          quantity: histItem.quantity || 0,
-          total: (histItem.quantity || 0) * (histItem.price || 0),
-        };
-      });
-    }
-
-    // Fallback: show full order items (should rarely happen)
-    return order.orderItems?.map((item) => ({
-      productName: item.product?.productName || "Unknown Product",
-      unit: item.unit || "kg",
-      price: item.price || 0,
-      quantity: item.orderedQuantity || 0,
-      total: (item.orderedQuantity || 0) * (item.price || 0),
-    })) || [];
+      return {
+        _id: order._id,
+        invoiceNumber: targetInvoice, // Use bill's invoice (DEL-02)
+        orderDate: order.orderDate,
+        status: order.status,
+        payment: order.payment,
+        totalAmount: matchingHistory?.amount || order.grandTotal || 0, // Partial from history
+        items:
+          matchingHistory?.items?.map((histItem) => ({
+            product: histItem.product?.productName || "Unknown Product", // Populated now
+            unit: histItem.product?.unit || "kg",
+            quantity: histItem.quantity, // Partial qty (e.g., 3)
+            price: histItem.price,
+            total: histItem.quantity * histItem.price,
+          })) || [], // Use history items
+      };
+    });
   };
 
-  const billItems = getBillItems();
+  const formattedOrders = getFormattedOrders();
   const invoiceNumber = getInvoiceNumber();
 
   return (
@@ -275,70 +266,74 @@ const ReceiptDetails = () => {
               </div>
             </div>
 
-            {/* Items Table - Only items from this invoice */}
-            {billItems.length > 0 ? (
+            {/* Linked Orders Section - Same as Outstanding Details */}
+            {formattedOrders.length > 0 ? (
               <div className="section-card">
-                <h3 className="section-title">
-                  Items (Invoice: {invoiceNumber})
-                </h3>
-
-                <div className="products-table-wrapper">
-                  <table className="products-table-full">
-                    <thead>
-                      <tr>
-                        <th>Product</th>
-                        <th style={{ textAlign: "center" }}>Qty</th>
-                        <th style={{ textAlign: "center" }}>Unit</th>
-                        <th style={{ textAlign: "right" }}>Price</th>
-                        <th style={{ textAlign: "right" }}>Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {billItems.map((item, idx) => (
-                        <tr key={idx}>
-                          <td>
-                            <span className="product-name">{item.productName}</span>
-                          </td>
-                          <td style={{ textAlign: "center", fontWeight: 500 }}>
-                            {item.quantity}
-                          </td>
-                          <td style={{ textAlign: "center" }}>
-                            {item.unit || "-"}
-                          </td>
-                          <td style={{ textAlign: "right" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
-                              <img src={DirhamSymbol} alt="AED" width={12} />
-                              {formatCurrency(item.price)}
-                            </div>
-                          </td>
-                          <td style={{ textAlign: "right", fontWeight: 600 }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
-                              <img src={DirhamSymbol} alt="AED" width={14} />
-                              {formatCurrency(item.total)}
-                            </div>
-                          </td>
+                <h3 className="section-title">Linked Orders ({formattedOrders.length})</h3>
+                <div className="orders-list">
+                  <div className="orders-table-wrapper-full">
+                    <table className="orders-table-full">
+                      <thead>
+                        <tr>
+                          <th style={{ minWidth: "130px" }}>Invoice #</th>
+                          <th style={{ minWidth: "110px" }}>Date</th>
+                          <th style={{ minWidth: "220px" }}>Items</th>
+                          <th style={{ minWidth: "110px", textAlign: "right" }}>Amount</th>
+                          <th style={{ minWidth: "120px" }}>Status</th>
+                          <th style={{ minWidth: "100px" }}>Payment</th>
                         </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td colSpan="4" style={{ textAlign: "right", fontWeight: 600 }}>
-                          Invoice Total:
-                        </td>
-                        <td style={{ textAlign: "right", fontWeight: 700, fontSize: "1.125rem" }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
-                            <img src={DirhamSymbol} alt="AED" width={14} />
-                            {formatCurrency(receipt.totalUsed || receipt.paidAmount)}
-                          </div>
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {formattedOrders.map((order) => (
+                          <tr key={order._id}>
+                            <td>{order.invoiceNumber || "-"}</td>
+                            <td>{formatDate(order.orderDate)}</td>
+                            <td>
+                              <div
+                                className="order-items-preview-full"
+                                title={order.items?.map((i) => `${i.product} × ${i.quantity}`).join(", ")}
+                              >
+                                {order.items?.slice(0, 3).map((item, idx) => (
+                                  <span key={idx} className="item-chip-full">
+                                    {item.product} × {item.quantity}
+                                  </span>
+                                ))}
+                                {order.items?.length > 3 && (
+                                  <span
+                                    className="item-more-full"
+                                    title={`${order.items.length - 3} more items`}
+                                  >
+                                    +{order.items.length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="order-amount-full" style={{ textAlign: "right" }}>
+                              <img src={DirhamSymbol} alt="AED" width={12} height={12} />
+                              {formatCurrency(order.totalAmount)}
+                            </td>
+                            <td>
+                              <span
+                                className={`order-status status-${order.status?.replace(/\s+/g, "_")}`}
+                              >
+                                {order.status?.replace("_", " ") || "Unknown"}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`payment-badge ${order.payment}`}>
+                                {order.payment}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             ) : (
               <div className="section-card">
-                <p className="text-muted">No item details available for this receipt</p>
+                <p className="text-muted">No linked orders found for this receipt</p>
               </div>
             )}
           </div>

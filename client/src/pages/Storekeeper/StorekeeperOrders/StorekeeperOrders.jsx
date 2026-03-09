@@ -229,7 +229,6 @@ const StorekeeperOrders = () => {
                   <thead>
                     <tr>
                       <th>No</th>
-                      <th>Invoice #</th> {/* ✅ NEW: Show Invoice Number */}
                       <th>Customer</th>
                       <th>Products</th>
                       <th>Packed Qty</th>{" "}
@@ -268,19 +267,12 @@ const StorekeeperOrders = () => {
                           .toFixed(2) || "0.00";
 
                       const statusBadge = getPackedStatusBadge(order);
-                      const invoiceNo = order.invoiceNumber || "N/A";
 
                       return (
                         <tr key={order._id}>
                           <td>{index + 1}</td>
 
-                          {/* ✅ SHOW INVOICE NUMBER (DEL-XX) */}
-                          <td>
-                            <strong className="invoice-number-cell">
-                              {invoiceNo}
-                            </strong>
-                          </td>
-
+                         
                           <td>
                             <div className="customer-cell">
                               <span className="customer-name">

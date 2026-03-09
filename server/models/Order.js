@@ -1,3 +1,4 @@
+// models/Order.js
 const { Schema, model } = require("mongoose");
 
 const orderItemSchema = new Schema({
@@ -9,10 +10,9 @@ const orderItemSchema = new Schema({
   unit: {
     type: String,
     trim: true,
-    default: '',
+    default: "",
   },
-    packedQuantity: { type: Number, default: 0, min: 0 },
-
+  packedQuantity: { type: Number, default: 0, min: 0 },
   orderedQuantity: {
     type: Number,
     required: [true, "Ordered quantity is required"],
@@ -24,21 +24,39 @@ const orderItemSchema = new Schema({
     min: 0,
   },
   invoicedQuantity: { type: Number, default: 0 },
+  
+  // ✅ Price & VAT Fields
   price: {
     type: Number,
     required: [true, "Price is required"],
     min: 0,
   },
-  totalAmount: {
+  vatPercentage: {
     type: Number,
-    required: [true, "Total amount is required"],
+    default: 5,
+    min: 0,
+    max: 100,
+  },
+  exclVatAmount: {
+    type: Number,
+    required: [true, "Excl. VAT amount is required"],
     min: 0,
   },
-  // Optional: remarks per item (if needed later)
+  vatAmount: {
+    type: Number,
+    required: [true, "VAT amount is required"],
+    min: 0,
+  },
+  totalAmount: {
+    type: Number,
+    required: [true, "Total amount (incl. VAT) is required"],
+    min: 0,
+  },
+  
   remarks: {
     type: String,
     trim: true,
-    default: '',
+    default: "",
   },
 });
 
@@ -78,87 +96,73 @@ const orderSchema = new Schema(
       enum: ["pending_assignment", "assigned", "accepted", "rejected", "cancelled"],
       default: "pending_assignment",
     },
-    assignedAt: {
-      type: Date,
-      default: null,
-    },
-    acceptedAt: {
-      type: Date,
-      default: null,
-    },
-    remarks: { 
-      type: String,
-      trim: true,
-      default: '',
-    },
-    invoiceNumber: {
-      type: String,
-      default: null,
-      index: true,
-    },
-   invoiceHistory: [
-    {
-      invoiceNumber: String,
-      quantity: Number,
-      amount: Number,
-      createdAt: { type: Date, default: Date.now },
-      items: [  
-        {
-          product: { type: Schema.Types.ObjectId, ref: "Product" },
-          quantity: Number, 
-          price: Number,     
-        }
-      ]
-    },
-  ],
-    packedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    packedAt: {
-      type: Date,
-      default: null,
-    },
-
+    assignedAt: { type: Date, default: null },
+    acceptedAt: { type: Date, default: null },
+    remarks: { type: String, trim: true, default: "" },
+    invoiceNumber: { type: String, default: null, index: true },
+    invoiceHistory: [
+      {
+        invoiceNumber: String,
+        quantity: Number,
+        amount: Number,
+        createdAt: { type: Date, default: Date.now },
+        items: [
+          {
+            product: { type: Schema.Types.ObjectId, ref: "Product" },
+            quantity: Number,
+            price: Number,
+          },
+        ],
+      },
+    ],
+    packedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    packedAt: { type: Date, default: null },
     packedStatus: {
       type: String,
-      enum: ["not_packed","ready_to_deliver", "partially_packed", "fully_packed"],
+      enum: ["not_packed", "ready_to_deliver", "partially_packed", "fully_packed"],
       default: "not_packed",
     },
   },
   { timestamps: true }
 );
-// Add virtual for remaining to pack
-orderItemSchema.virtual('remainingToPack').get(function() {
+
+// Virtuals
+orderItemSchema.virtual("remainingToPack").get(function () {
   return this.orderedQuantity - this.packedQuantity;
 });
 
-// Add virtual for remaining to deliver
-orderItemSchema.virtual('remainingToDeliver').get(function() {
+orderItemSchema.virtual("remainingToDeliver").get(function () {
   return this.packedQuantity - this.deliveredQuantity;
 });
 
-// Ensure virtuals are included in JSON output
-orderSchema.set('toJSON', { virtuals: true });
-orderSchema.set('toObject', { virtuals: true });
+orderSchema.set("toJSON", { virtuals: true });
+orderSchema.set("toObject", { virtuals: true });
 
-// Virtual for total ordered quantity (sum of all items)
-orderSchema.virtual('totalOrderedQuantity').get(function () {
+orderSchema.virtual("totalOrderedQuantity").get(function () {
   if (!this.orderItems || !Array.isArray(this.orderItems)) return 0;
   return this.orderItems.reduce((sum, item) => sum + item.orderedQuantity, 0);
 });
 
-// Virtual for total delivered quantity
-orderSchema.virtual('totalDeliveredQuantity').get(function () {
+orderSchema.virtual("totalDeliveredQuantity").get(function () {
   if (!this.orderItems || !Array.isArray(this.orderItems)) return 0;
   return this.orderItems.reduce((sum, item) => sum + item.deliveredQuantity, 0);
 });
 
-// Virtual for grand total amount
-orderSchema.virtual('grandTotal').get(function () {
+orderSchema.virtual("grandTotal").get(function () {
   if (!this.orderItems || !Array.isArray(this.orderItems)) return 0;
   return this.orderItems.reduce((sum, item) => sum + item.totalAmount, 0);
+});
+
+// ✅ NEW: Virtual for total VAT amount
+orderSchema.virtual("totalVatAmount").get(function () {
+  if (!this.orderItems || !Array.isArray(this.orderItems)) return 0;
+  return this.orderItems.reduce((sum, item) => sum + (item.vatAmount || 0), 0);
+});
+
+// ✅ NEW: Virtual for total excl. VAT amount
+orderSchema.virtual("totalExclVatAmount").get(function () {
+  if (!this.orderItems || !Array.isArray(this.orderItems)) return 0;
+  return this.orderItems.reduce((sum, item) => sum + (item.exclVatAmount || 0), 0);
 });
 
 const Order = model("Order", orderSchema);

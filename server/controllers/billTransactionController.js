@@ -6,10 +6,10 @@ const getMyTransactions = async (req, res) => {
   try {
     const transactions = await BillTransaction.find({ recipient: req.user._id })
       .populate("customer", "name")
-      .populate("bill", "amountDue status invoiceNumber")  // ✅ Include invoiceNumber
+      .populate("bill", "amountDue status invoiceNumber totalExclVat totalVatAmount grandTotal")
       .populate({
-        path: "order",  // ✅ Populate order to get invoiceNumber
-        select: "invoiceNumber"
+        path: "order",
+        select: "invoiceNumber totalAmount totalExclVat totalVatAmount grandTotal"
       })
       .sort({ createdAt: -1 });
     
