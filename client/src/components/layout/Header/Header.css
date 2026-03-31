@@ -209,3 +209,17 @@
     display: none;
   }
 }
+
+@media (max-width: 480px) {
+  .username {
+    display: none;
+  }
+
+  .header {
+    padding: 0 1rem;
+  }
+
+  .app-title {
+    font-size: 1rem;
+  }
+}

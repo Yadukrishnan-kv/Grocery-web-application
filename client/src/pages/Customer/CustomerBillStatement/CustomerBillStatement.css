@@ -155,6 +155,27 @@
   background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
 }
 
+/* Download button */
+.customer-bills-download-button {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.15);
+  white-space: nowrap;
+}
+
+.customer-bills-download-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(5, 150, 105, 0.25);
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+}
+
 @media (max-width: 767px) {
   .customer-bills-container-wrapper {
     border-radius: 12px;

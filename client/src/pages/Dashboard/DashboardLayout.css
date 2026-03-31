@@ -6,11 +6,14 @@
 }
 
 .main-content {
+  flex: 1;
   margin-top: 64px;
   margin-left: 0;
   padding: 2rem;
   transition: margin-left 0.2s ease;
   overflow-y: auto;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 @media (min-width: 768px) {
@@ -193,6 +196,18 @@
   color: #64748b;
   line-height: 1.7;
   font-size: 1.05rem;
+}
+
+/* Tablet responsiveness */
+@media (max-width: 1024px) {
+  .main-content {
+    padding: 1.5rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+  }
 }
 
 /* Mobile responsiveness */

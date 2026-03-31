@@ -31,6 +31,8 @@ const CreateCustomerOrder = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [grandTotal, setGrandTotal] = useState("0.00");
+  const [totalExclVat, setTotalExclVat] = useState("0.00");
+  const [totalVatAmount, setTotalVatAmount] = useState("0.00");
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -113,11 +115,19 @@ const CreateCustomerOrder = () => {
   };
 
   const updateGrandTotal = (items = formData.orderItems) => {
-    const total = items.reduce((sum, item) => {
-      const itemTotal = parseFloat(item.total) || 0;
-      return sum + itemTotal;
-    }, 0);
-    setGrandTotal(total.toFixed(2));
+    let sumExclVat = 0;
+    let sumVatAmount = 0;
+    let sumTotal = 0;
+
+    items.forEach((item) => {
+      sumExclVat += parseFloat(item.exclVat) || 0;
+      sumVatAmount += parseFloat(item.vatAmount) || 0;
+      sumTotal += parseFloat(item.total) || 0;
+    });
+
+    setTotalExclVat(sumExclVat.toFixed(2));
+    setTotalVatAmount(sumVatAmount.toFixed(2));
+    setGrandTotal(sumTotal.toFixed(2));
   };
 
   // Real API call for previous purchased price
@@ -463,16 +473,36 @@ const CreateCustomerOrder = () => {
               + Add Another Product
             </button>
 
-            {/* ✅ Updated Grand Total Section with VAT Note */}
+            {/* ✅ Grand Total Section with VAT Breakdown */}
             <div className="grand-total-section">
-              <label>Grand Total (Incl. VAT)</label>
-              <input
-                type="text"
-                value={grandTotal}
-                readOnly
-                className="grand-total-input"
-              />
-              <small className="vat-note">Includes VAT for all items</small>
+              <div className="grand-total-row">
+                <label>Total Dhs (Excl. VAT)</label>
+                <input
+                  type="text"
+                  value={totalExclVat}
+                  readOnly
+                  className="grand-total-input subtotal"
+                />
+              </div>
+              <div className="grand-total-row">
+                <label>VAT 5%</label>
+                <input
+                  type="text"
+                  value={totalVatAmount}
+                  readOnly
+                  className="grand-total-input vat"
+                />
+              </div>
+              <div className="grand-total-row grand-total-final">
+                <label>Grand Total (Incl. VAT)</label>
+                <input
+                  type="text"
+                  value={grandTotal}
+                  readOnly
+                  className="grand-total-input final"
+                />
+              </div>
+              <small className="vat-note">All amounts in AED</small>
             </div>
 
             <div className="form-group">

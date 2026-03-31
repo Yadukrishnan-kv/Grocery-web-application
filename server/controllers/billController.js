@@ -458,71 +458,120 @@ const getBillReceipt = async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const company = await CompanySettings.findOne() || { companyName: "Company" };
+
+    // 80mm thermal paper: ~226pt wide
+    const pageWidth = 226;
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const centerX = margin;
+
+    const doc = new PDFDocument({
+      size: [pageWidth, 800],
+      margin: margin,
+      bufferPages: true,
+    });
     doc.pipe(res);
-    
-    const pageWidth = doc.page.width;
-    const margin = 50;
-    
-    // Title
-    doc.fontSize(24).font("Helvetica-Bold").fillColor("#1e293b").text("PAYMENT RECEIPT", { align: "center" });
-    doc.moveDown(0.5);
-    
-    // Receipt & Date
-    doc
-      .fontSize(12)
-      .font("Helvetica")
-      .text(`Receipt No: ${displayReceiptNo}`, { align: "center" })
-      .text(`Date: ${new Date(bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString()}`, { align: "center" });
-    doc.moveDown(1.5);
-    
-    // Customer Details
-    doc.fontSize(14).font("Helvetica-Bold").text("Customer Details:");
-    doc
-      .fontSize(12)
-      .font("Helvetica")
-      .text(`Name: ${bill.customer?.name || "N/A"}`)
-      .text(`Phone: ${bill.customer?.phoneNumber || "N/A"}`)
-      .text(`Address: ${bill.customer?.address || "N/A"}`)
-      .text(`Pincode: ${bill.customer?.pincode || "N/A"}`);
-    doc.moveDown(1.5);
-    
-    // Bill Summary - ✅ FIXED: Show Grand Total (Incl. VAT)
-    doc.fontSize(14).font("Helvetica-Bold").text("Bill Summary:");
-    doc.moveDown(0.5);
-    
-    const summaryStartY = doc.y;
-    const labelX = margin + 20;
-    const valueX = margin + 220;
-    
-    doc.fontSize(12).font("Helvetica-Bold").text("Invoice Number:", labelX, summaryStartY);
-    doc.font("Helvetica").text(bill.invoiceNumber || "N/A", valueX, summaryStartY);
-    doc.moveDown(0.8);
-    
-    // ✅ Show VAT breakdown if available
-    if (bill.totalExclVat !== undefined && bill.totalVatAmount !== undefined) {
-      doc.font("Helvetica-Bold").text("Total (Excl. VAT):", labelX, doc.y);
-      doc.font("Helvetica").text(`AED ${bill.totalExclVat?.toFixed(2) || "0.00"}`, valueX, doc.y);
-      doc.moveDown(0.8);
-      
-      doc.font("Helvetica-Bold").text(`VAT ${bill.orders?.[0]?.orderItems?.[0]?.vatPercentage || 5}%:`, labelX, doc.y);
-      doc.font("Helvetica").text(`AED ${bill.totalVatAmount?.toFixed(2) || "0.00"}`, valueX, doc.y);
-      doc.moveDown(0.8);
+
+    let y = margin;
+
+    // Helper: dashed separator line
+    const drawDashedLine = (yPos) => {
+      doc.save();
+      doc.strokeColor("#000").lineWidth(0.5);
+      const dashLen = 3;
+      const gap = 2;
+      for (let x = margin; x < pageWidth - margin; x += dashLen + gap) {
+        doc.moveTo(x, yPos).lineTo(Math.min(x + dashLen, pageWidth - margin), yPos).stroke();
+      }
+      doc.restore();
+      return yPos + 6;
+    };
+
+    // ===== COMPANY HEADER =====
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#000")
+      .text((company.companyName || "COMPANY").toUpperCase(), centerX, y, { width: contentWidth, align: "center" });
+    y += 14;
+
+    if (company.companyAddress) {
+      doc.fontSize(6).font("Helvetica")
+        .text(company.companyAddress, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
     }
-    
-    doc.font("Helvetica-Bold").text("Grand Total (Incl. VAT):", labelX, doc.y);
+    if (company.companyPhone) {
+      doc.fontSize(6).font("Helvetica")
+        .text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+
+    y = drawDashedLine(y + 2);
+
+    // ===== TITLE =====
+    doc.fontSize(9).font("Helvetica-Bold")
+      .text("PAYMENT RECEIPT", centerX, y, { width: contentWidth, align: "center" });
+    y += 14;
+
+    y = drawDashedLine(y);
+
+    // ===== RECEIPT INFO =====
+    const labelW = 75;
+    const valueW = contentWidth - labelW;
+
+    const printRow = (label, value) => {
+      doc.fontSize(7).font("Helvetica-Bold").text(label, centerX, y, { width: labelW });
+      doc.fontSize(7).font("Helvetica").text(value, centerX + labelW, y, { width: valueW, align: "right" });
+      y += 11;
+    };
+
+    printRow("Receipt No:", displayReceiptNo);
+    printRow("Date:", new Date(bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString());
+
+    y = drawDashedLine(y + 2);
+
+    // ===== CUSTOMER INFO =====
+    doc.fontSize(7).font("Helvetica-Bold").text("CUSTOMER:", centerX, y);
+    y += 11;
+    doc.fontSize(7).font("Helvetica")
+      .text(bill.customer?.name || "N/A", centerX, y);
+    y += 10;
+    if (bill.customer?.phoneNumber) {
+      doc.text(bill.customer.phoneNumber, centerX, y);
+      y += 10;
+    }
+    if (bill.customer?.address) {
+      doc.text(`${bill.customer.address}${bill.customer.pincode ? ", " + bill.customer.pincode : ""}`, centerX, y, { width: contentWidth });
+      y += 10;
+    }
+
+    y = drawDashedLine(y + 2);
+
+    // ===== BILL SUMMARY =====
+    printRow("Invoice No:", bill.invoiceNumber || "N/A");
+
+    if (bill.totalExclVat !== undefined && bill.totalVatAmount !== undefined) {
+      printRow("Excl. VAT:", `AED ${bill.totalExclVat?.toFixed(2) || "0.00"}`);
+      printRow("VAT 5%:", `AED ${bill.totalVatAmount?.toFixed(2) || "0.00"}`);
+    }
+
+    y = drawDashedLine(y + 2);
+
+    // Grand total - larger font
     const grandTotal = bill.grandTotal || bill.amountDue;
-    doc.font("Helvetica").fillColor("#16a34a").text(`AED ${grandTotal?.toFixed(2) || "0.00"}`, valueX, doc.y);
-    doc.moveDown(2);
-    
-    // Footer
-    doc
-      .fontSize(10)
-      .font("Helvetica-Oblique")
-      .fillColor("#6b7280")
-      .text("Thank you for your payment!", { align: "center" })
-      .text("This is a computer-generated receipt.", { align: "center" });
-    
+    doc.fontSize(9).font("Helvetica-Bold")
+      .text("GRAND TOTAL", centerX, y, { width: labelW + 10 });
+    doc.fontSize(9).font("Helvetica-Bold")
+      .text(`AED ${grandTotal?.toFixed(2) || "0.00"}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
+    y += 14;
+
+    y = drawDashedLine(y);
+
+    // ===== FOOTER =====
+    y += 4;
+    doc.fontSize(6).font("Helvetica")
+      .text("Thank you for your payment!", centerX, y, { width: contentWidth, align: "center" });
+    y += 9;
+    doc.text("This is a computer-generated receipt.", centerX, y, { width: contentWidth, align: "center" });
+
     doc.end();
     console.log(`Receipt generated for bill ${bill._id} (Receipt: ${displayReceiptNo})`);
   } catch (error) {
@@ -534,6 +583,7 @@ const getBillReceipt = async (req, res) => {
 };
 
 // Download bill invoice (with invoice number)
+// Download bill invoice — thermal printer receipt style (80mm width)
 const downloadBillInvoice = async (req, res) => {
   try {
     const { billId } = req.params;
@@ -552,78 +602,143 @@ const downloadBillInvoice = async (req, res) => {
       }
     }
 
-    const company = await CompanySettings.findOne() || { companyName: "Ingoude Company" };
+    const company = await CompanySettings.findOne() || { companyName: "Company" };
     const filename = `bill-invoice-${bill.invoiceNumber || bill._id.toString().slice(-8)}.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    // 80mm thermal paper: ~226pt wide, variable height
+    const pageWidth = 226;
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const centerX = margin;
+
+    const doc = new PDFDocument({
+      size: [pageWidth, 800],
+      margin: margin,
+      bufferPages: true,
+    });
     doc.pipe(res);
 
-    doc.fontSize(20).font("Helvetica-Bold").text(company.companyName.toUpperCase(), { align: "center" });
-    doc.fontSize(14).moveDown(0.3).text("BILL INVOICE", { align: "center" });
-    doc.moveDown(1);
+    let y = margin;
 
-    doc.fontSize(11).font("Helvetica-Bold").text("INVOICE DETAILS", { underline: true });
-    doc.fontSize(10).font("Helvetica");
-    doc.text(`Invoice Number: ${bill.invoiceNumber || "N/A"}`);
+    // Helper: dashed separator line
+    const drawDashedLine = (yPos) => {
+      doc.save();
+      doc.strokeColor("#000").lineWidth(0.5);
+      const dashLen = 3;
+      const gap = 2;
+      for (let x = margin; x < pageWidth - margin; x += dashLen + gap) {
+        doc.moveTo(x, yPos).lineTo(Math.min(x + dashLen, pageWidth - margin), yPos).stroke();
+      }
+      doc.restore();
+      return yPos + 6;
+    };
+
+    // ===== COMPANY HEADER =====
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#000")
+      .text((company.companyName || "COMPANY").toUpperCase(), centerX, y, { width: contentWidth, align: "center" });
+    y += 14;
+
+    if (company.companyAddress) {
+      doc.fontSize(6).font("Helvetica")
+        .text(company.companyAddress, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyPhone) {
+      doc.fontSize(6).font("Helvetica")
+        .text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyEmail) {
+      doc.fontSize(6).font("Helvetica")
+        .text(company.companyEmail, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+
+    y = drawDashedLine(y + 2);
+
+    // ===== BILL INVOICE TITLE =====
+    doc.fontSize(9).font("Helvetica-Bold")
+      .text("BILL INVOICE", centerX, y, { width: contentWidth, align: "center" });
+    y += 14;
+
     if (bill.isOpeningBalance) {
-      doc.fillColor("#ef4444").text("⚠️  OPENING BALANCE", { align: "right" }).fillColor("#000");
+      doc.fontSize(7).font("Helvetica-Bold").fillColor("#000")
+        .text("** OPENING BALANCE **", centerX, y, { width: contentWidth, align: "center" });
+      y += 11;
     }
-    doc.text(`Bill ID: ${bill._id.toString().slice(-8)}`);
-    doc.text(`Bill Date: ${new Date(bill.createdAt).toLocaleDateString()}`);
-    doc.moveDown(0.5);
 
-    doc.fontSize(11).font("Helvetica-Bold").text("BILL TO", { underline: true });
-    doc.fontSize(10).font("Helvetica");
-    doc.text(`Name: ${bill.customer.name}`);
-    doc.text(`Email: ${bill.customer.email}`);
-    doc.text(`Phone: ${bill.customer.phoneNumber}`);
-    doc.text(`Address: ${bill.customer.address}, ${bill.customer.pincode}`);
-    doc.moveDown(1);
+    y = drawDashedLine(y);
 
-    doc.fontSize(11).font("Helvetica-Bold").text("BILL DETAILS", { underline: true });
-    doc.moveDown(0.5);
+    // ===== INVOICE INFO =====
+    const labelW = 75;
+    const valueW = contentWidth - labelW;
 
-    const tableX = 50;
-    const col1 = 150;
-    const col2 = 100;
-    
-    // ✅ Show VAT breakdown in invoice
-    const rows = [
-      ["Cycle Start", new Date(bill.cycleStart).toLocaleDateString()],
-      ["Cycle End", new Date(bill.cycleEnd).toLocaleDateString()],
-    ];
-    
-    // Add VAT breakdown if available
-    if (bill.totalExclVat !== undefined) {
-      rows.push(["Total (Excl. VAT)", `AED ${bill.totalExclVat.toFixed(2)}`]);
+    const printRow = (label, value) => {
+      doc.fontSize(7).font("Helvetica-Bold").text(label, centerX, y, { width: labelW });
+      doc.fontSize(7).font("Helvetica").text(value, centerX + labelW, y, { width: valueW, align: "right" });
+      y += 11;
+    };
+
+    printRow("Invoice No:", bill.invoiceNumber || "N/A");
+    printRow("Bill Date:", new Date(bill.createdAt).toLocaleDateString());
+    printRow("Due Date:", new Date(bill.dueDate).toLocaleDateString());
+
+    y = drawDashedLine(y + 2);
+
+    // ===== CUSTOMER INFO =====
+    doc.fontSize(7).font("Helvetica-Bold").text("BILL TO:", centerX, y);
+    y += 11;
+    doc.fontSize(7).font("Helvetica")
+      .text(bill.customer?.name || "N/A", centerX, y);
+    y += 10;
+    if (bill.customer?.phoneNumber) {
+      doc.text(bill.customer.phoneNumber, centerX, y);
+      y += 10;
     }
-    if (bill.totalVatAmount !== undefined) {
-      rows.push([`VAT ${bill.orders?.[0]?.orderItems?.[0]?.vatPercentage || 5}%`, `AED ${bill.totalVatAmount.toFixed(2)}`]);
+    if (bill.customer?.address) {
+      doc.text(`${bill.customer.address}${bill.customer.pincode ? ", " + bill.customer.pincode : ""}`, centerX, y, { width: contentWidth });
+      y += 10;
     }
-    
-    rows.push(
-      ["Grand Total (Incl. VAT)", `AED ${(bill.grandTotal || bill.amountDue).toFixed(2)}`],
-      ["Paid Amount", `AED ${bill.paidAmount?.toFixed(2) || "0.00"}`],
-      ["Amount Due", `AED ${bill.amountDue?.toFixed(2) || "0.00"}`],
-      ["Due Date", new Date(bill.dueDate).toLocaleDateString()],
-      ["Status", bill.status.toUpperCase()]
-    );
 
-    doc.fontSize(9).font("Helvetica");
-    rows.forEach(([label, value]) => {
-      doc.text(label, tableX, doc.y, { width: col1 });
-      doc.text(value, tableX + col1, doc.y - doc.currentLineHeight(), { width: col2, align: "right" });
-      doc.moveDown();
-    });
+    y = drawDashedLine(y + 2);
 
-    doc.moveDown(1);
-    doc.fontSize(9).font("Helvetica").fillColor("#555");
-    doc.text("Thank you for your business!", { align: "center" });
-    doc.text("This is a system-generated invoice.", { align: "center" });
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, { align: "center" });
+    // ===== AMOUNT BREAKDOWN =====
+    if (bill.totalExclVat !== undefined && bill.totalExclVat > 0) {
+      printRow("Excl. VAT:", `AED ${bill.totalExclVat.toFixed(2)}`);
+    }
+    if (bill.totalVatAmount !== undefined && bill.totalVatAmount > 0) {
+      printRow("VAT 5%:", `AED ${bill.totalVatAmount.toFixed(2)}`);
+    }
+
+    y = drawDashedLine(y + 2);
+
+    // Grand total - larger font
+    doc.fontSize(9).font("Helvetica-Bold")
+      .text("GRAND TOTAL", centerX, y, { width: labelW + 10 });
+    doc.fontSize(9).font("Helvetica-Bold")
+      .text(`AED ${(bill.grandTotal || bill.amountDue).toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
+    y += 14;
+
+    y = drawDashedLine(y);
+
+    // Payment status rows
+    printRow("Paid Amount:", `AED ${bill.paidAmount?.toFixed(2) || "0.00"}`);
+    printRow("Amount Due:", `AED ${bill.amountDue?.toFixed(2) || "0.00"}`);
+    printRow("Status:", bill.status.toUpperCase());
+
+    y = drawDashedLine(y + 2);
+
+    // ===== FOOTER =====
+    y += 4;
+    doc.fontSize(6).font("Helvetica").fillColor("#000")
+      .text("Thank you for your business!", centerX, y, { width: contentWidth, align: "center" });
+    y += 9;
+    doc.text("This is a computer-generated invoice.", centerX, y, { width: contentWidth, align: "center" });
+    y += 9;
+    doc.text(new Date().toLocaleString(), centerX, y, { width: contentWidth, align: "center" });
 
     doc.end();
   } catch (error) {

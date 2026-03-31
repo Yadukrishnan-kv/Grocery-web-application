@@ -16,7 +16,7 @@ const billSchema = new Schema(
     dueDate: { type: Date, required: true },
     status: {
       type: String,
-      enum: ["pending", "paid", "partial", "overdue"],
+      enum: ["pending", "paid", "partial", "overdue", "pending_payment"],
       default: "pending",
     },
     orders: [{ type: Schema.Types.ObjectId, ref: "Order" }],

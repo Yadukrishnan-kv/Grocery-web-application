@@ -5,10 +5,13 @@
 }
 
 .company-main-content {
+  flex: 1;
   padding: 2rem 1.5rem;
   transition: margin-left 0.3s ease;
   overflow-y: auto;
   margin-top: 64px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 @media (min-width: 768px) {
@@ -76,7 +79,8 @@
 .form-group textarea {
   resize: vertical;
   min-height: 100px;
-    width: 88%;
+    width: 100%;
+    box-sizing: border-box;
 
 }
 

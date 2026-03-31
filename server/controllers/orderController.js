@@ -531,6 +531,39 @@ const getPendingInvoice = async (req, res) => {
   }
 };
 
+// ========== Amount to Words Helpers ==========
+const numberToWords = (num) => {
+  if (num === 0) return "Zero";
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const convertGroup = (n) => {
+    if (n === 0) return "";
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+    return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " and " + convertGroup(n % 100) : "");
+  };
+  const parts = [];
+  const million = Math.floor(num / 1000000);
+  const thousand = Math.floor((num % 1000000) / 1000);
+  const remainder = Math.floor(num % 1000);
+  if (million) parts.push(convertGroup(million) + " Million");
+  if (thousand) parts.push(convertGroup(thousand) + " Thousand");
+  if (remainder) parts.push(convertGroup(remainder));
+  return parts.join(" ") || "Zero";
+};
+
+const amountToWords = (amount) => {
+  const wholePart = Math.floor(Math.abs(amount));
+  const filsPart = Math.round((Math.abs(amount) - wholePart) * 100);
+  let words = "UAE Dirham " + numberToWords(wholePart);
+  if (filsPart > 0) {
+    words += " and " + numberToWords(filsPart) + " Fils";
+  }
+  words += " Only";
+  return words;
+};
+
 const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const company = await CompanySettings.findOne();
   if (!company) {
@@ -539,97 +572,181 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
 
   const pageWidth = 595.28;
   const pageHeight = 841.89;
-  const margin = 50;
+  const margin = 25;
   const contentWidth = pageWidth - margin * 2;
+  const rightEdge = pageWidth - margin;
 
+  // Colors
+  const purple = "#4B3B8B";
+  const lightPurple = "#E8E0F0";
+  const gray = "#999999";
+  const darkGray = "#333333";
+  const headerBg = "#d9d9d9";
+  const green = "#4CAF50";
+
+  // Date formatting
   const date = new Date(order.orderDate || order.deliveredAt || Date.now());
-  const formattedDate = date.toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const formattedDate = `${date.getDate()}-${monthNames[date.getMonth()]}-${String(date.getFullYear()).slice(-2)}`;
+
+  // ===== OUTER BORDER =====
+  doc.rect(margin - 3, margin - 3, contentWidth + 6, pageHeight - margin * 2 + 6)
+    .lineWidth(2).strokeColor(darkGray).stroke();
+
+  let y = margin;
+
+  // ===== HEADER SECTION (3 columns) =====
+  const leftColWidth = 190;
+  const centerColX = margin + 195;
+  const centerColWidth = 155;
+  const rightColX = margin + 355;
+  const rightColWidth = contentWidth - 355;
+
+  // --- Left: Company Info ---
+  doc.fontSize(12).font("Helvetica-Bold").fillColor(darkGray)
+    .text(company.companyName || "Company Name", margin + 5, y + 3, { width: leftColWidth });
+
+  let infoY = y + 20;
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Manufactured & Distributed By:", margin + 5, infoY);
+  infoY += 11;
+  doc.fontSize(7).font("Helvetica").fillColor(darkGray);
+  if (company.companyAddress) {
+    doc.text(company.companyAddress, margin + 5, infoY, { width: leftColWidth - 10 });
+    infoY += 10;
+  }
+  if (company.companyPhone) {
+    doc.text(`Tel.: ${company.companyPhone}`, margin + 5, infoY, { width: leftColWidth - 10 });
+    infoY += 10;
+  }
+  if (company.companyEmail) {
+    doc.text(`E-mail: ${company.companyEmail}`, margin + 5, infoY, { width: leftColWidth - 10 });
+    infoY += 10;
+  }
+
+  // HACCP Badge
+  doc.rect(margin + 5, infoY + 2, 72, 13).fillColor(green).fill();
+  doc.fontSize(7).font("Helvetica-Bold").fillColor("#ffffff")
+    .text("HACCP CERTIFIED", margin + 8, infoY + 5, { width: 68 });
+
+  // --- Center: TAX INVOICE ---
+  const titleBoxY = y;
+  doc.rect(centerColX, titleBoxY, centerColWidth, 28).fillColor(purple).fill();
+  doc.fontSize(15).font("Helvetica-Bold").fillColor("#ffffff")
+    .text("TAX INVOICE", centerColX, titleBoxY + 7, { width: centerColWidth, align: "center" });
+
+  doc.rect(centerColX, titleBoxY + 28, centerColWidth, 18).fillColor(lightPurple).fill();
+
+  doc.rect(centerColX, titleBoxY + 46, centerColWidth, 18).fillColor(purple).fill();
+  doc.fontSize(8).font("Helvetica-Bold").fillColor("#ffffff")
+    .text(invoiceType, centerColX, titleBoxY + 50, { width: centerColWidth, align: "center" });
+
+  doc.rect(centerColX, titleBoxY, centerColWidth, 64)
+    .lineWidth(2).strokeColor(purple).stroke();
+
+  // --- Right: Invoice Details ---
+  const detailBoxY = y;
+  const detailBoxHeight = 88;
+  doc.rect(rightColX, detailBoxY, rightColWidth, detailBoxHeight)
+    .lineWidth(1.5).strokeColor(gray).stroke();
+
+  let detailY = detailBoxY + 8;
+  const detailRows = [
+    { label: "Inv. No.", value: invoiceNo || "N/A" },
+    { label: "Date", value: formattedDate },
+    { label: "D.O. No.", value: "* Not Applicable" },
+    { label: "Payment", value: order.payment ? order.payment.charAt(0).toUpperCase() + order.payment.slice(1) : "" },
+  ];
+
+  detailRows.forEach((row) => {
+    doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+      .text(row.label, rightColX + 8, detailY, { width: 55 });
+    doc.fontSize(8).font("Helvetica").fillColor(darkGray)
+      .text(row.value, rightColX + 63, detailY, { width: rightColWidth - 73, align: "right" });
+    detailY += 14;
   });
 
-  doc.fontSize(12).font("Helvetica").fillColor("#000000");
+  doc.moveTo(rightColX + 5, detailY + 2).lineTo(rightColX + rightColWidth - 5, detailY + 2)
+    .lineWidth(0.5).strokeColor(gray).stroke();
+  detailY += 8;
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text("TRN:", rightColX + 8, detailY, { width: rightColWidth - 16, align: "right" });
 
-  // Header
-  const headerY = margin;
-  doc
-    .fontSize(22)
-    .font("Helvetica-Bold")
-    .text(company.companyName || "INGOUDE COMPANY", margin, headerY);
+  // ===== TO SECTION =====
+  y = Math.max(infoY + 20, detailBoxY + detailBoxHeight) + 8;
 
-  doc
-    .fontSize(36)
-    .font("Helvetica-Bold")
-    .fillColor("#b0123b")
-    .text(invoiceType, margin, headerY + 40);
+  const toBoxWidth = contentWidth * 0.4;
+  const toBoxHeight = 55;
+  doc.rect(margin, y, toBoxWidth, toBoxHeight)
+    .lineWidth(1.5).strokeColor(gray).stroke();
 
-  const invoiceInfoX = pageWidth - margin - 200;
-  doc
-    .fontSize(12)
-    .font("Helvetica-Bold")
-    .fillColor("#000000")
-    .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
-    .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text("To.", margin + 8, y + 5);
 
-  // Bill To / From (unchanged)
-  const infoY = headerY + 120;
-  const billToX = margin;
-  const fromX = pageWidth - margin - 250;
+  let toY = y + 16;
+  doc.fontSize(9).font("Helvetica-Bold")
+    .text(order.customer?.name || "N/A", margin + 8, toY);
+  toY += 12;
+  doc.fontSize(8).font("Helvetica");
+  if (order.customer?.address) {
+    doc.text(order.customer.address, margin + 8, toY, { width: toBoxWidth - 16 });
+    toY += 10;
+  }
+  if (order.customer?.pincode) {
+    doc.text(order.customer.pincode, margin + 8, toY);
+    toY += 10;
+  }
+  doc.text("TRN :", margin + 8, toY);
 
-  doc.fontSize(14).font("Helvetica-Bold").text("Bill To:", billToX, infoY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(order.customer?.name || "N/A", billToX, infoY + 25)
-    .text(order.customer?.phoneNumber || "N/A", billToX, infoY + 45)
-    .text(order.customer?.address || "N/A", billToX, infoY + 65)
-    .text(`Pincode: ${order.customer?.pincode || "N/A"}`, billToX, infoY + 85);
+  y += toBoxHeight + 8;
 
-  doc.fontSize(14).font("Helvetica-Bold").text("From:", fromX, infoY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(company.companyName || "INGOUDE COMPANY", fromX, infoY + 25)
-    .text(company.companyPhone || "N/A", fromX, infoY + 45)
-    .text(company.companyAddress || "N/A", fromX, infoY + 65);
+  // ===== ITEMS TABLE (10 columns) =====
+  const colDefs = [
+    { width: 28, header: "S. No.", align: "center" },
+    { width: 138, header: "Item Name", align: "left" },
+    { width: 37, header: "Qty.", align: "center" },
+    { width: 37, header: "Unit", align: "center" },
+    { width: 55, header: "U. Price", align: "center" },
+    { width: 55, header: "Excl. VAT", align: "center" },
+    { width: 33, header: "Disc%", align: "center" },
+    { width: 33, header: "VAT%", align: "center" },
+    { width: 62, header: "VAT Amount", align: "center" },
+    { width: 67, header: "TOTAL", align: "center" },
+  ];
 
-  // Table - now supports MULTIPLE products with Serial No & VAT Columns
-  const tableY = infoY + 130;
-  const rowHeight = 40;
+  let colX = margin;
+  const cols = colDefs.map((col) => {
+    const result = { ...col, x: colX };
+    colX += col.width;
+    return result;
+  });
 
-  // ✅ UPDATED: Adjusted columns for Serial No + VAT Fields
-  const snoCol = margin + 10; // S.No (25px)
-  const descCol = margin + 35; // Description (150px - narrower)
-  const qtyCol = margin + 185; // Qty (30px)
-  const exclVatCol = margin + 215; // Excl. VAT (50px)
-  const vatPctCol = margin + 265; // VAT % (30px)
-  const vatAmtCol = margin + 295; // VAT Amt (50px)
-  const totalCol = margin + 345; // Total (Incl. VAT) (70px)
-  const tableEnd = margin + 415; // End of table
+  const headerRowHeight = 22;
+  const dataRowHeight = 18;
+  const footerSpaceNeeded = 310;
 
-  // Header row - ✅ Added S.No & VAT Headers
-  doc
-    .rect(margin, tableY - 5, tableEnd - margin + 10, rowHeight)
-    .fillColor("#b0123b")
-    .fill();
-  doc
-    .fillColor("#ffffff")
-    .fontSize(8) // Smaller for more columns
-    .font("Helvetica-Bold")
-    .text("S.No", snoCol, tableY + 10, { width: 25, align: "center" })
-    .text("Description", descCol, tableY + 10, { width: 150 })
-    .text("Qty", qtyCol, tableY + 10, { width: 30, align: "center" })
-    .text("Excl. VAT", exclVatCol, tableY + 10, { width: 50, align: "center" })
-    .text("VAT %", vatPctCol, tableY + 10, { width: 30, align: "center" })
-    .text("VAT Amt", vatAmtCol, tableY + 10, { width: 50, align: "center" })
-    .text("Total (Incl. VAT)", totalCol, tableY + 10, { width: 70, align: "center" });
+  // Helper to draw table header row
+  const drawTableHeader = (startY) => {
+    doc.rect(margin, startY, contentWidth, headerRowHeight).fillColor(headerBg).fill();
+    doc.rect(margin, startY, contentWidth, headerRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+    cols.forEach((col) => {
+      doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+        .text(col.header, col.x + 2, startY + 6, { width: col.width - 4, align: col.align });
+      doc.moveTo(col.x, startY).lineTo(col.x, startY + headerRowHeight)
+        .lineWidth(0.5).strokeColor(gray).stroke();
+    });
+    doc.moveTo(rightEdge, startY).lineTo(rightEdge, startY + headerRowHeight)
+      .lineWidth(0.5).strokeColor(gray).stroke();
+    return startY + headerRowHeight;
+  };
 
-  // Data rows - loop through orderItems with Serial No & VAT
-  let currentY = tableY + rowHeight;
+  y = drawTableHeader(y);
+
+  // Data rows
   let grandTotalExclVat = 0;
   let grandTotalVat = 0;
   let grandTotalInclVat = 0;
+  let totalWeight = 0;
   let serialNumber = 1;
 
   order.orderItems.forEach((item) => {
@@ -637,117 +754,183 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
       ? item.orderedQuantity - item.deliveredQuantity
       : item.deliveredQuantity || item.orderedQuantity;
 
-    if (qty <= 0) return; // Skip zero qty rows
+    if (qty <= 0) return;
 
-    // ✅ VAT Calculations
+    // Page overflow check
+    if (y + dataRowHeight + footerSpaceNeeded > pageHeight) {
+      doc.addPage({ size: "A4", margin: 0 });
+      doc.rect(margin - 3, margin - 3, contentWidth + 6, pageHeight - margin * 2 + 6)
+        .lineWidth(2).strokeColor(darkGray).stroke();
+      y = margin;
+      y = drawTableHeader(y);
+    }
+
     const vatPercentage = item.vatPercentage || 5;
-    const exclVatAmount = (item.price || 0) * qty;
+    const unitPrice = item.price || 0;
+    const exclVatAmount = unitPrice * qty;
     const vatAmount = exclVatAmount * (vatPercentage / 100);
     const itemTotal = exclVatAmount + vatAmount;
 
     grandTotalExclVat += exclVatAmount;
     grandTotalVat += vatAmount;
     grandTotalInclVat += itemTotal;
+    totalWeight += qty;
 
-    doc
-      .fillColor("#000000")
-      .fontSize(8) // Smaller font for fit
-      .font("Helvetica")
-      .text(serialNumber.toString(), snoCol, currentY + 10, { width: 25, align: "center" }) // ✅ Serial No
-      .text(
-        item.product?.productName || "Unknown Product",
-        descCol,
-        currentY + 10,
-        { width: 150 } // Fixed width for description
-      )
-      .text(qty.toString(), qtyCol, currentY + 10, {
-        width: 30,
-        align: "center",
-      })
-      .text(`AED ${exclVatAmount.toFixed(2)}`, exclVatCol, currentY + 10, {
-        width: 50,
-        align: "center",
-      })
-      .text(`${vatPercentage}%`, vatPctCol, currentY + 10, {
-        width: 30,
-        align: "center",
-      })
-      .text(`AED ${vatAmount.toFixed(2)}`, vatAmtCol, currentY + 10, {
-        width: 50,
-        align: "center",
-      })
-      .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 10, {
-        width: 70,
-        align: "center",
-      }); // Extra width for AED
+    const unit = item.unit || item.product?.unit || "Nos";
 
-    currentY += rowHeight;
-    serialNumber++; // Increment serial number
+    const rowData = [
+      serialNumber.toString(),
+      item.product?.productName || "Unknown Product",
+      qty.toString(),
+      unit,
+      unitPrice.toFixed(2),
+      exclVatAmount.toFixed(2),
+      "0",
+      vatPercentage.toString(),
+      vatAmount.toFixed(2),
+      itemTotal.toFixed(2),
+    ];
+
+    doc.rect(margin, y, contentWidth, dataRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+
+    cols.forEach((col, i) => {
+      doc.fontSize(8).font("Helvetica").fillColor("#000000")
+        .text(rowData[i], col.x + 2, y + 4, { width: col.width - 4, align: i === 1 ? "left" : "center" });
+      doc.moveTo(col.x, y).lineTo(col.x, y + dataRowHeight)
+        .lineWidth(0.5).strokeColor(gray).stroke();
+    });
+    doc.moveTo(rightEdge, y).lineTo(rightEdge, y + dataRowHeight)
+      .lineWidth(0.5).strokeColor(gray).stroke();
+
+    y += dataRowHeight;
+    serialNumber++;
   });
 
-  // VAT Summary & Grand Total - UPDATED: Breakdown Box
-  const subtotalY = currentY + 20;
-  const subtotalWidth = 250;
-  const subtotalX = pageWidth - margin - subtotalWidth;
+  // Check if footer sections need a new page
+  if (y + footerSpaceNeeded > pageHeight) {
+    doc.addPage({ size: "A4", margin: 0 });
+    doc.rect(margin - 3, margin - 3, contentWidth + 6, pageHeight - margin * 2 + 6)
+      .lineWidth(2).strokeColor(darkGray).stroke();
+    y = margin;
+  }
 
-  // VAT Breakdown Box
-  doc.rect(subtotalX, subtotalY, subtotalWidth, 60).fillColor("#f0f0f0").fill();
-  doc
-    .fillColor("#000000")
-    .fontSize(9)
-    .font("Helvetica")
-    .text("Excl. VAT Subtotal:", subtotalX + 15, subtotalY + 10, { width: 120 })
-    .text(`AED ${grandTotalExclVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 10, { align: "right", width: 50 })
-    .text("VAT Amount:", subtotalX + 15, subtotalY + 25, { width: 120 })
-    .text(`AED ${grandTotalVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 25, { align: "right", width: 50 })
-    .text("Grand Total (Incl. VAT):", subtotalX + 15, subtotalY + 40, { width: 120 })
-    .text(`AED ${grandTotalInclVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 40, { align: "right", width: 50 });
+  // ===== BALANCE SECTION =====
+  y += 5;
+  const balanceRowHeight = 28;
+  const balW1 = contentWidth * 0.35;
+  const balW2 = contentWidth * 0.15;
+  const balW3 = contentWidth * 0.1;
+  const balW4 = contentWidth * 0.15;
+  const balW5 = contentWidth * 0.25;
 
-  // Footer - unchanged
-  const footerY = subtotalY + 80;
+  doc.rect(margin, y, contentWidth, balanceRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
 
-  doc
-    .fillColor("#000000")
-    .fontSize(14)
-    .font("Helvetica-Bold")
-    .text("Payment Information:", margin, footerY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(`Bank: ${company.bankName || "N/A"}`, margin, footerY + 25)
-    .text(
-      `Account: ${company.bankAccountNumber || "N/A"}`,
-      margin,
-      footerY + 45,
-    )
-    .text(
-      `Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || "N/A"}`,
-      margin,
-      footerY + 65,
-    )
-    .text(`Order ID: ${order._id.toString().slice(-8)}`, margin, footerY + 85); // Shortened ID
+  const balSeps = [margin, margin + balW1, margin + balW1 + balW2, margin + balW1 + balW2 + balW3, margin + balW1 + balW2 + balW3 + balW4, rightEdge];
+  balSeps.forEach((sepX) => {
+    doc.moveTo(sepX, y).lineTo(sepX, y + balanceRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  });
 
-  const thankYouX = pageWidth - margin - 200;
-  doc
-    .fontSize(36)
-    .font("Helvetica-Bold")
-    .fillColor("#000000")
-    .text("Thank You!", thankYouX, footerY, { width: 200, align: "right" });
+  const prevBalance = order.customer?.balanceCreditLimit || 0;
 
-  const bottomY = footerY + 150;
-  doc
-    .fontSize(10)
-    .font("Helvetica-Oblique")
-    .fillColor("#666666")
-    .text("This is a system-generated invoice", margin, bottomY);
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text(`Previous Balance : ${prevBalance.toFixed(2)}`, margin + 5, y + 4, { width: balW1 - 10 })
+    .text("Current Balance :", margin + 5, y + 16, { width: balW1 - 10 });
 
-  // ✅ Add line under table for clean look
-  doc
-    .strokeColor("#ddd")
-    .lineWidth(1)
-    .moveTo(margin, tableY - 2)
-    .lineTo(tableEnd, tableY - 2)
-    .stroke();
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Total Weight", margin + balW1 + 3, y + 10, { width: balW2 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica").fillColor(darkGray)
+    .text(totalWeight.toString(), margin + balW1 + balW2 + 3, y + 10, { width: balW3 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Total Dhs.", margin + balW1 + balW2 + balW3 + 3, y + 10, { width: balW4 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text(grandTotalExclVat.toFixed(2), margin + balW1 + balW2 + balW3 + balW4 + 5, y + 10, { width: balW5 - 10, align: "right" });
+
+  y += balanceRowHeight;
+
+  // ===== WORDS SECTION =====
+  y += 5;
+  const wordsHeight = 48;
+  doc.rect(margin, y, contentWidth, wordsHeight).lineWidth(0.5).strokeColor(gray).stroke();
+
+  const grandTotalWords = amountToWords(grandTotalInclVat);
+  const vatWords = amountToWords(grandTotalVat);
+
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Total amount in words", margin + 8, y + 5);
+  doc.fontSize(8).font("Helvetica").fillColor(darkGray)
+    .text(grandTotalWords, margin + 8, y + 17, { width: contentWidth - 16 })
+    .text(`${vatWords} (AED ${grandTotalVat.toFixed(2)})`, margin + 8, y + 32, { width: contentWidth - 16 });
+
+  y += wordsHeight;
+
+  // ===== VAT & GRAND TOTAL =====
+  y += 5;
+  const vatRowHeight = 22;
+  const vatLabelWidth = contentWidth * 0.75;
+  const vatValueWidth = contentWidth * 0.25;
+
+  // VAT row
+  doc.rect(margin, y, vatLabelWidth, vatRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.rect(margin + vatLabelWidth, y, vatValueWidth, vatRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Vat 5%", margin, y + 6, { width: vatLabelWidth, align: "center" });
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text(grandTotalVat.toFixed(2), margin + vatLabelWidth + 5, y + 6, { width: vatValueWidth - 10, align: "right" });
+  y += vatRowHeight;
+
+  // Grand Total row
+  doc.rect(margin, y, vatLabelWidth, vatRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.rect(margin + vatLabelWidth, y, vatValueWidth, vatRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Grand Total", margin, y + 6, { width: vatLabelWidth, align: "center" });
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text(grandTotalInclVat.toFixed(2), margin + vatLabelWidth + 5, y + 6, { width: vatValueWidth - 10, align: "right" });
+  y += vatRowHeight;
+
+  // ===== CHEQUE SECTION =====
+  y += 5;
+  const chequeHeight = 25;
+  doc.rect(margin, y, contentWidth, chequeHeight).lineWidth(1.5).strokeColor(gray).stroke();
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text(`Cheque to be drawn in favour of '${company.companyName || "Company Name"}'`, margin, y + 8, { width: contentWidth, align: "center" });
+  y += chequeHeight;
+
+  // ===== FOOTER SECTION =====
+  y += 8;
+
+  // Condition text box
+  const conditionHeight = 38;
+  doc.rect(margin, y, contentWidth, conditionHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.fontSize(7).font("Helvetica").fillColor(darkGray)
+    .text("Received above items in good condition.", margin + 8, y + 5, { width: contentWidth - 16 });
+  doc.fontSize(6).font("Helvetica")
+    .text("..................................................", margin + 8, y + 18, { width: contentWidth - 16, align: "center" })
+    .text("Receiver's Name & Signature", margin + 8, y + 27, { width: contentWidth - 16, align: "center" });
+  y += conditionHeight;
+
+  // ===== SIGNATURE BOXES (4 boxes) =====
+  y += 8;
+  const sigGap = 8;
+  const sigBoxWidth = (contentWidth - sigGap * 3) / 4;
+  const sigBoxHeight = 90;
+
+  const signatures = [
+    "Received above items\nin good condition.\n\nReceiver's Name\n& Signature",
+    "Vehicle No. & Driver",
+    "Store Sign",
+    `for ${company.companyName || "Company Name"}`,
+  ];
+
+  signatures.forEach((label, i) => {
+    const boxX = margin + i * (sigBoxWidth + sigGap);
+    doc.roundedRect(boxX, y, sigBoxWidth, sigBoxHeight, 3)
+      .lineWidth(1.5).strokeColor(gray).stroke();
+    doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+      .text(label, boxX + 5, y + sigBoxHeight - 40, { width: sigBoxWidth - 10, align: "center" });
+  });
 };
 const assignOrderToDeliveryMan = async (req, res) => {
   try {
@@ -1588,7 +1771,7 @@ const getReadyToDeliver = async (req, res) => {
 const getPackedInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode")
+      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
       .populate("orderItems.product", "productName price unit");
     
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -1623,7 +1806,7 @@ const getPackedInvoice = async (req, res) => {
 const getUnifiedInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode")
+      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
       .populate("orderItems.product", "productName price unit");
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (!order.packedAt || !order.packedStatus) {
@@ -1649,327 +1832,77 @@ const getUnifiedInvoice = async (req, res) => {
     }
   }
 };
-// ✅ UNIFIED INVOICE PDF - Shows Ordered/Packed/Delivered columns
+// ✅ UNIFIED INVOICE PDF - New Tax Invoice Style
 const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
-  const company = await CompanySettings.findOne();
-  if (!company) throw new Error("Company invoice settings not configured.");
-  
-  const pageWidth = 595.28;
-  const margin = 50;
-  const headerY = margin;
-  const date = new Date(order.packedAt || Date.now());
-  const formattedDate = date.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-  
-  // ─── Header ───────────────────────────────────────────────────────
-  doc.fontSize(22).font("Helvetica-Bold").text(company.companyName || "INGOUDE COMPANY", margin, headerY);
-  doc.fontSize(36).font("Helvetica-Bold").fillColor("#b0123b").text(invoiceType, margin, headerY + 40);
-  
-  // ─── Invoice Number & Date ───────
-  const invoiceInfoX = pageWidth - margin - 200;
-  doc
-    .fontSize(12)
-    .font("Helvetica-Bold")
-    .fillColor("#000000")
-    .text(`Invoice No: ${invoiceNo}`, invoiceInfoX, headerY)
-    .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
-  
-  // ─── Bill To / From ───────────────────────────────────────────────
-  const infoY = headerY + 120;
-  const billToX = margin;
-  const fromX = pageWidth - margin - 250;
-  doc.fontSize(14).font("Helvetica-Bold").text("Bill To:", billToX, infoY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(order.customer?.name || "N/A", billToX, infoY + 25)
-    .text(order.customer?.phoneNumber || "N/A", billToX, infoY + 45)
-    .text(order.customer?.address || "N/A", billToX, infoY + 65)
-    .text(`Pincode: ${order.customer?.pincode || "N/A"}`, billToX, infoY + 85);
-  doc.fontSize(14).font("Helvetica-Bold").text("From:", fromX, infoY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(company.companyName || "INGOUDE COMPANY", fromX, infoY + 25)
-    .text(company.companyPhone || "N/A", fromX, infoY + 45)
-    .text(company.companyAddress || "N/A", fromX, infoY + 65);
-  
-  // ─── Table: S.No | Description | Qty | Excl. VAT | VAT % | VAT Amt | Total (Incl. VAT) ─────────────────
-  // ✅ UPDATED: New Column Positions for VAT Fields
-  const tableY = infoY + 130;
-  const rowHeight = 45;
-  const snoCol = margin + 10; // S.No (25px)
-  const descCol = margin + 35; // Description (150px - narrower for more columns)
-  const qtyCol = margin + 185; // Qty (30px)
-  const exclVatCol = margin + 215; // Excl. VAT (50px)
-  const vatPctCol = margin + 265; // VAT % (30px)
-  const vatAmtCol = margin + 295; // VAT Amt (50px)
-  const totalCol = margin + 345; // Total (Incl. VAT) (70px)
-  const tableEnd = margin + 415; // End of table
-  
-  // Header row
-  doc
-    .rect(margin, tableY - 5, tableEnd - margin + 10, rowHeight)
-    .fillColor("#b0123b")
-    .fill();
-  doc
-    .fillColor("#ffffff")
-    .fontSize(8) // Smaller font for more columns
-    .font("Helvetica-Bold")
-    .text("S.No", snoCol, tableY + 8, { width: 25, align: "center" })
-    .text("Description", descCol, tableY + 8, { width: 150 })
-    .text("Qty", qtyCol, tableY + 8, { width: 30, align: "center" })
-    .text("Excl. VAT", exclVatCol, tableY + 8, { width: 50, align: "center" })
-    .text("VAT %", vatPctCol, tableY + 8, { width: 30, align: "center" })
-    .text("VAT Amt", vatAmtCol, tableY + 8, { width: 50, align: "center" })
-    .text("Total (Incl. VAT)", totalCol, tableY + 8, { width: 70, align: "center" });
-  
-  // ─── Process History Items (Partial Qty) ─────────
+  // Gather items from history or fallback to order items
   const historyEntry = order.invoiceHistory?.find(h => h.invoiceNumber === invoiceNo);
-  let currentY = tableY + rowHeight;
-  let grandTotalExclVat = 0;
-  let grandTotalVat = 0;
-  let grandTotalInclVat = 0;
-  let serialNumber = 1;
-  
+  let unifiedItems = [];
+
   if (historyEntry && historyEntry.items?.length > 0) {
-    // Use history for partial qty/names (extend with VAT from orderItem)
     for (const histItem of historyEntry.items) {
       if (!histItem.quantity || histItem.quantity <= 0) continue;
       const orderItem = order.orderItems.find(oi => String(oi.product._id) === String(histItem.product));
-      const qty = histItem.quantity;
-      const price = histItem.price || orderItem?.price || 0; // Excl. VAT price
-      const vatPercentage = orderItem?.vatPercentage || 5;
-      const exclVatAmount = price * qty;
-      const vatAmount = exclVatAmount * (vatPercentage / 100);
-      const totalAmount = exclVatAmount + vatAmount;
-      
-      grandTotalExclVat += exclVatAmount;
-      grandTotalVat += vatAmount;
-      grandTotalInclVat += totalAmount;
-      
-      doc
-        .fillColor("#000000")
-        .fontSize(8)
-        .font("Helvetica")
-        .text(serialNumber.toString(), snoCol, currentY + 8, { width: 25, align: "center" })
-        .text(orderItem?.product?.productName || "Unknown Product", descCol, currentY + 8, { width: 150 })
-        .text(qty.toString(), qtyCol, currentY + 8, { width: 30, align: "center" })
-        .text(`AED ${exclVatAmount.toFixed(2)}`, exclVatCol, currentY + 8, { width: 50, align: "center" })
-        .text(`${vatPercentage}%`, vatPctCol, currentY + 8, { width: 30, align: "center" })
-        .text(`AED ${vatAmount.toFixed(2)}`, vatAmtCol, currentY + 8, { width: 50, align: "center" })
-        .text(`AED ${totalAmount.toFixed(2)}`, totalCol, currentY + 8, { width: 70, align: "center" });
-      
-      currentY += rowHeight;
-      serialNumber++;
+      unifiedItems.push({
+        product: orderItem?.product || null,
+        unit: orderItem?.unit || orderItem?.product?.unit || "Nos",
+        price: histItem.price || orderItem?.price || 0,
+        vatPercentage: orderItem?.vatPercentage || 5,
+        qty: histItem.quantity,
+      });
     }
   } else {
-    // Fallback: Use order items with delivered/packed qty
-    order.orderItems.forEach((item, idx) => {
+    order.orderItems.forEach((item) => {
       const qty = item.deliveredQuantity || item.packedQuantity || item.orderedQuantity || 0;
       if (qty <= 0) return;
-      const exclVatAmount = item.exclVatAmount || (item.price * qty);
-      const vatPercentage = item.vatPercentage || 5;
-      const vatAmount = item.vatAmount || (exclVatAmount * (vatPercentage / 100));
-      const totalAmount = item.totalAmount || (exclVatAmount + vatAmount);
-      
-      grandTotalExclVat += exclVatAmount;
-      grandTotalVat += vatAmount;
-      grandTotalInclVat += totalAmount;
-      
-      doc
-        .fillColor("#000000")
-        .fontSize(8)
-        .font("Helvetica")
-        .text((idx + 1).toString(), snoCol, currentY + 8, { width: 25, align: "center" })
-        .text(item.product?.productName || "Unknown Product", descCol, currentY + 8, { width: 150 })
-        .text(qty.toString(), qtyCol, currentY + 8, { width: 30, align: "center" })
-        .text(`AED ${exclVatAmount.toFixed(2)}`, exclVatCol, currentY + 8, { width: 50, align: "center" })
-        .text(`${vatPercentage}%`, vatPctCol, currentY + 8, { width: 30, align: "center" })
-        .text(`AED ${vatAmount.toFixed(2)}`, vatAmtCol, currentY + 8, { width: 50, align: "center" })
-        .text(`AED ${totalAmount.toFixed(2)}`, totalCol, currentY + 8, { width: 70, align: "center" });
-      
-      currentY += rowHeight;
-      serialNumber++;
+      unifiedItems.push({
+        product: item.product,
+        unit: item.unit || item.product?.unit || "Nos",
+        price: item.price || 0,
+        vatPercentage: item.vatPercentage || 5,
+        qty,
+      });
     });
   }
-  
-  // ─── VAT Summary & Grand Total ───────────────────────────
-  const subtotalY = currentY + 20;
-  const subtotalWidth = 250;
-  const subtotalX = pageWidth - margin - subtotalWidth;
-  
-  // VAT Breakdown Box
-  doc.rect(subtotalX, subtotalY, subtotalWidth, 60).fillColor("#f0f0f0").fill();
-  doc
-    .fillColor("#000000")
-    .fontSize(9)
-    .font("Helvetica")
-    .text("Excl. VAT Subtotal:", subtotalX + 15, subtotalY + 10, { width: 120 })
-    .text(`AED ${grandTotalExclVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 10, { align: "right", width: 50 })
-    .text("VAT Amount:", subtotalX + 15, subtotalY + 25, { width: 120 })
-    .text(`AED ${grandTotalVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 25, { align: "right", width: 50 })
-    .text("Grand Total (Incl. VAT):", subtotalX + 15, subtotalY + 40, { width: 120 })
-    .text(`AED ${grandTotalInclVat.toFixed(2)}`, subtotalX + subtotalWidth - 60, subtotalY + 40, { align: "right", width: 50 });
-  
-  // ─── Footer ───────────────────────────────────────────────────────
-  const footerY = subtotalY + 80;
-  doc.fillColor("#000000").fontSize(14).font("Helvetica-Bold").text("Payment Information:", margin, footerY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(`Bank: ${company.bankName || "N/A"}`, margin, footerY + 25)
-    .text(`Account: ${company.bankAccountNumber || "N/A"}`, margin, footerY + 45)
-    .text(
-      `Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || "N/A"}`,
-      margin,
-      footerY + 65
-    )
-    .text(`Order ID: ${order._id.toString().slice(-8)}`, margin, footerY + 85);
-  const thankYouX = pageWidth - margin - 150;
-  doc.fontSize(28).font("Helvetica-Bold").fillColor("#000000").text("Thank You!", thankYouX, footerY, { width: 150, align: "right" });
-  const bottomY = footerY + 120;
-  doc.fontSize(10).font("Helvetica-Oblique").fillColor("#666666").text(`Invoice Reference: ${invoiceNo}`, margin, bottomY);
-  
-  // ✅ Add line under table for clean look
-  doc
-    .strokeColor("#ddd")
-    .lineWidth(1)
-    .moveTo(margin, tableY - 2)
-    .lineTo(tableEnd, tableY - 2)
-    .stroke();
+
+  // Build a wrapper order so generateStyledInvoicePDF can process it
+  const wrapperOrder = {
+    ...order,
+    _id: order._id,
+    customer: order.customer,
+    payment: order.payment,
+    orderDate: order.packedAt || order.orderDate || order.deliveredAt,
+    orderItems: unifiedItems.map((ui) => ({
+      product: ui.product,
+      unit: ui.unit,
+      price: ui.price,
+      vatPercentage: ui.vatPercentage,
+      orderedQuantity: ui.qty,
+      deliveredQuantity: ui.qty,
+    })),
+  };
+
+  await generateStyledInvoicePDF(doc, wrapperOrder, invoiceType, invoiceNo);
 };
+// ✅ PACKED INVOICE PDF - New Tax Invoice Style (uses packed quantities)
 const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
-  const company = await CompanySettings.findOne();
-  if (!company) throw new Error("Company invoice settings not configured.");
+  // Build wrapper with packed quantities so generateStyledInvoicePDF renders them
+  const wrapperOrder = {
+    ...order,
+    _id: order._id,
+    customer: order.customer,
+    payment: order.payment,
+    orderDate: order.packedAt || order.orderDate,
+    orderItems: order.orderItems.map((item) => ({
+      product: item.product,
+      unit: item.unit || item.product?.unit || "Nos",
+      price: item.price,
+      vatPercentage: item.vatPercentage || 5,
+      orderedQuantity: item.packedQuantity || 0,
+      deliveredQuantity: item.packedQuantity || 0,
+    })),
+  };
 
-  const pageWidth = 595.28;
-  const margin = 50;
-  const headerY = margin;
-
-  const date = new Date(order.packedAt || Date.now());
-  const formattedDate = date.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-
-  // Header
-  doc.fontSize(22).font("Helvetica-Bold").text(company.companyName || "INGOUDE COMPANY", margin, headerY);
-  doc.fontSize(36).font("Helvetica-Bold").fillColor("#b0123b").text(invoiceType, margin, headerY + 40);
-
-  // Invoice info
-  const invoiceInfoX = pageWidth - margin - 200;
-  doc.fontSize(12).font("Helvetica-Bold").fillColor("#000000")
-    .text(`NO: ${invoiceNo}`, invoiceInfoX, headerY)
-    .text(`Date: ${formattedDate}`, invoiceInfoX, headerY + 20);
-
-  // Bill To / From
-  const infoY = headerY + 120;
-  const billToX = margin;
-  const fromX = pageWidth - margin - 250;
-
-  doc.fontSize(14).font("Helvetica-Bold").text("Bill To:", billToX, infoY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(order.customer?.name || "N/A", billToX, infoY + 25)
-    .text(order.customer?.phoneNumber || "N/A", billToX, infoY + 45)
-    .text(order.customer?.address || "N/A", billToX, infoY + 65)
-    .text(`Pincode: ${order.customer?.pincode || "N/A"}`, billToX, infoY + 85);
-
-  doc.fontSize(14).font("Helvetica-Bold").text("From:", fromX, infoY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(company.companyName || "INGOUDE COMPANY", fromX, infoY + 25)
-    .text(company.companyPhone || "N/A", fromX, infoY + 45)
-    .text(company.companyAddress || "N/A", fromX, infoY + 65);
-
-  // Table Header - ✅ UPDATED WITH S.No
-  const tableY = infoY + 130;
-  const rowHeight = 40;
-  
-  // ✅ NEW COLUMN POSITIONS with S.No
-  const snoCol = margin;
-  const descCol = margin + 40;
-  const qtyCol = margin + 260;
-  const priceCol = margin + 320;
-  const totalCol = margin + 380;
-
-  doc.rect(margin - 10, tableY - 5, pageWidth - margin * 2 + 20, rowHeight)
-    .fillColor("#b0123b").fill();
-
-  doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold")
-    .text("S.No", snoCol, tableY + 8, { width: 30, align: "center" })  // ✅ S.No header
-    .text("Description", descCol, tableY + 8)
-    .text("Packed Qty", qtyCol, tableY + 8, { width: 50, align: "center" })
-    .text("Price", priceCol, tableY + 8, { width: 50, align: "center" })
-    .text("Total", totalCol, tableY + 8, { width: 50, align: "center" });
-
-  // Data rows - ✅ ADD SERIAL NUMBER
-  let currentY = tableY + rowHeight;
-  let grandTotal = 0;
-  let serialNumber = 1;  // ✅ Start at 1
-
-  order.orderItems.forEach((item) => {
-    const qty = item.packedQuantity || 0;
-    const itemTotal = qty * item.price;
-    grandTotal += itemTotal;
-
-    doc.fillColor("#000000").fontSize(10).font("Helvetica")
-      // ✅ ADD SERIAL NUMBER
-      .text(serialNumber.toString(), snoCol, currentY + 8, { width: 30, align: "center" })
-      .text(item.product?.productName || "Unknown Product", descCol, currentY + 8)
-      .text(qty.toString(), qtyCol, currentY + 8, { width: 50, align: "center" })
-      .text(`AED ${item.price.toFixed(2)}`, priceCol, currentY + 8, { width: 50, align: "center" })
-      .text(`AED ${itemTotal.toFixed(2)}`, totalCol, currentY + 8, { width: 50, align: "center" });
-
-    currentY += rowHeight;
-    serialNumber++;  // ✅ Increment
-  });
-
-  // Grand Total
-  const subtotalY = currentY + 40;
-  const subtotalWidth = 200;
-  const subtotalX = pageWidth - margin - subtotalWidth;
-
-  doc.rect(subtotalX, subtotalY, subtotalWidth, 35).fillColor("#222222").fill();
-  doc
-    .fillColor("#ffffff")
-    .fontSize(12)
-    .font("Helvetica-Bold")
-    .text("Grand Total", subtotalX + 15, subtotalY + 12)
-    .text(`AED ${grandTotal.toFixed(2)}`, subtotalX + subtotalWidth - 20, subtotalY + 12, { align: "right" });
-
-  // Footer (unchanged)
-  const footerY = subtotalY + 80;
-
-  doc
-    .fillColor("#000000")
-    .fontSize(14)
-    .font("Helvetica-Bold")
-    .text("Payment Information:", margin, footerY);
-  doc
-    .fontSize(12)
-    .font("Helvetica")
-    .text(`Bank: ${company.bankName || "N/A"}`, margin, footerY + 25)
-    .text(`Account: ${company.bankAccountNumber || "N/A"}`, margin, footerY + 45)
-    .text(
-      `Payment Method: ${order.payment?.charAt(0).toUpperCase() + order.payment?.slice(1) || "N/A"}`,
-      margin,
-      footerY + 65
-    )
-    .text(`Order ID: ${order._id.toString()}`, margin, footerY + 85);
-
-  const thankYouX = pageWidth - margin - 200;
-  doc
-    .fontSize(36)
-    .font("Helvetica-Bold")
-    .fillColor("#000000")
-    .text("Thank You!", thankYouX, footerY, { width: 200, align: "right" });
-
-  const bottomY = footerY + 150;
-  doc
-    .fontSize(10)
-    .font("Helvetica-Oblique")
-    .fillColor("#666666")
-    .text("This is a system-generated invoice", margin, bottomY);
+  await generateStyledInvoicePDF(doc, wrapperOrder, invoiceType, invoiceNo);
 };
 
 const getAllOrdersForStorekeeper = async (req, res) => {

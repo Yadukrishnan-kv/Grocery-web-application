@@ -65,10 +65,12 @@
   flex: 1;
   padding: 24px 32px;
   transition: margin-left var(--transition-normal);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .wallet-main-content.sidebar-open {
-  margin-left: 280px;
+  margin-left: 240px;
 }
 
 .wallet-container-wrapper {

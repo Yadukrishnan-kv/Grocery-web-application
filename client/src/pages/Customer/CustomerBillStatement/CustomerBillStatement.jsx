@@ -463,6 +463,7 @@ const getSalesManForCustomer = useCallback(async () => {
                       <th scope="col">Days Remaining</th>
                       <th scope="col">Paid Amount</th>
                       <th scope="col">Status</th>
+                      <th scope="col">Download</th>
                       <th scope="col">Actions</th>
                     </tr>
                   </thead>
@@ -477,14 +478,7 @@ const getSalesManForCustomer = useCallback(async () => {
                             <td>{formatDate(bill.cycleStart)}</td>
                             <td>{formatDate(bill.cycleEnd)}</td>
                             <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                }}
-                              >
-                                <span>
+                              <span>
                                   {bill.invoiceNumber || 
                                    bill.orders?.[0]?.invoiceNumber || 
                                    `DEL-${bill._id.toString().slice(-8)}`}
@@ -501,24 +495,7 @@ const getSalesManForCustomer = useCallback(async () => {
                                       OB
                                     </span>
                                   )}
-                                </span>
-                                {bill.invoiceNumber && bill.status === "paid" && (
-                                  <button
-                                    onClick={() => handleDownloadInvoice(bill._id, bill.invoiceNumber)}
-                                    style={{
-                                      padding: "4px 8px",
-                                      fontSize: "11px",
-                                      backgroundColor: "#007bff",
-                                      color: "white",
-                                      border: "none",
-                                      borderRadius: "3px",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    Download
-                                  </button>
-                                )}
-                              </div>
+                              </span>
                             </td>
                             <td>
                               <div
@@ -589,6 +566,16 @@ const getSalesManForCustomer = useCallback(async () => {
                               </span>
                             </td>
                             <td>
+                              {bill.status === "paid" && bill.invoiceNumber && (
+                                <button
+                                  className="customer-bills-download-button"
+                                  onClick={() => handleDownloadInvoice(bill._id, bill.invoiceNumber)}
+                                >
+                                  ⬇ Download
+                                </button>
+                              )}
+                            </td>
+                            <td>
                               {bill.status !== "paid" && bill.status !== "pending_payment" && (
                                 <button
                                   className="customer-bills-pay-button"
@@ -613,7 +600,7 @@ const getSalesManForCustomer = useCallback(async () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan="10" className="customer-bills-no-data">
+                        <td colSpan="12" className="customer-bills-no-data">
                           No bills found
                         </td>
                       </tr>

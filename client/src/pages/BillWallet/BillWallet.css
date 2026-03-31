@@ -14,10 +14,12 @@
   flex: 1;
   padding: 30px;
   transition: margin-left 0.3s ease;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .bill-wallet-main.sidebar-open {
-  margin-left: 250px; /* Adjust based on your sidebar width */
+  margin-left: 240px;
 }
 
 .bill-wallet-container {
@@ -280,6 +282,10 @@
 }
 
 @media (max-width: 768px) {
+  .bill-wallet-main {
+    padding: 16px;
+  }
+
   .bill-wallet-container {
     padding: 24px;
   }
@@ -291,6 +297,32 @@
   .confirm-modal {
     padding: 24px;
     max-width: 90%;
+  }
+
+  .summary-card .amount {
+    font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .bill-wallet-main {
+    padding: 12px;
+  }
+
+  .bill-wallet-container {
+    padding: 16px;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .summary-card .amount {
+    font-size: 1.5rem;
+  }
+
+  .summary-card h4 {
+    font-size: 1.1rem;
   }
 }
 /* Add to BillWallet.css */

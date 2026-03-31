@@ -150,6 +150,30 @@
   }
 }
 
+/* Mobile behavior */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    z-index: 99;
+  }
+
+  .sidebar.open {
+    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 98;
+  }
+
+  .sidebar-backdrop.visible {
+    display: block;
+  }
+}
+
 /* Focus styles for accessibility */
 .nav-link:focus,
 .sub-link:focus {
