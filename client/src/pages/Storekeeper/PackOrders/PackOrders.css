@@ -140,6 +140,78 @@
   color: white;
   border: none;
 }
+
+/* Action Cell & Buttons */
+.actions-cell {
+  min-width: 160px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.pack-cell {
+  min-width: 120px;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.order-list-icon-button {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.order-list-view-button {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.order-list-view-button:hover:not(:disabled) {
+  background: #bfdbfe;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(30, 64, 175, 0.15);
+}
+
+.order-list-edit-button {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.order-list-edit-button:hover:not(:disabled) {
+  background: #bbf7d0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(22, 101, 52, 0.15);
+}
+
+.order-list-edit-button:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.order-list-icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.no-invoice-text {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
 /* PackOrders specific tweaks */
 .pack-button {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);

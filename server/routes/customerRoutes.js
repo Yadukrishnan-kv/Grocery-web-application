@@ -19,7 +19,10 @@ const {
   getMyCustomers,
   getMyCustomersWithDue,
   getCustomerOutstandingDetails,
-  getCustomerReceipts
+  getCustomerReceipts,
+  getPendingRequestsForManager,
+  suggestCreditLimit,
+  updateSuggestionStatus
 } = require("../controllers/customerController");
 
 router.use(protect); 
@@ -41,5 +44,8 @@ router.get('/my-customers', protect, getMyCustomers);
 router.get('/my-customers-with-due', protect, getMyCustomersWithDue);
 router.get('/outstanding/:customerId', protect, getCustomerOutstandingDetails);
 router.get('/receipts', protect, getCustomerReceipts);
+router.get('/customer-requests/manager-pending', protect, getPendingRequestsForManager);
+router.post('/customer-requests/suggest-credit/:id', protect, suggestCreditLimit);
+router.post('/customer-requests/update-suggestion/:id', protect, updateSuggestionStatus);
 
 module.exports = router;

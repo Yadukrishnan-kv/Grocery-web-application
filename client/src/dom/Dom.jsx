@@ -51,6 +51,8 @@ import CustomerOutstandingDetails from "../pages/Salesmanpages/OutstandingReport
 import ReceiptReport from "../pages/Salesmanpages/ReceiptReport/ReceiptReport";
 import ReceiptDetails from "../pages/Salesmanpages/ReceiptReport/ReceiptDetails";
 import StorekeeperOrders from "../pages/Storekeeper/StorekeeperOrders/StorekeeperOrders";
+import RemainingPackOrders from "../pages/Storekeeper/RemainingPackOrders/RemainingPackOrders";
+import CreditSuggestion from "../pages/Salesmanpages/CreditSuggestion/CreditSuggestion";
 function Dom() {
   return (
     <div>
@@ -137,6 +139,10 @@ function Dom() {
             />
             <Route path="/sales/customers" element={<SalesmanCustomers />} />
             <Route
+              path="/manager/credit-suggestion"
+              element={<CreditSuggestion />}
+            />
+            <Route
               path="/sales/pending-orders"
               element={<SalesmanPendingOrders />}
             />
@@ -176,6 +182,7 @@ function Dom() {
               element={<AdminOrderRequests />}
             />
             <Route path="/storekeeper/packed-orders" element={<PackOrders />} />
+            <Route path="/storekeeper/remaining-pack-orders" element={<RemainingPackOrders />} />
             <Route
               path="/PendingOrdersForPacking"
               element={<PendingOrders />}

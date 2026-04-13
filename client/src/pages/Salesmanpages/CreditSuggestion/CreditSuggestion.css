@@ -1,0 +1,218 @@
+/* CreditSuggestion.css — Matches PendingCustomerRequests premium style */
+
+.credit-suggestion-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.credit-suggestion-main-content {
+  flex: 1;
+  padding: 1.5rem;
+  transition: margin-left 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  overflow-y: auto;
+  margin-top: 64px;
+}
+
+@media (min-width: 768px) {
+  .credit-suggestion-main-content.sidebar-open {
+    margin-left: 240px;
+  }
+}
+
+.credit-suggestion-container-wrapper {
+  width: 98%;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.credit-suggestion-container {
+  padding: 2rem;
+}
+
+.credit-suggestion-header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.credit-suggestion-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.credit-suggestion-loading {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #64748b;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.credit-suggestion-no-data {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 1rem;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.credit-suggestion-table-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: white;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.credit-suggestion-data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1000px;
+}
+
+.credit-suggestion-data-table th,
+.credit-suggestion-data-table td {
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.credit-suggestion-data-table th {
+  background: linear-gradient(90deg, #f8fafc, #f1f5f9);
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.credit-suggestion-data-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.credit-suggestion-data-table tbody tr:hover {
+  background-color: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.credit-suggestion-data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Suggest input + button */
+.suggest-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.suggest-credit-input {
+  width: 110px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.suggest-credit-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.suggest-btn {
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #6366f1;
+  color: white;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.suggest-btn:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.suggest-btn:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Status badges */
+.suggestion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.suggestion-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.suggestion-badge.accepted {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.suggestion-badge.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.suggestion-badge.none {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .credit-suggestion-container {
+    padding: 1.5rem;
+  }
+
+  .credit-suggestion-page-title {
+    font-size: 1.5rem;
+  }
+
+  .credit-suggestion-data-table th,
+  .credit-suggestion-data-table td {
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .suggest-input-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -61,6 +61,31 @@ const deleteRole = async (req, res) => {
   }
 };
 
+const updateRole = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Role name is required" });
+    }
+
+    const existing = await Role.findOne({ name: name.trim(), _id: { $ne: req.params.id } });
+    if (existing) {
+      return res.status(400).json({ message: "Role name already exists" });
+    }
+
+    const role = await Role.findByIdAndUpdate(
+      req.params.id,
+      { name: name.trim() },
+      { new: true, runValidators: true }
+    );
+    if (!role) return res.status(404).json({ message: "Role not found" });
+
+    res.json(role);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // controllers/roleController.js
 const getPermissions = async (req, res) => {
   try {
@@ -171,6 +196,7 @@ module.exports = {
   createRole,
   getAllRoles,
   updateRolePermissions,
+  updateRole,
   deleteRole,
   getPermissions,
   getRoleById,

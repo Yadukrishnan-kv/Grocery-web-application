@@ -19,7 +19,7 @@ const {
   acceptAssignedOrder,
   rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,
   getMyOrders,getOrderInvoice,getlastorderdetails,checkFirstOrder,
-  getPendingOrderRequests,approveOrderRequest,rejectOrderRequest,getCustomerOrderHistory,createOrderRequest,packOrder,getPendingForPacking,getMyPendingOrders,getPackedToday,
+  getPendingOrderRequests,approveOrderRequest,rejectOrderRequest,getCustomerOrderHistory,createOrderRequest,packOrder,getPendingForPacking,getRemainingForPacking,getMyPendingOrders,getPackedToday,
   getReadyToDeliver,getPackedInvoice,getUnifiedInvoice,getAllOrdersForStorekeeper
 } = require("../controllers/orderController");
 
@@ -60,6 +60,7 @@ router.post("/pack/:orderId", protect, packOrder);
 // routes/orderRoutes.js
 
 router.get("/pending-for-packing", protect, getPendingForPacking);
+router.get("/remaining-for-packing", protect, getRemainingForPacking);
 router.get("/my-pending-orders", protect, getMyPendingOrders);
 // routes/orderRoutes.js
 router.get("/packed-today", protect, getPackedToday);

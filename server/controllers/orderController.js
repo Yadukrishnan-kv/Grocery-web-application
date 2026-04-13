@@ -14,7 +14,7 @@ const PDFDocument = require("pdfkit");
 
 const createOrder = async (req, res) => {
   try {
-    const { customerId, payment, remarks, orderItems } = req.body;
+    const { customerId, payment, remarks, orderItems, scheduleDays } = req.body;
 
     // Validation
     if (!customerId || !payment || !orderItems || orderItems.length === 0) {
@@ -46,10 +46,17 @@ const createOrder = async (req, res) => {
       };
     });
 
+    const days = parseInt(scheduleDays) || 0;
+    const packableAfter = new Date();
+    packableAfter.setDate(packableAfter.getDate() + days);
+    packableAfter.setHours(0, 0, 0, 0);
+
     const order = new Order({
       customer: customerId,
       payment,
       remarks: remarks || "",
+      scheduleDays: days,
+      packableAfter: days > 0 ? packableAfter : null,
       orderItems: processedItems,
       status: "pending",
       assignmentStatus: "pending_assignment",
@@ -428,6 +435,18 @@ const getOrInitCounter = async () => {
   return counter;
 };
 
+// Helper: Buffer PDF in memory before sending (prevents ERR_INCOMPLETE_CHUNKED_ENCODING)
+const buildPDFBuffer = (generateFn) => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 0 });
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+    generateFn(doc).then(() => doc.end()).catch(reject);
+  });
+};
+
 const getDeliveredInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
@@ -448,15 +467,14 @@ const getDeliveredInvoice = async (req, res) => {
     const invoiceNo = order.invoiceNumber; // ← Use existing DEL-XX
     const filename = `delivered-invoice-${invoiceNo}.pdf`;
     
+    const pdfBuffer = await buildPDFBuffer(async (doc) => {
+      await generateStyledInvoicePDF(doc, order, "DELIVERED INVOICE", invoiceNo);
+    });
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    
-    const doc = new PDFDocument({ size: "A4", margin: 0 });
-    doc.pipe(res);
-    
-    await generateStyledInvoicePDF(doc, order, "DELIVERED INVOICE", invoiceNo);
-    
-    doc.end();
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.end(pdfBuffer);
   } catch (error) {
     console.error("Error generating delivered invoice:", error);
     if (!res.headersSent) {
@@ -497,11 +515,6 @@ const getPendingInvoice = async (req, res) => {
     const invoiceNo = order.invoiceNumber;
 
     const filename = `pending-invoice-${order._id.toString().slice(-8)}.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
-    const doc = new PDFDocument({ size: "A4", margin: 0 });
-    doc.pipe(res);
 
     // Create pending version with remaining quantities
     const pendingOrder = {
@@ -515,14 +528,14 @@ const getPendingInvoice = async (req, res) => {
       })),
     };
 
-    await generateStyledInvoicePDF(
-      doc,
-      pendingOrder,
-      "PENDING INVOICE",
-      invoiceNo,
-    );
+    const pdfBuffer = await buildPDFBuffer(async (doc) => {
+      await generateStyledInvoicePDF(doc, pendingOrder, "PENDING INVOICE", invoiceNo);
+    });
 
-    doc.end();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.end(pdfBuffer);
   } catch (error) {
     console.error("Error generating pending invoice:", error);
     if (!res.headersSent) {
@@ -1013,24 +1026,15 @@ const getOrderInvoice = async (req, res) => {
     }
 
     const filename = `order-invoice-${order._id.toString().slice(-8)}.pdf`;
+
+    const pdfBuffer = await buildPDFBuffer(async (doc) => {
+      await generateStyledInvoicePDF(doc, order, "ORDER INVOICE", `ORD-${order._id.toString().slice(-6)}`);
+    });
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
-    const doc = new PDFDocument({ size: "A4", margin: 0 });
-    doc.pipe(res);
-
-    // Reuse your existing PDF generator function
-    // We pass the full order object (it already has orderedQuantity, deliveredQuantity, etc.)
-    await generateStyledInvoicePDF(
-      doc,
-      order,
-      "ORDER INVOICE",
-      `ORD-${order._id.toString().slice(-6)}`,
-    );
-
-    doc.end();
-
-    console.log(`Order invoice served for order ${order._id}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.end(pdfBuffer);
   } catch (error) {
     console.error("Error generating order invoice:", error);
     if (!res.headersSent) {
@@ -1698,8 +1702,37 @@ const packOrder = async (req, res) => {
 };
 const getPendingForPacking = async (req, res) => {
   try {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const orders = await Order.find({
-      $or: [{ packedStatus: { $in: ["not_packed", "partially_packed"] } }, { status: "pending" }],
+      packedStatus: "not_packed",
+      status: { $ne: "cancelled" },
+      $or: [
+        { packableAfter: null },
+        { packableAfter: { $lte: now } }
+      ]
+    })
+      .populate("customer", "name email phoneNumber")
+      .populate("orderItems.product", "productName unit price")
+      .populate("assignedTo", "username")
+      .sort({ orderDate: -1 });
+    res.json(orders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getRemainingForPacking = async (req, res) => {
+  try {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const orders = await Order.find({
+      packedStatus: "partially_packed",
+      $or: [
+        { packableAfter: null },
+        { packableAfter: { $lte: now } }
+      ]
     })
       .populate("customer", "name email phoneNumber")
       .populate("orderItems.product", "productName unit price")
@@ -1785,15 +1818,14 @@ const getPackedInvoice = async (req, res) => {
     
     const filename = `packed-invoice-${invoiceNumber}.pdf`;
     
+    const pdfBuffer = await buildPDFBuffer(async (doc) => {
+      await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", invoiceNumber);
+    });
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    
-    const doc = new PDFDocument({ size: "A4", margin: 0 });
-    doc.pipe(res);
-    
-    await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", invoiceNumber);
-    
-    doc.end();
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.end(pdfBuffer);
   } catch (error) {
     console.error("Error generating packed invoice:", error);
     if (!res.headersSent) {
@@ -1818,13 +1850,15 @@ const getUnifiedInvoice = async (req, res) => {
       return res.status(404).json({ message: "Specified invoice not found in order history" });
     }
     const filename = `unified-invoice-${targetInvoiceNo}.pdf`;
+
+    const pdfBuffer = await buildPDFBuffer(async (doc) => {
+      await generateUnifiedInvoicePDF(doc, order, "INVOICE", targetInvoiceNo);
+    });
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    const doc = new PDFDocument({ size: "A4", margin: 0 });
-    doc.pipe(res);
-    // Pass target invoiceNo
-    await generateUnifiedInvoicePDF(doc, order, "INVOICE", targetInvoiceNo);
-    doc.end();
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.end(pdfBuffer);
   } catch (error) {
     console.error("Error generating unified invoice:", error);
     if (!res.headersSent) {
@@ -1955,6 +1989,7 @@ module.exports = {
   checkFirstOrder,
   packOrder,
   getPendingForPacking,
+  getRemainingForPacking,
   getMyPendingOrders,
   getPackedToday,
   getReadyToDeliver,

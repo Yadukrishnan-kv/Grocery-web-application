@@ -10,7 +10,11 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+  exposedHeaders: ['Content-Disposition'],
+}));
 app.use(express.json());
 
 // Serve React build files (static assets like js, css, images)

@@ -99,6 +99,8 @@ const orderSchema = new Schema(
     assignedAt: { type: Date, default: null },
     acceptedAt: { type: Date, default: null },
     remarks: { type: String, trim: true, default: "" },
+    scheduleDays: { type: Number, default: 0, min: 0 },
+    packableAfter: { type: Date, default: null },
     invoiceNumber: { type: String, default: null, index: true },
     invoiceHistory: [
       {

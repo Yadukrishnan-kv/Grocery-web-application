@@ -94,7 +94,7 @@
 
 .roles-table-header-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 200px;
+  grid-template-columns: 1fr 1fr 300px;
   padding: 1.25rem 1.5rem;
   background: linear-gradient(90deg, #f8fafc, #f1f5f9);
   font-weight: 600;
@@ -107,7 +107,7 @@
 
 .roles-table-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 200px;
+  grid-template-columns: 1fr 1fr 300px;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #f1f5f9;
   transition: all 0.2s ease;
@@ -260,8 +260,145 @@
   }
 
   .roles-edit-button,
-  .roles-delete-button {
+  .roles-delete-button,
+  .roles-rename-button {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
   }
+}
+
+/* Rename / Edit button */
+.roles-rename-button {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0d9488;
+  cursor: pointer;
+}
+
+.roles-rename-button:hover:not(:disabled) {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+  color: #0f766e;
+  transform: scale(1.05);
+}
+
+.roles-rename-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+
+/* Edit Role Modal */
+.roles-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+
+.roles-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  animation: rolesModalPop 0.3s ease-out;
+}
+
+@keyframes rolesModalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.roles-modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 1.5rem 0;
+}
+
+.roles-modal-field {
+  margin-bottom: 1.5rem;
+}
+
+.roles-modal-field label {
+  display: block;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.roles-modal-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.roles-modal-input:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.roles-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.roles-modal-cancel,
+.roles-modal-save {
+  padding: 0.625rem 1.5rem;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.roles-modal-cancel {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.roles-modal-cancel:hover {
+  background: #cbd5e1;
+}
+
+.roles-modal-save {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+.roles-modal-save:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+}
+
+.roles-modal-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }

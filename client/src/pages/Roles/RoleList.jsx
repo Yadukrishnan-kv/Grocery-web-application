@@ -5,12 +5,17 @@ import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './RoleList.css';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 const RoleList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null); // Add user state
+  const [user, setUser] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingRole, setEditingRole] = useState(null);
+  const [editRoleName, setEditRoleName] = useState('');
+  const [saving, setSaving] = useState(false);
   
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -68,6 +73,39 @@ const RoleList = () => {
     }
   };
 
+  const handleEditClick = (role) => {
+    setEditingRole(role);
+    setEditRoleName(role.name);
+    setShowEditModal(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editRoleName.trim()) {
+      toast.error('Role name is required');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${backendUrl}/api/roles/updateRole/${editingRole._id}`,
+        { name: editRoleName.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Role updated successfully');
+      setShowEditModal(false);
+      setEditingRole(null);
+      setEditRoleName('');
+      fetchRoles();
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Failed to update role';
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!user) {
     return <div className="loading">Loading...</div>;
   }
@@ -116,6 +154,13 @@ const RoleList = () => {
                 </span>
               </div>
               <div className="roles-actions-cell">
+                <button
+                  onClick={() => handleEditClick(role)}
+                  className="roles-rename-button"
+                  disabled={role.name === 'Admin' || role.name === 'superadmin'}
+                >
+                  Edit
+                </button>
                 <Link 
                   to={`/roles/edit/${role._id}`} 
                   className="roles-edit-button"
@@ -137,6 +182,44 @@ const RoleList = () => {
     </div>
   </div>
 </main>
+
+      {showEditModal && (
+        <div className="roles-modal-overlay">
+          <div className="roles-modal">
+            <h3 className="roles-modal-title">Edit Role</h3>
+            <div className="roles-modal-field">
+              <label htmlFor="editRoleName">Role Name</label>
+              <input
+                id="editRoleName"
+                type="text"
+                value={editRoleName}
+                onChange={(e) => setEditRoleName(e.target.value)}
+                className="roles-modal-input"
+                autoFocus
+              />
+            </div>
+            <div className="roles-modal-actions">
+              <button
+                className="roles-modal-cancel"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingRole(null);
+                  setEditRoleName('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="roles-modal-save"
+                onClick={handleEditSave}
+                disabled={saving || !editRoleName.trim()}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

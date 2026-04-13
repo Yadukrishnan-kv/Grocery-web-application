@@ -27,7 +27,6 @@ const DeliveredOrdersList = () => {
   const [deliveringOrderId, setDeliveringOrderId] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
-  const fractionalUnits = ["kg", "gram", "liter", "ml", "meter", "cm", "inch"];
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -177,7 +176,7 @@ const DeliveredOrdersList = () => {
         : `invoice-${orderId.slice(-8)}.pdf`;
 
       const res = await axios.get(
-        `${backendUrl}/api/orders/unified-invoice/${orderId}`,
+        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",

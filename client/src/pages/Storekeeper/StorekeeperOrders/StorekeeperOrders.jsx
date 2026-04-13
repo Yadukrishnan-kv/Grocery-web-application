@@ -60,7 +60,7 @@ const StorekeeperOrders = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${backendUrl}/api/orders/unified-invoice/${orderId}`,
+        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",

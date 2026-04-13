@@ -1,19 +1,17 @@
-// src/pages/Storekeeper/PackOrders.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import toast from "react-hot-toast";
 import axios from "axios";
-import "./PackOrders.css";
+import "./RemainingPackOrders.css";
 
-const PackOrders = () => {
+const RemainingPackOrders = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeItem, setActiveItem] = useState("Pack Orders");
+  const [activeItem, setActiveItem] = useState("Remaining Pack Orders");
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [packInputs, setPackInputs] = useState({});
   const [processing, setProcessing] = useState(false);
@@ -37,16 +35,16 @@ const PackOrders = () => {
     }
   }, [backendUrl]);
 
-  const fetchPendingOrders = useCallback(async () => {
+  const fetchRemainingOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(`${backendUrl}/api/orders/pending-for-packing`, {
+      const response = await axios.get(`${backendUrl}/api/orders/remaining-for-packing`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(response.data);
     } catch (error) {
-      console.error("Error fetching pending orders:", error);
-      toast.error("Failed to load orders to pack");
+      console.error("Error fetching remaining orders:", error);
+      toast.error("Failed to load remaining orders");
     } finally {
       setLoading(false);
     }
@@ -54,15 +52,15 @@ const PackOrders = () => {
 
   useEffect(() => {
     fetchCurrentUser();
-    fetchPendingOrders();
-    const interval = setInterval(fetchPendingOrders, 60000); // refresh every minute
+    fetchRemainingOrders();
+    const interval = setInterval(fetchRemainingOrders, 60000);
     return () => clearInterval(interval);
-  }, [fetchCurrentUser, fetchPendingOrders]);
+  }, [fetchCurrentUser, fetchRemainingOrders]);
 
   const openPackModal = (order) => {
     const inputs = {};
     order.orderItems.forEach((item) => {
-      inputs[item._id] = item.packedQuantity || 0; // show already packed as default
+      inputs[item._id] = 0;
     });
     setSelectedOrder(order);
     setPackInputs(inputs);
@@ -83,7 +81,7 @@ const PackOrders = () => {
 
     const packedItems = selectedOrder.orderItems
       .map((item) => ({
-        product: item._id,                    // important: send orderItem _id
+        product: item._id,
         packedQuantity: Number(packInputs[item._id] || 0),
       }))
       .filter((p) => p.packedQuantity > 0);
@@ -101,10 +99,10 @@ const PackOrders = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      toast.success("Packing submitted successfully!");
+      toast.success("Remaining packing submitted successfully!");
       setSelectedOrder(null);
       setPackInputs({});
-      fetchPendingOrders();
+      fetchRemainingOrders();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to submit packing");
     } finally {
@@ -112,9 +110,6 @@ const PackOrders = () => {
     }
   };
 
-  // ────────────────────────────────────────────────────────────────
-  //  FIXED: Now correctly passes the specific invoiceNumber
-  // ────────────────────────────────────────────────────────────────
   const downloadUnifiedInvoice = async (orderId, invoiceNumber) => {
     if (!invoiceNumber) {
       toast.error("No invoice number available for this order yet");
@@ -158,15 +153,9 @@ const PackOrders = () => {
         !searchTerm.trim() ||
         (order.customer?.name &&
           order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        (order.packedStatus &&
-          order.packedStatus.toLowerCase() === statusFilter.toLowerCase());
-
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
-  }, [orders, searchTerm, statusFilter]);
+  }, [orders, searchTerm]);
 
   const clearSearch = () => setSearchTerm("");
 
@@ -201,24 +190,9 @@ const PackOrders = () => {
         <div className="order-list-container-wrapper">
           <div className="order-list-container">
             <div className="order-list-header-section">
-              <h2 className="order-list-page-title">Pack Orders</h2>
+              <h2 className="order-list-page-title">Remaining Pack Orders</h2>
 
               <div className="order-list-controls-group">
-                <label htmlFor="statusFilter" className="order-list-filter-label">
-                  Filter by Packing Status:
-                </label>
-                <select
-                  id="statusFilter"
-                  className="order-list-status-filter"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="all">All</option>
-                  <option value="not_packed">Not Packed</option>
-                  <option value="partially_packed">Partially Packed</option>
-                  <option value="fully_packed">Fully Packed</option>
-                </select>
-
                 <div className="order-list-search-container">
                   <input
                     type="text"
@@ -237,9 +211,9 @@ const PackOrders = () => {
             </div>
 
             {loading ? (
-              <div className="order-list-loading">Loading orders to pack...</div>
+              <div className="order-list-loading">Loading remaining orders...</div>
             ) : filteredOrders.length === 0 ? (
-              <div className="order-list-no-data">No orders found</div>
+              <div className="order-list-no-data">No remaining orders to pack</div>
             ) : (
               <div className="order-list-table-wrapper">
                 <table className="order-list-data-table">
@@ -250,102 +224,100 @@ const PackOrders = () => {
                       <th>Products</th>
                       <th>Total Ordered</th>
                       <th>Packed Qty</th>
+                      <th>Remaining Qty</th>
                       <th>Status</th>
                       <th>Order Date</th>
                       <th>Delivery After</th>
                       <th>Actions</th>
-                      <th>Pack</th>
+                      <th>Remaining Pack</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.map((order, index) => (
-                      <tr key={order._id}>
-                        <td>{index + 1}</td>
-                        <td>{order.customer?.name || "N/A"}</td>
+                    {filteredOrders.map((order, index) => {
+                      const totalPacked = order.orderItems?.reduce(
+                        (sum, i) => sum + (i.packedQuantity || 0),
+                        0
+                      ) || 0;
+                      const totalOrdered = order.totalOrderedQuantity || 0;
+                      const totalRemaining = totalOrdered - totalPacked;
 
-                        <td className="products-cell">
-                          {order.orderItems?.length > 0 ? (
-                            <div className="products-list">
-                              {order.orderItems.map((item, i) => (
-                                <div key={i} className="product-tag">
-                                  <span className="product-name">
-                                    {item.product?.productName || "Unknown"}
-                                  </span>
-                                  <span className="product-qty">× {item.orderedQuantity}</span>
-                                  <span className="product-unit">{item.unit || ""}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="no-products">No products</span>
-                          )}
-                        </td>
+                      return (
+                        <tr key={order._id}>
+                          <td>{index + 1}</td>
+                          <td>{order.customer?.name || "N/A"}</td>
 
-                        <td>{order.totalOrderedQuantity || 0}</td>
-                        <td>
-                          {order.orderItems?.reduce(
-                            (sum, i) => sum + (i.packedQuantity || 0),
-                            0
-                          ) || 0}
-                        </td>
+                          <td className="products-cell">
+                            {order.orderItems?.length > 0 ? (
+                              <div className="products-list">
+                                {order.orderItems.map((item, i) => {
+                                  const remaining = item.orderedQuantity - (item.packedQuantity || 0);
+                                  return (
+                                    <div key={i} className="product-tag">
+                                      <span className="product-name">
+                                        {item.product?.productName || "Unknown"}
+                                      </span>
+                                      <span className="product-qty">× {item.orderedQuantity}</span>
+                                      <span className="product-unit">{item.unit || ""}</span>
+                                      {remaining > 0 && (
+                                        <span className="product-remaining">
+                                          ({remaining} remaining)
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <span className="no-products">No products</span>
+                            )}
+                          </td>
 
-                        <td>
-                          <span
-                            className={`order-list-status-badge order-list-status-${
-                              order.packedStatus?.toLowerCase() || "not_packed"
-                            }`}
-                          >
-                            {order.packedStatus === "fully_packed"
-                              ? "Fully Packed"
-                              : order.packedStatus === "partially_packed"
-                              ? "Partially Packed"
-                              : "Not Packed"}
-                          </span>
-                        </td>
+                          <td>{totalOrdered}</td>
+                          <td>{totalPacked}</td>
+                          <td className="remaining-qty-cell">
+                            <span className="remaining-badge">{totalRemaining}</span>
+                          </td>
 
-                        <td>{formatDate(order.orderDate)}</td>
-
-                        <td>
-                          {order.packableAfter
-                            ? formatDate(order.packableAfter)
-                            : <span className="no-invoice-text">Same Day</span>}
-                        </td>
-
-                        <td className="actions-cell">
-                          {/* Invoice button – only shown when invoice exists */}
-                          {order.invoiceNumber ? (
-                            <button
-                              className="order-list-icon-button order-list-view-button"
-                              onClick={() =>
-                                downloadUnifiedInvoice(order._id, order.invoiceNumber)
-                              }
-                              title={`Download Invoice ${order.invoiceNumber}`}
-                            >
-                              📄 Invoice ({order.invoiceNumber})
-                            </button>
-                          ) : (
-                            <span className="no-invoice-text" title="Invoice generated after first packing">
-                              No Invoice Yet
+                          <td>
+                            <span className="order-list-status-badge order-list-status-partially_packed">
+                              Partially Packed
                             </span>
-                          )}
-                        </td>
+                          </td>
 
-                        <td className="pack-cell">
-                          <button
-                            className="order-list-icon-button order-list-edit-button"
-                            onClick={() => openPackModal(order)}
-                            disabled={order.packedStatus === "fully_packed"}
-                            title={
-                              order.packedStatus === "fully_packed"
-                                ? "Order already fully packed"
-                                : "Pack / Add more quantity"
-                            }
-                          >
-                            {order.packedStatus === "fully_packed" ? "Packed ✓" : "Pack"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          <td>{formatDate(order.orderDate)}</td>
+
+                          <td>
+                            {order.packableAfter
+                              ? formatDate(order.packableAfter)
+                              : <span className="no-invoice-text">Same Day</span>}
+                          </td>
+
+                          <td className="actions-cell">
+                            {order.invoiceNumber && (
+                              <button
+                                className="order-list-icon-button order-list-view-button"
+                                onClick={() =>
+                                  downloadUnifiedInvoice(order._id, order.invoiceNumber)
+                                }
+                                title={`Download Invoice ${order.invoiceNumber}`}
+                              >
+                                📄 Invoice ({order.invoiceNumber})
+                              </button>
+                            )}
+                          </td>
+
+                          <td className="pack-cell">
+                            <button
+                              className="order-list-icon-button order-list-edit-button"
+                              onClick={() => openPackModal(order)}
+                              title="Pack remaining quantity"
+                            >
+                              Pack Remaining
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -358,7 +330,7 @@ const PackOrders = () => {
       {selectedOrder && (
         <div className="modal-overlay">
           <div className="pack-modal">
-            <h3>Pack Order #{selectedOrder._id.toString().slice(-8)}</h3>
+            <h3>Pack Remaining - Order #{selectedOrder._id.toString().slice(-8)}</h3>
             <p>Customer: {selectedOrder.customer?.name || "N/A"}</p>
 
             <div className="pack-items">
@@ -411,4 +383,4 @@ const PackOrders = () => {
   );
 };
 
-export default PackOrders;
+export default RemainingPackOrders;

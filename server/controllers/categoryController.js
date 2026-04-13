@@ -1,4 +1,6 @@
 const Category = require("../models/Category");
+const SubCategory = require("../models/SubCategory");
+const Product = require("../models/Product");
 
 const createCategory = async (req, res) => {
   try {
@@ -52,14 +54,29 @@ const updateCategory = async (req, res) => {
       }
     }
 
+    // Get the old category name before updating
+    const oldCategory = await Category.findById(req.params.id);
+    if (!oldCategory) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+    const oldCategoryName = oldCategory.CategoryName;
+
     const category = await Category.findByIdAndUpdate(
       req.params.id,
       { CategoryName },
       { new: true, runValidators: true }
     );
 
-    if (!category) {
-      return res.status(404).json({ message: "Category not found" });
+    // Update CategoryName in SubCategories and Products that used the old name
+    if (oldCategoryName !== CategoryName) {
+      await SubCategory.updateMany(
+        { CategoryName: oldCategoryName },
+        { CategoryName }
+      );
+      await Product.updateMany(
+        { CategoryName: oldCategoryName },
+        { CategoryName }
+      );
     }
 
     res.json(category);

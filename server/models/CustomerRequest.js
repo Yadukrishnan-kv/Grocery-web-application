@@ -75,6 +75,20 @@ const customerRequestSchema = new Schema(
       trim: true,
       default: '',
     },
+    suggestedCreditLimit: {
+      type: Number,
+      default: null,
+    },
+    suggestedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    suggestedCreditLimitStatus: {
+      type: String,
+      enum: ["none", "pending", "accepted", "rejected"],
+      default: "none",
+    },
   },
   { timestamps: true }
 );

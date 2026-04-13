@@ -172,7 +172,7 @@ const OrderArrivedList = () => {
         : `invoice-${orderId.slice(-8)}.pdf`;
 
       const res = await axios.get(
-        `${backendUrl}/api/orders/unified-invoice/${orderId}`,
+        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",

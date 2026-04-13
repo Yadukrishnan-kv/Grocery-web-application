@@ -43,10 +43,12 @@ const MENU_PERMISSIONS = {
   billWallet: "menu.billWallet",
   AdminOrderRequests: "menu.admin.order.requests",
   storekeeperpacked: "menu.storekeeper.packed.orders",
+  storekeeperRemainingPack: "menu.storekeeper.remaining.pack.orders",
   SalesPendingOrders: "menu.PendingOrders",
   SalesOutstandingReport: "menu.OutstandingReport",
   SalesReceiptReport: "menu.ReceiptReport",
-  StorekeeperOrders: "menu.storekeeper.all-orders"
+  StorekeeperOrders: "menu.storekeeper.all-orders",
+  CreditSuggestion: "menu.credit.suggestion"
 };
 
 const navItems = [
@@ -273,14 +275,26 @@ const navItems = [
     path: "/sales/payment-requests",
   },
   {
+    id: "CreditSuggestion",
+    label: "Credit Suggestion",
+    icon: "💡",
+    path: "/manager/credit-suggestion",
+  },
+  {
     id: "storekeeperpacked",
-    label: "Packed Orders",
+    label: "All Orders",
     icon: "📦",
     path: "/storekeeper/packed-orders",
   },
+  {
+    id: "storekeeperRemainingPack",
+    label: "Remaining Pack Orders",
+    icon: "📦",
+    path: "/storekeeper/remaining-pack-orders",
+  },
   { 
   id: 'StorekeeperOrders', 
-  label: 'All Orders', 
+  label: 'Pack Orders', 
   icon: '📋',
   path: '/storekeeper/all-orders' 
 },
@@ -312,7 +326,9 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
           item.id !== "ChequeWallet" &&
           item.id !== "paymentRequestsdelivery" &&
           item.id !== "paymentRequestssales" &&
+          item.id !== "CreditSuggestion" &&
           item.id !== "storekeeperpacked" &&
+          item.id !== "storekeeperRemainingPack" &&
           item.id !== "SalesPendingOrders" &&
           item.id !== "SalesOutstandingReport" &&
           item.id !== "SalesReceiptReport" &&

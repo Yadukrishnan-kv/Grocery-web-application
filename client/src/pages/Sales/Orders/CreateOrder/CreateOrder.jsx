@@ -15,6 +15,7 @@ const CreateOrder = () => {
     customerId: "",
     payment: "credit",
     remarks: "",
+    scheduleDays: "",
     orderItems: [
       {
         productId: "",
@@ -283,6 +284,7 @@ const CreateOrder = () => {
         customerId: formData.customerId,
         payment: formData.payment,
         remarks: formData.remarks.trim(),
+        scheduleDays: parseInt(formData.scheduleDays) || 0,
         orderItems: formData.orderItems.map((item) => ({
           productId: item.productId,
           orderedQuantity: parseInt(item.orderedQuantity),
@@ -509,6 +511,23 @@ const CreateOrder = () => {
                 />
               </div>
               <small className="vat-note">All amounts in AED</small>
+            </div>
+
+            <div className="form-group">
+              <label>Schedule Day (Optional)</label>
+              <input
+                type="number"
+                min="0"
+               
+                value={formData.scheduleDays}
+                onChange={(e) => setFormData({ ...formData, scheduleDays: e.target.value })}
+                className="order-select"
+              />
+              {formData.scheduleDays > 0 && (
+                <p className="helper-text">
+                  Order will be available for packing after {formData.scheduleDays} day{formData.scheduleDays > 1 ? 's' : ''}
+                </p>
+              )}
             </div>
 
             <div className="form-group">

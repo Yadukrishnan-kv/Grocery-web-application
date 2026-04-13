@@ -53,6 +53,28 @@ const PendingCustomerRequests = () => {
     fetchData();
   }, [backendUrl, navigate]);
 
+  const handleSuggestionAction = async (id, action) => {
+    try {
+      await axios.post(
+        `${backendUrl}/api/customers/customer-requests/update-suggestion/${id}`,
+        { action },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        }
+      );
+
+      toast.success(`Credit suggestion ${action} successfully`);
+
+      // Update the request in state (don't remove it, customer is still pending)
+      setRequests(prev => prev.map(r =>
+        r._id === id ? { ...r, suggestedCreditLimitStatus: action } : r
+      ));
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Error updating suggestion';
+      toast.error(msg);
+    }
+  };
+
   const handleAccept = async (id) => {
     try {
       const response = await axios.post(
@@ -164,6 +186,8 @@ const PendingCustomerRequests = () => {
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
                       <th scope="col">Credit Limit</th>
+                      <th scope="col">Suggested Credit</th>
+                      <th scope="col">Suggestion</th>
                       <th scope="col">Billing Type</th>
                       <th scope="col">Statement Type</th>
                       <th scope="col">Due Days</th>
@@ -182,6 +206,42 @@ const PendingCustomerRequests = () => {
                         <td>{request.email}</td>
                         <td>{request.phoneNumber}</td>
                         <td>AED{request.creditLimit.toFixed(2)}</td>
+                        <td>
+                          {request.suggestedCreditLimit != null
+                            ? `AED ${request.suggestedCreditLimit.toFixed(2)}`
+                            : '-'}
+                          {request.suggestedBy?.username && request.suggestedCreditLimit != null && (
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                              by {request.suggestedBy.username}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {request.suggestedCreditLimitStatus === 'pending' ? (
+                            <div className="action-buttons">
+                              <button
+                                className="suggestion-approve-btn"
+                                title="Accept suggested credit limit"
+                                onClick={() => handleSuggestionAction(request._id, 'accepted')}
+                              >
+                                ✔
+                              </button>
+                              <button
+                                className="suggestion-reject-btn"
+                                title="Reject suggested credit limit (use salesman's credit limit)"
+                                onClick={() => handleSuggestionAction(request._id, 'rejected')}
+                              >
+                                ✘
+                              </button>
+                            </div>
+                          ) : request.suggestedCreditLimitStatus === 'accepted' ? (
+                            <span style={{ color: '#16a34a', fontWeight: 600 }}>✅ Accepted</span>
+                          ) : request.suggestedCreditLimitStatus === 'rejected' ? (
+                            <span style={{ color: '#dc2626', fontWeight: 600 }}>❌ Rejected</span>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>—</span>
+                          )}
+                        </td>
                         <td>{request.billingType}</td>
                         <td>
                           {request.statementType

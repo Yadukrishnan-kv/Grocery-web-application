@@ -59,12 +59,13 @@ const RolePermissions = () => {
     WalletMoney: "menu.wallet.money",
     paymentRequestsdelivery: "menu.paymentRequestsdelivery",
     paymentRequestssales: "menu.paymentRequestssales",
-    storekeeperpacked: "menu.storekeeper.packed.orders"  
-    ,
+    storekeeperpacked: "menu.storekeeper.packed.orders",
+    storekeeperRemainingPack: "menu.storekeeper.remaining.pack.orders",
     SalesPendingOrders: "menu.PendingOrders",
     SalesOutstandingReport: "menu.OutstandingReport",
     SalesReceiptReport: "menu.ReceiptReport",
-    StorekeeperOrders: "menu.storekeeper.all-orders"
+    StorekeeperOrders: "menu.storekeeper.all-orders",
+    CreditSuggestion: "menu.credit.suggestion"
 
   };
 

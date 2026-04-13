@@ -4,6 +4,7 @@ const {
   createRole,
   getAllRoles,
   updateRolePermissions,
+  updateRole,
   deleteRole,
   getPermissions,
   getRoleById
@@ -23,5 +24,6 @@ router.post("/createRole", protect,  createRole);
 router.get("/getAllRoles", protect,  getAllRoles);
 router.get("/getrole/:id", protect,  getRoleById);
 router.put("/updatepermissions/:id", protect,  updateRolePermissions);
+router.put("/updateRole/:id", protect, updateRole);
 router.delete("/deleteRole/:id", protect, deleteRole);
 module.exports = router;

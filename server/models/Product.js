@@ -42,7 +42,8 @@ const productSchema = new Schema(
         'jar',
         'tin',
         'carton',
-        'bundle'
+        'bundle',
+        'Nos'
       ],
       required: [true, "Unit is required"],
       trim: true,

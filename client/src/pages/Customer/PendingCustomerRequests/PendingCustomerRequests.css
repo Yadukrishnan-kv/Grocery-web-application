@@ -322,3 +322,41 @@
     min-width: 140px;
   }
 }
+
+/* Suggestion approve/reject buttons */
+.suggestion-approve-btn,
+.suggestion-reject-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.suggestion-approve-btn {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.suggestion-approve-btn:hover {
+  background: #10b981;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.suggestion-reject-btn {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.suggestion-reject-btn:hover {
+  background: #ef4444;
+  color: white;
+  transform: translateY(-1px);
+}

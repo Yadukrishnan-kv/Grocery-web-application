@@ -417,6 +417,7 @@ const CreateProduct = () => {
                 <option value="tin">tin</option>
                 <option value="carton">carton</option>
                 <option value="bundle">bundle</option>
+                <option value="Nos">Nos</option>
               </select>
               {errors.unit && (
                 <p id="unit-error" className="product-error-text" role="alert">

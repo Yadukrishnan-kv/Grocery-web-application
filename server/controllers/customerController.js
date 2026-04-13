@@ -2,6 +2,7 @@ const Customer = require("../models/Customer");
 const User = require("../models/User");
 const CustomerRequest = require("../models/CustomerRequest");
 const Bill = require("../models/Bill");
+const Role = require("../models/Role");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
@@ -316,9 +317,11 @@ const deleteCustomer = async (req, res) => {
     }
 
     // 2. Find and delete corresponding user (if exists)
-    const user = await User.findOneAndDelete({ email: customer.email });
-    if (user) {
-      console.log(`Deleted user account for customer: ${customer.email}`);
+    if (customer.user) {
+      const user = await User.findByIdAndDelete(customer.user);
+      if (user) {
+        console.log(`Deleted user account for customer: ${customer.email}`);
+      }
     }
 
     // 3. Delete the customer
@@ -501,6 +504,7 @@ const getPendingCustomerRequests = async (req, res) => {
 
     const requests = await CustomerRequest.find({ status: "pending" })
       .populate("salesman", "username email")
+      .populate("suggestedBy", "username email")
       .sort({ createdAt: -1 });
 
     res.json(requests);
@@ -547,12 +551,19 @@ const acceptCustomerRequest = async (req, res) => {
       creditLimit: request.creditLimit,
       balanceCreditLimit: request.creditLimit - (request.openingBalance || 0),
       billingType: request.billingType,
-      statementType: request.statementType,  // NEW — copy from request
-      dueDays: request.dueDays,              // NEW — copy from request
+      statementType: request.statementType,
+      dueDays: request.dueDays,
       openingBalance: request.openingBalance || 0,
       openingBalanceDueDays: request.openingBalanceDueDays || null,
-      salesman: request.salesman,            // NEW — copy from request
+      salesman: request.salesman,
     });
+
+    // If admin already accepted the suggested credit limit, use it
+    if (request.suggestedCreditLimitStatus === "accepted" && request.suggestedCreditLimit != null) {
+      customer.creditLimit = request.suggestedCreditLimit;
+      customer.balanceCreditLimit = request.suggestedCreditLimit - (request.openingBalance || 0);
+      await customer.save();
+    }
 
     // Create bill for opening balance if applicable
     if ((request.openingBalance || 0) > 0 && request.openingBalanceDueDays) {
@@ -608,6 +619,37 @@ const acceptCustomerRequest = async (req, res) => {
     res.status(201).json(responseData);
   } catch (error) {
     console.error("Accept request error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Admin approves or rejects suggested credit limit only (does NOT create/reject customer)
+const updateSuggestionStatus = async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Access denied - Admin only" });
+    }
+
+    const { action } = req.body; // "accepted" or "rejected"
+    if (!['accepted', 'rejected'].includes(action)) {
+      return res.status(400).json({ message: "Invalid action. Must be 'accepted' or 'rejected'" });
+    }
+
+    const request = await CustomerRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    if (request.suggestedCreditLimitStatus !== "pending") {
+      return res.status(400).json({ message: "Suggestion already processed" });
+    }
+
+    request.suggestedCreditLimitStatus = action;
+    await request.save();
+
+    res.json({ message: `Credit suggestion ${action} successfully`, request });
+  } catch (error) {
+    console.error("Update suggestion status error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -966,6 +1008,62 @@ const getCustomerReceipts = async (req, res) => {
   }
 };
 
+// Sales Manager: Get pending customer requests for credit suggestion
+const getPendingRequestsForManager = async (req, res) => {
+  try {
+    const role = await Role.findOne({ name: req.user.role });
+    if (!role || !role.permissions.includes("menu.credit.suggestion")) {
+      return res.status(403).json({ message: "Access denied - Credit Suggestion permission required" });
+    }
+
+    const requests = await CustomerRequest.find({ status: "pending" })
+      .populate("salesman", "username email")
+      .populate("suggestedBy", "username email")
+      .sort({ createdAt: -1 });
+
+    res.json(requests);
+  } catch (error) {
+    console.error("Error fetching requests for manager:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Sales Manager: Suggest credit limit for a pending customer request
+const suggestCreditLimit = async (req, res) => {
+  try {
+    const role = await Role.findOne({ name: req.user.role });
+    if (!role || !role.permissions.includes("menu.credit.suggestion")) {
+      return res.status(403).json({ message: "Access denied - Credit Suggestion permission required" });
+    }
+
+    const { suggestedCreditLimit } = req.body;
+    const parsedLimit = parseFloat(suggestedCreditLimit);
+
+    if (isNaN(parsedLimit) || parsedLimit < 0) {
+      return res.status(400).json({ message: "Invalid credit limit value" });
+    }
+
+    const request = await CustomerRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    if (request.status !== "pending") {
+      return res.status(400).json({ message: "Request already processed" });
+    }
+
+    request.suggestedCreditLimit = parsedLimit;
+    request.suggestedBy = req.user._id;
+    request.suggestedCreditLimitStatus = "pending";
+    await request.save();
+
+    res.json({ message: "Credit limit suggestion submitted successfully", request });
+  } catch (error) {
+    console.error("Error suggesting credit limit:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   createCustomer,
   getAllCustomers,
@@ -984,5 +1082,8 @@ module.exports = {
   getMyCustomers,
   getMyCustomersWithDue,
   getCustomerOutstandingDetails,
-  getCustomerReceipts
+  getCustomerReceipts,
+  getPendingRequestsForManager,
+  suggestCreditLimit,
+  updateSuggestionStatus
 };
