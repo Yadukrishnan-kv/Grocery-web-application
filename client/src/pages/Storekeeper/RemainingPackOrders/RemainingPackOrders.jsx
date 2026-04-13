@@ -172,7 +172,7 @@ const RemainingPackOrders = () => {
   if (!user) return <div className="loading">Loading user data...</div>;
 
   return (
-    <div className="order-list-layout">
+    <div className="remaining-pack-layout">
       <Header
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -186,37 +186,30 @@ const RemainingPackOrders = () => {
         user={user}
       />
 
-      <main className={`order-list-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
-        <div className="order-list-container-wrapper">
-          <div className="order-list-container">
-            <div className="order-list-header-section">
-              <h2 className="order-list-page-title">Remaining Pack Orders</h2>
+      <main className={`remaining-pack-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
+        <div className="remaining-pack-container-wrapper">
+          <div className="remaining-pack-container">
+            <div className="remaining-pack-header-section">
+              <h2 className="remaining-pack-page-title">Remaining Pack Orders</h2>
 
-              <div className="order-list-controls-group">
-                <div className="order-list-search-container">
-                  <input
-                    type="text"
-                    className="order-list-search-input"
-                    placeholder="Search by customer..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                  {searchTerm && (
-                    <button className="order-list-search-clear" onClick={clearSearch}>
-                      ×
-                    </button>
-                  )}
-                </div>
+              <div className="remaining-pack-search-container">
+                <input
+                  type="text"
+                  className="remaining-pack-search-input"
+                  placeholder="Search by customer..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
             </div>
 
             {loading ? (
-              <div className="order-list-loading">Loading remaining orders...</div>
+              <div className="remaining-pack-loading">Loading remaining orders...</div>
             ) : filteredOrders.length === 0 ? (
-              <div className="order-list-no-data">No remaining orders to pack</div>
+              <div className="remaining-pack-no-data">No remaining orders to pack</div>
             ) : (
-              <div className="order-list-table-wrapper">
-                <table className="order-list-data-table">
+              <div className="remaining-pack-table-wrapper">
+                <table className="remaining-pack-data-table">
                   <thead>
                     <tr>
                       <th>No</th>

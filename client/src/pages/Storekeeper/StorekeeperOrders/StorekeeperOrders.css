@@ -336,6 +336,13 @@
   gap: 0.35rem;
   white-space: nowrap;
   line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.order-list-data-table td:last-child {
+  min-width: 160px;
+  white-space: nowrap;
+  width: 1%;
 }
 
 .order-list-view-button {
