@@ -1,5 +1,6 @@
 // src/pages/Orders/CreateOrder/CreateOrder.jsx
 import React, { useState, useEffect, useCallback } from "react";
+import ProductSearchDropdown from "../../../../components/common/ProductSearchDropdown";
 import Header from "../../../../components/layout/Header/Header";
 import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
 import "./CreateOrder.css";
@@ -365,17 +366,12 @@ const CreateOrder = () => {
               <div key={index} className="order-item-row vat-enabled">
                 <div className="item-field">
                   <label>Product</label>
-                  <select
+                  <ProductSearchDropdown
+                    products={products}
                     value={item.productId}
-                    onChange={(e) => handleProductSelect(index, e.target.value)}
-                  >
-                    <option value="">Select Product</option>
-                    {products.map((p) => (
-                      <option key={p._id} value={p._id}>
-                        {p.productName} - {p.unit}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(productId) => handleProductSelect(index, productId)}
+                    placeholder="Select Product"
+                  />
                   {errors[`orderItems.${index}.productId`] && (
                     <p className="error-text">{errors[`orderItems.${index}.productId`]}</p>
                   )}

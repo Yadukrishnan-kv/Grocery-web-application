@@ -1,0 +1,87 @@
+/* ProductSearchDropdown styles */
+.product-search-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-control {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.searchbar-style {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  border: 1.5px solid #d1d5db;
+  background: #f9fafb;
+}
+
+.dropdown-input {
+  flex: 1 1 0%;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0.75rem 0.75rem 0.75rem 1rem;
+  font-size: 1rem;
+  color: #1f2937;
+  border-radius: 8px 0 0 8px;
+  box-sizing: border-box;
+}
+.dropdown-input:focus {
+  outline: none;
+  background: #fff;
+}
+
+.dropdown-arrow-btn {
+  background: none;
+  border: none;
+  outline: none;
+  padding: 0 0.9rem 0 0.5rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dropdown-arrow-btn:active, .dropdown-arrow-btn:focus {
+  background: #f3f4f6;
+}
+.dropdown-arrow {
+  color: #6b7280;
+  font-size: 1.1em;
+  pointer-events: none;
+}
+.dropdown-menu {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 10;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 2px;
+}
+.dropdown-item {
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #1f2937;
+  transition: background 0.15s;
+}
+.dropdown-item:hover, .dropdown-item.selected {
+  background: #f3f4f6;
+}
+.dropdown-item.no-match {
+  color: #9ca3af;
+  cursor: default;
+}
