@@ -1,5 +1,6 @@
 // src/pages/Customer/Orders/CustomerOrdersList.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
@@ -8,6 +9,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 const CustomerOrdersList = () => {
+  const navigate = useNavigate();
   const [realOrders, setRealOrders] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -149,6 +151,15 @@ const CustomerOrdersList = () => {
     return `${day}/${month}/${year}`;
   };
 
+  // Returns true if the order is delivered and within 5 days
+  const isReturnEligible = (item) => {
+    if (item.type === "request") return false;
+    if (item.status !== "delivered" && item.status !== "partial_delivered") return false;
+    const deliveredDate = new Date(item.updatedAt);
+    const diffDays = (Date.now() - deliveredDate.getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays <= 5;
+  };
+
   const getStatusDisplay = (item) => {
     if (item.type === "request") {
       if (item.status === "pending") return "Pending Approval";
@@ -273,6 +284,7 @@ const CustomerOrdersList = () => {
                       <th scope="col">Delivery Partner</th>
                       <th scope="col">Status</th>
                       <th scope="col">Order Date</th>
+                      <th scope="col">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -365,6 +377,21 @@ const CustomerOrdersList = () => {
                             {isRequest
                               ? formatDate(item.requestedAt)
                               : formatDate(item.orderDate)}
+                          </td>
+
+                          <td>
+                            {isReturnEligible(item) ? (
+                              <button
+                                className="co-btn-return"
+                                onClick={() =>
+                                  navigate(`/sales-returns/create?orderId=${item._id}`)
+                                }
+                              >
+                                ↩ Return
+                              </button>
+                            ) : (
+                              <span className="co-return-na">—</span>
+                            )}
                           </td>
                         </tr>
                       );

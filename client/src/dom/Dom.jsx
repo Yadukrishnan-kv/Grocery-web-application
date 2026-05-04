@@ -53,6 +53,11 @@ import ReceiptDetails from "../pages/Salesmanpages/ReceiptReport/ReceiptDetails"
 import StorekeeperOrders from "../pages/Storekeeper/StorekeeperOrders/StorekeeperOrders";
 import RemainingPackOrders from "../pages/Storekeeper/RemainingPackOrders/RemainingPackOrders";
 import CreditSuggestion from "../pages/Salesmanpages/CreditSuggestion/CreditSuggestion";
+import Emirates from "../pages/Emirates/Emirates";
+import SalesReturn from "../pages/SalesReturn/SalesReturn";
+import CreateSalesReturn from "../pages/SalesReturn/CreateSalesReturn";
+import ReturnPickups from "../pages/DeliveryPartner/ReturnPickups/ReturnPickups";
+import ReturnReceived from "../pages/Storekeeper/ReturnReceived/ReturnReceived";
 function Dom() {
   return (
     <div>
@@ -193,8 +198,12 @@ function Dom() {
       <StorekeeperOrders />
   } 
 />
+            <Route path="/emirates" element={<Emirates />} />
+            <Route path="/sales-returns" element={<SalesReturn />} />
+            <Route path="/sales-returns/create" element={<CreateSalesReturn />} />
+            <Route path="/delivery/return-pickups" element={<ReturnPickups />} />
+            <Route path="/storekeeper/return-received" element={<ReturnReceived />} />
           </Routes>
-        
         </BrowserRouter>
       </PermissionProvider>
     </div>

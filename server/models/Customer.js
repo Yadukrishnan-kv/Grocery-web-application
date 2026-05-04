@@ -80,6 +80,39 @@ const customerSchema = new Schema(
       ref: "User",
       // not required for legacy customers but assigned when created by admin or salesman
     },
+    contactPersonName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    contactPersonPhone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    contactPersonAddress: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    latitude: {
+      type: Number,
+      default: null,
+    },
+    longitude: {
+      type: Number,
+      default: null,
+    },
+    emiratesName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    emiratesCode: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   { timestamps: true }
 );

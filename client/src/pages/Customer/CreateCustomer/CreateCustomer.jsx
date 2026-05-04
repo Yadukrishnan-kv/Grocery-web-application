@@ -22,6 +22,13 @@ const CreateCustomer = () => {
     openingBalance: "",
     openingBalanceDueDays: "",
     salesmanId: "",
+    contactPersonName: "",
+    contactPersonPhone: "",
+    contactPersonAddress: "",
+    latitude: "",
+    longitude: "",
+    emiratesName: "",
+    emiratesCode: "",
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -93,6 +100,19 @@ const CreateCustomer = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "salesmanId") {
+      const selected = salesmen.find((s) => s._id === value);
+      setFormData((prev) => ({
+        ...prev,
+        salesmanId: value,
+        emiratesName: selected?.emiratesName || "",
+        emiratesCode: selected?.emiratesCode || "",
+      }));
+      if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -141,6 +161,13 @@ const CreateCustomer = () => {
           ? parseInt(formData.openingBalanceDueDays)
           : null,
         salesmanId: formData.salesmanId || null,
+        contactPersonName: formData.contactPersonName.trim() || null,
+        contactPersonPhone: formData.contactPersonPhone.trim() || null,
+        contactPersonAddress: formData.contactPersonAddress.trim() || null,
+        latitude: formData.latitude !== "" ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude !== "" ? parseFloat(formData.longitude) : null,
+        emiratesName: formData.emiratesName || null,
+        emiratesCode: formData.emiratesCode || null,
       };
 
       let response;
@@ -203,6 +230,14 @@ const CreateCustomer = () => {
           openingBalance: customer.openingBalance?.toString() || "0",
           openingBalanceDueDays:
             customer.openingBalanceDueDays?.toString() || "",
+          salesmanId: customer.salesman?._id || customer.salesman || "",
+          contactPersonName: customer.contactPersonName || "",
+          contactPersonPhone: customer.contactPersonPhone || "",
+          contactPersonAddress: customer.contactPersonAddress || "",
+          latitude: customer.latitude?.toString() || "",
+          longitude: customer.longitude?.toString() || "",
+          emiratesName: customer.emiratesName || "",
+          emiratesCode: customer.emiratesCode || "",
         });
         setIsEdit(true);
         setCustomerId(id);
@@ -558,7 +593,7 @@ const CreateCustomer = () => {
               )}
             </div>
 
-            {/* NEW: Salesman Dropdown (only for admin) */}
+            {/* Salesman Dropdown (only for admin) */}
             {user?.role === "Admin" && (
               <div className="customer-form-row">
                 <div className="customer-form-group">
@@ -578,8 +613,117 @@ const CreateCustomer = () => {
                     ))}
                   </select>
                 </div>
+
+                <div className="customer-form-group">
+                  <label htmlFor="emiratesName">Emirates</label>
+                  <select
+                    id="emiratesName"
+                    name="emiratesName"
+                    value={formData.emiratesName}
+                    className="customer-select"
+                    disabled
+                    style={{ backgroundColor: "#f8fafc", cursor: "default" }}
+                  >
+                    <option value="">
+                      {formData.emiratesName || "Auto-filled from Salesman"}
+                    </option>
+                  </select>
+                </div>
+
+                <div className="customer-form-group">
+                  <label htmlFor="emiratesCode">Emirates Code</label>
+                  <input
+                    id="emiratesCode"
+                    name="emiratesCode"
+                    type="text"
+                    value={formData.emiratesCode}
+                    readOnly
+                    placeholder="Auto-filled from Salesman"
+                    className="customer-input"
+                    style={{ backgroundColor: "#f8fafc", cursor: "default" }}
+                  />
+                </div>
               </div>
             )}
+
+            {/* Contact Person & Location */}
+            <div className="customer-form-row">
+              <div className="customer-form-group">
+                <label htmlFor="contactPersonName">Contact Person Name</label>
+                <input
+                  id="contactPersonName"
+                  name="contactPersonName"
+                  type="text"
+                  value={formData.contactPersonName}
+                  onChange={handleChange}
+                  placeholder="e.g. John Doe"
+                  className="customer-input"
+                />
+              </div>
+            </div>
+
+            {formData.contactPersonName.trim() && (
+              <>
+                <div className="customer-form-row">
+                  <div className="customer-form-group">
+                    <label htmlFor="contactPersonPhone">Contact Person Phone</label>
+                    <input
+                      id="contactPersonPhone"
+                      name="contactPersonPhone"
+                      type="text"
+                      value={formData.contactPersonPhone}
+                      onChange={handleChange}
+                      placeholder="e.g. +971 50 123 4567"
+                      className="customer-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="customer-form-row">
+                  <div className="customer-form-group">
+                    <label htmlFor="contactPersonAddress">Contact Person Address</label>
+                    <textarea
+                      id="contactPersonAddress"
+                      name="contactPersonAddress"
+                      value={formData.contactPersonAddress}
+                      onChange={handleChange}
+                      rows="2"
+                      placeholder="e.g. Office 12, Building A, Dubai"
+                      className="customer-textarea"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="customer-form-row">
+              <div className="customer-form-group">
+                <label htmlFor="latitude">Latitude</label>
+                <input
+                  id="latitude"
+                  name="latitude"
+                  type="number"
+                  step="any"
+                  value={formData.latitude}
+                  onChange={handleChange}
+                  placeholder="e.g. 25.2048"
+                  className="customer-input"
+                />
+              </div>
+              <div className="customer-form-group">
+                <label htmlFor="longitude">Longitude</label>
+                <input
+                  id="longitude"
+                  name="longitude"
+                  type="number"
+                  step="any"
+                  value={formData.longitude}
+                  onChange={handleChange}
+                  placeholder="e.g. 55.2708"
+                  className="customer-input"
+                />
+              </div>
+            </div>
 
             <button
               type="submit"

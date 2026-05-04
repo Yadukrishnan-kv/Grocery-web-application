@@ -34,6 +34,8 @@ app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use("/api/wallet", require('./routes/walletRoutes'));
 app.use("/api/payment-requests", require('./routes/paymentRequestRoutes'));
 app.use("/api/bill-transactions", require('./routes/billTransactionRoutes'));
+app.use("/api/emirates", require('./routes/emiratesRoutes'));
+app.use("/api/sales-returns", require('./routes/salesReturnRoutes'));
 
 // Health check endpoint
 app.get('/api/ping', (req, res) => {

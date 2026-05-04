@@ -48,7 +48,12 @@ const MENU_PERMISSIONS = {
   SalesOutstandingReport: "menu.OutstandingReport",
   SalesReceiptReport: "menu.ReceiptReport",
   StorekeeperOrders: "menu.storekeeper.all-orders",
-  CreditSuggestion: "menu.credit.suggestion"
+  CreditSuggestion: "menu.credit.suggestion",
+  Emirates: "menu.emirates",
+  SalesReturn: "menu.salesReturn",
+  CreateSalesReturn: "menu.createSalesReturn",
+  ReturnPickups: "menu.returnPickups",
+  ReturnReceived: "menu.returnReceived",
 };
 
 const navItems = [
@@ -94,6 +99,12 @@ const navItems = [
     ],
   },
 
+  {
+    id: "CreateSalesReturn",
+    label: "Sales Returns",
+    icon: "↩️",
+    path: "/sales-returns/create",
+  },
   {
     id: "SalesPendingOrders",
     label: "Pending Orders",
@@ -148,6 +159,11 @@ const navItems = [
         id: "CancelledOrders",
         label: "Cancelled Orders",
         path: "/CancelledOrders/list",
+      },
+      {
+        id: "ReturnPickups",
+        label: "Return Pickups",
+        path: "/delivery/return-pickups",
       },
     ],
   },
@@ -298,6 +314,24 @@ const navItems = [
   icon: '📋',
   path: '/storekeeper/all-orders' 
 },
+{
+  id: 'ReturnReceived',
+  label: 'Return Received',
+  icon: '↩️',
+  path: '/storekeeper/return-received',
+},
+{
+  id: 'SalesReturn',
+  label: 'Sales Returns',
+  icon: '↩️',
+  path: '/sales-returns',
+},
+{
+  id: 'Emirates',
+  label: 'Emirates',
+  icon: '🌍',
+  path: '/emirates',
+},
 ];
 
 const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
@@ -332,7 +366,10 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
           item.id !== "SalesPendingOrders" &&
           item.id !== "SalesOutstandingReport" &&
           item.id !== "SalesReceiptReport" &&
-          item.id !== "StorekeeperOrders"
+          item.id !== "StorekeeperOrders" &&
+          item.id !== "ReturnPickups" &&
+          item.id !== "ReturnReceived" &&
+          item.id !== "CreateSalesReturn"
       );
     }
 

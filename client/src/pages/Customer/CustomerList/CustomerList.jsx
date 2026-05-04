@@ -246,8 +246,15 @@ const CustomerList = () => {
                       <th scope="col">Name</th>
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
+                      <th scope="col">Contact Person</th>
+                      <th scope="col">Contact Phone</th>
+                      <th scope="col">Contact Address</th>
                       <th scope="col">Address</th>
                       <th scope="col">Pincode</th>
+                      <th scope="col">Emirates</th>
+                      <th scope="col">Code</th>
+                      <th scope="col">Latitude</th>
+                      <th scope="col">Longitude</th>
                       <th scope="col">Credit Limit</th>
                       <th scope="col">Balance</th>
                       <th scope="col">Opening Balance</th>
@@ -283,8 +290,15 @@ const CustomerList = () => {
                           <td>{customer.name || "-"}</td>
                           <td>{customer.email || "-"}</td>
                           <td>{customer.phoneNumber || "-"}</td>
+                          <td>{customer.contactPersonName || "-"}</td>
+                          <td>{customer.contactPersonPhone || "-"}</td>
+                          <td>{customer.contactPersonAddress || "-"}</td>
                           <td>{customer.address || "-"}</td>
                           <td>{customer.pincode || "-"}</td>
+                          <td>{customer.emiratesName || customer.salesman?.emiratesName || "-"}</td>
+                          <td>{customer.emiratesCode || customer.salesman?.emiratesCode || "-"}</td>
+                          <td>{customer.latitude != null ? customer.latitude : "-"}</td>
+                          <td>{customer.longitude != null ? customer.longitude : "-"}</td>
 
                           <td>
                             <div

@@ -258,6 +258,24 @@
   outline-offset: 2px;
 }
 
+/* Return button */
+.co-btn-return {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  border-radius: 7px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.co-btn-return:hover { opacity: 0.88; }
+
+.co-return-na { color: #cbd5e1; font-size: 1rem; }
+
 /* Status Filter */
 .customer-orders-filter-group {
   display: flex;

@@ -21,6 +21,13 @@ const createCustomer = async (req, res) => {
       openingBalance = 0,
       openingBalanceDueDays,
       salesmanId,
+      contactPersonName,
+      contactPersonPhone,
+      contactPersonAddress,
+      latitude,
+      longitude,
+      emiratesName,
+      emiratesCode,
     } = req.body;
 
     // Validation
@@ -102,6 +109,13 @@ const createCustomer = async (req, res) => {
       openingBalanceDueDays: parsedOpeningBalanceDueDays,
       user: user._id,
       salesman: salesmanId || null,
+      contactPersonName: contactPersonName?.trim() || null,
+      contactPersonPhone: contactPersonPhone?.trim() || null,
+      contactPersonAddress: contactPersonAddress?.trim() || null,
+      latitude: latitude !== undefined && latitude !== '' ? parseFloat(latitude) : null,
+      longitude: longitude !== undefined && longitude !== '' ? parseFloat(longitude) : null,
+      emiratesName: emiratesName?.trim() || null,
+      emiratesCode: emiratesCode?.trim() || null,
     });
 
     // Create bill for opening balance if applicable
@@ -231,6 +245,14 @@ const updateCustomer = async (req, res) => {
       "dueDays",
       "openingBalance",
       "openingBalanceDueDays",
+      "salesmanId",
+      "contactPersonName",
+      "contactPersonPhone",
+      "contactPersonAddress",
+      "latitude",
+      "longitude",
+      "emiratesName",
+      "emiratesCode",
     ];
 
     allowedFields.forEach(field => {
@@ -238,6 +260,20 @@ const updateCustomer = async (req, res) => {
         updateData[field] = req.body[field];
       }
     });
+
+    // Map salesmanId → salesman field
+    if (updateData.salesmanId !== undefined) {
+      updateData.salesman = updateData.salesmanId || null;
+      delete updateData.salesmanId;
+    }
+
+    // Coerce latitude/longitude to numbers or null
+    if (updateData.latitude !== undefined) {
+      updateData.latitude = updateData.latitude !== '' ? parseFloat(updateData.latitude) : null;
+    }
+    if (updateData.longitude !== undefined) {
+      updateData.longitude = updateData.longitude !== '' ? parseFloat(updateData.longitude) : null;
+    }
 
     // Special handling for creditLimit / openingBalance changes
     if (updateData.creditLimit !== undefined || updateData.openingBalance !== undefined) {
@@ -691,7 +727,7 @@ function getDaysRemaining(dueDate) {
 const getAllCustomersWithDue = async (req, res) => {
   try {
     const customers = await Customer.find()
-      .populate("salesman", "username email")
+      .populate("salesman", "username email emiratesName emiratesCode")
       .sort({ name: 1 });
 
     const customersWithDue = await Promise.all(

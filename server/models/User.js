@@ -32,6 +32,16 @@ const userSchema = new Schema(
       required: true,
       default: "Admin", 
     },
+    emiratesName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    emiratesCode: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   { timestamps: true }
 );

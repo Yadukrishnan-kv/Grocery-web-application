@@ -65,7 +65,10 @@ const RolePermissions = () => {
     SalesOutstandingReport: "menu.OutstandingReport",
     SalesReceiptReport: "menu.ReceiptReport",
     StorekeeperOrders: "menu.storekeeper.all-orders",
-    CreditSuggestion: "menu.credit.suggestion"
+    CreditSuggestion: "menu.credit.suggestion",
+    "Sales Return (Create Request)": "menu.createSalesReturn",
+    "Return Pickups (Delivery Man)": "menu.returnPickups",
+    "Return Received (Storekeeper)": "menu.returnReceived",
 
   };
 

@@ -13,7 +13,7 @@ const getAllUsers = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
+    const { username, email, password, role, emiratesName, emiratesCode } = req.body;
 
     
 
@@ -22,7 +22,7 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: "Username or email already in use" });
     }
 
-    const user = await User.create({ username, email, password, role });
+    const user = await User.create({ username, email, password, role, emiratesName: emiratesName || null, emiratesCode: emiratesCode || null });
     const safeUser = await User.findById(user._id).select("-password");
 
     res.status(201).json(safeUser);
@@ -33,7 +33,7 @@ const createUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const { username, email, role } = req.body;
+    const { username, email, role, emiratesName, emiratesCode } = req.body;
 
     
 
@@ -46,7 +46,7 @@ const updateUser = async (req, res) => {
 
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
-      { username, email, role },
+      { username, email, role, emiratesName: emiratesName || null, emiratesCode: emiratesCode || null },
       { new: true, runValidators: true }
     ).select("-password");
 
@@ -193,7 +193,7 @@ const getDeliveryMen = async (req, res) => {
 
 const getSalesMen = async (req, res) => {
   try {
-    const salesMen = await User.find({ role: { $regex: /sales/i } }).select("username _id");
+    const salesMen = await User.find({ role: { $regex: /sales/i } }).select("username _id emiratesName emiratesCode");
     res.json(salesMen);
   } catch (error) {
     res.status(500).json({ message: "Server error" });

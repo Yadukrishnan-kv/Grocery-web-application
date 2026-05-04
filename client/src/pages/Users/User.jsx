@@ -13,7 +13,9 @@ const User = () => {
     username: '',
     email: '',
     password: '',
-    role: ''
+    role: '',
+    emiratesName: '',
+    emiratesCode: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -22,10 +24,14 @@ const User = () => {
   const [isEdit, setIsEdit] = useState(false);
   const [userId, setUserId] = useState(null);
   const [roles, setRoles] = useState([]);
+  const [emiratesList, setEmiratesList] = useState([]);
   
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Whether the selected role is a salesman-type role
+  const isSalesmanRole = formData.role.toLowerCase().replace(/\s+/g, '').includes('salesman');
 
   const validateForm = () => {
     const newErrors = {};
@@ -58,6 +64,30 @@ const User = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'emiratesName') {
+      const selected = emiratesList.find((em) => em.emiratesName === value);
+      setFormData(prev => ({
+        ...prev,
+        emiratesName: value,
+        emiratesCode: selected ? selected.emiratesCode : '',
+      }));
+      if (errors.emiratesName) setErrors(prev => ({ ...prev, emiratesName: '' }));
+      return;
+    }
+
+    if (name === 'role') {
+      // Clear emirates fields when role changes
+      setFormData(prev => ({
+        ...prev,
+        role: value,
+        emiratesName: '',
+        emiratesCode: '',
+      }));
+      if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -92,7 +122,9 @@ const User = () => {
         await axios.put(`${backendUrl}/api/users/updateUser/${userId}`, {
           username: formData.username,
           email: formData.email,
-          role: formData.role
+          role: formData.role,
+          emiratesName: isSalesmanRole ? formData.emiratesName : null,
+          emiratesCode: isSalesmanRole ? formData.emiratesCode : null,
         }, config);
 
         toast.success('User updated successfully!');
@@ -102,7 +134,9 @@ const User = () => {
           username: formData.username,
           email: formData.email,
           password: formData.password,
-          role: formData.role
+          role: formData.role,
+          emiratesName: isSalesmanRole ? formData.emiratesName : null,
+          emiratesCode: isSalesmanRole ? formData.emiratesCode : null,
         }, config);
 
         toast.success('User created successfully!');
@@ -133,9 +167,22 @@ const User = () => {
     }
   }, [backendUrl]);
 
+  const fetchEmirates = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${backendUrl}/api/emirates/getAll`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEmiratesList(response.data);
+    } catch (error) {
+      console.error("Failed to fetch emirates:", error);
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
     fetchRoles();
-  }, [fetchRoles]);
+    fetchEmirates();
+  }, [fetchRoles, fetchEmirates]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -157,7 +204,9 @@ const User = () => {
               username: userToEdit.username,
               email: userToEdit.email,
               password: '', // Don't pre-fill password
-              role: userToEdit.role
+              role: userToEdit.role,
+              emiratesName: userToEdit.emiratesName || '',
+              emiratesCode: userToEdit.emiratesCode || '',
             });
             setIsEdit(true);
             setUserId(editId);
@@ -309,6 +358,40 @@ const User = () => {
                 </p>
               )}
             </div>
+
+            {isSalesmanRole && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="emiratesName">Emirates</label>
+                  <select
+                    id="emiratesName"
+                    name="emiratesName"
+                    value={formData.emiratesName}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Emirates</option>
+                    {emiratesList.map(em => (
+                      <option key={em._id} value={em.emiratesName}>
+                        {em.emiratesName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="emiratesCode">Emirates Code</label>
+                  <input
+                    id="emiratesCode"
+                    name="emiratesCode"
+                    type="text"
+                    value={formData.emiratesCode}
+                    readOnly
+                    placeholder="Auto-filled from Emirates selection"
+                    style={{ backgroundColor: '#f8fafc', cursor: 'default' }}
+                  />
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"

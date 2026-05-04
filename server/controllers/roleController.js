@@ -106,6 +106,8 @@ const getPermissions = async (req, res) => {
         "menu.wallet.money",
         'menu.billWallet',
         'menu.admin.order.requests',
+        'menu.emirates',
+        'menu.salesReturn',
         
         // Note: menu.deliveries is excluded for Admin
       ];
@@ -131,12 +133,12 @@ const getPermissions = async (req, res) => {
       } else if (permission === "menu.customers") {
         expandedPermissions.push("menu.customers.list");
       } else if (permission === "menu.sales") {
-          expandedPermissions.push("menu.sales.orders", "menu.sales.reports");
+          expandedPermissions.push("menu.sales.orders", "menu.sales.reports", "menu.createSalesReturn");
       } else if (permission === "menu.deliveries") {
-        expandedPermissions.push("menu.deliveries.arrived", "menu.deliveries.accepted", "menu.deliveries.delivered", "menu.deliveries.PendingOrdersForPacking", "menu.deliveries.cancelled");
+        expandedPermissions.push("menu.deliveries.arrived", "menu.deliveries.accepted", "menu.deliveries.delivered", "menu.deliveries.PendingOrdersForPacking", "menu.deliveries.cancelled", "menu.returnPickups");
       }
       else if (permission === "menu.customer.orders") {
-        expandedPermissions.push("menu.customer.orders");
+        expandedPermissions.push("menu.customer.orders", "menu.createSalesReturn");
       }
       else if (permission === "menu.customer.order.status") {
         expandedPermissions.push("menu.customer.order.status");
@@ -174,6 +176,18 @@ const getPermissions = async (req, res) => {
       }
       else if (permission === "menu.storekeeper.all-orders") {
         expandedPermissions.push("menu.storekeeper.all-orders");
+      }
+      else if (permission === "menu.returnReceived") {
+        expandedPermissions.push("menu.returnReceived");
+      }
+      else if (permission === "menu.returnPickups") {
+        expandedPermissions.push("menu.returnPickups");
+      }
+      else if (permission === "menu.createSalesReturn") {
+        expandedPermissions.push("menu.createSalesReturn");
+      }
+      else if (permission === "menu.salesReturn") {
+        expandedPermissions.push("menu.salesReturn");
       }
       
       
