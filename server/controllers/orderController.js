@@ -1524,7 +1524,30 @@ const getCustomerOrderHistory = async (req, res) => {
       .populate("orderItems.product", "productName price unit")
       .sort({ requestedAt: -1 });
 
-    res.json({ realOrders, requests });
+    // Fetch sales returns for these orders so the customer can see return status
+    const SalesReturn = require("../models/SalesReturn");
+    const orderIds = realOrders.map((o) => o._id);
+    const salesReturns = await SalesReturn.find({
+      order: { $in: orderIds },
+    }).select("order status");
+
+    // Map orderId → salesReturn (pick the latest active one)
+    const returnByOrder = {};
+    for (const sr of salesReturns) {
+      const key = sr.order.toString();
+      // Prefer active returns over cancelled/rejected ones
+      if (!returnByOrder[key] || !["cancelled", "rejected"].includes(sr.status)) {
+        returnByOrder[key] = { _id: sr._id, status: sr.status };
+      }
+    }
+
+    // Attach salesReturn to each real order
+    const ordersWithReturn = realOrders.map((order) => ({
+      ...order.toObject(),
+      salesReturn: returnByOrder[order._id.toString()] || null,
+    }));
+
+    res.json({ realOrders: ordersWithReturn, requests });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }

@@ -6,6 +6,19 @@ const Role = require("../models/Role");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
+// Generate CustomerId: [3-char emiratesCode][3-char salesmanName][3-char customerName]
+// Ensures uniqueness by appending a counter suffix when a collision occurs.
+const generateCustomerId = async (emiratesCode, salesmanName, customerName) => {
+  const pad = (str, len) => (str || "XXX").replace(/[^A-Za-z0-9]/g, "").toUpperCase().padEnd(len, "X").slice(0, len);
+  const base = pad(emiratesCode, 3) + pad(salesmanName, 3) + pad(customerName, 3);
+  let candidate = base;
+  let counter = 1;
+  while (await Customer.exists({ customerId: candidate })) {
+    candidate = base + String(counter++).padStart(2, "0");
+  }
+  return candidate;
+};
+
 const createCustomer = async (req, res) => {
   try {
     const {
@@ -93,6 +106,22 @@ const createCustomer = async (req, res) => {
       role: "Customer",
     });
 
+    // Fetch salesman info for customerId generation and salesman-emirates fields
+    let salesmanUsername = "ADM";
+    let salesmanEmiratesName = null;
+    let salesmanEmiratesCode = null;
+    if (salesmanId) {
+      const salesman = await User.findById(salesmanId).select("username emiratesName emiratesCode");
+      if (salesman) {
+        salesmanUsername = salesman.username;
+        salesmanEmiratesName = salesman.emiratesName || null;
+        salesmanEmiratesCode = salesman.emiratesCode || null;
+      }
+    }
+
+    // CustomerId: [customer's emiratesCode 3] + [salesman name 3] + [customer name 3]
+    const generatedCustomerId = await generateCustomerId(emiratesCode, salesmanUsername, name.trim());
+
     // Create customer with new fields
     const customer = await Customer.create({
       name: name.trim(),
@@ -116,6 +145,9 @@ const createCustomer = async (req, res) => {
       longitude: longitude !== undefined && longitude !== '' ? parseFloat(longitude) : null,
       emiratesName: emiratesName?.trim() || null,
       emiratesCode: emiratesCode?.trim() || null,
+      salesmanEmiratesName,
+      salesmanEmiratesCode,
+      customerId: generatedCustomerId,
     });
 
     // Create bill for opening balance if applicable
@@ -437,6 +469,8 @@ const createCustomerRequest = async (req, res) => {
       dueDays,        // NEW
       openingBalance = 0,
       openingBalanceDueDays,
+      emiratesName,
+      emiratesCode,
     } = req.body;
 
     // Validation
@@ -498,11 +532,15 @@ const createCustomerRequest = async (req, res) => {
       pincode: pincode.trim(),
       creditLimit: parsedCreditLimit,
       billingType,
-      statementType: parsedStatementType,  // NEW
-      dueDays: parsedDueDays,              // NEW
+      statementType: parsedStatementType,
+      dueDays: parsedDueDays,
       openingBalance: parsedOpeningBalance,
       openingBalanceDueDays: parsedOpeningBalanceDueDays,
       salesman: req.user._id,
+      emiratesName: emiratesName?.trim() || null,
+      emiratesCode: emiratesCode?.trim() || null,
+      salesmanEmiratesName: req.user.emiratesName || null,
+      salesmanEmiratesCode: req.user.emiratesCode || null,
     });
 
     res.status(201).json({
@@ -577,6 +615,11 @@ const acceptCustomerRequest = async (req, res) => {
       role: "Customer",
     });
 
+    const salesmanUser = await User.findById(request.salesman).select("username emiratesName emiratesCode");
+    const salesmanUsername = salesmanUser ? salesmanUser.username : "ADM";
+    // Use the customer's own emiratesCode for customerId generation
+    const generatedCustomerId = await generateCustomerId(request.emiratesCode, salesmanUsername, request.name);
+
     const customer = await Customer.create({
       user: user._id,
       name: request.name,
@@ -592,6 +635,11 @@ const acceptCustomerRequest = async (req, res) => {
       openingBalance: request.openingBalance || 0,
       openingBalanceDueDays: request.openingBalanceDueDays || null,
       salesman: request.salesman,
+      emiratesName: request.emiratesName || null,
+      emiratesCode: request.emiratesCode || null,
+      salesmanEmiratesName: salesmanUser?.emiratesName || null,
+      salesmanEmiratesCode: salesmanUser?.emiratesCode || null,
+      customerId: generatedCustomerId,
     });
 
     // If admin already accepted the suggested credit limit, use it

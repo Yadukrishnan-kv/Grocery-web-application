@@ -29,6 +29,8 @@ const CreateCustomer = () => {
     longitude: "",
     emiratesName: "",
     emiratesCode: "",
+    salesmanEmiratesName: "",
+    salesmanEmiratesCode: "",
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -37,6 +39,7 @@ const CreateCustomer = () => {
   const [isEdit, setIsEdit] = useState(false);
   const [customerId, setCustomerId] = useState(null);
   const [salesmen, setSalesmen] = useState([]);
+  const [emiratesList, setEmiratesList] = useState([]);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -106,10 +109,21 @@ const CreateCustomer = () => {
       setFormData((prev) => ({
         ...prev,
         salesmanId: value,
-        emiratesName: selected?.emiratesName || "",
-        emiratesCode: selected?.emiratesCode || "",
+        salesmanEmiratesName: selected?.emiratesName || "",
+        salesmanEmiratesCode: selected?.emiratesCode || "",
       }));
       if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+      return;
+    }
+
+    if (name === "emiratesName") {
+      const selected = emiratesList.find((em) => em.emiratesName === value);
+      setFormData((prev) => ({
+        ...prev,
+        emiratesName: value,
+        emiratesCode: selected ? selected.emiratesCode : "",
+      }));
+      if (errors.emiratesName) setErrors((prev) => ({ ...prev, emiratesName: "" }));
       return;
     }
 
@@ -168,6 +182,8 @@ const CreateCustomer = () => {
         longitude: formData.longitude !== "" ? parseFloat(formData.longitude) : null,
         emiratesName: formData.emiratesName || null,
         emiratesCode: formData.emiratesCode || null,
+        salesmanEmiratesName: formData.salesmanEmiratesName || null,
+        salesmanEmiratesCode: formData.salesmanEmiratesCode || null,
       };
 
       let response;
@@ -238,6 +254,8 @@ const CreateCustomer = () => {
           longitude: customer.longitude?.toString() || "",
           emiratesName: customer.emiratesName || "",
           emiratesCode: customer.emiratesCode || "",
+          salesmanEmiratesName: customer.salesmanEmiratesName || "",
+          salesmanEmiratesCode: customer.salesmanEmiratesCode || "",
         });
         setIsEdit(true);
         setCustomerId(id);
@@ -285,6 +303,19 @@ const CreateCustomer = () => {
     }
   }, [backendUrl]);
 
+  const fetchEmirates = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/api/emirates/getAll`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setEmiratesList(response.data);
+    } catch (error) {
+      console.error("Failed to load emirates", error);
+      toast.error("Failed to load emirates list");
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const editId = searchParams.get("edit");
@@ -297,7 +328,8 @@ const CreateCustomer = () => {
   useEffect(() => {
     fetchCurrentUser();
     fetchSalesmen();
-  }, [fetchCurrentUser, fetchSalesmen]);
+    fetchEmirates();
+  }, [fetchCurrentUser, fetchSalesmen, fetchEmirates]);
 
   if (loading) {
     return <div className="customer-loading">Loading user information...</div>;
@@ -595,56 +627,66 @@ const CreateCustomer = () => {
 
             {/* Salesman Dropdown (only for admin) */}
             {user?.role === "Admin" && (
-              <div className="customer-form-row">
-                <div className="customer-form-group">
-                  <label htmlFor="salesmanId">Assign Salesman</label>
-                  <select
-                    id="salesmanId"
-                    name="salesmanId"
-                    value={formData.salesmanId}
-                    onChange={handleChange}
-                    className="customer-select"
-                  >
-                    <option value="">Select Salesman (Optional)</option>
-                    {salesmen.map((salesman) => (
-                      <option key={salesman._id} value={salesman._id}>
-                        {salesman.username}
-                      </option>
-                    ))}
-                  </select>
+              <>
+                <div className="customer-form-row">
+                  <div className="customer-form-group">
+                    <label htmlFor="salesmanId">Assign Salesman</label>
+                    <select
+                      id="salesmanId"
+                      name="salesmanId"
+                      value={formData.salesmanId}
+                      onChange={handleChange}
+                      className="customer-select"
+                    >
+                      <option value="">Select Salesman (Optional)</option>
+                      {salesmen.map((salesman) => (
+                        <option key={salesman._id} value={salesman._id}>
+                          {salesman.username}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-
-                <div className="customer-form-group">
-                  <label htmlFor="emiratesName">Emirates</label>
-                  <select
-                    id="emiratesName"
-                    name="emiratesName"
-                    value={formData.emiratesName}
-                    className="customer-select"
-                    disabled
-                    style={{ backgroundColor: "#f8fafc", cursor: "default" }}
-                  >
-                    <option value="">
-                      {formData.emiratesName || "Auto-filled from Salesman"}
-                    </option>
-                  </select>
-                </div>
-
-                <div className="customer-form-group">
-                  <label htmlFor="emiratesCode">Emirates Code</label>
-                  <input
-                    id="emiratesCode"
-                    name="emiratesCode"
-                    type="text"
-                    value={formData.emiratesCode}
-                    readOnly
-                    placeholder="Auto-filled from Salesman"
-                    className="customer-input"
-                    style={{ backgroundColor: "#f8fafc", cursor: "default" }}
-                  />
-                </div>
-              </div>
+              </>
             )}
+
+            {/* Emirates Section */}
+            <div className="customer-form-row">
+              <div className="customer-form-group">
+                <label htmlFor="emiratesName">Emirates</label>
+                <select
+                  id="emiratesName"
+                  name="emiratesName"
+                  value={formData.emiratesName}
+                  onChange={handleChange}
+                  className="customer-select"
+                >
+                  <option value="">Select Emirates</option>
+                  {emiratesList.map((em) => (
+                    <option key={em._id} value={em.emiratesName}>
+                      {em.emiratesName}
+                    </option>
+                  ))}
+                </select>
+                {errors.emiratesName && (
+                  <p className="customer-error-text">{errors.emiratesName}</p>
+                )}
+              </div>
+
+              <div className="customer-form-group">
+                <label htmlFor="emiratesCode">Emirates Code</label>
+                <input
+                  id="emiratesCode"
+                  name="emiratesCode"
+                  type="text"
+                  value={formData.emiratesCode}
+                  readOnly
+                  placeholder="Auto-filled from Emirates"
+                  className="customer-input"
+                  style={{ backgroundColor: "#f8fafc", cursor: "default" }}
+                />
+              </div>
+            </div>
 
             {/* Contact Person & Location */}
             <div className="customer-form-row">

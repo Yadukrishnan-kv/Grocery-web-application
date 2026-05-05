@@ -160,6 +160,12 @@ const CustomerOrdersList = () => {
     return diffDays <= 5;
   };
 
+  // Returns true if an active (non-cancelled, non-rejected) return already exists
+  const hasActiveReturn = (item) => {
+    if (!item.salesReturn) return false;
+    return !["cancelled", "rejected"].includes(item.salesReturn.status);
+  };
+
   const getStatusDisplay = (item) => {
     if (item.type === "request") {
       if (item.status === "pending") return "Pending Approval";
@@ -380,15 +386,28 @@ const CustomerOrdersList = () => {
                           </td>
 
                           <td>
-                            {isReturnEligible(item) ? (
-                              <button
-                                className="co-btn-return"
-                                onClick={() =>
-                                  navigate(`/sales-returns/create?orderId=${item._id}`)
-                                }
-                              >
-                                ↩ Return
-                              </button>
+                            {item.salesReturn?.status === "completed" ? (
+                              <span className="co-return-na">Returned</span>
+                            ) : isReturnEligible(item) ? (
+                              hasActiveReturn(item) ? (
+                                <button
+                                  className="co-btn-return"
+                                  disabled
+                                  title={`Return already submitted (${item.salesReturn.status})`}
+                                  style={{ opacity: 0.5, cursor: "not-allowed" }}
+                                >
+                                  ↩ Returned
+                                </button>
+                              ) : (
+                                <button
+                                  className="co-btn-return"
+                                  onClick={() =>
+                                    navigate(`/sales-returns/create?orderId=${item._id}`)
+                                  }
+                                >
+                                  ↩ Return
+                                </button>
+                              )
                             ) : (
                               <span className="co-return-na">—</span>
                             )}

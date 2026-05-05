@@ -113,6 +113,23 @@ const customerSchema = new Schema(
       trim: true,
       default: null,
     },
+    salesmanEmiratesName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    salesmanEmiratesCode: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    customerId: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
+      sparse: true,
+    },
   },
   { timestamps: true }
 );

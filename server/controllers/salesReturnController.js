@@ -307,11 +307,53 @@ const confirmPickup = async (req, res) => {
       return res.status(403).json({ message: "You are not assigned to this pickup" });
     }
 
+    const order = await Order.findById(sr.order);
+    const totalReturnAmount = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
+
+    // Restore customer credit balance if credit order
+    if (order && order.payment === "credit") {
+      await Customer.findByIdAndUpdate(sr.customer, {
+        $inc: { balanceCreditLimit: totalReturnAmount },
+      });
+    }
+
+    // Adjust related bill
+    let billAdjusted = false;
+    let relatedBillId = sr.relatedBill || null;
+
+    if (order && !sr.billAdjusted) {
+      const bills = await Bill.find({
+        orders: order._id,
+        status: { $nin: ["paid", "cancelled"] },
+      }).sort({ createdAt: -1 });
+
+      if (bills.length > 0) {
+        const bill = bills[0];
+        const newAmountDue = Math.max(0, bill.amountDue - totalReturnAmount);
+        bill.amountDue = newAmountDue;
+        if (bill.grandTotal !== undefined) {
+          bill.grandTotal = Math.max(0, bill.grandTotal - totalReturnAmount);
+        }
+        if (bill.totalExclVat !== undefined) {
+          bill.totalExclVat = Math.max(
+            0,
+            bill.totalExclVat - sr.returnItems.reduce((s, i) => s + (i.exclVatAmount || 0), 0)
+          );
+        }
+        if (newAmountDue === 0) bill.status = "paid";
+        await bill.save();
+        relatedBillId = bill._id;
+        billAdjusted = true;
+      }
+    }
+
     sr.status = "picked_up";
     sr.pickedUpAt = new Date();
+    sr.billAdjusted = sr.billAdjusted || billAdjusted;
+    if (relatedBillId) sr.relatedBill = relatedBillId;
     await sr.save();
 
-    res.json({ message: "Pickup confirmed. Return is on its way to the store.", salesReturn: sr });
+    res.json({ message: "Pickup confirmed. Bill and credit limit updated.", salesReturn: sr });
   } catch (error) {
     res.status(500).json({ message: "Server error: " + error.message });
   }
@@ -332,18 +374,18 @@ const confirmReturnReceived = async (req, res) => {
     const order = await Order.findById(sr.order);
     const totalReturnAmount = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
 
-    // Restore customer credit balance if credit order
-    if (order && order.payment === "credit") {
+    // Restore customer credit balance if not already done at pickup
+    if (order && order.payment === "credit" && !sr.billAdjusted) {
       await Customer.findByIdAndUpdate(sr.customer, {
         $inc: { balanceCreditLimit: totalReturnAmount },
       });
     }
 
-    // Adjust or cancel related bill
-    let billAdjusted = false;
-    let relatedBillId = null;
+    // Adjust or cancel related bill (only if not already adjusted at pickup)
+    let billAdjusted = sr.billAdjusted || false;
+    let relatedBillId = sr.relatedBill || null;
 
-    if (order) {
+    if (order && !sr.billAdjusted) {
       const bills = await Bill.find({
         orders: order._id,
         status: { $nin: ["paid", "cancelled"] },
@@ -440,7 +482,17 @@ const getDeliveredOrdersForReturn = async (req, res) => {
       .populate("customer", "name phoneNumber")
       .populate("orderItems.product", "productName unit price")
       .sort({ updatedAt: -1 });
-    res.json(orders);
+
+    // Exclude orders that already have an active (non-cancelled, non-rejected) return
+    const orderIds = orders.map((o) => o._id);
+    const existingReturns = await SalesReturn.find({
+      order: { $in: orderIds },
+      status: { $nin: ["cancelled", "rejected"] },
+    }).select("order");
+    const returnedOrderIds = new Set(existingReturns.map((sr) => sr.order.toString()));
+
+    const filteredOrders = orders.filter((o) => !returnedOrderIds.has(o._id.toString()));
+    res.json(filteredOrders);
   } catch (error) {
     res.status(500).json({ message: "Server error: " + error.message });
   }

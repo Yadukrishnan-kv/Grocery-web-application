@@ -161,11 +161,14 @@ const SalesmanCustomers = () => {
                   <thead>
                     <tr>
                       <th scope="col">No</th>
+                      <th scope="col">Customer ID</th>
                       <th scope="col">Name</th>
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
                       <th scope="col">Address</th>
                       <th scope="col">Pincode</th>
+                      <th scope="col">Emirates</th>
+                      <th scope="col">Emirates Code</th>
                       <th scope="col">Credit Limit</th>
                       <th scope="col">Balance</th>
                       <th scope="col">Used Credit</th>
@@ -184,11 +187,18 @@ const SalesmanCustomers = () => {
                       return (
                         <tr key={customer._id}>
                           <td>{index + 1}</td>
+                          <td>
+                            <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
+                              {customer.customerId || "-"}
+                            </span>
+                          </td>
                           <td>{customer.name || "-"}</td>
                           <td>{customer.email || "-"}</td>
                           <td>{customer.phoneNumber || "-"}</td>
                           <td>{customer.address || "-"}</td>
                           <td>{customer.pincode || "-"}</td>
+                          <td>{customer.emiratesName || "-"}</td>
+                          <td>{customer.emiratesCode || "-"}</td>
 
                           {/* Credit Limit */}
                           <td>

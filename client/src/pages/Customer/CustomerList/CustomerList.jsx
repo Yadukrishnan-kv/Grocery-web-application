@@ -243,6 +243,7 @@ const CustomerList = () => {
                   <thead>
                     <tr>
                       <th scope="col">No</th>
+                      <th scope="col">Customer ID</th>
                       <th scope="col">Name</th>
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
@@ -252,7 +253,7 @@ const CustomerList = () => {
                       <th scope="col">Address</th>
                       <th scope="col">Pincode</th>
                       <th scope="col">Emirates</th>
-                      <th scope="col">Code</th>
+                      <th scope="col">Emirates Code</th>
                       <th scope="col">Latitude</th>
                       <th scope="col">Longitude</th>
                       <th scope="col">Credit Limit</th>
@@ -287,6 +288,11 @@ const CustomerList = () => {
                       return (
                         <tr key={customer._id}>
                           <td>{index + 1}</td>
+                          <td>
+                            <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
+                              {customer.customerId || "-"}
+                            </span>
+                          </td>
                           <td>{customer.name || "-"}</td>
                           <td>{customer.email || "-"}</td>
                           <td>{customer.phoneNumber || "-"}</td>
@@ -295,8 +301,8 @@ const CustomerList = () => {
                           <td>{customer.contactPersonAddress || "-"}</td>
                           <td>{customer.address || "-"}</td>
                           <td>{customer.pincode || "-"}</td>
-                          <td>{customer.emiratesName || customer.salesman?.emiratesName || "-"}</td>
-                          <td>{customer.emiratesCode || customer.salesman?.emiratesCode || "-"}</td>
+                          <td>{customer.emiratesName || "-"}</td>
+                          <td>{customer.emiratesCode || "-"}</td>
                           <td>{customer.latitude != null ? customer.latitude : "-"}</td>
                           <td>{customer.longitude != null ? customer.longitude : "-"}</td>
 

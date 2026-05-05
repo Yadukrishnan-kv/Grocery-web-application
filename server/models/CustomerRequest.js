@@ -89,6 +89,26 @@ const customerRequestSchema = new Schema(
       enum: ["none", "pending", "accepted", "rejected"],
       default: "none",
     },
+    emiratesName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    emiratesCode: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    salesmanEmiratesName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    salesmanEmiratesCode: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   { timestamps: true }
 );

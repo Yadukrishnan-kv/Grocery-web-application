@@ -1,5 +1,5 @@
 // src/pages/Sales/CreateCustomerRequest.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import '../../Customer/CreateCustomer/CreateCustomer.css'; // Reuse same CSS
@@ -20,12 +20,17 @@ const CreateCustomerRequest = () => {
     dueDays: '',
     openingBalance: '',
     openingBalanceDueDays: '',
+    emiratesName: '',
+    emiratesCode: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [emiratesList, setEmiratesList] = useState([]);
+  const [salesmanEmiratesName, setSalesmanEmiratesName] = useState('');
+  const [salesmanEmiratesCode, setSalesmanEmiratesCode] = useState('');
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -76,6 +81,18 @@ const CreateCustomerRequest = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'emiratesName') {
+      const selected = emiratesList.find((em) => em.emiratesName === value);
+      setFormData(prev => ({
+        ...prev,
+        emiratesName: value,
+        emiratesCode: selected ? selected.emiratesCode : '',
+      }));
+      if (errors.emiratesName) setErrors(prev => ({ ...prev, emiratesName: '' }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -122,6 +139,8 @@ const CreateCustomerRequest = () => {
         openingBalanceDueDays: formData.openingBalanceDueDays
           ? parseInt(formData.openingBalanceDueDays)
           : null,
+        emiratesName: formData.emiratesName || null,
+        emiratesCode: formData.emiratesCode || null,
       };
 
       await axios.post(
@@ -160,6 +179,11 @@ const CreateCustomerRequest = () => {
         if (res.data.user.role !== "Sales man") {  // fixed typo
           navigate('/dashboard');
         }
+
+        // Store salesman's own emirates in separate state (not editable)
+        const salesmanData = res.data.user || res.data;
+        setSalesmanEmiratesName(salesmanData.emiratesName || '');
+        setSalesmanEmiratesCode(salesmanData.emiratesCode || '');
       } catch (error) {
         console.error("Failed to load user", error);
         navigate('/login');
@@ -168,7 +192,20 @@ const CreateCustomerRequest = () => {
       }
     };
 
+    const fetchEmirates = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`${backendUrl}/api/emirates/getAll`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setEmiratesList(res.data);
+      } catch (error) {
+        console.error("Failed to load emirates", error);
+      }
+    };
+
     fetchUser();
+    fetchEmirates();
   }, [backendUrl, navigate]);
 
   if (loading) return <div className="customer-loading">Loading user information...</div>;
@@ -396,6 +433,69 @@ const CreateCustomerRequest = () => {
             {errors.submit && (
               <div className="customer-error-banner" role="alert">
                 {errors.submit}
+              </div>
+            )}
+
+            {/* Customer Emirates Dropdown */}
+            <div className="customer-form-row">
+              <div className="customer-form-group">
+                <label htmlFor="emiratesName">Customer Emirates</label>
+                <select
+                  id="emiratesName"
+                  name="emiratesName"
+                  value={formData.emiratesName}
+                  onChange={handleChange}
+                  className="customer-select"
+                >
+                  <option value="">Select Emirates</option>
+                  {emiratesList.map((em) => (
+                    <option key={em._id} value={em.emiratesName}>
+                      {em.emiratesName}
+                    </option>
+                  ))}
+                </select>
+                {errors.emiratesName && (
+                  <p className="customer-error-text">{errors.emiratesName}</p>
+                )}
+              </div>
+              <div className="customer-form-group">
+                <label htmlFor="emiratesCode">Customer Emirates Code</label>
+                <input
+                  id="emiratesCode"
+                  name="emiratesCode"
+                  type="text"
+                  value={formData.emiratesCode}
+                  readOnly
+                  placeholder="Auto-filled from selection"
+                  className="customer-input"
+                  style={{ backgroundColor: "#f8fafc", cursor: "default" }}
+                />
+              </div>
+            </div>
+
+            {/* Salesman's own emirates (readonly info) */}
+            {(salesmanEmiratesName || salesmanEmiratesCode) && (
+              <div className="customer-form-row">
+                <div className="customer-form-group">
+                  <label>Your Emirates</label>
+                  <input
+                    type="text"
+                    value={salesmanEmiratesName}
+                    readOnly
+                    className="customer-input"
+                    style={{ backgroundColor: "#f8fafc", cursor: "default" }}
+                  />
+                </div>
+                <div className="customer-form-group">
+                  <label>Your Emirates Code</label>
+                  <input
+                    type="text"
+                    value={salesmanEmiratesCode}
+                    readOnly
+                    className="customer-input"
+                    style={{ backgroundColor: "#f8fafc", cursor: "default" }}
+                  />
+                </div>
               </div>
             )}
 
