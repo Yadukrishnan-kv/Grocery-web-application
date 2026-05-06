@@ -16,7 +16,7 @@ const CreateSalesReturn = () => {
   const [deliveredOrders, setDeliveredOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [returnItems, setReturnItems] = useState({}); // { productId: { qty: '', reason: '' } }
+  const [returnItems, setReturnItems] = useState({}); // { productId: { reason: '' } }
   const [returnReason, setReturnReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -53,7 +53,7 @@ const CreateSalesReturn = () => {
           const init = {};
           (found.orderItems || []).forEach((item) => {
             if ((item.deliveredQuantity || 0) > 0) {
-              init[item.product._id] = { qty: "", reason: "" };
+              init[item.product._id] = { reason: "" };
             }
           });
           setReturnItems(init);
@@ -80,11 +80,10 @@ const CreateSalesReturn = () => {
     }
     const order = deliveredOrders.find((o) => o._id === orderId);
     setSelectedOrder(order || null);
-    // Init return items with qty = '' for each delivered item
     const init = {};
     (order?.orderItems || []).forEach((item) => {
       if ((item.deliveredQuantity || 0) > 0) {
-        init[item.product._id] = { qty: "", reason: "" };
+        init[item.product._id] = { reason: "" };
       }
     });
     setReturnItems(init);
@@ -102,7 +101,7 @@ const CreateSalesReturn = () => {
 
   const calcTotal = () =>
     getDeliveredItems().reduce((sum, item) => {
-      const qty = parseInt(returnItems[item.product._id]?.qty) || 0;
+      const qty = item.deliveredQuantity || 0;
       const exclVat = qty * item.price;
       const vat = (exclVat * (item.vatPercentage || 5)) / 100;
       return sum + exclVat + vat;
@@ -118,13 +117,13 @@ const CreateSalesReturn = () => {
     const itemsToReturn = getDeliveredItems()
       .map((item) => ({
         productId: item.product._id,
-        returnedQuantity: parseInt(returnItems[item.product._id]?.qty) || 0,
+        returnedQuantity: item.deliveredQuantity,
         reason: returnItems[item.product._id]?.reason || "",
       }))
       .filter((i) => i.returnedQuantity > 0);
 
     if (itemsToReturn.length === 0) {
-      toast.error("Enter at least one return quantity");
+      toast.error("No delivered items to return");
       return;
     }
 
@@ -236,8 +235,8 @@ const CreateSalesReturn = () => {
             {selectedOrder && deliveredItems.length > 0 && (
               <div className="csr-card">
                 <div className="csr-card-header">
-                  <h2>Step 2 — Select Items to Return</h2>
-                  <p className="csr-card-sub">Enter return quantity (max = delivered qty). Leave 0 to skip item.</p>
+                  <h2>Step 2 — Items to Return</h2>
+                  <p className="csr-card-sub">All delivered items will be returned in full.</p>
                 </div>
                 <div className="csr-card-body">
                   <div className="csr-items-table-wrap">
@@ -246,7 +245,6 @@ const CreateSalesReturn = () => {
                         <tr>
                           <th>Product</th>
                           <th>Unit</th>
-                          <th>Delivered Qty</th>
                           <th>Return Qty</th>
                           <th>Price / Unit</th>
                           <th>Return Amount</th>
@@ -256,14 +254,13 @@ const CreateSalesReturn = () => {
                       <tbody>
                         {deliveredItems.map((item) => {
                           const productId = item.product._id;
-                          const qtyVal = returnItems[productId]?.qty || "";
-                          const qty = parseInt(qtyVal) || 0;
+                          const qty = item.deliveredQuantity || 0;
                           const exclVat = qty * item.price;
                           const vat = (exclVat * (item.vatPercentage || 5)) / 100;
                           const lineTotal = exclVat + vat;
 
                           return (
-                            <tr key={productId} className={qty > 0 ? "csr-row-selected" : ""}>
+                            <tr key={productId} className="csr-row-selected">
                               <td>
                                 <div className="csr-product-name">
                                   {item.product?.productName || "—"}
@@ -272,23 +269,12 @@ const CreateSalesReturn = () => {
                               <td>{item.unit || item.product?.unit || "—"}</td>
                               <td>
                                 <span className="csr-delivered-badge">
-                                  {item.deliveredQuantity}
+                                  {qty}
                                 </span>
                               </td>
-                              <td>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={item.deliveredQuantity}
-                                  value={qtyVal}
-                                  onChange={(e) => handleItemChange(productId, "qty", e.target.value)}
-                                  className="csr-qty-input"
-                                  placeholder="0"
-                                />
-                              </td>
                               <td>AED {(item.price || 0).toFixed(2)}</td>
-                              <td className={qty > 0 ? "csr-line-total" : "csr-muted"}>
-                                {qty > 0 ? `AED ${lineTotal.toFixed(2)}` : "—"}
+                              <td className="csr-line-total">
+                                AED {lineTotal.toFixed(2)}
                               </td>
                               <td>
                                 <input
@@ -297,7 +283,6 @@ const CreateSalesReturn = () => {
                                   onChange={(e) => handleItemChange(productId, "reason", e.target.value)}
                                   className="csr-reason-input"
                                   placeholder="Reason (optional)"
-                                  disabled={!qty}
                                 />
                               </td>
                             </tr>
@@ -307,7 +292,7 @@ const CreateSalesReturn = () => {
                       {calcTotal() > 0 && (
                         <tfoot>
                           <tr>
-                            <td colSpan="5" className="csr-total-label">Total Return Amount (incl. VAT)</td>
+                            <td colSpan="4" className="csr-total-label">Total Return Amount (incl. VAT)</td>
                             <td colSpan="2" className="csr-total-val">
                               AED {calcTotal().toFixed(2)}
                             </td>

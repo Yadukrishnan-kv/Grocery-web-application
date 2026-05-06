@@ -475,10 +475,21 @@ const getPickedUpReturns = async (req, res) => {
 const getDeliveredOrdersForReturn = async (req, res) => {
   try {
     const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
-    const orders = await Order.find({
+
+    // Build base query
+    const query = {
       status: { $in: ["delivered", "partial_delivered"] },
       updatedAt: { $gte: fiveDaysAgo },
-    })
+    };
+
+    // If user is a salesman, restrict to their customers only
+    if (req.user && req.user.role === "Sales man") {
+      const myCustomers = await Customer.find({ salesman: req.user._id }).select("_id");
+      const myCustomerIds = myCustomers.map((c) => c._id);
+      query.customer = { $in: myCustomerIds };
+    }
+
+    const orders = await Order.find(query)
       .populate("customer", "name phoneNumber")
       .populate("orderItems.product", "productName unit price")
       .sort({ updatedAt: -1 });
@@ -515,162 +526,372 @@ const getSalesReturnsByOrder = async (req, res) => {
 // ─── PDF: Return Invoice ──────────────────────────────────────────────────────
 
 const generateReturnInvoicePDF = async (doc, sr, settings) => {
-  const pageW = doc.page.width;
-  const margin = 40;
-  const cw = pageW - margin * 2;
+  const company = settings;
+  if (!company) {
+    throw new Error("Company invoice settings not configured.");
+  }
 
-  // Header
-  doc.rect(0, 0, pageW, 130).fill("#1e3a5f");
-  doc.fillColor("white").fontSize(22).font("Helvetica-Bold")
-    .text(settings?.companyName || "Company", margin, 25, { width: cw - 170 });
-  doc.fillColor("#7dd3fc").fontSize(10).font("Helvetica")
-    .text("SALES RETURN CREDIT NOTE", margin, 55, { width: cw - 170 });
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 25;
+  const contentWidth = pageWidth - margin * 2;
+  const rightEdge = pageWidth - margin;
 
-  // Invoice number box
-  doc.roundedRect(pageW - 195, 18, 160, 65, 8).fill("#ffffff1a");
-  doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("RETURN INVOICE #", pageW - 188, 28);
-  doc.fillColor("white").fontSize(17).font("Helvetica-Bold")
-    .text(sr.returnInvoiceNumber || "RET-XXXX", pageW - 188, 43, { width: 148 });
+  // Colors
+  const purple = "#4B3B8B";
+  const lightPurple = "#E8E0F0";
+  const gray = "#999999";
+  const darkGray = "#333333";
+  const headerBg = "#d9d9d9";
+  const green = "#4CAF50";
 
-  // Info strip
-  doc.rect(0, 130, pageW, 28).fill("#16325c");
-  const infoLine = [settings?.phone, settings?.email, settings?.address]
-    .filter(Boolean)
-    .join("   |   ");
-  doc.fillColor("#cbd5e1").fontSize(8).font("Helvetica")
-    .text(infoLine || " ", margin, 140, { width: cw, align: "center" });
+  // Date formatting
+  const date = new Date(sr.completedAt || sr.createdAt || Date.now());
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const formattedDate = `${date.getDate()}-${monthNames[date.getMonth()]}-${String(date.getFullYear()).slice(-2)}`;
 
-  // Red return badge
-  doc.rect(0, 158, pageW, 22).fill("#dc2626");
-  doc.fillColor("white").fontSize(9).font("Helvetica-Bold")
-    .text("SALES RETURN — CREDIT NOTE", margin, 164, { width: cw, align: "center" });
+  // ===== OUTER BORDER =====
+  doc.rect(margin - 3, margin - 3, contentWidth + 6, pageHeight - margin * 2 + 6)
+    .lineWidth(2).strokeColor(darkGray).stroke();
 
-  let y = 195;
+  let y = margin;
 
-  // Bill-to + Return Details cards
-  const halfW = (cw - 16) / 2;
+  // ===== HEADER SECTION (3 columns) =====
+  const leftColWidth = 190;
+  const centerColX = margin + 195;
+  const centerColWidth = 155;
+  const rightColX = margin + 355;
+  const rightColWidth = contentWidth - 355;
 
-  doc.roundedRect(margin, y, halfW, 105, 6).fill("#f8fafc").stroke("#e2e8f0");
-  doc.fillColor("#64748b").fontSize(8).font("Helvetica-Bold").text("BILL TO", margin + 12, y + 10);
-  doc.fillColor("#0f172a").fontSize(11).font("Helvetica-Bold")
-    .text(sr.customer?.name || "Customer", margin + 12, y + 26, { width: halfW - 24 });
-  doc.fillColor("#475569").fontSize(9).font("Helvetica")
-    .text(sr.customer?.phoneNumber || "", margin + 12, y + 46, { width: halfW - 24 })
-    .text(sr.customer?.address || "", margin + 12, y + 62, { width: halfW - 24 });
+  // --- Left: Company Info ---
+  doc.fontSize(12).font("Helvetica-Bold").fillColor(darkGray)
+    .text(company.companyName || "Company Name", margin + 5, y + 3, { width: leftColWidth });
 
-  const rx = margin + halfW + 16;
-  doc.roundedRect(rx, y, halfW, 105, 6).fill("#fef9c3").stroke("#fde68a");
-  doc.fillColor("#92400e").fontSize(8).font("Helvetica-Bold").text("RETURN DETAILS", rx + 12, y + 10);
+  let infoY = y + 20;
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Manufactured & Distributed By:", margin + 5, infoY);
+  infoY += 11;
+  doc.fontSize(7).font("Helvetica").fillColor(darkGray);
+  if (company.companyAddress) {
+    doc.text(company.companyAddress, margin + 5, infoY, { width: leftColWidth - 10 });
+    infoY += 10;
+  }
+  if (company.companyPhone) {
+    doc.text(`Tel.: ${company.companyPhone}`, margin + 5, infoY, { width: leftColWidth - 10 });
+    infoY += 10;
+  }
+  if (company.companyEmail) {
+    doc.text(`E-mail: ${company.companyEmail}`, margin + 5, infoY, { width: leftColWidth - 10 });
+    infoY += 10;
+  }
 
-  const dets = [
-    ["Return Invoice", sr.returnInvoiceNumber || "-"],
-    ["Original Order", sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-8) || "-"],
-    ["Return Date", new Date(sr.completedAt || sr.createdAt).toLocaleDateString("en-GB")],
-    ["Reason", (sr.returnReason || "Not specified").slice(0, 38)],
+  // HACCP Badge
+  doc.rect(margin + 5, infoY + 2, 72, 13).fillColor(green).fill();
+  doc.fontSize(7).font("Helvetica-Bold").fillColor("#ffffff")
+    .text("HACCP CERTIFIED", margin + 8, infoY + 5, { width: 68 });
+
+  // --- Center: TAX INVOICE ---
+  const titleBoxY = y;
+  doc.rect(centerColX, titleBoxY, centerColWidth, 28).fillColor(purple).fill();
+  doc.fontSize(15).font("Helvetica-Bold").fillColor("#ffffff")
+    .text("TAX INVOICE", centerColX, titleBoxY + 7, { width: centerColWidth, align: "center" });
+
+  doc.rect(centerColX, titleBoxY + 28, centerColWidth, 18).fillColor(lightPurple).fill();
+
+  doc.rect(centerColX, titleBoxY + 46, centerColWidth, 18).fillColor(purple).fill();
+  doc.fontSize(7).font("Helvetica-Bold").fillColor("#ffffff")
+    .text("SALES RETURN CREDIT NOTE", centerColX, titleBoxY + 50, { width: centerColWidth, align: "center" });
+
+  doc.rect(centerColX, titleBoxY, centerColWidth, 64)
+    .lineWidth(2).strokeColor(purple).stroke();
+
+  // --- Right: Invoice Details ---
+  const detailBoxY = y;
+  const detailBoxHeight = 88;
+  doc.rect(rightColX, detailBoxY, rightColWidth, detailBoxHeight)
+    .lineWidth(1.5).strokeColor(gray).stroke();
+
+  let detailY = detailBoxY + 8;
+  const detailRows = [
+    { label: "Ret. Inv. No.", value: sr.returnInvoiceNumber || "N/A" },
+    { label: "Date", value: formattedDate },
+    { label: "Orig. Order", value: sr.order?.invoiceNumber || "N/A" },
+    { label: "Refund", value: (sr.refundMethod || "none").replace(/_/g, " ") },
   ];
-  let dy = y + 26;
-  dets.forEach(([lbl, val]) => {
-    doc.fillColor("#78350f").fontSize(8).font("Helvetica-Bold")
-      .text(lbl + ": ", rx + 12, dy, { continued: true });
-    doc.fillColor("#1c1917").font("Helvetica").text(val, { width: halfW - 24 });
-    dy += 16;
+
+  detailRows.forEach((row) => {
+    doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+      .text(row.label, rightColX + 8, detailY, { width: 55 });
+    doc.fontSize(8).font("Helvetica").fillColor(darkGray)
+      .text(row.value, rightColX + 63, detailY, { width: rightColWidth - 73, align: "right" });
+    detailY += 14;
   });
 
-  y += 120;
+  doc.moveTo(rightColX + 5, detailY + 2).lineTo(rightColX + rightColWidth - 5, detailY + 2)
+    .lineWidth(0.5).strokeColor(gray).stroke();
+  detailY += 8;
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text("TRN:", rightColX + 8, detailY, { width: rightColWidth - 16, align: "right" });
 
-  // Items table header
-  const cols = {
-    no: margin, product: margin + 28, unit: margin + 256, qty: margin + 308,
-    price: margin + 355, vat: margin + 410, total: margin + 460,
+  // ===== TO SECTION =====
+  y = Math.max(infoY + 20, detailBoxY + detailBoxHeight) + 8;
+
+  const toBoxWidth = contentWidth * 0.55;
+  const toBoxHeight = 55;
+  doc.rect(margin, y, toBoxWidth, toBoxHeight)
+    .lineWidth(1.5).strokeColor(gray).stroke();
+
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text("To.", margin + 8, y + 5);
+
+  let toY = y + 16;
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text(sr.customer?.name || "N/A", margin + 8, toY);
+  toY += 12;
+  doc.fontSize(8).font("Helvetica").fillColor(darkGray);
+  if (sr.customer?.address) {
+    doc.text(sr.customer.address, margin + 8, toY, { width: toBoxWidth - 16 });
+    toY += 10;
+  }
+  if (sr.customer?.phoneNumber) {
+    doc.text(sr.customer.phoneNumber, margin + 8, toY);
+    toY += 10;
+  }
+  doc.text("TRN :", margin + 8, toY);
+
+  // Return reason box alongside "To" box
+  const reasonX = margin + toBoxWidth + 8;
+  const reasonWidth = contentWidth - toBoxWidth - 8;
+  doc.rect(reasonX, y, reasonWidth, toBoxHeight)
+    .lineWidth(1.5).strokeColor(gray).stroke();
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Return Reason:", reasonX + 8, y + 5);
+  doc.fontSize(8).font("Helvetica").fillColor(darkGray)
+    .text(sr.returnReason || "Not specified", reasonX + 8, y + 18, { width: reasonWidth - 16 });
+
+  y += toBoxHeight + 8;
+
+  // ===== ITEMS TABLE =====
+  const colDefs = [
+    { width: 28, header: "S. No.", align: "center" },
+    { width: 138, header: "Item Name", align: "left" },
+    { width: 37, header: "Ret.Qty", align: "center" },
+    { width: 37, header: "Unit", align: "center" },
+    { width: 55, header: "U. Price", align: "center" },
+    { width: 55, header: "Excl. VAT", align: "center" },
+    { width: 33, header: "Disc%", align: "center" },
+    { width: 33, header: "VAT%", align: "center" },
+    { width: 62, header: "VAT Amount", align: "center" },
+    { width: 67, header: "TOTAL", align: "center" },
+  ];
+
+  let colX = margin;
+  const cols = colDefs.map((col) => {
+    const result = { ...col, x: colX };
+    colX += col.width;
+    return result;
+  });
+
+  const headerRowHeight = 22;
+  const dataRowHeight = 18;
+  const footerSpaceNeeded = 310;
+
+  const drawTableHeader = (startY) => {
+    doc.rect(margin, startY, contentWidth, headerRowHeight).fillColor(headerBg).fill();
+    doc.rect(margin, startY, contentWidth, headerRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+    cols.forEach((col) => {
+      doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+        .text(col.header, col.x + 2, startY + 6, { width: col.width - 4, align: col.align });
+      doc.moveTo(col.x, startY).lineTo(col.x, startY + headerRowHeight)
+        .lineWidth(0.5).strokeColor(gray).stroke();
+    });
+    doc.moveTo(rightEdge, startY).lineTo(rightEdge, startY + headerRowHeight)
+      .lineWidth(0.5).strokeColor(gray).stroke();
+    return startY + headerRowHeight;
   };
 
-  doc.rect(margin, y, cw, 24).fill("#1e3a5f");
-  doc.fillColor("white").fontSize(8.5).font("Helvetica-Bold");
-  doc.text("#", cols.no + 4, y + 8)
-    .text("Product", cols.product + 4, y + 8)
-    .text("Unit", cols.unit + 4, y + 8)
-    .text("Qty", cols.qty + 4, y + 8)
-    .text("Price", cols.price + 4, y + 8)
-    .text("VAT%", cols.vat + 4, y + 8)
-    .text("Total", cols.total + 4, y + 8);
-  y += 24;
+  y = drawTableHeader(y);
 
-  // Items rows
-  sr.returnItems.forEach((item, idx) => {
-    const rh = 22;
-    doc.rect(margin, y, cw, rh).fill(idx % 2 === 0 ? "#ffffff" : "#f8fafc").stroke("#e2e8f0");
-    doc.fillColor("#0f172a").fontSize(8.5).font("Helvetica");
-    doc.text(String(idx + 1), cols.no + 4, y + 7)
-      .text((item.product?.productName || "Product").slice(0, 32), cols.product + 4, y + 7, { width: 220 })
-      .text(item.unit || "-", cols.unit + 4, y + 7)
-      .text(String(item.returnedQuantity), cols.qty + 4, y + 7)
-      .text(`AED ${(item.price || 0).toFixed(2)}`, cols.price + 4, y + 7)
-      .text(`${item.vatPercentage || 5}%`, cols.vat + 4, y + 7)
-      .text(`AED ${(item.totalAmount || 0).toFixed(2)}`, cols.total + 4, y + 7);
-    y += rh;
+  // Data rows
+  let grandTotalExclVat = 0;
+  let grandTotalVat = 0;
+  let grandTotalInclVat = 0;
+  let totalWeight = 0;
+  let serialNumber = 1;
+
+  sr.returnItems.forEach((item) => {
+    const qty = item.returnedQuantity || 0;
+    if (qty <= 0) return;
+
+    // Page overflow check
+    if (y + dataRowHeight + footerSpaceNeeded > pageHeight) {
+      doc.addPage({ size: "A4", margin: 0 });
+      doc.rect(margin - 3, margin - 3, contentWidth + 6, pageHeight - margin * 2 + 6)
+        .lineWidth(2).strokeColor(darkGray).stroke();
+      y = margin;
+      y = drawTableHeader(y);
+    }
+
+    const vatPercentage = item.vatPercentage || 5;
+    const unitPrice = item.price || 0;
+    const exclVatAmount = item.exclVatAmount || unitPrice * qty;
+    const vatAmount = item.vatAmount || exclVatAmount * (vatPercentage / 100);
+    const itemTotal = item.totalAmount || exclVatAmount + vatAmount;
+
+    grandTotalExclVat += exclVatAmount;
+    grandTotalVat += vatAmount;
+    grandTotalInclVat += itemTotal;
+    totalWeight += qty;
+
+    const unit = item.unit || item.product?.unit || "Nos";
+    const rowData = [
+      serialNumber.toString(),
+      item.product?.productName || "Unknown Product",
+      qty.toString(),
+      unit,
+      unitPrice.toFixed(2),
+      exclVatAmount.toFixed(2),
+      "0",
+      vatPercentage.toString(),
+      vatAmount.toFixed(2),
+      itemTotal.toFixed(2),
+    ];
+
+    doc.rect(margin, y, contentWidth, dataRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+    cols.forEach((col, i) => {
+      doc.fontSize(8).font("Helvetica").fillColor("#000000")
+        .text(rowData[i], col.x + 2, y + 4, { width: col.width - 4, align: i === 1 ? "left" : "center" });
+      doc.moveTo(col.x, y).lineTo(col.x, y + dataRowHeight)
+        .lineWidth(0.5).strokeColor(gray).stroke();
+    });
+    doc.moveTo(rightEdge, y).lineTo(rightEdge, y + dataRowHeight)
+      .lineWidth(0.5).strokeColor(gray).stroke();
+
+    y += dataRowHeight;
+    serialNumber++;
   });
 
-  y += 14;
+  // Check if footer sections need a new page
+  if (y + footerSpaceNeeded > pageHeight) {
+    doc.addPage({ size: "A4", margin: 0 });
+    doc.rect(margin - 3, margin - 3, contentWidth + 6, pageHeight - margin * 2 + 6)
+      .lineWidth(2).strokeColor(darkGray).stroke();
+    y = margin;
+  }
 
-  // Totals
-  const totalExcl = sr.returnItems.reduce((s, i) => s + (i.exclVatAmount || 0), 0);
-  const totalVat = sr.returnItems.reduce((s, i) => s + (i.vatAmount || 0), 0);
-  const totalAmt = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
+  // ===== BALANCE SECTION =====
+  y += 5;
+  const balanceRowHeight = 28;
+  const balW1 = contentWidth * 0.35;
+  const balW2 = contentWidth * 0.15;
+  const balW3 = contentWidth * 0.1;
+  const balW4 = contentWidth * 0.15;
+  const balW5 = contentWidth * 0.25;
 
-  const sx = margin + cw - 250;
-  const sumRows = [
-    ["Subtotal (Excl. VAT)", `AED ${totalExcl.toFixed(2)}`],
-    ["VAT Amount", `AED ${totalVat.toFixed(2)}`],
-    ["Total Return Amount", `AED ${totalAmt.toFixed(2)}`],
+  doc.rect(margin, y, contentWidth, balanceRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+
+  const balSeps = [margin, margin + balW1, margin + balW1 + balW2, margin + balW1 + balW2 + balW3, margin + balW1 + balW2 + balW3 + balW4, rightEdge];
+  balSeps.forEach((sepX) => {
+    doc.moveTo(sepX, y).lineTo(sepX, y + balanceRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text(`Refund Amount : ${(sr.refundAmount || grandTotalInclVat).toFixed(2)}`, margin + 5, y + 4, { width: balW1 - 10 })
+    .text(`Status : ${(sr.refundStatus || "pending").toUpperCase()}`, margin + 5, y + 16, { width: balW1 - 10 });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Total Returned", margin + balW1 + 3, y + 10, { width: balW2 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica").fillColor(darkGray)
+    .text(totalWeight.toString(), margin + balW1 + balW2 + 3, y + 10, { width: balW3 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Total Dhs.", margin + balW1 + balW2 + balW3 + 3, y + 10, { width: balW4 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+    .text(grandTotalExclVat.toFixed(2), margin + balW1 + balW2 + balW3 + balW4 + 5, y + 10, { width: balW5 - 10, align: "right" });
+
+  y += balanceRowHeight;
+
+  // ===== WORDS SECTION =====
+  y += 5;
+  const wordsHeight = 48;
+  doc.rect(margin, y, contentWidth, wordsHeight).lineWidth(0.5).strokeColor(gray).stroke();
+
+  const grandTotalWords = amountToWords(grandTotalInclVat);
+  const vatWords = amountToWords(grandTotalVat);
+
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Total amount in words", margin + 8, y + 5);
+  doc.fontSize(8).font("Helvetica").fillColor(darkGray)
+    .text(grandTotalWords, margin + 8, y + 17, { width: contentWidth - 16 })
+    .text(`${vatWords} (AED ${grandTotalVat.toFixed(2)})`, margin + 8, y + 32, { width: contentWidth - 16 });
+
+  y += wordsHeight;
+
+  // ===== VAT & TOTAL RETURN AMOUNT =====
+  y += 5;
+  const vatRowHeight = 22;
+  const vatLabelWidth = contentWidth * 0.75;
+  const vatValueWidth = contentWidth * 0.25;
+
+  // VAT row
+  doc.rect(margin, y, vatLabelWidth, vatRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.rect(margin + vatLabelWidth, y, vatValueWidth, vatRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Vat 5%", margin, y + 6, { width: vatLabelWidth, align: "center" });
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text(grandTotalVat.toFixed(2), margin + vatLabelWidth + 5, y + 6, { width: vatValueWidth - 10, align: "right" });
+  y += vatRowHeight;
+
+  // Total Return Amount row
+  doc.rect(margin, y, vatLabelWidth, vatRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.rect(margin + vatLabelWidth, y, vatValueWidth, vatRowHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text("Total Return Amount", margin, y + 6, { width: vatLabelWidth, align: "center" });
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(darkGray)
+    .text(grandTotalInclVat.toFixed(2), margin + vatLabelWidth + 5, y + 6, { width: vatValueWidth - 10, align: "right" });
+  y += vatRowHeight;
+
+  // ===== REFUND METHOD SECTION =====
+  y += 5;
+  const refundHeight = 25;
+  doc.rect(margin, y, contentWidth, refundHeight).lineWidth(1.5).strokeColor(gray).stroke();
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(darkGray)
+    .text(`Refund via: ${(sr.refundMethod || "none").replace(/_/g, " ").toUpperCase()}`, margin, y + 8, { width: contentWidth, align: "center" });
+  y += refundHeight;
+
+  // ===== FOOTER SECTION =====
+  y += 8;
+  const conditionHeight = 38;
+  doc.rect(margin, y, contentWidth, conditionHeight).lineWidth(0.5).strokeColor(gray).stroke();
+  doc.fontSize(7).font("Helvetica").fillColor(darkGray)
+    .text("This is a computer-generated Sales Return Credit Note.", margin + 8, y + 5, { width: contentWidth - 16 });
+  doc.fontSize(6).font("Helvetica")
+    .text("..................................................", margin + 8, y + 18, { width: contentWidth - 16, align: "center" })
+    .text("Authorized Signature", margin + 8, y + 27, { width: contentWidth - 16, align: "center" });
+  y += conditionHeight;
+
+  // ===== SIGNATURE BOXES =====
+  y += 8;
+  const sigGap = 8;
+  const sigBoxWidth = (contentWidth - sigGap * 3) / 4;
+  const sigBoxHeight = 90;
+
+  const signatures = [
+    "Customer Acknowledgment",
+    "Return Verified By",
+    "Store Keeper Sign",
+    `for ${company.companyName || "Company Name"}`,
   ];
 
-  sumRows.forEach(([label, val], i) => {
-    const isLast = i === sumRows.length - 1;
-    if (isLast) {
-      doc.roundedRect(sx - 8, y - 2, 258, 26, 4).fill("#1e3a5f");
-      doc.fillColor("white").fontSize(11).font("Helvetica-Bold");
-    } else {
-      doc.fillColor("#475569").fontSize(9).font("Helvetica");
-    }
-    doc.text(label, sx, y + (isLast ? 5 : 0), { width: 148 });
-    doc.text(val, sx + 152, y + (isLast ? 5 : 0), { width: 96, align: "right" });
-    y += isLast ? 32 : 18;
+  signatures.forEach((label, i) => {
+    const boxX = margin + i * (sigBoxWidth + sigGap);
+    doc.roundedRect(boxX, y, sigBoxWidth, sigBoxHeight, 3)
+      .lineWidth(1.5).strokeColor(gray).stroke();
+    doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
+      .text(label, boxX + 5, y + sigBoxHeight - 40, { width: sigBoxWidth - 10, align: "center" });
   });
-
-  y += 10;
-
-  // Amount in words
-  doc.rect(margin, y, cw, 28).fill("#f0fdf4").stroke("#bbf7d0");
-  doc.fillColor("#166534").fontSize(8.5).font("Helvetica-Bold")
-    .text("Amount in Words: ", margin + 10, y + 9, { continued: true });
-  doc.font("Helvetica").fillColor("#14532d")
-    .text(amountToWords(totalAmt), { width: cw - 20 });
-  y += 40;
-
-  // Refund information
-  doc.roundedRect(margin, y, cw, 40, 6).fill("#fef9c3").stroke("#fde68a");
-  doc.fillColor("#92400e").fontSize(9).font("Helvetica-Bold")
-    .text("Refund Information", margin + 10, y + 6);
-  doc.fillColor("#78350f").fontSize(8.5).font("Helvetica")
-    .text(
-      `Refund Method: ${(sr.refundMethod || "none").replace(/_/g, " ").toUpperCase()}   |   ` +
-      `Status: ${(sr.refundStatus || "pending").toUpperCase()}   |   ` +
-      `Amount: AED ${(sr.refundAmount || totalAmt).toFixed(2)}`,
-      margin + 10, y + 22, { width: cw - 20 }
-    );
-  y += 52;
-
-  // Footer
-  const footerY = doc.page.height - 50;
-  doc.rect(0, footerY, pageW, 50).fill("#1e3a5f");
-  doc.fillColor("#94a3b8").fontSize(8).font("Helvetica")
-    .text("This is a computer-generated Sales Return Credit Note.", margin, footerY + 9, {
-      width: cw, align: "center",
-    });
-  doc.fillColor("white").fontSize(8.5).font("Helvetica-Bold")
-    .text(settings?.companyName || "Company", margin, footerY + 26, {
-      width: cw, align: "center",
-    });
 };
 
 const getReturnInvoice = async (req, res) => {

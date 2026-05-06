@@ -54,6 +54,7 @@ import StorekeeperOrders from "../pages/Storekeeper/StorekeeperOrders/Storekeepe
 import RemainingPackOrders from "../pages/Storekeeper/RemainingPackOrders/RemainingPackOrders";
 import CreditSuggestion from "../pages/Salesmanpages/CreditSuggestion/CreditSuggestion";
 import Emirates from "../pages/Emirates/Emirates";
+import CreateEmirates from "../pages/Emirates/CreateEmirates";
 import SalesReturn from "../pages/SalesReturn/SalesReturn";
 import CreateSalesReturn from "../pages/SalesReturn/CreateSalesReturn";
 import ReturnPickups from "../pages/DeliveryPartner/ReturnPickups/ReturnPickups";
@@ -199,6 +200,7 @@ function Dom() {
   } 
 />
             <Route path="/emirates" element={<Emirates />} />
+            <Route path="/emirates/create" element={<CreateEmirates />} />
             <Route path="/sales-returns" element={<SalesReturn />} />
             <Route path="/sales-returns/create" element={<CreateSalesReturn />} />
             <Route path="/delivery/return-pickups" element={<ReturnPickups />} />

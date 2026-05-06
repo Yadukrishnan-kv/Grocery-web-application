@@ -357,7 +357,7 @@ const SalesReturn = () => {
                             >
                               View
                             </button>
-                            {sr.status === "pending_admin_approval" && (
+                            {sr.status === "pending_admin_approval" && user?.role === "Admin" && (
                               <>
                                 <button
                                   className="sr-btn-sm sr-btn-approve"
@@ -373,7 +373,7 @@ const SalesReturn = () => {
                                 </button>
                               </>
                             )}
-                            {sr.status === "approved" && (
+                            {sr.status === "approved" && user?.role === "Admin" && (
                               <button
                                 className="sr-btn-sm sr-btn-assign"
                                 onClick={() => { setAssignModal(sr); setAssignDeliveryManId(""); }}
