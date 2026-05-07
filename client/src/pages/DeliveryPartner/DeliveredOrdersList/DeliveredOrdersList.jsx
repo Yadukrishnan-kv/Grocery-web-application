@@ -146,7 +146,7 @@ const DeliveredOrdersList = () => {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.post(
+      const res = await axios.post(
         `${backendUrl}/api/orders/deliverorder/${currentOrder._id}`,
         {
           deliveredItems,
@@ -157,7 +157,14 @@ const DeliveredOrdersList = () => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      toast.success("Delivery recorded successfully!");
+      if (res.data.returnCreditUsed && res.data.returnCreditUsed > 0) {
+        toast.success(
+          `Return credit of AED ${res.data.returnCreditUsed.toFixed(2)} was applied. Remaining AED ${(res.data.amountCollected - res.data.returnCreditUsed).toFixed(2)} collected as ${paymentMethod}.`,
+          { duration: 6000 }
+        );
+      } else {
+        toast.success("Delivery recorded successfully!");
+      }
       fetchAcceptedOrders();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to record delivery");

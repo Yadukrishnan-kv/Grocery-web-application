@@ -6,15 +6,16 @@ const Role = require("../models/Role");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
-// Generate CustomerId: [3-char emiratesCode][3-char salesmanName][3-char customerName]
-// Ensures uniqueness by appending a counter suffix when a collision occurs.
-const generateCustomerId = async (emiratesCode, salesmanName, customerName) => {
+// Generate CustomerId: [3-char emiratesCode][3-char salesmanName][4-digit sequential starting from 1001]
+// Total 10 characters. Sequential number increments until unique.
+const generateCustomerId = async (emiratesCode, salesmanName) => {
   const pad = (str, len) => (str || "XXX").replace(/[^A-Za-z0-9]/g, "").toUpperCase().padEnd(len, "X").slice(0, len);
-  const base = pad(emiratesCode, 3) + pad(salesmanName, 3) + pad(customerName, 3);
-  let candidate = base;
-  let counter = 1;
+  const prefix = pad(emiratesCode, 3) + pad(salesmanName, 3);
+  let counter = 1001;
+  let candidate = prefix + String(counter);
   while (await Customer.exists({ customerId: candidate })) {
-    candidate = base + String(counter++).padStart(2, "0");
+    counter++;
+    candidate = prefix + String(counter);
   }
   return candidate;
 };
@@ -119,8 +120,8 @@ const createCustomer = async (req, res) => {
       }
     }
 
-    // CustomerId: [customer's emiratesCode 3] + [salesman name 3] + [customer name 3]
-    const generatedCustomerId = await generateCustomerId(emiratesCode, salesmanUsername, name.trim());
+    // CustomerId: [customer's emiratesCode 3] + [salesman name 3] + [4-digit sequential from 1001]
+    const generatedCustomerId = await generateCustomerId(emiratesCode, salesmanUsername);
 
     // Create customer with new fields
     const customer = await Customer.create({
@@ -471,6 +472,11 @@ const createCustomerRequest = async (req, res) => {
       openingBalanceDueDays,
       emiratesName,
       emiratesCode,
+      contactPersonName,
+      contactPersonPhone,
+      contactPersonAddress,
+      latitude,
+      longitude,
     } = req.body;
 
     // Validation
@@ -480,9 +486,9 @@ const createCustomerRequest = async (req, res) => {
       !phoneNumber?.trim() ||
       !address?.trim() ||
       !pincode?.trim() ||
-      !creditLimit
+      creditLimit === undefined || creditLimit === null || creditLimit === ''
     ) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "All required fields must be filled" });
     }
 
     const parsedCreditLimit = parseFloat(creditLimit);
@@ -541,6 +547,11 @@ const createCustomerRequest = async (req, res) => {
       emiratesCode: emiratesCode?.trim() || null,
       salesmanEmiratesName: req.user.emiratesName || null,
       salesmanEmiratesCode: req.user.emiratesCode || null,
+      contactPersonName: contactPersonName?.trim() || null,
+      contactPersonPhone: contactPersonPhone?.trim() || null,
+      contactPersonAddress: contactPersonAddress?.trim() || null,
+      latitude: latitude !== undefined && latitude !== '' ? parseFloat(latitude) : null,
+      longitude: longitude !== undefined && longitude !== '' ? parseFloat(longitude) : null,
     });
 
     res.status(201).json({
@@ -618,7 +629,7 @@ const acceptCustomerRequest = async (req, res) => {
     const salesmanUser = await User.findById(request.salesman).select("username emiratesName emiratesCode");
     const salesmanUsername = salesmanUser ? salesmanUser.username : "ADM";
     // Use the customer's own emiratesCode for customerId generation
-    const generatedCustomerId = await generateCustomerId(request.emiratesCode, salesmanUsername, request.name);
+    const generatedCustomerId = await generateCustomerId(request.emiratesCode, salesmanUsername);
 
     const customer = await Customer.create({
       user: user._id,
@@ -830,7 +841,7 @@ const getMyCustomersWithDue = async (req, res) => {
     }
 
     const customers = await Customer.find({ salesman: req.user._id })
-      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType openingBalance')
+      .select('name email phoneNumber address pincode customerId emiratesName emiratesCode creditLimit balanceCreditLimit returnCreditBalance billingType openingBalance')
       .sort({ name: 1 });
 
     const customersWithDetails = await Promise.all(
@@ -866,6 +877,10 @@ const getMyCustomersWithDue = async (req, res) => {
           usedCredit: customer.creditLimit - customer.balanceCreditLimit,
           billingType: customer.billingType,
           openingBalance: customer.openingBalance,
+          customerId: customer.customerId,
+          emiratesName: customer.emiratesName,
+          emiratesCode: customer.emiratesCode,
+          returnCreditBalance: customer.returnCreditBalance,
           totalOutstanding,
           pendingBillDaysLeft: daysLeft,
           pendingDueDate: latestPendingBill?.dueDate,

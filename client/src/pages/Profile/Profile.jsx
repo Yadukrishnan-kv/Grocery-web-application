@@ -259,7 +259,7 @@ const Profile = () => {
                       <span className="value">{profile.customerDetails.address || 'N/A'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="label">Pincode</span>
+                      <span className="label">TRN</span>
                       <span className="value">{profile.customerDetails.pincode || 'N/A'}</span>
                     </div>
                     <div className="detail-row">

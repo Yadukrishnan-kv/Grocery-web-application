@@ -20,7 +20,7 @@ const paymentTransactionSchema = new Schema(
     },
     method: {
       type: String,
-      enum: ["cash", "cheque"],
+      enum: ["cash", "cheque", "return_credit"],
       required: true,
     },
     chequeDetails: {

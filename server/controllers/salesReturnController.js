@@ -84,16 +84,29 @@ const createSalesReturn = async (req, res) => {
       return res.status(400).json({ message: "Only delivered orders can be returned" });
     }
 
-    // 5-day window check
+    // 30-day window check
     const daysSinceDelivery =
       (Date.now() - new Date(order.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceDelivery > 5) {
+    if (daysSinceDelivery > 30) {
       return res.status(400).json({
-        message: `Return window expired. Returns must be made within 5 days of delivery (${Math.floor(daysSinceDelivery)} days ago).`,
+        message: `Return window expired. Returns must be made within 30 days of delivery (${Math.floor(daysSinceDelivery)} days ago).`,
       });
     }
 
     // Validate and build return items
+    // First, compute already-returned quantities for this order (non-cancelled, non-rejected)
+    const existingReturns = await SalesReturn.find({
+      order: orderId,
+      status: { $nin: ["cancelled", "rejected"] },
+    }).select("returnItems");
+    const alreadyReturnedQty = {};
+    for (const sr of existingReturns) {
+      for (const ri of sr.returnItems) {
+        const prodId = ri.product.toString();
+        alreadyReturnedQty[prodId] = (alreadyReturnedQty[prodId] || 0) + ri.returnedQuantity;
+      }
+    }
+
     const processedItems = [];
     for (const ri of returnItems) {
       const orderItem = order.orderItems.find(
@@ -106,9 +119,11 @@ const createSalesReturn = async (req, res) => {
       }
       const qty = parseInt(ri.returnedQuantity);
       if (!qty || qty <= 0) continue;
-      if (qty > (orderItem.deliveredQuantity || 0)) {
+      const alreadyReturned = alreadyReturnedQty[orderItem.product._id.toString()] || 0;
+      const maxReturnable = (orderItem.deliveredQuantity || 0) - alreadyReturned;
+      if (qty > maxReturnable) {
         return res.status(400).json({
-          message: `Return qty (${qty}) exceeds delivered qty (${orderItem.deliveredQuantity}) for "${orderItem.product?.productName || "product"}"`,
+          message: `Return qty (${qty}) exceeds remaining returnable qty (${maxReturnable}) for "${orderItem.product?.productName || "product"}"`,
         });
       }
       const exclVatAmount = parseFloat((qty * orderItem.price).toFixed(2));
@@ -161,6 +176,12 @@ const getAllSalesReturns = async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
+
+    // If user is a salesman, restrict to their customers' returns only
+    if (req.user && req.user.role === "Sales man") {
+      const myCustomers = await Customer.find({ salesman: req.user._id }).select("_id");
+      filter.customer = { $in: myCustomers.map((c) => c._id) };
+    }
 
     const returns = await SalesReturn.find(filter)
       .populate("order", "invoiceNumber orderDate status payment")
@@ -310,14 +331,22 @@ const confirmPickup = async (req, res) => {
     const order = await Order.findById(sr.order);
     const totalReturnAmount = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
 
-    // Restore customer credit balance if credit order
-    if (order && order.payment === "credit") {
-      await Customer.findByIdAndUpdate(sr.customer, {
-        $inc: { balanceCreditLimit: totalReturnAmount },
-      });
+    // For credit orders: restore balanceCreditLimit (frees up credit for next purchase)
+    // For cash/cheque orders: add to returnCreditBalance (store credit — no cash refund)
+    if (order) {
+      if (order.payment === "credit") {
+        await Customer.findByIdAndUpdate(sr.customer, {
+          $inc: { balanceCreditLimit: totalReturnAmount },
+        });
+      } else {
+        // cash / cheque — convert return amount to store credit
+        await Customer.findByIdAndUpdate(sr.customer, {
+          $inc: { returnCreditBalance: totalReturnAmount },
+        });
+      }
     }
 
-    // Adjust related bill
+    // Adjust related bill — only reduce amountDue, never modify grandTotal/invoice amounts
     let billAdjusted = false;
     let relatedBillId = sr.relatedBill || null;
 
@@ -329,18 +358,11 @@ const confirmPickup = async (req, res) => {
 
       if (bills.length > 0) {
         const bill = bills[0];
-        const newAmountDue = Math.max(0, bill.amountDue - totalReturnAmount);
-        bill.amountDue = newAmountDue;
-        if (bill.grandTotal !== undefined) {
-          bill.grandTotal = Math.max(0, bill.grandTotal - totalReturnAmount);
+        bill.amountDue = Math.max(0, bill.amountDue - totalReturnAmount);
+        if (bill.amountDue <= 0) {
+          bill.amountDue = 0;
+          bill.status = "paid";
         }
-        if (bill.totalExclVat !== undefined) {
-          bill.totalExclVat = Math.max(
-            0,
-            bill.totalExclVat - sr.returnItems.reduce((s, i) => s + (i.exclVatAmount || 0), 0)
-          );
-        }
-        if (newAmountDue === 0) bill.status = "paid";
         await bill.save();
         relatedBillId = bill._id;
         billAdjusted = true;
@@ -374,14 +396,22 @@ const confirmReturnReceived = async (req, res) => {
     const order = await Order.findById(sr.order);
     const totalReturnAmount = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
 
-    // Restore customer credit balance if not already done at pickup
-    if (order && order.payment === "credit" && !sr.billAdjusted) {
-      await Customer.findByIdAndUpdate(sr.customer, {
-        $inc: { balanceCreditLimit: totalReturnAmount },
-      });
+    // For credit orders: restore balanceCreditLimit (if not already done at pickup)
+    // For cash/cheque orders: add to returnCreditBalance (if not already done at pickup)
+    if (order && !sr.billAdjusted) {
+      if (order.payment === "credit") {
+        await Customer.findByIdAndUpdate(sr.customer, {
+          $inc: { balanceCreditLimit: totalReturnAmount },
+        });
+      } else {
+        // cash / cheque — convert return amount to store credit
+        await Customer.findByIdAndUpdate(sr.customer, {
+          $inc: { returnCreditBalance: totalReturnAmount },
+        });
+      }
     }
 
-    // Adjust or cancel related bill (only if not already adjusted at pickup)
+    // Adjust bill — only reduce amountDue, never modify grandTotal/invoice amounts
     let billAdjusted = sr.billAdjusted || false;
     let relatedBillId = sr.relatedBill || null;
 
@@ -393,15 +423,11 @@ const confirmReturnReceived = async (req, res) => {
 
       if (bills.length > 0) {
         const bill = bills[0];
-        const newAmountDue = Math.max(0, bill.amountDue - totalReturnAmount);
-        bill.amountDue = newAmountDue;
-        if (bill.grandTotal !== undefined) {
-          bill.grandTotal = Math.max(0, bill.grandTotal - totalReturnAmount);
+        bill.amountDue = Math.max(0, bill.amountDue - totalReturnAmount);
+        if (bill.amountDue <= 0) {
+          bill.amountDue = 0;
+          bill.status = "paid";
         }
-        if (bill.totalExclVat !== undefined) {
-          bill.totalExclVat = Math.max(0, bill.totalExclVat - sr.returnItems.reduce((s, i) => s + (i.exclVatAmount || 0), 0));
-        }
-        if (newAmountDue === 0) bill.status = "paid";
         await bill.save();
         relatedBillId = bill._id;
         billAdjusted = true;
@@ -458,12 +484,12 @@ const getMyReturnPickups = async (req, res) => {
 
 const getPickedUpReturns = async (req, res) => {
   try {
-    const returns = await SalesReturn.find({ status: "picked_up" })
+    const returns = await SalesReturn.find({ status: { $in: ["picked_up", "completed"] } })
       .populate("order", "invoiceNumber orderDate")
       .populate("customer", "name phoneNumber address")
       .populate("returnItems.product", "productName unit")
       .populate("assignedTo", "username")
-      .sort({ pickedUpAt: -1 });
+      .sort({ updatedAt: -1 });
     res.json(returns);
   } catch (error) {
     res.status(500).json({ message: "Server error: " + error.message });
@@ -474,12 +500,12 @@ const getPickedUpReturns = async (req, res) => {
 
 const getDeliveredOrdersForReturn = async (req, res) => {
   try {
-    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     // Build base query
     const query = {
       status: { $in: ["delivered", "partial_delivered"] },
-      updatedAt: { $gte: fiveDaysAgo },
+      updatedAt: { $gte: thirtyDaysAgo },
     };
 
     // If user is a salesman, restrict to their customers only
@@ -494,15 +520,40 @@ const getDeliveredOrdersForReturn = async (req, res) => {
       .populate("orderItems.product", "productName unit price")
       .sort({ updatedAt: -1 });
 
-    // Exclude orders that already have an active (non-cancelled, non-rejected) return
+    // Build map of already-returned quantities per order per product
     const orderIds = orders.map((o) => o._id);
     const existingReturns = await SalesReturn.find({
       order: { $in: orderIds },
       status: { $nin: ["cancelled", "rejected"] },
-    }).select("order");
-    const returnedOrderIds = new Set(existingReturns.map((sr) => sr.order.toString()));
+    }).select("order returnItems");
 
-    const filteredOrders = orders.filter((o) => !returnedOrderIds.has(o._id.toString()));
+    // returnedQtyMap: orderId -> productId -> qty already returned
+    const returnedQtyMap = {};
+    for (const sr of existingReturns) {
+      const orderId = sr.order.toString();
+      if (!returnedQtyMap[orderId]) returnedQtyMap[orderId] = {};
+      for (const ri of sr.returnItems) {
+        const prodId = ri.product.toString();
+        returnedQtyMap[orderId][prodId] = (returnedQtyMap[orderId][prodId] || 0) + ri.returnedQuantity;
+      }
+    }
+
+    // Only include orders where at least one item still has remaining returnable qty
+    const filteredOrders = orders
+      .map((o) => {
+        const obj = o.toObject();
+        obj.alreadyReturnedQty = returnedQtyMap[o._id.toString()] || {};
+        return obj;
+      })
+      .filter((o) =>
+        (o.orderItems || []).some((item) => {
+          const deliveredQty = item.deliveredQuantity || 0;
+          const prodId = item.product?._id?.toString() || item.product?.toString();
+          const alreadyReturned = o.alreadyReturnedQty[prodId] || 0;
+          return deliveredQty - alreadyReturned > 0;
+        })
+      );
+
     res.json(filteredOrders);
   } catch (error) {
     res.status(500).json({ message: "Server error: " + error.message });

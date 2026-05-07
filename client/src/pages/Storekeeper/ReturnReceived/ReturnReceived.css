@@ -60,6 +60,50 @@
 
 .rr-loading { text-align: center; padding: 3rem; color: #94a3b8; }
 
+.rr-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.rr-tab {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rr-tab.active {
+  color: #4f46e5;
+  border-bottom-color: #4f46e5;
+}
+
+.rr-tab-count {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.rr-status-done {
+  color: #16a34a;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
 .rr-empty-card {
   background: white;
   border-radius: 16px;

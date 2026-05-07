@@ -539,7 +539,7 @@ const getBillReceipt = async (req, res) => {
       y += 10;
     }
     if (bill.customer?.address) {
-      doc.text(`${bill.customer.address}${bill.customer.pincode ? ", " + bill.customer.pincode : ""}`, centerX, y, { width: contentWidth });
+      doc.text(bill.customer.address, centerX, y, { width: contentWidth });
       y += 10;
     }
 
@@ -699,7 +699,7 @@ const downloadBillInvoice = async (req, res) => {
       y += 10;
     }
     if (bill.customer?.address) {
-      doc.text(`${bill.customer.address}${bill.customer.pincode ? ", " + bill.customer.pincode : ""}`, centerX, y, { width: contentWidth });
+      doc.text(bill.customer.address, centerX, y, { width: contentWidth });
       y += 10;
     }
 

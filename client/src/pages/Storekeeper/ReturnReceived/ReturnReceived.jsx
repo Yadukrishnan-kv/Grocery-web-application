@@ -15,6 +15,7 @@ const ReturnReceived = () => {
   const [refundMethod, setRefundMethod] = useState("none");
   const [processing, setProcessing] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
+  const [activeTab, setActiveTab] = useState("pending");
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchUser = useCallback(async () => {
@@ -79,6 +80,10 @@ const ReturnReceived = () => {
   const totalReturnAmt = (sr) =>
     (sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
 
+  const pendingReturns = returns.filter((r) => r.status === "picked_up");
+  const completedReturns = returns.filter((r) => r.status === "completed");
+  const visibleReturns = activeTab === "pending" ? pendingReturns : completedReturns;
+
   return (
     <div className="rr-layout">
       <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} user={user} />
@@ -101,16 +106,38 @@ const ReturnReceived = () => {
               </p>
             </div>
             <div className="rr-badge-count">
-              {returns.length} item(s) awaiting
+              {pendingReturns.length} item(s) awaiting
             </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="rr-tabs">
+            <button
+              className={`rr-tab ${activeTab === "pending" ? "active" : ""}`}
+              onClick={() => setActiveTab("pending")}
+            >
+              Pending Confirmation
+              {pendingReturns.length > 0 && (
+                <span className="rr-tab-count">{pendingReturns.length}</span>
+              )}
+            </button>
+            <button
+              className={`rr-tab ${activeTab === "history" ? "active" : ""}`}
+              onClick={() => setActiveTab("history")}
+            >
+              History
+              {completedReturns.length > 0 && (
+                <span className="rr-tab-count">{completedReturns.length}</span>
+              )}
+            </button>
           </div>
 
           {loading ? (
             <div className="rr-loading">Loading...</div>
-          ) : returns.length === 0 ? (
+          ) : visibleReturns.length === 0 ? (
             <div className="rr-empty-card">
-              <div className="rr-empty-icon">✅</div>
-              <p>No returned goods awaiting confirmation.</p>
+              <div className="rr-empty-icon">{activeTab === "pending" ? "✅" : "📋"}</div>
+              <p>{activeTab === "pending" ? "No returned goods awaiting confirmation." : "No completed returns yet."}</p>
             </div>
           ) : (
             <div className="rr-card">
@@ -121,6 +148,7 @@ const ReturnReceived = () => {
                       <th>#</th>
                       <th>Customer</th>
                       <th>Original Order</th>
+                      <th>Return Invoice</th>
                       <th>Delivery Man</th>
                       <th>Items</th>
                       <th>Return Amount</th>
@@ -130,7 +158,7 @@ const ReturnReceived = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {returns.map((sr, idx) => (
+                    {visibleReturns.map((sr, idx) => (
                       <tr key={sr._id}>
                         <td>{idx + 1}</td>
                         <td>
@@ -141,6 +169,15 @@ const ReturnReceived = () => {
                           <span className="rr-inv-badge">
                             {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
                           </span>
+                        </td>
+                        <td>
+                          {sr.returnInvoiceNumber ? (
+                            <span className="rr-inv-badge" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
+                              {sr.returnInvoiceNumber}
+                            </span>
+                          ) : (
+                            <span className="rr-muted">—</span>
+                          )}
                         </td>
                         <td>{sr.assignedTo?.username || <span className="rr-muted">—</span>}</td>
                         <td>
@@ -156,15 +193,19 @@ const ReturnReceived = () => {
                         </td>
                         <td className="rr-reason">{sr.returnReason || "—"}</td>
                         <td>
-                          <button
-                            className="rr-btn-confirm"
-                            onClick={() => {
-                              setConfirmModal(sr);
-                              setRefundMethod("none");
-                            }}
-                          >
-                            Confirm Received
-                          </button>
+                          {sr.status === "picked_up" ? (
+                            <button
+                              className="rr-btn-confirm"
+                              onClick={() => {
+                                setConfirmModal(sr);
+                                setRefundMethod("none");
+                              }}
+                            >
+                              Confirm Received
+                            </button>
+                          ) : (
+                            <span className="rr-status-done">✅ Completed</span>
+                          )}
                         </td>
                       </tr>
                     ))}

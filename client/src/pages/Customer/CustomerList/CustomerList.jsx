@@ -251,7 +251,7 @@ const CustomerList = () => {
                       <th scope="col">Contact Phone</th>
                       <th scope="col">Contact Address</th>
                       <th scope="col">Address</th>
-                      <th scope="col">Pincode</th>
+                      <th scope="col">TRN</th>
                       <th scope="col">Emirates</th>
                       <th scope="col">Emirates Code</th>
                       <th scope="col">Latitude</th>

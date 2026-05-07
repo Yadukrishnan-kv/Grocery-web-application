@@ -56,17 +56,17 @@ const CreateCustomer = () => {
     if (!formData.phoneNumber.trim())
       newErrors.phoneNumber = "Phone number is required";
     if (!formData.address.trim()) newErrors.address = "Address is required";
-    if (!formData.pincode.trim()) newErrors.pincode = "Pincode is required";
-
-    if (
-      !formData.creditLimit ||
-      isNaN(formData.creditLimit) ||
-      parseFloat(formData.creditLimit) < 0
-    ) {
-      newErrors.creditLimit = "Valid credit limit ≥ 0 required";
-    }
+    if (!formData.pincode.trim()) newErrors.pincode = "TRN is required";
 
     if (formData.billingType === "Credit limit") {
+      if (
+        formData.creditLimit === "" ||
+        isNaN(formData.creditLimit) ||
+        parseFloat(formData.creditLimit) < 0
+      ) {
+        newErrors.creditLimit = "Valid credit limit ≥ 0 required";
+      }
+
       if (!formData.statementType)
         newErrors.statementType = "Statement type required";
       if (
@@ -435,7 +435,7 @@ const CreateCustomer = () => {
               </div>
 
               <div className="customer-form-group">
-                <label htmlFor="pincode">Pincode</label>
+                <label htmlFor="pincode">TRN</label>
                 <input
                   id="pincode"
                   name="pincode"

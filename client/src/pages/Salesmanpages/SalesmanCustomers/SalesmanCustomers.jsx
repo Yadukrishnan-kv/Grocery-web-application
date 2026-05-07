@@ -166,7 +166,7 @@ const SalesmanCustomers = () => {
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
                       <th scope="col">Address</th>
-                      <th scope="col">Pincode</th>
+                      <th scope="col">TRN</th>
                       <th scope="col">Emirates</th>
                       <th scope="col">Emirates Code</th>
                       <th scope="col">Credit Limit</th>

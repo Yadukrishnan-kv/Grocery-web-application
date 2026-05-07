@@ -193,7 +193,7 @@ const getDeliveryMen = async (req, res) => {
 
 const getSalesMen = async (req, res) => {
   try {
-    const salesMen = await User.find({ role: { $regex: /sales/i } }).select("username _id emiratesName emiratesCode");
+    const salesMen = await User.find({ role: "Sales man" }).select("username _id emiratesName emiratesCode");
     res.json(salesMen);
   } catch (error) {
     res.status(500).json({ message: "Server error" });

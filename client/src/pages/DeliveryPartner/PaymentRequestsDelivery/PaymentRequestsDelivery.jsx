@@ -521,8 +521,8 @@ const PaymentRequestsDelivery = () => {
     }
   };
 
-  const handleMarkReceivedClick = (billId, amountDue, invoiceNumber) => {
-    setBillToMark({ id: billId, amountDue, invoiceNumber });
+  const handleMarkReceivedClick = (billId, amountDue, invoiceNumber, grandTotal, paidAmount) => {
+    setBillToMark({ id: billId, amountDue, invoiceNumber, grandTotal, paidAmount });
     setMarkAmount(amountDue.toFixed(2));
     setMarkMethod("cash");
     setMarkChequeDetails({ number: "", bank: "", date: "" });
@@ -743,7 +743,7 @@ const PaymentRequestsDelivery = () => {
         fail = 0;
       for (const billId of selectedPendingBills) {
         const bill = pendingBills.find((b) => b._id === billId);
-        if (!bill || bill.status !== "pending") continue;
+        if (!bill || bill.status === "paid") continue;
         try {
           await axios.post(
             `${backendUrl}/api/bills/mark-received`,
@@ -1137,7 +1137,7 @@ const PaymentRequestsDelivery = () => {
                               type="checkbox"
                               checked={selectedPendingBills.includes(bill._id)}
                               onChange={() => handlePendingBillSelect(bill._id)}
-                              disabled={bill.status !== "pending"}
+                              disabled={bill.status === "paid"}
                             />
                           </td>
                           <td>{idx + 1}</td>
@@ -1153,11 +1153,11 @@ const PaymentRequestsDelivery = () => {
                             </span>
                           </td>
                           <td className="actions-col">
-                            {bill.status === "pending" && (
+                            {(bill.status === "pending" || bill.status === "partial") && (
                               <button
                                 className="mark-received-btn"
                                 onClick={() =>
-                                  handleMarkReceivedClick(bill._id, bill.amountDue, invoiceNo)
+                                  handleMarkReceivedClick(bill._id, bill.amountDue, invoiceNo, bill.grandTotal, bill.paidAmount)
                                 }
                                 disabled={processingId === bill._id}
                               >
@@ -1567,8 +1567,14 @@ const PaymentRequestsDelivery = () => {
               <p>
                 <strong>Invoice:</strong> {billToMark.invoiceNumber || "N/A"}
               </p>
+              {billToMark.grandTotal != null && (
+                <p><strong>Total Bill:</strong> AED {Number(billToMark.grandTotal).toFixed(2)}</p>
+              )}
+              {billToMark.paidAmount > 0 && (
+                <p><strong>Already Paid:</strong> AED {Number(billToMark.paidAmount).toFixed(2)}</p>
+              )}
               <p>
-                <strong>Due Amount:</strong> AED {billToMark.amountDue.toFixed(2)}
+                <strong>Remaining Due:</strong> AED {billToMark.amountDue.toFixed(2)}
               </p>
             </div>
             <div className="pay-modal-input-group">

@@ -1,5 +1,5 @@
 // src/pages/Sales/CreateCustomerRequest.jsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import '../../Customer/CreateCustomer/CreateCustomer.css'; // Reuse same CSS
@@ -22,6 +22,11 @@ const CreateCustomerRequest = () => {
     openingBalanceDueDays: '',
     emiratesName: '',
     emiratesCode: '',
+    contactPersonName: '',
+    contactPersonPhone: '',
+    contactPersonAddress: '',
+    latitude: '',
+    longitude: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -43,13 +48,13 @@ const CreateCustomerRequest = () => {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Please provide a valid email';
     if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Phone number is required';
     if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.pincode.trim()) newErrors.pincode = 'Pincode is required';
-    if (!formData.creditLimit || isNaN(formData.creditLimit) || parseFloat(formData.creditLimit) < 0) {
-      newErrors.creditLimit = 'Valid credit limit is required';
-    }
+    if (!formData.pincode.trim()) newErrors.pincode = 'TRN is required';
 
     // NEW: Validate if Credit limit
     if (formData.billingType === "Credit limit") {
+      if (formData.creditLimit === '' || isNaN(formData.creditLimit) || parseFloat(formData.creditLimit) < 0) {
+        newErrors.creditLimit = 'Valid credit limit is required';
+      }
       if (!formData.statementType) newErrors.statementType = 'Statement type is required for Credit limit';
       if (!formData.dueDays || isNaN(formData.dueDays) || parseInt(formData.dueDays) < 0) {
         newErrors.dueDays = 'Valid due days is required (non-negative number)';
@@ -141,6 +146,11 @@ const CreateCustomerRequest = () => {
           : null,
         emiratesName: formData.emiratesName || null,
         emiratesCode: formData.emiratesCode || null,
+        contactPersonName: formData.contactPersonName.trim() || null,
+        contactPersonPhone: formData.contactPersonPhone.trim() || null,
+        contactPersonAddress: formData.contactPersonAddress.trim() || null,
+        latitude: formData.latitude !== '' ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude !== '' ? parseFloat(formData.longitude) : null,
       };
 
       await axios.post(
@@ -285,7 +295,7 @@ const CreateCustomerRequest = () => {
               </div>
 
               <div className="customer-form-group">
-                <label htmlFor="pincode">Pincode</label>
+                <label htmlFor="pincode">TRN</label>
                 <input
                   id="pincode"
                   name="pincode"
@@ -469,6 +479,108 @@ const CreateCustomerRequest = () => {
                   placeholder="Auto-filled from selection"
                   className="customer-input"
                   style={{ backgroundColor: "#f8fafc", cursor: "default" }}
+                />
+              </div>
+            </div>
+
+            {/* Customer ID Preview */}
+            {formData.emiratesCode && user?.username && (
+              <div className="customer-form-row">
+                <div className="customer-form-group">
+                  <label>Customer ID Preview</label>
+                  <input
+                    type="text"
+                    value={(() => {
+                      const pad = (str, len) =>
+                        (str || "XXX").replace(/[^A-Za-z0-9]/g, "").toUpperCase().padEnd(len, "X").slice(0, len);
+                      return pad(formData.emiratesCode, 3) + pad(user.username, 3) + "1001+";
+                    })()}
+                    readOnly
+                    className="customer-input"
+                    style={{ backgroundColor: "#f8fafc", cursor: "default", fontFamily: "monospace", letterSpacing: "0.1em" }}
+                  />
+                  <small style={{ color: "#888", fontSize: "0.78rem" }}>
+                    Format: [Emirates 3] + [Salesman 3] + [Sequential from 1001]. Exact number assigned on approval.
+                  </small>
+                </div>
+              </div>
+            )}
+
+            {/* Contact Person & Location */}
+            <div className="customer-form-row">
+              <div className="customer-form-group">
+                <label htmlFor="contactPersonName">Contact Person Name</label>
+                <input
+                  id="contactPersonName"
+                  name="contactPersonName"
+                  type="text"
+                  value={formData.contactPersonName}
+                  onChange={handleChange}
+                  placeholder="e.g. John Doe"
+                  className="customer-input"
+                />
+              </div>
+            </div>
+
+            {formData.contactPersonName.trim() && (
+              <>
+                <div className="customer-form-row">
+                  <div className="customer-form-group">
+                    <label htmlFor="contactPersonPhone">Contact Person Phone</label>
+                    <input
+                      id="contactPersonPhone"
+                      name="contactPersonPhone"
+                      type="text"
+                      value={formData.contactPersonPhone}
+                      onChange={handleChange}
+                      placeholder="e.g. +971 50 123 4567"
+                      className="customer-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="customer-form-row">
+                  <div className="customer-form-group">
+                    <label htmlFor="contactPersonAddress">Contact Person Address</label>
+                    <textarea
+                      id="contactPersonAddress"
+                      name="contactPersonAddress"
+                      value={formData.contactPersonAddress}
+                      onChange={handleChange}
+                      rows="2"
+                      placeholder="e.g. Office 12, Building A, Dubai"
+                      className="customer-textarea"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="customer-form-row">
+              <div className="customer-form-group">
+                <label htmlFor="latitude">Latitude</label>
+                <input
+                  id="latitude"
+                  name="latitude"
+                  type="number"
+                  step="any"
+                  value={formData.latitude}
+                  onChange={handleChange}
+                  placeholder="e.g. 25.2048"
+                  className="customer-input"
+                />
+              </div>
+              <div className="customer-form-group">
+                <label htmlFor="longitude">Longitude</label>
+                <input
+                  id="longitude"
+                  name="longitude"
+                  type="number"
+                  step="any"
+                  value={formData.longitude}
+                  onChange={handleChange}
+                  placeholder="e.g. 55.2708"
+                  className="customer-input"
                 />
               </div>
             </div>

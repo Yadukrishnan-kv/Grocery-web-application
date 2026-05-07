@@ -25,7 +25,7 @@ const customerRequestSchema = new Schema(
     },
     pincode: {
       type: String,
-      required: [true, "Pincode is required"],
+      required: [true, "TRN is required"],
       trim: true,
     },
     creditLimit: {
@@ -107,6 +107,29 @@ const customerRequestSchema = new Schema(
     salesmanEmiratesCode: {
       type: String,
       trim: true,
+      default: null,
+    },
+    contactPersonName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    contactPersonPhone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    contactPersonAddress: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    latitude: {
+      type: Number,
+      default: null,
+    },
+    longitude: {
+      type: Number,
       default: null,
     },
   },

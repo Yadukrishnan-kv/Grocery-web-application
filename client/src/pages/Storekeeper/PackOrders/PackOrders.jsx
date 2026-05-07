@@ -95,12 +95,18 @@ const PackOrders = () => {
     setProcessing(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.post(
+      const res = await axios.post(
         `${backendUrl}/api/orders/pack/${selectedOrder._id}`,
         { packedItems },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      if (res.data.returnCreditUsed && res.data.returnCreditUsed > 0) {
+        toast.success(
+          `Return credit of AED ${res.data.returnCreditUsed.toFixed(2)} was applied to this order.`,
+          { duration: 5000 }
+        );
+      }
       toast.success("Packing submitted successfully!");
       setSelectedOrder(null);
       setPackInputs({});

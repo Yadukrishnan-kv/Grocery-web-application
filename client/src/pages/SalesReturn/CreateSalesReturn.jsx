@@ -1,5 +1,5 @@
 // src/pages/SalesReturn/CreateSalesReturn.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../../components/layout/Header/Header";
 import Sidebar from "../../components/layout/Sidebar/Sidebar";
@@ -14,9 +14,10 @@ const CreateSalesReturn = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [deliveredOrders, setDeliveredOrders] = useState([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [returnItems, setReturnItems] = useState({}); // { productId: { reason: '' } }
+  const [returnItems, setReturnItems] = useState({}); // { productId: { reason: '', returnQty: 0 } }
   const [returnReason, setReturnReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -48,12 +49,13 @@ const CreateSalesReturn = () => {
       if (preselectedOrderId) {
         const found = res.data.find((o) => o._id === preselectedOrderId);
         if (found) {
+          setSelectedCustomerId(found.customer?._id || "");
           setSelectedOrderId(preselectedOrderId);
           setSelectedOrder(found);
           const init = {};
           (found.orderItems || []).forEach((item) => {
             if ((item.deliveredQuantity || 0) > 0) {
-              init[item.product._id] = { reason: "" };
+              init[item.product._id] = { reason: "", returnQty: item.deliveredQuantity };
             }
           });
           setReturnItems(init);
@@ -71,6 +73,30 @@ const CreateSalesReturn = () => {
     fetchDeliveredOrders();
   }, [fetchUser, fetchDeliveredOrders]);
 
+  // Derive unique customers from the loaded orders
+  const uniqueCustomers = useMemo(() => {
+    const map = new Map();
+    deliveredOrders.forEach((o) => {
+      if (o.customer && o.customer._id) {
+        map.set(o.customer._id, o.customer);
+      }
+    });
+    return Array.from(map.values());
+  }, [deliveredOrders]);
+
+  // Filter orders by selected customer
+  const customerOrders = useMemo(() => {
+    if (!selectedCustomerId) return [];
+    return deliveredOrders.filter((o) => o.customer?._id === selectedCustomerId);
+  }, [deliveredOrders, selectedCustomerId]);
+
+  const handleCustomerSelect = (customerId) => {
+    setSelectedCustomerId(customerId);
+    setSelectedOrderId("");
+    setSelectedOrder(null);
+    setReturnItems({});
+  };
+
   const handleOrderSelect = (orderId) => {
     setSelectedOrderId(orderId);
     if (!orderId) {
@@ -78,12 +104,17 @@ const CreateSalesReturn = () => {
       setReturnItems({});
       return;
     }
-    const order = deliveredOrders.find((o) => o._id === orderId);
+    const order = customerOrders.find((o) => o._id === orderId);
     setSelectedOrder(order || null);
+    const alreadyReturned = order?.alreadyReturnedQty || {};
     const init = {};
     (order?.orderItems || []).forEach((item) => {
-      if ((item.deliveredQuantity || 0) > 0) {
-        init[item.product._id] = { reason: "" };
+      const deliveredQty = item.deliveredQuantity || 0;
+      const prodId = item.product._id;
+      const already = alreadyReturned[prodId] || 0;
+      const remaining = deliveredQty - already;
+      if (remaining > 0) {
+        init[prodId] = { reason: "", returnQty: remaining };
       }
     });
     setReturnItems(init);
@@ -96,13 +127,22 @@ const CreateSalesReturn = () => {
     }));
   };
 
-  const getDeliveredItems = () =>
-    (selectedOrder?.orderItems || []).filter((i) => (i.deliveredQuantity || 0) > 0);
+  const getDeliveredItems = () => {
+    const alreadyReturned = selectedOrder?.alreadyReturnedQty || {};
+    return (selectedOrder?.orderItems || []).filter((i) => {
+      const deliveredQty = i.deliveredQuantity || 0;
+      const prodId = i.product._id?.toString() || i.product?.toString();
+      const already = alreadyReturned[prodId] || 0;
+      return deliveredQty - already > 0;
+    });
+  };
 
   const calcTotal = () =>
     getDeliveredItems().reduce((sum, item) => {
-      const qty = item.deliveredQuantity || 0;
-      const exclVat = qty * item.price;
+      const productId = item.product._id;
+      const returnQty = parseInt(returnItems[productId]?.returnQty || 0);
+      if (returnQty <= 0) return sum;
+      const exclVat = returnQty * item.price;
       const vat = (exclVat * (item.vatPercentage || 5)) / 100;
       return sum + exclVat + vat;
     }, 0);
@@ -117,13 +157,13 @@ const CreateSalesReturn = () => {
     const itemsToReturn = getDeliveredItems()
       .map((item) => ({
         productId: item.product._id,
-        returnedQuantity: item.deliveredQuantity,
+        returnedQuantity: parseInt(returnItems[item.product._id]?.returnQty || 0),
         reason: returnItems[item.product._id]?.reason || "",
       }))
       .filter((i) => i.returnedQuantity > 0);
 
     if (itemsToReturn.length === 0) {
-      toast.error("No delivered items to return");
+      toast.error("Please enter at least one return quantity");
       return;
     }
 
@@ -170,40 +210,62 @@ const CreateSalesReturn = () => {
                 ← Back
               </button>
               <h1 className="csr-page-title">Create Sales Return</h1>
-              <p className="csr-page-sub">Returns can only be made within 5 days of delivery</p>
+              <p className="csr-page-sub">Returns can only be made within 30 days of delivery</p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit}>
-            {/* Step 1: Select Order */}
+            {/* Step 1: Select Customer then Order */}
             <div className="csr-card">
               <div className="csr-card-header">
-                <h2>Step 1 — Select Delivered Order</h2>
+                <h2>Step 1 — Select Customer &amp; Order</h2>
               </div>
               <div className="csr-card-body">
                 {loadingOrders ? (
                   <p className="csr-loading">Loading delivered orders...</p>
                 ) : deliveredOrders.length === 0 ? (
                   <div className="csr-info-box">
-                    No delivered orders within the last 5 days. Returns can only be made within 5 days of delivery.
+                    No delivered orders within the last 30 days. Returns can only be made within 30 days of delivery.
                   </div>
                 ) : (
-                  <div className="csr-form-group">
-                    <label>Select Order</label>
-                    <select
-                      className="csr-select"
-                      value={selectedOrderId}
-                      onChange={(e) => handleOrderSelect(e.target.value)}
-                    >
-                      <option value="">-- Select an order --</option>
-                      {deliveredOrders.map((o) => (
-                        <option key={o._id} value={o._id}>
-                          {o.invoiceNumber || o._id.slice(-8)} — {o.customer?.name} —{" "}
-                          {new Date(o.updatedAt).toLocaleDateString("en-GB")}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <>
+                    {/* Customer dropdown */}
+                    <div className="csr-form-group">
+                      <label>Select Customer</label>
+                      <select
+                        className="csr-select"
+                        value={selectedCustomerId}
+                        onChange={(e) => handleCustomerSelect(e.target.value)}
+                      >
+                        <option value="">-- Select a customer --</option>
+                        {uniqueCustomers.map((c) => (
+                          <option key={c._id} value={c._id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Order dropdown — only shown after customer is selected */}
+                    {selectedCustomerId && (
+                      <div className="csr-form-group">
+                        <label>Select Order</label>
+                        <select
+                          className="csr-select"
+                          value={selectedOrderId}
+                          onChange={(e) => handleOrderSelect(e.target.value)}
+                        >
+                          <option value="">-- Select an order --</option>
+                          {customerOrders.map((o) => (
+                            <option key={o._id} value={o._id}>
+                              {o.invoiceNumber || o._id.slice(-8)} —{" "}
+                              {new Date(o.updatedAt).toLocaleDateString("en-GB")}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {selectedOrder && (
@@ -236,7 +298,7 @@ const CreateSalesReturn = () => {
               <div className="csr-card">
                 <div className="csr-card-header">
                   <h2>Step 2 — Items to Return</h2>
-                  <p className="csr-card-sub">All delivered items will be returned in full.</p>
+                  <p className="csr-card-sub">Enter the quantity to return for each item (0 to skip).</p>
                 </div>
                 <div className="csr-card-body">
                   <div className="csr-items-table-wrap">
@@ -245,6 +307,9 @@ const CreateSalesReturn = () => {
                         <tr>
                           <th>Product</th>
                           <th>Unit</th>
+                          <th>Delivered Qty</th>
+                          <th>Already Returned</th>
+                          <th>Remaining</th>
                           <th>Return Qty</th>
                           <th>Price / Unit</th>
                           <th>Return Amount</th>
@@ -254,13 +319,16 @@ const CreateSalesReturn = () => {
                       <tbody>
                         {deliveredItems.map((item) => {
                           const productId = item.product._id;
-                          const qty = item.deliveredQuantity || 0;
-                          const exclVat = qty * item.price;
+                          const deliveredQty = item.deliveredQuantity || 0;
+                          const alreadyReturned = (selectedOrder?.alreadyReturnedQty || {})[productId] || 0;
+                          const remainingQty = deliveredQty - alreadyReturned;
+                          const returnQty = parseInt(returnItems[productId]?.returnQty || 0);
+                          const exclVat = returnQty * item.price;
                           const vat = (exclVat * (item.vatPercentage || 5)) / 100;
                           const lineTotal = exclVat + vat;
 
                           return (
-                            <tr key={productId} className="csr-row-selected">
+                            <tr key={productId} className={returnQty > 0 ? "csr-row-selected" : ""}>
                               <td>
                                 <div className="csr-product-name">
                                   {item.product?.productName || "—"}
@@ -269,8 +337,34 @@ const CreateSalesReturn = () => {
                               <td>{item.unit || item.product?.unit || "—"}</td>
                               <td>
                                 <span className="csr-delivered-badge">
-                                  {qty}
+                                  {deliveredQty}
                                 </span>
+                              </td>
+                              <td>
+                                {alreadyReturned > 0 ? (
+                                  <span style={{ color: "#e67e22", fontWeight: 600 }}>{alreadyReturned}</span>
+                                ) : (
+                                  <span style={{ color: "#aaa" }}>—</span>
+                                )}
+                              </td>
+                              <td>
+                                <span style={{ color: "#27ae60", fontWeight: 600 }}>{remainingQty}</span>
+                              </td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={remainingQty}
+                                  value={returnItems[productId]?.returnQty ?? remainingQty}
+                                  onChange={(e) => {
+                                    const val = Math.min(
+                                      Math.max(0, parseInt(e.target.value) || 0),
+                                      remainingQty
+                                    );
+                                    handleItemChange(productId, "returnQty", val);
+                                  }}
+                                  className="csr-qty-input"
+                                />
                               </td>
                               <td>AED {(item.price || 0).toFixed(2)}</td>
                               <td className="csr-line-total">
@@ -292,7 +386,7 @@ const CreateSalesReturn = () => {
                       {calcTotal() > 0 && (
                         <tfoot>
                           <tr>
-                            <td colSpan="4" className="csr-total-label">Total Return Amount (incl. VAT)</td>
+                            <td colSpan="5" className="csr-total-label">Total Return Amount (incl. VAT)</td>
                             <td colSpan="2" className="csr-total-val">
                               AED {calcTotal().toFixed(2)}
                             </td>

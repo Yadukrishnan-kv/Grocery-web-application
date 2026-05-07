@@ -377,6 +377,11 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
       .filter((item) => {
         const itemPermission = MENU_PERMISSIONS[item.id];
 
+        // Salesmen can always see Sales Returns status page (read-only view)
+        // but NOT the separate Create Sales Return shortcut (they can create from the list page)
+        if (item.id === "CreateSalesReturn" && user?.role === "Sales man") return false;
+        if (item.id === "SalesReturn" && user?.role === "Sales man") return true;
+
         // If no permission required, show it
         if (!itemPermission) return true;
 

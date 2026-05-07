@@ -33,7 +33,7 @@ const customerSchema = new Schema(
     },
     pincode: {
       type: String,
-      required: [true, "Pincode is required"],
+      required: [true, "TRN is required"],
       trim: true,
     },
     creditLimit: {
@@ -46,6 +46,11 @@ const customerSchema = new Schema(
       default: function() {
         return this.creditLimit;
       },
+      min: 0,
+    },
+    returnCreditBalance: {
+      type: Number,
+      default: 0,
       min: 0,
     },
     billingType: {

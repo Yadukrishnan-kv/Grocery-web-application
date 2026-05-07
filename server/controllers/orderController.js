@@ -301,8 +301,7 @@ const deliverOrder = async (req, res) => {
     }
 
     let grandDeliveryAmount = 0;
-
-    // Update delivered quantities
+    let returnCreditUsed = 0;
     for (const inputItem of deliveredItems) {
       const orderItem = order.orderItems.id(inputItem.product);
       if (!orderItem) {
@@ -324,20 +323,44 @@ const deliverOrder = async (req, res) => {
 
     // Handle cash/cheque payment immediately
     if (paymentMethod === "cash" || paymentMethod === "cheque") {
-      await PaymentTransaction.create({
-        order: order._id,
-        deliveryMan: req.user._id,
-        amount: grandDeliveryAmount,
-        method: paymentMethod,
-        chequeDetails: paymentMethod === "cheque" ? chequeDetails : undefined,
-        status: "received",
-      });
-
       const customer = await Customer.findById(order.customer);
+
+      let cashToCollect = grandDeliveryAmount;
+
+      // Apply returnCreditBalance first — return credits are consumed before cash is collected
+      if (customer && (customer.returnCreditBalance || 0) > 0) {
+        returnCreditUsed = parseFloat(Math.min(customer.returnCreditBalance, grandDeliveryAmount).toFixed(2));
+        customer.returnCreditBalance -= returnCreditUsed;
+        cashToCollect = parseFloat((grandDeliveryAmount - returnCreditUsed).toFixed(2));
+
+        // Record the return credit portion as a payment transaction
+        await PaymentTransaction.create({
+          order: order._id,
+          deliveryMan: req.user._id,
+          amount: returnCreditUsed,
+          method: "return_credit",
+          status: "received",
+        });
+      }
+
+      // Record the actual cash/cheque collected (only remaining amount)
+      if (cashToCollect > 0) {
+        await PaymentTransaction.create({
+          order: order._id,
+          deliveryMan: req.user._id,
+          amount: cashToCollect,
+          method: paymentMethod,
+          chequeDetails: paymentMethod === "cheque" ? chequeDetails : undefined,
+          status: "received",
+        });
+      }
+
+      // Restore balanceCreditLimit for "Credit limit" billing type customers
       if (customer && customer.billingType === "Credit limit") {
         customer.balanceCreditLimit += grandDeliveryAmount;
-        await customer.save();
       }
+
+      if (customer) await customer.save();
     }
 
     // Calculate totals for status updates
@@ -349,12 +372,12 @@ const deliverOrder = async (req, res) => {
     await order.save();
 
     // ✅ CREATE NEW BILL FOR THIS DELIVERY (never update existing)
-    const customer = await Customer.findById(order.customer);
+    const customerForBill = await Customer.findById(order.customer);
     if (
       order.payment === "credit" &&
       paymentMethod !== "cash" &&
       paymentMethod !== "cheque" &&
-      customer?.statementType === "invoice-based"
+      customerForBill?.statementType === "invoice-based"
     ) {
       // ✅ Pass specific delivery amount and current invoice number
       const bill = await createInvoiceBasedBill(order, grandDeliveryAmount, order.invoiceNumber);
@@ -367,10 +390,11 @@ const deliverOrder = async (req, res) => {
     res.json({
       message:
         paymentMethod === "cash" || paymentMethod === "cheque"
-          ? `Delivery recorded & ${paymentMethod} received – credit restored: AED ${grandDeliveryAmount.toFixed(2)}`
+          ? `Delivery recorded & ${paymentMethod} received – AED ${grandDeliveryAmount.toFixed(2)} total`
           : "Delivery recorded successfully. Bill generated for credit payment.",
       order,
       amountCollected: grandDeliveryAmount,
+      returnCreditUsed,
     });
   } catch (error) {
     console.error("Deliver order error:", error);
@@ -706,10 +730,12 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     toY += 10;
   }
   if (order.customer?.pincode) {
-    doc.text(order.customer.pincode, margin + 8, toY);
+    doc.text(`TRN: ${order.customer.pincode}`, margin + 8, toY, { width: toBoxWidth - 16 });
+    toY += 10;
+  } else {
+    doc.text("TRN:", margin + 8, toY);
     toY += 10;
   }
-  doc.text("TRN :", margin + 8, toY);
 
   y += toBoxHeight + 8;
 
@@ -1654,16 +1680,32 @@ const packOrder = async (req, res) => {
     if (order.payment === "credit" && newlyPackedAmount > 0) {
       const customer = await Customer.findById(order.customer);
       if (customer?.billingType === "Credit limit") {
-        if (customer.balanceCreditLimit < newlyPackedAmount) {
-          return res.status(400).json({
-            message: `Insufficient credit. Need AED ${newlyPackedAmount.toFixed(2)} (Incl. VAT), available AED ${customer.balanceCreditLimit.toFixed(2)}`,
-          });
+        let remaining = newlyPackedAmount;
+
+        // Use returnCreditBalance first (from previous sales returns)
+        if ((customer.returnCreditBalance || 0) > 0) {
+          const rcu = parseFloat(Math.min(customer.returnCreditBalance, remaining).toFixed(2));
+          customer.returnCreditBalance -= rcu;
+          packReturnCreditUsed = rcu;
+          remaining = parseFloat((remaining - rcu).toFixed(2));
         }
-        // ✅ Deduct Grand Total (Incl. VAT) from credit limit
-        customer.balanceCreditLimit -= newlyPackedAmount;
+
+        // Then use balanceCreditLimit for the rest
+        if (remaining > 0) {
+          if (customer.balanceCreditLimit < remaining) {
+            return res.status(400).json({
+              message: `Insufficient credit. Need AED ${remaining.toFixed(2)} (Incl. VAT), available AED ${customer.balanceCreditLimit.toFixed(2)}`,
+            });
+          }
+          customer.balanceCreditLimit -= remaining;
+        }
+
         await customer.save();
       }
     }
+
+    // Capture how much return credit was applied for the response
+    let packReturnCreditUsed = 0;
 
     // 4. Generate new invoice number ONLY when something new is packed
     let newInvoiceNumber = order.invoiceNumber;
@@ -1706,11 +1748,12 @@ const packOrder = async (req, res) => {
         : `Partially packed (${totalNewlyPackedQty} units). Credit deducted: AED ${newlyPackedAmount.toFixed(2)} (Incl. VAT)`,
       order,
       invoiceNumber: newInvoiceNumber,
+      returnCreditUsed: packReturnCreditUsed,
       newlyPacked: {
         quantity: totalNewlyPackedQty,
-        amount: newlyPackedAmount,           // Grand Total (Incl. VAT)
-        exclVat: newlyPackedExclVat,         // Excl. VAT
-        vatAmount: newlyPackedVatAmount,     // VAT Amount
+        amount: newlyPackedAmount,
+        exclVat: newlyPackedExclVat,
+        vatAmount: newlyPackedVatAmount,
         items: newlyPackedItems,
       },
       nextStep: allFullyPacked ? "Ready for delivery" : "Can pack more later",
