@@ -420,6 +420,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                     <th>Customer</th>
                     <th>Invoice #</th>
                     <th>Amount</th>
+                    <th>Return Credit Used</th>
                     <th>Date</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -443,6 +444,11 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
   {tx.displayInvoiceNumber || tx.order?.invoiceNumber || tx.invoiceNumber || "N/A"}
 </td>
                       <td>AED {tx.amount.toFixed(2)}</td>
+                      <td>
+                        {tx.returnCreditUsed > 0
+                          ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
+                          : <span style={{ color: "#9ca3af" }}>—</span>}
+                      </td>
                       <td>{new Date(tx.date).toLocaleDateString()}</td>
                       <td>{tx.status}</td>
                       <td>

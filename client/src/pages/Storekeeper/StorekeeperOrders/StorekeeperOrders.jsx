@@ -253,7 +253,7 @@ const StorekeeperOrders = () => {
                           0,
                         ) || 0;
 
-                      // ✅ Calculate amount based on packed quantity (not total order)
+                      // ✅ Calculate amount based on packed quantity (VAT-inclusive)
                       const packedAmount =
                         order.orderItems
                           ?.reduce((sum, item) => {
@@ -262,7 +262,14 @@ const StorekeeperOrders = () => {
                               item.invoicedQuantity || 0;
                             const qtyForThisInvoice =
                               packedQty - previouslyInvoiced;
-                            return sum + qtyForThisInvoice * item.price;
+                            // Use totalAmount (incl. VAT) proportionally
+                            const ratio = item.orderedQuantity > 0
+                              ? qtyForThisInvoice / item.orderedQuantity
+                              : 0;
+                            const itemTotal = item.totalAmount
+                              ? item.totalAmount * ratio
+                              : qtyForThisInvoice * item.price * (1 + (item.vatPercentage || 5) / 100);
+                            return sum + itemTotal;
                           }, 0)
                           .toFixed(2) || "0.00";
 

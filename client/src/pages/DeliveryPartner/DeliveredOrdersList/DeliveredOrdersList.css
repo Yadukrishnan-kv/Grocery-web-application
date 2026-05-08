@@ -741,6 +741,39 @@
   letter-spacing: -0.02em;
 }
 
+/* Return Credit Breakdown Banner */
+.return-credit-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rc-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+  color: #374151;
+}
+.rc-highlight {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+.rc-total {
+  border-top: 1px solid #bfdbfe;
+  padding-top: 8px;
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+.rc-note {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: #1d4ed8;
+}
+
 /* Product List Container */
 .products-delivery-list {
   display: flex;

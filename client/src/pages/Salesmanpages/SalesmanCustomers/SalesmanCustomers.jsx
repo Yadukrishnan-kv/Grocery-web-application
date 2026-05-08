@@ -171,6 +171,7 @@ const SalesmanCustomers = () => {
                       <th scope="col">Emirates Code</th>
                       <th scope="col">Credit Limit</th>
                       <th scope="col">Balance</th>
+                      <th scope="col">Return Balance</th>
                       <th scope="col">Used Credit</th>
                       <th scope="col">Outstanding</th>
                       <th scope="col">Billing Type</th>
@@ -213,6 +214,14 @@ const SalesmanCustomers = () => {
                             <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                               <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
                               <span>{(customer.balanceCreditLimit || 0).toFixed(2)}</span>
+                            </div>
+                          </td>
+
+                          {/* Return Balance */}
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
+                              <span>{(customer.returnCreditBalance || 0).toFixed(2)}</span>
                             </div>
                           </td>
 

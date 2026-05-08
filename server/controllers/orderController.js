@@ -318,7 +318,12 @@ const deliverOrder = async (req, res) => {
       }
 
       orderItem.deliveredQuantity += qtyToDeliver;
-      grandDeliveryAmount += qtyToDeliver * orderItem.price;
+      // Use VAT-inclusive amount (proportional to delivered qty), matching how credit was deducted at packing
+      const ratio = qtyToDeliver / orderItem.orderedQuantity;
+      const itemTotalWithVat = orderItem.totalAmount
+        ? orderItem.totalAmount * ratio
+        : qtyToDeliver * orderItem.price * (1 + (orderItem.vatPercentage || 5) / 100);
+      grandDeliveryAmount += parseFloat(itemTotalWithVat.toFixed(2));
     }
 
     // Handle cash/cheque payment immediately
@@ -1027,7 +1032,7 @@ const getMyAssignedOrders = async (req, res) => {
       assignedTo: req.user._id,
       assignmentStatus: { $in: ["assigned", "accepted", "rejected"] },
     })
-      .populate("customer", "name phoneNumber address pincode")
+      .populate("customer", "name phoneNumber address pincode returnCreditBalance billingType")
       .populate("orderItems.product", "productName price unit")
       .populate("assignedTo", "username email")
       .sort({ assignedAt: -1 });
@@ -1676,6 +1681,9 @@ const packOrder = async (req, res) => {
       }
     }
 
+    // Capture how much return credit was applied for the response
+    let packReturnCreditUsed = 0;
+
     // 3. Credit deduction - ✅ NOW USES VAT-INCLUSIVE AMOUNT
     if (order.payment === "credit" && newlyPackedAmount > 0) {
       const customer = await Customer.findById(order.customer);
@@ -1703,9 +1711,6 @@ const packOrder = async (req, res) => {
         await customer.save();
       }
     }
-
-    // Capture how much return credit was applied for the response
-    let packReturnCreditUsed = 0;
 
     // 4. Generate new invoice number ONLY when something new is packed
     let newInvoiceNumber = order.invoiceNumber;

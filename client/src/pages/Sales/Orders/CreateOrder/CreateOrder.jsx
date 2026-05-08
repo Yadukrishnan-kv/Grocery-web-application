@@ -239,7 +239,9 @@ const CreateOrder = () => {
   const handleCustomerChange = (e) => {
     const selectedCustomerId = e.target.value;
     const selectedCustomer = customers.find((c) => c._id === selectedCustomerId);
-    const defaultPayment = selectedCustomer?.paymentMethod || selectedCustomer?.defaultPayment || "credit";
+    // Map billingType to default payment (user can still override)
+    const defaultPayment =
+      selectedCustomer?.billingType === "Cash" ? "cash" : "credit";
 
     setFormData({
       ...formData,
@@ -347,13 +349,11 @@ const CreateOrder = () => {
             <div className="form-group">
               <label>
                 Payment Method
-                {formData.customerId && <span className="auto-fetch-badge"> of Customer</span>}
+                {formData.customerId && <span className="auto-fetch-badge"> (pre-filled from customer, can override)</span>}
               </label>
               <select
                 value={formData.payment}
                 onChange={(e) => setFormData({ ...formData, payment: e.target.value })}
-                disabled={!!formData.customerId}
-                className={formData.customerId ? "auto-filled" : ""}
               >
                 <option value="credit">Credit</option>
                 <option value="cash">Cash</option>

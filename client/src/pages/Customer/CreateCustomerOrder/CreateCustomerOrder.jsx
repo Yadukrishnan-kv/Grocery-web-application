@@ -80,9 +80,9 @@ const CreateCustomerOrder = () => {
       const profile = response.data;
       setCustomerProfile(profile);
 
-      const defaultPayment = profile?.paymentMethod ||
-                            profile?.defaultPayment ||
-                            "credit";
+      // Map billingType to default payment (user can still override)
+      const defaultPayment =
+        profile?.billingType === "Cash" ? "cash" : "credit";
 
       setFormData((prev) => ({
         ...prev,
@@ -346,14 +346,12 @@ const CreateCustomerOrder = () => {
               <select
                 value={formData.payment}
                 onChange={(e) => setFormData({ ...formData, payment: e.target.value })}
-                disabled
-                className="auto-filled"
               >
                 <option value="credit">Credit</option>
                 <option value="cash">Cash</option>
               </select>
               {errors.payment && <p className="error-text">{errors.payment}</p>}
-              <p className="helper-text">Payment method is set from your customer profile</p>
+              <p className="helper-text">Pre-filled from your profile billing type — you can change it if needed</p>
             </div>
 
             <h3>Order Items</h3>

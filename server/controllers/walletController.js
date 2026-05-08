@@ -64,6 +64,21 @@ const getDeliveryCashWallet = async (req, res) => {
       tx.displayInvoiceNumber = order.invoiceNumber || 'N/A';
     });
 
+    // Attach returnCreditUsed from paired return_credit transactions for each order
+    const cashOrderIds = transactions.map(tx => tx.order?._id).filter(Boolean);
+    const cashReturnCreditTxs = await PaymentTransaction.find({
+      order: { $in: cashOrderIds },
+      method: 'return_credit',
+    }).lean();
+    const cashReturnCreditByOrder = {};
+    cashReturnCreditTxs.forEach(tx => {
+      const oid = String(tx.order);
+      cashReturnCreditByOrder[oid] = (cashReturnCreditByOrder[oid] || 0) + tx.amount;
+    });
+    transactions.forEach(tx => {
+      tx.returnCreditUsed = cashReturnCreditByOrder[String(tx.order?._id)] || 0;
+    });
+
     const totalAmount = transactions
       .filter(tx => tx.status === "received" || tx.status === "pending")
       .reduce((sum, tx) => sum + tx.amount, 0);
@@ -87,6 +102,21 @@ const getDeliveryChequeWallet = async (req, res) => {
         ]
       })
       .sort({ date: -1 });
+
+    // Attach returnCreditUsed from paired return_credit transactions for each order
+    const chequeOrderIds = transactions.map(tx => tx.order?._id).filter(Boolean);
+    const chequeReturnCreditTxs = await PaymentTransaction.find({
+      order: { $in: chequeOrderIds },
+      method: 'return_credit',
+    }).lean();
+    const chequeReturnCreditByOrder = {};
+    chequeReturnCreditTxs.forEach(tx => {
+      const oid = String(tx.order);
+      chequeReturnCreditByOrder[oid] = (chequeReturnCreditByOrder[oid] || 0) + tx.amount;
+    });
+    transactions.forEach(tx => {
+      tx.returnCreditUsed = chequeReturnCreditByOrder[String(tx.order?._id)] || 0;
+    });
 
     const totalAmount = transactions
       .filter(tx => tx.status === "received" || tx.status === "pending")
@@ -192,7 +222,9 @@ const rejectPayment = async (req, res) => {
 
 const getAdminWalletMoney = async (req, res) => {
   try {
-    const transactions = await PaymentTransaction.find({})
+    const transactions = await PaymentTransaction.find({
+      method: { $in: ['cash', 'cheque'] },
+    })
       .populate({
         path: 'deliveryMan',
         select: 'username'
@@ -203,7 +235,23 @@ const getAdminWalletMoney = async (req, res) => {
           { path: 'customer', select: 'name' },
         ]
       })
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
+
+    // Attach returnCreditUsed from paired return_credit transactions for each order
+    const adminOrderIds = transactions.map(tx => tx.order?._id).filter(Boolean);
+    const adminReturnCreditTxs = await PaymentTransaction.find({
+      order: { $in: adminOrderIds },
+      method: 'return_credit',
+    }).lean();
+    const adminReturnCreditByOrder = {};
+    adminReturnCreditTxs.forEach(tx => {
+      const oid = String(tx.order);
+      adminReturnCreditByOrder[oid] = (adminReturnCreditByOrder[oid] || 0) + tx.amount;
+    });
+    transactions.forEach(tx => {
+      tx.returnCreditUsed = adminReturnCreditByOrder[String(tx.order?._id)] || 0;
+    });
 
     res.json(transactions);
   } catch (error) {
@@ -236,7 +284,7 @@ const generatePaymentReceipt = async (req, res) => {
       .populate({
         path: 'order',
         select: 'customer orderItems invoiceNumber payment orderDate invoiceHistory _id',
-        populate: [{ path: 'customer', select: 'name phoneNumber' }],
+        populate: [{ path: 'customer', select: 'name phoneNumber address' }],
       })
       .populate('deliveryMan', 'username')
       .lean();
@@ -258,89 +306,142 @@ const generatePaymentReceipt = async (req, res) => {
       return res.status(404).json({ message: 'Associated order not found' });
     }
 
-    // ✅ CRITICAL FIX: Determine correct invoice number for this transaction
+    // Determine correct invoice number for this transaction
     let correctInvoiceNumber = 'N/A';
-    
-    // Priority 1: Transaction has its own invoiceNumber (best case)
     if (transaction.invoiceNumber) {
       correctInvoiceNumber = transaction.invoiceNumber;
-    } 
-    // Priority 2: Match against invoiceHistory by amount
-    else if (order.invoiceHistory?.length > 0) {
+    } else if (order.invoiceHistory?.length > 0) {
       const txAmount = transaction.amount;
       const txDate = new Date(transaction.date || transaction.createdAt);
-      
-      // Find exact amount match
-      const amountMatch = order.invoiceHistory.find(hist => 
-        Math.abs(hist.amount - txAmount) < 0.01
-      );
-      
+      const amountMatch = order.invoiceHistory.find(hist => Math.abs(hist.amount - txAmount) < 0.01);
       if (amountMatch) {
         correctInvoiceNumber = amountMatch.invoiceNumber;
-      } 
-      // Fallback: Find closest by date within 5-minute window
-      else {
+      } else {
         const timeWindowMs = 5 * 60 * 1000;
-        const dateMatch = order.invoiceHistory.find(hist => {
-          const histDate = new Date(hist.createdAt);
-          return Math.abs(txDate - histDate) <= timeWindowMs;
-        });
-        
-        if (dateMatch) {
-          correctInvoiceNumber = dateMatch.invoiceNumber;
-        } else {
-          // Last resort: use order's current invoiceNumber
-          correctInvoiceNumber = order.invoiceNumber || 'N/A';
-        }
+        const dateMatch = order.invoiceHistory.find(hist =>
+          Math.abs(txDate - new Date(hist.createdAt)) <= timeWindowMs
+        );
+        correctInvoiceNumber = dateMatch?.invoiceNumber || order.invoiceNumber || 'N/A';
       }
-    } 
-    // Fallback
-    else {
+    } else {
       correctInvoiceNumber = order.invoiceNumber || 'N/A';
     }
 
     const company = (await CompanySettings.findOne()) || { companyName: 'INGOUDE COMPANY' };
 
-    const doc = new PDFDocument({ size: 'A5', margin: 40 });
-    
-    // ✅ Use correct invoice number in filename
-    const filename = `receipt-${correctInvoiceNumber}.pdf`;
+    // 80mm thermal receipt style (matches admin/salesman bill receipts)
+    const pageWidth = 226;
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const centerX = margin;
+    const labelW = 75;
+    const valueW = contentWidth - labelW;
 
+    const doc = new PDFDocument({ size: [pageWidth, 800], margin, bufferPages: true });
+    const filename = `receipt-${correctInvoiceNumber}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-
     doc.pipe(res);
 
-    // Header
-    doc.fontSize(18).font('Helvetica-Bold').text(company.companyName.toUpperCase(), { align: 'center' });
-    doc.fontSize(14).moveDown(0.3).text('PAYMENT RECEIPT', { align: 'center' });
-    doc.moveDown(1.2);
+    let y = margin;
 
-    // Receipt Details - ✅ Use correctInvoiceNumber
-    doc.fontSize(11).font('Helvetica');
-    doc.text(`Receipt No: REC-${transaction._id.toString().slice(-6)}`);
-    doc.text(`Invoice No: ${correctInvoiceNumber}`);  // ✅ FIXED
-    doc.text(`Order ID: ${order._id.toString().slice(-8)}`);
-    doc.text(`Customer: ${order.customer?.name || 'N/A'}`);
-    doc.text(`Delivery Man: ${transaction.deliveryMan?.username || 'N/A'}`);
-    doc.text(`Amount: AED ${transaction.amount.toFixed(2)}`);
-    doc.text(`Method: ${transaction.method.charAt(0).toUpperCase() + transaction.method.slice(1)}`);
-    doc.text(`Date: ${new Date(transaction.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+    const drawDashedLine = (yPos) => {
+      doc.save();
+      doc.strokeColor('#000').lineWidth(0.5);
+      const dashLen = 3, gap = 2;
+      for (let x = margin; x < pageWidth - margin; x += dashLen + gap) {
+        doc.moveTo(x, yPos).lineTo(Math.min(x + dashLen, pageWidth - margin), yPos).stroke();
+      }
+      doc.restore();
+      return yPos + 6;
+    };
 
-    if (transaction.method === 'cheque' && transaction.chequeDetails) {
-      doc.moveDown(0.8);
-      doc.fontSize(11).text('Cheque Details:', { underline: true });
-      doc.fontSize(10).moveDown(0.3);
-      doc.text(`  • Number : ${transaction.chequeDetails.number || 'N/A'}`);
-      doc.text(`  • Bank   : ${transaction.chequeDetails.bank || 'N/A'}`);
-      doc.text(`  • Date   : ${transaction.chequeDetails.date ? new Date(transaction.chequeDetails.date).toLocaleDateString('en-IN') : 'N/A'}`);
+    const printRow = (label, value) => {
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text(label, centerX, y, { width: labelW });
+      doc.fontSize(7).font('Helvetica').fillColor('#000').text(String(value), centerX + labelW, y, { width: valueW, align: 'right' });
+      y += 11;
+    };
+
+    // ===== COMPANY HEADER =====
+    doc.fontSize(10).font('Helvetica-Bold').fillColor('#000')
+      .text((company.companyName || 'COMPANY').toUpperCase(), centerX, y, { width: contentWidth, align: 'center' });
+    y += 14;
+    if (company.companyAddress) {
+      doc.fontSize(6).font('Helvetica').fillColor('#000')
+        .text(company.companyAddress, centerX, y, { width: contentWidth, align: 'center' });
+      y += 9;
+    }
+    if (company.companyPhone) {
+      doc.fontSize(6).font('Helvetica').fillColor('#000')
+        .text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: 'center' });
+      y += 9;
     }
 
-    // Footer
-    doc.moveDown(2.5);
-    doc.fontSize(9).font('Helvetica-Oblique').fillColor('#555').text('Thank you for your payment!', { align: 'center' });
-    doc.moveDown(0.3);
-    doc.text('This is a system-generated receipt.', { align: 'center' });
+    y = drawDashedLine(y + 2);
+
+    // ===== TITLE =====
+    doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
+      .text('PAYMENT RECEIPT', centerX, y, { width: contentWidth, align: 'center' });
+    y += 14;
+
+    y = drawDashedLine(y);
+
+    // ===== RECEIPT INFO =====
+    printRow('Receipt No:', `REC-${transaction._id.toString().slice(-6)}`);
+    printRow('Invoice No:', correctInvoiceNumber);
+    printRow('Date:', new Date(transaction.date).toLocaleDateString('en-IN'));
+
+    y = drawDashedLine(y + 2);
+
+    // ===== CUSTOMER INFO =====
+    doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text('CUSTOMER:', centerX, y);
+    y += 11;
+    doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer?.name || 'N/A', centerX, y);
+    y += 10;
+    if (order.customer?.phoneNumber) {
+      doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer.phoneNumber, centerX, y);
+      y += 10;
+    }
+    if (order.customer?.address) {
+      doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer.address, centerX, y, { width: contentWidth });
+      y += 10;
+    }
+
+    y = drawDashedLine(y + 2);
+
+    // ===== PAYMENT DETAILS =====
+    printRow('Delivery Man:', transaction.deliveryMan?.username || 'N/A');
+    printRow('Amount Paid:', `AED ${transaction.amount.toFixed(2)}`);
+    printRow('Method:', transaction.method.charAt(0).toUpperCase() + transaction.method.slice(1));
+
+    if (transaction.method === 'cheque' && transaction.chequeDetails) {
+      y = drawDashedLine(y + 2);
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text('CHEQUE DETAILS:', centerX, y);
+      y += 11;
+      printRow('Cheque No:', transaction.chequeDetails.number || 'N/A');
+      printRow('Bank:', transaction.chequeDetails.bank || 'N/A');
+      if (transaction.chequeDetails.date) {
+        printRow('Cheque Date:', new Date(transaction.chequeDetails.date).toLocaleDateString('en-IN'));
+      }
+    }
+
+    y = drawDashedLine(y + 2);
+
+    // ===== GRAND TOTAL =====
+    doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
+      .text('TOTAL PAID', centerX, y, { width: labelW + 10 });
+    doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
+      .text(`AED ${transaction.amount.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: 'right' });
+    y += 14;
+
+    y = drawDashedLine(y);
+
+    // ===== FOOTER =====
+    y += 4;
+    doc.fontSize(6).font('Helvetica').fillColor('#000')
+      .text('Thank you for your payment!', centerX, y, { width: contentWidth, align: 'center' });
+    y += 9;
+    doc.text('This is a computer-generated receipt.', centerX, y, { width: contentWidth, align: 'center' });
 
     doc.end();
   } catch (error) {
@@ -362,8 +463,8 @@ const generateBulkPaymentReceipt = async (req, res) => {
     const transactions = await PaymentTransaction.find({ _id: { $in: transactionIds } })
       .populate({
         path: 'order',
-        select: 'customer invoiceNumber _id orderDate',
-        populate: { path: 'customer', select: 'name phoneNumber' },
+        select: 'customer invoiceNumber _id orderDate invoiceHistory',
+        populate: { path: 'customer', select: 'name phoneNumber address' },
       })
       .populate('deliveryMan', 'username')
       .lean();
@@ -374,9 +475,6 @@ const generateBulkPaymentReceipt = async (req, res) => {
 
     const company = (await CompanySettings.findOne()) || { companyName: 'INGOUDE COMPANY' };
 
-    // ────────────────────────────────────────────────
-    // Decide if we generate ONE receipt or multiple
-    // ────────────────────────────────────────────────
     const firstTx = transactions[0];
     const firstCustomerId = firstTx.order?.customer?._id?.toString();
     const firstDate = new Date(firstTx.date).toDateString();
@@ -388,96 +486,157 @@ const generateBulkPaymentReceipt = async (req, res) => {
     });
 
     const useSingleReceipt = allSameCustomerAndDay && transactions.length > 1;
-    const finalReceiptNumber = useSingleReceipt 
-      ? receiptNumber || `REC-CASH-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(1000 + Math.random() * 9000)}`
+    const finalReceiptNumber = useSingleReceipt
+      ? receiptNumber || `REC-CASH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`
       : null;
 
-    const doc = new PDFDocument({ size: 'A5', margin: 40 });
+    // 80mm thermal receipt style (matches admin/salesman bill receipts)
+    const pageWidth = 226;
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const centerX = margin;
+    const labelW = 75;
+    const valueW = contentWidth - labelW;
+
+    const doc = new PDFDocument({ size: [pageWidth, 800], margin, bufferPages: true });
 
     res.setHeader('Content-Type', 'application/pdf');
-
-    // Filename
     const filename = useSingleReceipt
       ? `${finalReceiptNumber}.pdf`
       : transactions.length === 1
         ? `receipt-${transactions[0].invoiceNumber || transactions[0].order?.invoiceNumber || 'N/A'}.pdf`
         : `bulk-cash-receipts-${Date.now()}.pdf`;
-
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-
     doc.pipe(res);
 
-    // ────────────────────────────────────────────────
-    // Generate PDF content
-    // ────────────────────────────────────────────────
-   transactions.forEach((tx, index) => {
-  if (index > 0) doc.addPage();
+    const drawDashedLine = (yPos) => {
+      doc.save();
+      doc.strokeColor('#000').lineWidth(0.5);
+      const dashLen = 3, gap = 2;
+      for (let x = margin; x < pageWidth - margin; x += dashLen + gap) {
+        doc.moveTo(x, yPos).lineTo(Math.min(x + dashLen, pageWidth - margin), yPos).stroke();
+      }
+      doc.restore();
+      return yPos + 6;
+    };
 
-  // Header
-  doc.fontSize(18).font('Helvetica-Bold').text(company.companyName.toUpperCase(), { align: 'center' });
-  doc.fontSize(14).moveDown(0.3).text('CASH PAYMENT RECEIPT', { align: 'center' });
-  doc.moveDown(0.5);
+    transactions.forEach((tx, index) => {
+      if (index > 0) doc.addPage();
 
-  // Receipt number logic...
-  
-  doc.moveDown(1);
+      let y = margin;
 
-  // ✅ CRITICAL FIX: Get correct invoice number for EACH transaction
-  let correctInvoiceNumber = 'N/A';
-  
-  if (tx.invoiceNumber) {
-    correctInvoiceNumber = tx.invoiceNumber;
-  } else if (tx.order?.invoiceHistory?.length > 0) {
-    const txAmount = tx.amount;
-    const txDate = new Date(tx.date || tx.createdAt);
-    
-    const amountMatch = tx.order.invoiceHistory.find(hist => 
-      Math.abs(hist.amount - txAmount) < 0.01
-    );
-    
-    if (amountMatch) {
-      correctInvoiceNumber = amountMatch.invoiceNumber;
-    } else {
-      const timeWindowMs = 5 * 60 * 1000;
-      const dateMatch = tx.order.invoiceHistory.find(hist => {
-        const histDate = new Date(hist.createdAt);
-        return Math.abs(txDate - histDate) <= timeWindowMs;
-      });
-      
-      if (dateMatch) {
-        correctInvoiceNumber = dateMatch.invoiceNumber;
+      const makePrintRow = (label, value) => {
+        doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text(label, centerX, y, { width: labelW });
+        doc.fontSize(7).font('Helvetica').fillColor('#000').text(String(value), centerX + labelW, y, { width: valueW, align: 'right' });
+        y += 11;
+      };
+
+      // Determine correct invoice number
+      let correctInvoiceNumber = 'N/A';
+      if (tx.invoiceNumber) {
+        correctInvoiceNumber = tx.invoiceNumber;
+      } else if (tx.order?.invoiceHistory?.length > 0) {
+        const txAmount = tx.amount;
+        const txDate = new Date(tx.date || tx.createdAt);
+        const amountMatch = tx.order.invoiceHistory.find(hist => Math.abs(hist.amount - txAmount) < 0.01);
+        if (amountMatch) {
+          correctInvoiceNumber = amountMatch.invoiceNumber;
+        } else {
+          const timeWindowMs = 5 * 60 * 1000;
+          const dateMatch = tx.order.invoiceHistory.find(hist =>
+            Math.abs(txDate - new Date(hist.createdAt)) <= timeWindowMs
+          );
+          correctInvoiceNumber = dateMatch?.invoiceNumber || tx.order.invoiceNumber || 'N/A';
+        }
       } else {
-        correctInvoiceNumber = tx.order.invoiceNumber || 'N/A';
+        correctInvoiceNumber = tx.order?.invoiceNumber || 'N/A';
       }
-    }
-  } else {
-    correctInvoiceNumber = tx.order?.invoiceNumber || 'N/A';
-  }
 
-  // Transaction details - ✅ Use correctInvoiceNumber
-  const order = tx.order || {};
-  doc.fontSize(11).font('Helvetica');
-  doc.text(`Invoice No: ${correctInvoiceNumber}`);  // ✅ FIXED - shows DEL-01 or DEL-02 correctly
-  doc.text(`Customer: ${order.customer?.name || 'N/A'}`);
-  doc.text(`Delivery Partner: ${tx.deliveryMan?.username || 'N/A'}`);
-  doc.text(`Amount Paid: AED ${tx.amount.toFixed(2)}`);
-  doc.text(`Payment Method: ${tx.method.charAt(0).toUpperCase() + tx.method.slice(1)}`);
-  doc.text(`Payment Date: ${new Date(tx.date).toLocaleString('en-IN')}`);
-  
+      // ===== COMPANY HEADER =====
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#000')
+        .text((company.companyName || 'COMPANY').toUpperCase(), centerX, y, { width: contentWidth, align: 'center' });
+      y += 14;
+      if (company.companyAddress) {
+        doc.fontSize(6).font('Helvetica').fillColor('#000')
+          .text(company.companyAddress, centerX, y, { width: contentWidth, align: 'center' });
+        y += 9;
+      }
+      if (company.companyPhone) {
+        doc.fontSize(6).font('Helvetica').fillColor('#000')
+          .text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: 'center' });
+        y += 9;
+      }
 
-      // Cheque details if applicable
+      y = drawDashedLine(y + 2);
+
+      // ===== TITLE =====
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
+        .text('CASH PAYMENT RECEIPT', centerX, y, { width: contentWidth, align: 'center' });
+      y += 14;
+      if (useSingleReceipt) {
+        doc.fontSize(7).font('Helvetica').fillColor('#000')
+          .text(finalReceiptNumber, centerX, y, { width: contentWidth, align: 'center' });
+        y += 11;
+      }
+
+      y = drawDashedLine(y);
+
+      // ===== RECEIPT INFO =====
+      makePrintRow('Invoice No:', correctInvoiceNumber);
+      makePrintRow('Date:', new Date(tx.date).toLocaleDateString('en-IN'));
+
+      y = drawDashedLine(y + 2);
+
+      // ===== CUSTOMER INFO =====
+      const order = tx.order || {};
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text('CUSTOMER:', centerX, y);
+      y += 11;
+      doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer?.name || 'N/A', centerX, y);
+      y += 10;
+      if (order.customer?.phoneNumber) {
+        doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer.phoneNumber, centerX, y);
+        y += 10;
+      }
+      if (order.customer?.address) {
+        doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer.address, centerX, y, { width: contentWidth });
+        y += 10;
+      }
+
+      y = drawDashedLine(y + 2);
+
+      // ===== PAYMENT DETAILS =====
+      makePrintRow('Delivery Man:', tx.deliveryMan?.username || 'N/A');
+      makePrintRow('Amount Paid:', `AED ${tx.amount.toFixed(2)}`);
+      makePrintRow('Method:', tx.method.charAt(0).toUpperCase() + tx.method.slice(1));
+
       if (tx.method === 'cheque' && tx.chequeDetails) {
-        doc.moveDown(0.8);
-        doc.fontSize(11).text('Cheque Details:', { underline: true });
-        doc.moveDown(0.3);
-        doc.fontSize(10).text(`  • Cheque No : ${tx.chequeDetails.number || 'N/A'}`);
-        doc.text(`  • Bank      : ${tx.chequeDetails.bank || 'N/A'}`);
-        doc.text(`  • Date      : ${tx.chequeDetails.date ? new Date(tx.chequeDetails.date).toLocaleDateString('en-IN') : 'N/A'}`);
+        y = drawDashedLine(y + 2);
+        doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text('CHEQUE DETAILS:', centerX, y);
+        y += 11;
+        makePrintRow('Cheque No:', tx.chequeDetails.number || 'N/A');
+        makePrintRow('Bank:', tx.chequeDetails.bank || 'N/A');
+        if (tx.chequeDetails.date) {
+          makePrintRow('Cheque Date:', new Date(tx.chequeDetails.date).toLocaleDateString('en-IN'));
+        }
       }
 
-      doc.moveDown(1.5);
-      doc.fontSize(9).font('Helvetica-Oblique').fillColor('#555').text('Thank you for your payment!', { align: 'center' });
-      doc.text('This is a system-generated receipt.', { align: 'center' });
+      y = drawDashedLine(y + 2);
+
+      // ===== GRAND TOTAL =====
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
+        .text('TOTAL PAID', centerX, y, { width: labelW + 10 });
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
+        .text(`AED ${tx.amount.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: 'right' });
+      y += 14;
+
+      y = drawDashedLine(y);
+
+      // ===== FOOTER =====
+      y += 4;
+      doc.fontSize(6).font('Helvetica').fillColor('#000')
+        .text('Thank you for your payment!', centerX, y, { width: contentWidth, align: 'center' });
+      y += 9;
+      doc.text('This is a computer-generated receipt.', centerX, y, { width: contentWidth, align: 'center' });
     });
 
     doc.end();

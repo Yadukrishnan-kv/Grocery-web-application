@@ -18,6 +18,7 @@ const ReturnPickups = () => {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
+  const [activeTab, setActiveTab] = useState("active");
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchUser = useCallback(async () => {
@@ -79,6 +80,7 @@ const ReturnPickups = () => {
 
   const assigned = pickups.filter((p) => p.status === "pickup_assigned");
   const pickedUp = pickups.filter((p) => p.status === "picked_up");
+  const completed = pickups.filter((p) => p.status === "completed");
 
   return (
     <div className="rp-layout">
@@ -106,18 +108,46 @@ const ReturnPickups = () => {
               <div className="rp-stat rp-stat-cyan">
                 <strong>{pickedUp.length}</strong> Picked Up
               </div>
+              <div className="rp-stat" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
+                <strong>{completed.length}</strong> Completed
+              </div>
             </div>
           </div>
 
           {loading ? (
             <div className="rp-loading">Loading pickups...</div>
-          ) : pickups.length === 0 ? (
-            <div className="rp-empty-card">
-              <div className="rp-empty-icon">📦</div>
-              <p>No return pickups assigned to you.</p>
-            </div>
           ) : (
             <>
+              {/* Tabs */}
+              <div className="rp-tabs" style={{ marginBottom: "16px" }}>
+                <button
+                  className={`rp-tab ${activeTab === "active" ? "active" : ""}`}
+                  onClick={() => setActiveTab("active")}
+                >
+                  Active
+                  {(assigned.length + pickedUp.length) > 0 && (
+                    <span className="rp-tab-count">{assigned.length + pickedUp.length}</span>
+                  )}
+                </button>
+                <button
+                  className={`rp-tab ${activeTab === "history" ? "active" : ""}`}
+                  onClick={() => setActiveTab("history")}
+                >
+                  History
+                  {completed.length > 0 && (
+                    <span className="rp-tab-count">{completed.length}</span>
+                  )}
+                </button>
+              </div>
+
+              {activeTab === "active" && (
+                (assigned.length === 0 && pickedUp.length === 0) ? (
+                  <div className="rp-empty-card">
+                    <div className="rp-empty-icon">📦</div>
+                    <p>No active return pickups assigned to you.</p>
+                  </div>
+                ) : (
+                  <>
               {/* Pending pickups */}
               {assigned.length > 0 && (
                 <div className="rp-section">
@@ -236,6 +266,74 @@ const ReturnPickups = () => {
                     </div>
                   </div>
                 </div>
+              )}
+              </>
+              ))}
+
+              {/* History Tab */}
+              {activeTab === "history" && (
+                completed.length === 0 ? (
+                  <div className="rp-empty-card">
+                    <div className="rp-empty-icon">📋</div>
+                    <p>No completed return pickups yet.</p>
+                  </div>
+                ) : (
+                  <div className="rp-section">
+                    <div className="rp-card">
+                      <div className="rp-table-wrap">
+                        <table className="rp-table">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Customer</th>
+                              <th>Original Order</th>
+                              <th>Return Invoice</th>
+                              <th>Items</th>
+                              <th>Return Amount</th>
+                              <th>Completed At</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {completed.map((sr, idx) => (
+                              <tr key={sr._id}>
+                                <td>{idx + 1}</td>
+                                <td>
+                                  <div className="rp-name">{sr.customer?.name || "—"}</div>
+                                  <div className="rp-phone">{sr.customer?.phoneNumber || ""}</div>
+                                </td>
+                                <td>
+                                  <span className="rp-inv-badge">
+                                    {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
+                                  </span>
+                                </td>
+                                <td>
+                                  {sr.returnInvoiceNumber ? (
+                                    <span className="rp-inv-badge" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
+                                      {sr.returnInvoiceNumber}
+                                    </span>
+                                  ) : <span className="rp-muted">—</span>}
+                                </td>
+                                <td>
+                                  <button className="rp-items-btn" onClick={() => setDetailItem(sr)}>
+                                    {(sr.returnItems || []).length} item(s)
+                                  </button>
+                                </td>
+                                <td className="rp-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
+                                <td className="rp-muted">
+                                  {sr.completedAt
+                                    ? new Date(sr.completedAt).toLocaleString("en-GB")
+                                    : "—"}
+                                </td>
+                                <td><span className="rp-badge-green">✅ Completed</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
             </>
           )}

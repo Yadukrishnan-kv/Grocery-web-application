@@ -258,6 +258,7 @@ const CustomerList = () => {
                       <th scope="col">Longitude</th>
                       <th scope="col">Credit Limit</th>
                       <th scope="col">Balance</th>
+                      <th scope="col">Return Balance</th>
                       <th scope="col">Opening Balance</th>
                       <th scope="col">Opening Due Days</th>
                       <th scope="col">Billing Type</th>
@@ -345,6 +346,28 @@ const CustomerList = () => {
                               <span>
                                 {customer.balanceCreditLimit?.toFixed(2) ||
                                   "0.00"}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Return Balance */}
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="AED"
+                                width={15}
+                                height={15}
+                                style={{ paddingTop: "3px" }}
+                              />
+                              <span>
+                                {(customer.returnCreditBalance || 0).toFixed(2)}
                               </span>
                             </div>
                           </td>

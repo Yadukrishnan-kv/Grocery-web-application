@@ -288,6 +288,7 @@ const ChequeWallet = () => {
                       <th className="col-customer">Customer</th>
                       <th className="col-order">Order ID</th>
                       <th className="col-amount">Amount</th>
+                      <th className="col-return-credit">Return Credit Used</th>
                       <th className="col-cheque">Cheque Details</th>
                       <th className="col-date">Date</th>
                       <th className="col-status">Status</th>
@@ -311,6 +312,11 @@ const ChequeWallet = () => {
                             <img src={DirhamSymbol} alt="AED" className="dirham-icon-small" />
                             <span className="amount-value">{tx.amount.toFixed(2)}</span>
                           </div>
+                        </td>
+                        <td className="col-return-credit">
+                          {tx.returnCreditUsed > 0
+                            ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
+                            : <span style={{ color: "#9ca3af" }}>—</span>}
                         </td>
                         <td className="col-cheque">{renderChequeDetails(tx.chequeDetails)}</td>
                         <td className="col-date">{new Date(tx.date).toLocaleDateString('en-GB')}</td>

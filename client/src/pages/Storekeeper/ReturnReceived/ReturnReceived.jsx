@@ -12,7 +12,6 @@ const ReturnReceived = () => {
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState(null);
-  const [refundMethod, setRefundMethod] = useState("none");
   const [processing, setProcessing] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [activeTab, setActiveTab] = useState("pending");
@@ -60,15 +59,11 @@ const ReturnReceived = () => {
       const token = localStorage.getItem("token");
       const res = await axios.post(
         `${backendUrl}/api/sales-returns/confirm-received/${confirmModal._id}`,
-        { refundMethod },
+        { refundMethod: "none" },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(
-        `Return completed! Invoice: ${res.data.returnInvoiceNumber}` +
-        (refundMethod !== "none" ? `. Refund (${refundMethod}) marked as pending.` : "")
-      );
+      toast.success(`Return completed! Invoice: ${res.data.returnInvoiceNumber}`);
       setConfirmModal(null);
-      setRefundMethod("none");
       fetchPickedUpReturns();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to confirm receipt");
@@ -102,7 +97,7 @@ const ReturnReceived = () => {
             <div>
               <h1 className="rr-page-title">Return Received</h1>
               <p className="rr-page-sub">
-                Confirm receipt of returned goods from delivery man — triggers bill adjustment and refund
+                Confirm receipt of returned goods — triggers credit/return-balance adjustment and return invoice
               </p>
             </div>
             <div className="rr-badge-count">
@@ -196,10 +191,7 @@ const ReturnReceived = () => {
                           {sr.status === "picked_up" ? (
                             <button
                               className="rr-btn-confirm"
-                              onClick={() => {
-                                setConfirmModal(sr);
-                                setRefundMethod("none");
-                              }}
+                              onClick={() => setConfirmModal(sr)}
                             >
                               Confirm Received
                             </button>
@@ -236,30 +228,10 @@ const ReturnReceived = () => {
               <div className="rr-info-banner">
                 <strong>On confirmation:</strong>
                 <ul>
-                  <li>Customer credit balance will be restored (if credit order)</li>
-                  <li>Related bill will be adjusted / cancelled</li>
+                  <li><strong>Credit order:</strong> Customer's credit balance is restored &amp; unpaid bill is reduced or closed</li>
+                  <li><strong>Cash / Cheque order:</strong> Return amount is added to customer's Return Balance wallet — automatically deducted on next order before cash/cheque is collected</li>
                   <li>Return invoice will be generated</li>
-                  {refundMethod !== "none" && (
-                    <li>Refund via <strong>{refundMethod.replace(/_/g, " ")}</strong> will be marked as pending</li>
-                  )}
                 </ul>
-              </div>
-
-              <div className="rr-form-group">
-                <label>Refund Method</label>
-                <select
-                  value={refundMethod}
-                  onChange={(e) => setRefundMethod(e.target.value)}
-                  className="rr-select"
-                >
-                  <option value="none">No Refund / Credit Adjustment Only</option>
-                  <option value="cash">Cash Refund</option>
-                  <option value="cheque">Cheque Refund</option>
-                  <option value="credit_adjustment">Credit Adjustment</option>
-                </select>
-                <p className="rr-select-hint">
-                  Select how the customer should be refunded. If "No Refund", only credit balance is restored.
-                </p>
               </div>
 
               <div className="rr-modal-actions">

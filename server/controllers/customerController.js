@@ -51,7 +51,7 @@ const createCustomer = async (req, res) => {
       !phoneNumber?.trim() ||
       !address?.trim() ||
       !pincode?.trim() ||
-      !creditLimit
+      creditLimit === undefined || creditLimit === null || creditLimit === ""
     ) {
       return res.status(400).json({ message: "All core fields are required" });
     }

@@ -86,7 +86,9 @@ const DeliveredOrdersList = () => {
     }
 
     setCurrentOrder(order);
-    setPaymentMethod("credit");
+    // Cash billing type customers never use credit payment at delivery
+    const isCashCustomer = order.customer?.billingType === "Cash" || order.payment !== "credit";
+    setPaymentMethod(isCashCustomer ? "cash" : "credit");
     setChequeNumber("");
     setChequeBank("");
     setChequeDate("");
@@ -471,14 +473,43 @@ const DeliveredOrdersList = () => {
         </div>
 
         {/* Delivery Modal - Now Read-Only: Shows Details, Auto-Full Delivery */}
-        {showDeliveryModal && currentOrder && (
+        {showDeliveryModal && currentOrder && (() => {
+          // Compute delivery amount & return credit breakdown for display
+          const grandDeliveryAmount = currentOrder.orderItems.reduce((sum, item) => {
+            const qty = getProductToDeliver(item);
+            if (qty <= 0) return sum;
+            const ratio = item.orderedQuantity > 0 ? qty / item.orderedQuantity : 0;
+            const itemTotal = item.totalAmount
+              ? item.totalAmount * ratio
+              : qty * item.price * (1 + (item.vatPercentage || 5) / 100);
+            return sum + itemTotal;
+          }, 0);
+          const returnCreditAvailable = currentOrder.customer?.returnCreditBalance || 0;
+          const returnCreditToApply = parseFloat(Math.min(returnCreditAvailable, grandDeliveryAmount).toFixed(2));
+          const cashToCollect = parseFloat(Math.max(0, grandDeliveryAmount - returnCreditToApply).toFixed(2));
+
+          return (
           <div className="delivery-modal-overlay">
             <div className="delivery-modal">
-              <h3>
-                Confirm  Delivery 
-              </h3>
+              <h3>Confirm Delivery</h3>
 
-             
+              {/* Return Credit Breakdown Banner */}
+              {returnCreditToApply > 0 && (
+                <div className="return-credit-banner">
+                  <div className="rc-row">
+                    <span>Order Total (incl. VAT):</span>
+                    <span>AED {grandDeliveryAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="rc-row rc-highlight">
+                    <span>Return Credit Applied:</span>
+                    <span>− AED {returnCreditToApply.toFixed(2)}</span>
+                  </div>
+                  <div className="rc-row rc-total">
+                    <strong>{cashToCollect === 0 ? "✅ No cash collection needed" : `Cash / Cheque to collect:`}</strong>
+                    {cashToCollect > 0 && <strong>AED {cashToCollect.toFixed(2)}</strong>}
+                  </div>
+                </div>
+              )}
 
               {/* Products List - Read-Only Display */}
               <div className="products-delivery-list">
@@ -514,17 +545,26 @@ const DeliveredOrdersList = () => {
                 })}
               </div>
 
-              {/* Payment Section - Unchanged */}
+              {/* Payment Section */}
               <div className="payment-section">
                 <label>Payment Method</label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 >
-                  <option value="credit">Credit</option>
+                  {/* Credit option only for Credit limit customers with a credit order */}
+                  {currentOrder.customer?.billingType !== "Cash" && currentOrder.payment === "credit" && (
+                    <option value="credit">Credit</option>
+                  )}
                   <option value="cash">Cash</option>
                   <option value="cheque">Cheque</option>
                 </select>
+                {(paymentMethod === "cash" || paymentMethod === "cheque") && returnCreditToApply > 0 && cashToCollect === 0 && (
+                  <p className="rc-note">Return credit covers the full amount — no {paymentMethod} needed.</p>
+                )}
+                {(paymentMethod === "cash" || paymentMethod === "cheque") && returnCreditToApply > 0 && cashToCollect > 0 && (
+                  <p className="rc-note">Collect AED {cashToCollect.toFixed(2)} as {paymentMethod} (return credit of AED {returnCreditToApply.toFixed(2)} already applied).</p>
+                )}
               </div>
 
               {paymentMethod === "cheque" && (
@@ -561,12 +601,13 @@ const DeliveredOrdersList = () => {
                 >
                   {deliveringOrderId === currentOrder._id
                     ? "Submitting..."
-                    : "Confirm  Delivery"}
+                    : "Confirm Delivery"}
                 </button>
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
       </main>
     </div>
   );

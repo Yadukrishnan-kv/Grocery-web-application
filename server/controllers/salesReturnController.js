@@ -3,6 +3,7 @@ const SalesReturn = require("../models/SalesReturn");
 const Order = require("../models/Order");
 const Customer = require("../models/Customer");
 const Bill = require("../models/Bill");
+const PaymentTransaction = require("../models/PaymentTransaction");
 const InvoiceCounter = require("../models/InvoiceCounter");
 const CompanySettings = require("../models/CompanySettings");
 const PDFDocument = require("pdfkit");
@@ -126,10 +127,21 @@ const createSalesReturn = async (req, res) => {
           message: `Return qty (${qty}) exceeds remaining returnable qty (${maxReturnable}) for "${orderItem.product?.productName || "product"}"`,
         });
       }
-      const exclVatAmount = parseFloat((qty * orderItem.price).toFixed(2));
       const vatPercent = orderItem.vatPercentage || 5;
-      const vatAmount = parseFloat(((exclVatAmount * vatPercent) / 100).toFixed(2));
-      const totalAmount = parseFloat((exclVatAmount + vatAmount).toFixed(2));
+
+      // Use proportional slice of orderItem.totalAmount (VAT-inclusive) — same logic
+      // as packOrder and deliverOrder: totalAmount * (returnedQty / orderedQty)
+      const ratio = orderItem.orderedQuantity > 0 ? qty / orderItem.orderedQuantity : 0;
+
+      const exclVatAmount = orderItem.exclVatAmount
+        ? parseFloat((orderItem.exclVatAmount * ratio).toFixed(2))
+        : parseFloat((qty * orderItem.price).toFixed(2));
+      const vatAmount = orderItem.vatAmount
+        ? parseFloat((orderItem.vatAmount * ratio).toFixed(2))
+        : parseFloat(((qty * orderItem.price * vatPercent) / 100).toFixed(2));
+      const totalAmount = orderItem.totalAmount
+        ? parseFloat((orderItem.totalAmount * ratio).toFixed(2))
+        : parseFloat((exclVatAmount + vatAmount).toFixed(2));
 
       processedItems.push({
         product: orderItem.product._id,
@@ -331,47 +343,67 @@ const confirmPickup = async (req, res) => {
     const order = await Order.findById(sr.order);
     const totalReturnAmount = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
 
-    // For credit orders: restore balanceCreditLimit (frees up credit for next purchase)
-    // For cash/cheque orders: add to returnCreditBalance (store credit — no cash refund)
+    // Determine how the order was actually settled at delivery:
+    // If a cash/cheque PaymentTransaction exists → customer paid cash at delivery
+    // (even if order.payment === "credit", credit was already restored at delivery time)
+    // → return amount goes to returnCreditBalance (store credit for next order)
+    // If no cash/cheque transaction → true credit purchase (bill still open)
+    // → restore balanceCreditLimit + reduce unpaid bill
     if (order) {
-      if (order.payment === "credit") {
-        await Customer.findByIdAndUpdate(sr.customer, {
-          $inc: { balanceCreditLimit: totalReturnAmount },
-        });
-      } else {
-        // cash / cheque — convert return amount to store credit
+      const cashPaid = await PaymentTransaction.findOne({
+        order: order._id,
+        method: { $in: ["cash", "cheque"] },
+      });
+
+      const wasPaidWithCash = !!cashPaid || order.payment !== "credit";
+
+      if (wasPaidWithCash) {
+        // Cash/cheque was collected at delivery — no credit to restore, use return wallet
         await Customer.findByIdAndUpdate(sr.customer, {
           $inc: { returnCreditBalance: totalReturnAmount },
+        });
+      } else {
+        // True credit purchase — restore credit limit
+        await Customer.findByIdAndUpdate(sr.customer, {
+          $inc: { balanceCreditLimit: totalReturnAmount },
         });
       }
     }
 
-    // Adjust related bill — only reduce amountDue, never modify grandTotal/invoice amounts
+    // For true credit orders: reduce the unpaid bill's amountDue
     let billAdjusted = false;
     let relatedBillId = sr.relatedBill || null;
 
-    if (order && !sr.billAdjusted) {
-      const bills = await Bill.find({
-        orders: order._id,
-        status: { $nin: ["paid", "cancelled"] },
-      }).sort({ createdAt: -1 });
+    if (order && order.payment === "credit") {
+      const cashPaid = await PaymentTransaction.findOne({
+        order: order._id,
+        method: { $in: ["cash", "cheque"] },
+      });
 
-      if (bills.length > 0) {
-        const bill = bills[0];
-        bill.amountDue = Math.max(0, bill.amountDue - totalReturnAmount);
-        if (bill.amountDue <= 0) {
-          bill.amountDue = 0;
-          bill.status = "paid";
+      if (!cashPaid && !sr.billAdjusted) {
+        const bills = await Bill.find({
+          orders: order._id,
+          status: { $nin: ["paid", "cancelled"] },
+        }).sort({ createdAt: -1 });
+
+        if (bills.length > 0) {
+          const bill = bills[0];
+          bill.amountDue = Math.max(0, bill.amountDue - totalReturnAmount);
+          if (bill.amountDue <= 0) {
+            bill.amountDue = 0;
+            bill.status = "paid";
+          }
+          await bill.save();
+          relatedBillId = bill._id;
+          billAdjusted = true;
         }
-        await bill.save();
-        relatedBillId = bill._id;
-        billAdjusted = true;
       }
     }
 
     sr.status = "picked_up";
     sr.pickedUpAt = new Date();
-    sr.billAdjusted = sr.billAdjusted || billAdjusted;
+    // Always mark billAdjusted=true so confirmReturnReceived never double-counts
+    sr.billAdjusted = true;
     if (relatedBillId) sr.relatedBill = relatedBillId;
     await sr.save();
 
@@ -396,41 +428,40 @@ const confirmReturnReceived = async (req, res) => {
     const order = await Order.findById(sr.order);
     const totalReturnAmount = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
 
-    // For credit orders: restore balanceCreditLimit (if not already done at pickup)
-    // For cash/cheque orders: add to returnCreditBalance (if not already done at pickup)
-    if (order && !sr.billAdjusted) {
-      if (order.payment === "credit") {
-        await Customer.findByIdAndUpdate(sr.customer, {
-          $inc: { balanceCreditLimit: totalReturnAmount },
-        });
-      } else {
-        // cash / cheque — convert return amount to store credit
-        await Customer.findByIdAndUpdate(sr.customer, {
-          $inc: { returnCreditBalance: totalReturnAmount },
-        });
-      }
-    }
-
-    // Adjust bill — only reduce amountDue, never modify grandTotal/invoice amounts
+    // sr.billAdjusted is always set to true by confirmPickup, so this block
+    // only runs if somehow confirmReturnReceived is called without a prior confirmPickup
+    // (edge case guard — should not happen in normal flow)
     let billAdjusted = sr.billAdjusted || false;
     let relatedBillId = sr.relatedBill || null;
 
     if (order && !sr.billAdjusted) {
-      const bills = await Bill.find({
-        orders: order._id,
-        status: { $nin: ["paid", "cancelled"] },
-      }).sort({ createdAt: -1 });
+      const cashPaid = await PaymentTransaction.findOne({
+        order: order._id,
+        method: { $in: ["cash", "cheque"] },
+      });
+      const wasPaidWithCash = !!cashPaid || order.payment !== "credit";
 
-      if (bills.length > 0) {
-        const bill = bills[0];
-        bill.amountDue = Math.max(0, bill.amountDue - totalReturnAmount);
-        if (bill.amountDue <= 0) {
-          bill.amountDue = 0;
-          bill.status = "paid";
+      if (wasPaidWithCash) {
+        await Customer.findByIdAndUpdate(sr.customer, {
+          $inc: { returnCreditBalance: totalReturnAmount },
+        });
+      } else {
+        await Customer.findByIdAndUpdate(sr.customer, {
+          $inc: { balanceCreditLimit: totalReturnAmount },
+        });
+        // Reduce unpaid bill
+        const bills = await Bill.find({
+          orders: order._id,
+          status: { $nin: ["paid", "cancelled"] },
+        }).sort({ createdAt: -1 });
+        if (bills.length > 0) {
+          const bill = bills[0];
+          bill.amountDue = Math.max(0, bill.amountDue - totalReturnAmount);
+          if (bill.amountDue <= 0) { bill.amountDue = 0; bill.status = "paid"; }
+          await bill.save();
+          relatedBillId = bill._id;
+          billAdjusted = true;
         }
-        await bill.save();
-        relatedBillId = bill._id;
-        billAdjusted = true;
       }
     }
 
@@ -468,7 +499,7 @@ const getMyReturnPickups = async (req, res) => {
   try {
     const returns = await SalesReturn.find({
       assignedTo: req.user._id,
-      status: { $in: ["pickup_assigned", "picked_up"] },
+      status: { $in: ["pickup_assigned", "picked_up", "completed"] },
     })
       .populate("order", "invoiceNumber orderDate")
       .populate("customer", "name phoneNumber address")

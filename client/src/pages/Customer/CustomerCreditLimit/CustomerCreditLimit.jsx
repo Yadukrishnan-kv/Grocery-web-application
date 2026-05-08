@@ -197,8 +197,31 @@ const CustomerCreditLimit = () => {
                 </p>
               </div>
 
-              <div className="customer-credit-card">
-                <h3>Credit Utilization</h3>
+              <div className="customer-credit-card">                <h3>Return Balance</h3>
+                <p className="customer-credit-amount customer-credit-available">
+                  {" "}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <img
+                      src={DirhamSymbol}
+                      alt="Dirham Symbol"
+                      width={55}
+                      height={55}
+                      style={{
+                        paddingTop: "3px",
+                      }}
+                    />
+                    <span> {(customer.returnCreditBalance || 0).toFixed(2)}</span>
+                  </div>
+                </p>
+              </div>
+
+              <div className="customer-credit-card">                <h3>Credit Utilization</h3>
                 <p className="customer-credit-utilization">
                   {creditUtilization}%
                 </p>

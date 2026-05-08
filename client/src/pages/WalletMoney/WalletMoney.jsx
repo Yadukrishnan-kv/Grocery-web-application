@@ -483,6 +483,7 @@ const WalletMoney = () => {
                       <th>Customer</th>
                       <th>Order ID</th>
                       <th>Amount</th>
+                      <th>Return Credit Used</th>
                       <th>Status</th>
                       <th>Date</th>
                       <th>Actions</th>
@@ -507,6 +508,11 @@ const WalletMoney = () => {
                           <td>{tx.order?.customer?.name || "—"}</td>
                           <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
                           <td>{tx.amount.toFixed(2)}</td>
+                          <td>
+                            {tx.returnCreditUsed > 0
+                              ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
+                              : <span style={{ color: "#9ca3af" }}>—</span>}
+                          </td>
                           <td>
                             <span className={`status-badge status-${tx.status}`}>
                               {tx.status === "received" ? "Received (Not Sent)" :
@@ -643,6 +649,7 @@ const WalletMoney = () => {
                       <th>Customer</th>
                       <th>Order ID</th>
                       <th>Amount</th>
+                      <th>Return Credit Used</th>
                       <th>Cheque Details</th>
                       <th>Status</th>
                       <th>Date</th>
@@ -668,6 +675,11 @@ const WalletMoney = () => {
                           <td>{tx.order?.customer?.name || "—"}</td>
                           <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
                           <td>{tx.amount.toFixed(2)}</td>
+                          <td>
+                            {tx.returnCreditUsed > 0
+                              ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
+                              : <span style={{ color: "#9ca3af" }}>—</span>}
+                          </td>
                           <td>{renderCheque(tx.chequeDetails)}</td>
                           <td>
                             <span className={`status-badge status-${tx.status}`}>
