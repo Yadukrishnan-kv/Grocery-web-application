@@ -6,11 +6,6 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import "./ReturnPickups.css";
 
-const STATUS_LABELS = {
-  pickup_assigned: "Assigned",
-  picked_up: "Picked Up",
-};
-
 const ReturnPickups = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
@@ -72,6 +67,30 @@ const ReturnPickups = () => {
       toast.error(err.response?.data?.message || "Failed to confirm pickup");
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleDownloadInvoice = async (id, invoiceNumber) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/sales-returns/invoice/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `return-${invoiceNumber}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Invoice downloaded successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to download invoice");
     }
   };
 
@@ -230,6 +249,7 @@ const ReturnPickups = () => {
                             <th>Return Amount</th>
                             <th>Picked Up At</th>
                             <th>Status</th>
+                            <th>Action</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -258,6 +278,19 @@ const ReturnPickups = () => {
                               </td>
                               <td>
                                 <span className="rp-badge-cyan">Bring to Store</span>
+                              </td>
+                              <td>
+                                {sr.returnInvoiceNumber ? (
+                                  <button
+                                    className="rp-btn-download"
+                                    onClick={() => handleDownloadInvoice(sr._id, sr.returnInvoiceNumber)}
+                                    title="Download invoice"
+                                  >
+                                    📥 Invoice
+                                  </button>
+                                ) : (
+                                  <span className="rp-muted">—</span>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -292,6 +325,7 @@ const ReturnPickups = () => {
                               <th>Return Amount</th>
                               <th>Completed At</th>
                               <th>Status</th>
+                              <th>Action</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -326,6 +360,19 @@ const ReturnPickups = () => {
                                     : "—"}
                                 </td>
                                 <td><span className="rp-badge-green">✅ Completed</span></td>
+                                <td>
+                                  {sr.returnInvoiceNumber ? (
+                                    <button
+                                      className="rp-btn-download"
+                                      onClick={() => handleDownloadInvoice(sr._id, sr.returnInvoiceNumber)}
+                                      title="Download invoice"
+                                    >
+                                      📥 Invoice
+                                    </button>
+                                  ) : (
+                                    <span className="rp-muted">—</span>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>

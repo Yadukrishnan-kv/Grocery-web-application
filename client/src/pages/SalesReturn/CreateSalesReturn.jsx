@@ -73,29 +73,18 @@ const CreateSalesReturn = () => {
     fetchDeliveredOrders();
   }, [fetchUser, fetchDeliveredOrders]);
 
-  // Derive unique customers from the loaded orders
-  const uniqueCustomers = useMemo(() => {
-    const map = new Map();
-    deliveredOrders.forEach((o) => {
-      if (o.customer && o.customer._id) {
-        map.set(o.customer._id, o.customer);
-      }
-    });
-    return Array.from(map.values());
-  }, [deliveredOrders]);
-
-  // Filter orders by selected customer
+  // Filter orders for logged-in customer
   const customerOrders = useMemo(() => {
-    if (!selectedCustomerId) return [];
-    return deliveredOrders.filter((o) => o.customer?._id === selectedCustomerId);
-  }, [deliveredOrders, selectedCustomerId]);
+    if (!user || !user._id) return [];
+    return deliveredOrders.filter((o) => o.customer?._id === user._id);
+  }, [deliveredOrders, user]);
 
-  const handleCustomerSelect = (customerId) => {
-    setSelectedCustomerId(customerId);
-    setSelectedOrderId("");
-    setSelectedOrder(null);
-    setReturnItems({});
-  };
+  // Auto-set selected customer to logged-in user
+  useEffect(() => {
+    if (user && user._id && !selectedCustomerId) {
+      setSelectedCustomerId(user._id);
+    }
+  }, [user, selectedCustomerId]);
 
   const handleOrderSelect = (orderId) => {
     setSelectedOrderId(orderId);
@@ -215,57 +204,35 @@ const CreateSalesReturn = () => {
           </div>
 
           <form onSubmit={handleSubmit}>
-            {/* Step 1: Select Customer then Order */}
+            {/* Step 1: Select Order */}
             <div className="csr-card">
               <div className="csr-card-header">
-                <h2>Step 1 — Select Customer &amp; Order</h2>
+                <h2>Step 1 — Select Order</h2>
               </div>
               <div className="csr-card-body">
                 {loadingOrders ? (
-                  <p className="csr-loading">Loading delivered orders...</p>
-                ) : deliveredOrders.length === 0 ? (
+                  <p className="csr-loading">Loading your delivered orders...</p>
+                ) : customerOrders.length === 0 ? (
                   <div className="csr-info-box">
                     No delivered orders within the last 30 days. Returns can only be made within 30 days of delivery.
                   </div>
                 ) : (
-                  <>
-                    {/* Customer dropdown */}
-                    <div className="csr-form-group">
-                      <label>Select Customer</label>
-                      <select
-                        className="csr-select"
-                        value={selectedCustomerId}
-                        onChange={(e) => handleCustomerSelect(e.target.value)}
-                      >
-                        <option value="">-- Select a customer --</option>
-                        {uniqueCustomers.map((c) => (
-                          <option key={c._id} value={c._id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Order dropdown — only shown after customer is selected */}
-                    {selectedCustomerId && (
-                      <div className="csr-form-group">
-                        <label>Select Order</label>
-                        <select
-                          className="csr-select"
-                          value={selectedOrderId}
-                          onChange={(e) => handleOrderSelect(e.target.value)}
-                        >
-                          <option value="">-- Select an order --</option>
-                          {customerOrders.map((o) => (
-                            <option key={o._id} value={o._id}>
-                              {o.invoiceNumber || o._id.slice(-8)} —{" "}
-                              {new Date(o.updatedAt).toLocaleDateString("en-GB")}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </>
+                  <div className="csr-form-group">
+                    <label>Select Order</label>
+                    <select
+                      className="csr-select"
+                      value={selectedOrderId}
+                      onChange={(e) => handleOrderSelect(e.target.value)}
+                    >
+                      <option value="">-- Select an order --</option>
+                      {customerOrders.map((o) => (
+                        <option key={o._id} value={o._id}>
+                          {o.invoiceNumber || o._id.slice(-8)} —{" "}
+                          {new Date(o.updatedAt).toLocaleDateString("en-GB")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
 
                 {selectedOrder && (

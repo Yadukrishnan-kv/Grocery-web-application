@@ -17,7 +17,7 @@ const getNextReturnInvoiceNumber = async () => {
     { new: true, upsert: true }
   );
   const num = String(counter.returnCount).padStart(4, "0");
-  return `RET-${num}`;
+  return `CRN-${num}`;
 };
 
 const buildPDFBuffer = (generateFn) => {
@@ -695,7 +695,7 @@ const generateReturnInvoicePDF = async (doc, sr, settings) => {
 
   let detailY = detailBoxY + 8;
   const detailRows = [
-    { label: "Ret. Inv. No.", value: sr.returnInvoiceNumber || "N/A" },
+    { label: "CreditNote", value: sr.returnInvoiceNumber || "N/A" },
     { label: "Date", value: formattedDate },
     { label: "Orig. Order", value: sr.order?.invoiceNumber || "N/A" },
     { label: "Refund", value: (sr.refundMethod || "none").replace(/_/g, " ") },
