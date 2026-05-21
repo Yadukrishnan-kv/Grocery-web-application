@@ -551,22 +551,15 @@ const getBillReceipt = async (req, res) => {
     // ===== BILL SUMMARY =====
     printRow("Invoice No:", bill.invoiceNumber || "N/A");
 
-    if (bill.totalExclVat !== undefined && bill.totalVatAmount !== undefined) {
-      printRow("Excl. VAT:", `AED ${bill.totalExclVat?.toFixed(2) || "0.00"}`);
-      printRow("VAT 5%:", `AED ${bill.totalVatAmount?.toFixed(2) || "0.00"}`);
-    }
+    // Removed Excl. VAT and VAT 5% rows as per requirements
 
     y = drawDashedLine(y + 2);
 
-    // Grand total - larger font
-    const grandTotal = bill.grandTotal || bill.amountDue;
-    doc.fontSize(9).font("Helvetica-Bold")
-      .text("GRAND TOTAL", centerX, y, { width: labelW + 10 });
-    doc.fontSize(9).font("Helvetica-Bold")
-      .text(`AED ${grandTotal?.toFixed(2) || "0.00"}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
-    y += 14;
-
-    y = drawDashedLine(y);
+    // Only show Paid Amount
+    doc.fontSize(7).font("Helvetica-Bold").text("Paid Amount:", centerX, y, { width: labelW });
+    doc.fontSize(7).font("Helvetica").text(`AED ${bill.paidAmount?.toFixed(2) || "0.00"}`, centerX + labelW, y, { width: valueW, align: "right" });
+    y += 11;
+    y = drawDashedLine(y + 2);
 
     // ===== FOOTER =====
     y += 4;

@@ -37,10 +37,14 @@ const CreateSalesReturn = () => {
     }
   }, [backendUrl]);
 
-  const fetchDeliveredOrders = useCallback(async () => {
+  const fetchDeliveredOrders = useCallback(async (customerId = null) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get(`${backendUrl}/api/sales-returns/delivered-orders`, {
+      const url = new URL(`${backendUrl}/api/sales-returns/delivered-orders`);
+      if (customerId) {
+        url.searchParams.append("customerId", customerId);
+      }
+      const res = await axios.get(url.toString(), {
         headers: { Authorization: `Bearer ${token}` },
       });
       setDeliveredOrders(res.data);
@@ -70,21 +74,63 @@ const CreateSalesReturn = () => {
 
   useEffect(() => {
     fetchUser();
-    fetchDeliveredOrders();
+    // For customer role: fetch only their orders by passing their ID
+    // For admin/salesman: fetch all orders (no customerId parameter)
+    const initCustomerId = null;
+    fetchDeliveredOrders(initCustomerId);
   }, [fetchUser, fetchDeliveredOrders]);
 
-  // Filter orders for logged-in customer
-  const customerOrders = useMemo(() => {
-    if (!user || !user._id) return [];
-    return deliveredOrders.filter((o) => o.customer?._id === user._id);
-  }, [deliveredOrders, user]);
+  // Get unique customers from deliveredOrders
+  const uniqueCustomers = useMemo(() => {
+    const map = {};
+    deliveredOrders.forEach((o) => {
+      if (o.customer && o.customer._id) {
+        map[o.customer._id] = o.customer;
+      }
+    });
+    return Object.values(map);
+  }, [deliveredOrders]);
 
-  // Auto-set selected customer to logged-in user
+
+  // Determine if user is customer
+  const isCustomer = user?.role === "customer";
+
+  // Orders to display: all delivered orders if admin/salesman (no customer selected yet), 
+  // or filtered by selected customer, or customer's own orders if customer role
+  const customerOrders = useMemo(() => {
+    if (isCustomer) {
+      // Customer role: backend already filtered to their orders, show all
+      return deliveredOrders;
+    } else if (selectedCustomerId) {
+      // Admin/Salesman with customer selected: backend should have filtered, but apply client-side filter as safety check
+      return deliveredOrders.filter((o) => String(o.customer?._id) === String(selectedCustomerId));
+    } else {
+      // Admin/Salesman with no customer selected: show all available orders
+      return deliveredOrders;
+    }
+  }, [deliveredOrders, selectedCustomerId, isCustomer]);
+
+  // Auto-select customer for customer role ONLY
   useEffect(() => {
-    if (user && user._id && !selectedCustomerId) {
+    if (isCustomer && user && user._id && !selectedCustomerId) {
       setSelectedCustomerId(user._id);
     }
-  }, [user, selectedCustomerId]);
+  }, [user, isCustomer, selectedCustomerId]);
+
+  // When customer changes, reset order selection and refetch orders for that customer
+  const handleCustomerChange = (e) => {
+    const newCustomerId = e.target.value;
+    setSelectedCustomerId(newCustomerId);
+    setSelectedOrderId("");
+    setSelectedOrder(null);
+    setReturnItems({});
+    
+    // Refetch orders for the selected customer
+    if (newCustomerId) {
+      setLoadingOrders(true);
+      fetchDeliveredOrders(newCustomerId);
+    }
+  };
 
   const handleOrderSelect = (orderId) => {
     setSelectedOrderId(orderId);
@@ -204,35 +250,53 @@ const CreateSalesReturn = () => {
           </div>
 
           <form onSubmit={handleSubmit}>
-            {/* Step 1: Select Order */}
+            {/* Step 1: Select Customer (if not customer) and Order */}
             <div className="csr-card">
               <div className="csr-card-header">
-                <h2>Step 1 — Select Order</h2>
+                <h2>Step 1 — {isCustomer ? "Select Order" : "Select Customer & Order"}</h2>
               </div>
               <div className="csr-card-body">
                 {loadingOrders ? (
-                  <p className="csr-loading">Loading your delivered orders...</p>
-                ) : customerOrders.length === 0 ? (
-                  <div className="csr-info-box">
-                    No delivered orders within the last 30 days. Returns can only be made within 30 days of delivery.
-                  </div>
+                  <p className="csr-loading">Loading delivered orders...</p>
                 ) : (
-                  <div className="csr-form-group">
-                    <label>Select Order</label>
-                    <select
-                      className="csr-select"
-                      value={selectedOrderId}
-                      onChange={(e) => handleOrderSelect(e.target.value)}
-                    >
-                      <option value="">-- Select an order --</option>
-                      {customerOrders.map((o) => (
-                        <option key={o._id} value={o._id}>
-                          {o.invoiceNumber || o._id.slice(-8)} —{" "}
-                          {new Date(o.updatedAt).toLocaleDateString("en-GB")}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <>
+                    {/* Customer dropdown is only for admin/salesman, never for customer role */}
+                    {user && !isCustomer && (
+                      <div className="csr-form-group">
+                        <label>Select Customer</label>
+                        <select
+                          className="csr-select"
+                          value={selectedCustomerId}
+                          onChange={handleCustomerChange}
+                        >
+                          {uniqueCustomers.length === 0 && <option value="">No customers found</option>}
+                          {uniqueCustomers.map((c) => (
+                            <option key={c._id} value={c._id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="csr-form-group">
+                      <label>Select Order</label>
+                      <select
+                        className="csr-select"
+                        value={selectedOrderId}
+                        onChange={(e) => handleOrderSelect(e.target.value)}
+                      >
+                        <option value="">-- Select an order --</option>
+                        {customerOrders.map((o) => (
+                          <option key={o._id} value={o._id}>
+                            {o.invoiceNumber || o._id.slice(-8)} — {new Date(o.updatedAt).toLocaleDateString("en-GB")}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {customerOrders.length === 0 && (
+                      <div className="csr-info-box">
+                        No delivered orders within the last 30 days. Returns can only be made within 30 days of delivery.
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {selectedOrder && (

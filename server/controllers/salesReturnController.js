@@ -1,4 +1,5 @@
 // controllers/salesReturnController.js
+const mongoose = require("mongoose");
 const SalesReturn = require("../models/SalesReturn");
 const Order = require("../models/Order");
 const Customer = require("../models/Customer");
@@ -539,12 +540,35 @@ const getDeliveredOrdersForReturn = async (req, res) => {
       updatedAt: { $gte: thirtyDaysAgo },
     };
 
-    // If user is a salesman, restrict to their customers only
-    if (req.user && req.user.role === "Sales man") {
+    // Filter based on user role
+    if (req.user && req.user.role === "customer") {
+      // Customer role: only their own orders (ignore customerId query param for security)
+      query.customer = req.user._id;
+    } else if (req.user && req.user.role === "Sales man") {
+      // Salesman: only their customers' orders
       const myCustomers = await Customer.find({ salesman: req.user._id }).select("_id");
       const myCustomerIds = myCustomers.map((c) => c._id);
       query.customer = { $in: myCustomerIds };
+      
+      // If salesman filters by specific customer, apply that filter too (must be one of their customers)
+      if (req.query.customerId) {
+        try {
+          query.customer = new mongoose.Types.ObjectId(req.query.customerId);
+        } catch (e) {
+          return res.status(400).json({ message: "Invalid customer ID format" });
+        }
+      }
+    } else if (req.user && req.user.role === "admin") {
+      // Admin: optionally filter by specific customer if provided
+      if (req.query.customerId) {
+        try {
+          query.customer = new mongoose.Types.ObjectId(req.query.customerId);
+        } catch (e) {
+          return res.status(400).json({ message: "Invalid customer ID format" });
+        }
+      }
     }
+    // For any other role: no customer filter
 
     const orders = await Order.find(query)
       .populate("customer", "name phoneNumber")
@@ -584,6 +608,15 @@ const getDeliveredOrdersForReturn = async (req, res) => {
           return deliveredQty - alreadyReturned > 0;
         })
       );
+
+    // Debug logging for troubleshooting
+    console.log("[DEBUG] getDeliveredOrdersForReturn: Returned Orders:");
+    filteredOrders.forEach((order) => {
+      console.log(`OrderID: ${order._id}, CustomerID: ${order.customer?._id || order.customer}, Invoice: ${order.invoiceNumber}`);
+      (order.orderItems || []).forEach((item) => {
+        console.log(`  ProductID: ${item.product?._id || item.product}, DeliveredQty: ${item.deliveredQuantity}, AlreadyReturned: ${(order.alreadyReturnedQty || {})[item.product?._id?.toString() || item.product?.toString()] || 0}`);
+      });
+    });
 
     res.json(filteredOrders);
   } catch (error) {
