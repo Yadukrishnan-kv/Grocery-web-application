@@ -386,7 +386,10 @@ const getAllPendingBills = async (req, res) => {
 const markBillReceived = async (req, res) => {
   try {
     const { billId, amount, method, chequeDetails, batchId } = req.body;
-    if (!req.user || !["Delivery Man", "Sales Man"].includes(req.user.role)) {
+    // Allow: delivery, deliveryman, delivery man, sales, salesman, sales man (case-insensitive, partial match)
+    const role = req.user && req.user.role ? String(req.user.role).toLowerCase() : "";
+    const allowedRoles = ["delivery", "deliveryman", "delivery man", "sales", "salesman", "sales man"];
+    if (!req.user || !allowedRoles.some(r => role.includes(r))) {
       return res.status(403).json({ message: "Access denied" });
     }
     const bill = await Bill.findById(billId).populate("customer").populate("orders");

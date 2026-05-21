@@ -1,12 +1,40 @@
-// src/pages/Storekeeper/PackOrders.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+
 import toast from "react-hot-toast";
 import axios from "axios";
-import "./PackOrders.css";
+
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
 
 const PackOrders = () => {
+  const pdfRefs = useRef({});
+  // PDF Download Handler
+  const handleDownloadPDF = async (orderId) => {
+    const element = pdfRefs.current[orderId];
+    if (!element) {
+      toast.error("Order details not found for PDF");
+      return;
+    }
+    try {
+      const canvas = await html2canvas(element, { scale: 2 });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pageWidth;
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`order-details-${orderId}.pdf`);
+      toast.success("Order PDF downloaded");
+    } catch (err) {
+      toast.error("Failed to generate PDF");
+    }
+  };
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -334,6 +362,34 @@ const PackOrders = () => {
                               No Invoice Yet
                             </span>
                           )}
+                          {/* Download/Print PDF button */}
+                          <button
+                            className="order-list-icon-button order-list-download-pdf"
+                            onClick={() => handleDownloadPDF(order._id)}
+                            title="Download/Print Order PDF"
+                          >
+                            🖨️ PDF
+                          </button>
+                          {/* Hidden order details for PDF generation */}
+                          <div
+                            ref={el => (pdfRefs.current[order._id] = el)}
+                            style={{ position: 'absolute', left: '-9999px', top: 0, background: '#fff', color: '#000', padding: 24, width: 600, fontSize: 14, zIndex: -1 }}
+                          >
+                            <h2>Order Details</h2>
+                            <div><strong>Order ID:</strong> {order._id}</div>
+                            <div><strong>Customer:</strong> {order.customer?.name || "N/A"}</div>
+                            <div><strong>Order Date:</strong> {formatDate(order.orderDate)}</div>
+                            <div><strong>Status:</strong> {order.packedStatus}</div>
+                            <div><strong>Products:</strong></div>
+                            <ul>
+                              {order.orderItems?.map((item, i) => (
+                                <li key={i}>
+                                  {item.product?.productName || "Unknown"} - Qty: {item.orderedQuantity} {item.unit || ""} (Packed: {item.packedQuantity || 0})
+                                </li>
+                              ))}
+                            </ul>
+                            <div><strong>Total Ordered:</strong> {order.totalOrderedQuantity || 0}</div>
+                          </div>
                         </td>
 
                         <td className="pack-cell">

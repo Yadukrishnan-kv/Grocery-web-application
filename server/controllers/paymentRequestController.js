@@ -60,7 +60,9 @@ const createPaymentRequest = async (req, res) => {
 const getMyPaymentRequests = async (req, res) => {
   try {
     const role = (req.user && req.user.role) ? String(req.user.role).toLowerCase() : "";
-    if (!req.user || (!role.includes("delivery") && !role.includes("sales"))) {
+    // Allow: delivery, deliveryman, sales, salesman (case-insensitive, partial match)
+    const allowedRoles = ["delivery", "deliveryman", "delivery man", "sales", "salesman", "sales man"];
+    if (!req.user || !allowedRoles.some(r => role.includes(r))) {
       return res.status(403).json({ message: "Access denied" });
     }
     
