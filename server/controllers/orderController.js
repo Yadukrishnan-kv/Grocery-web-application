@@ -326,29 +326,28 @@ const deliverOrder = async (req, res) => {
       grandDeliveryAmount += parseFloat(itemTotalWithVat.toFixed(2));
     }
 
-    // Handle cash/cheque payment immediately
+    // --- Robust Delivery Logic: Store Credit First, Restore Credit Limit, Record Payments ---
     if (paymentMethod === "cash" || paymentMethod === "cheque") {
       const customer = await Customer.findById(order.customer);
-
       let cashToCollect = grandDeliveryAmount;
-
-      // Apply returnCreditBalance first — return credits are consumed before cash is collected
+      returnCreditUsed = 0;
+      // 1. Use store credit (returnCreditBalance) first
       if (customer && (customer.returnCreditBalance || 0) > 0) {
-        returnCreditUsed = parseFloat(Math.min(customer.returnCreditBalance, grandDeliveryAmount).toFixed(2));
+        returnCreditUsed = Math.min(customer.returnCreditBalance, grandDeliveryAmount);
         customer.returnCreditBalance -= returnCreditUsed;
         cashToCollect = parseFloat((grandDeliveryAmount - returnCreditUsed).toFixed(2));
-
         // Record the return credit portion as a payment transaction
-        await PaymentTransaction.create({
-          order: order._id,
-          deliveryMan: req.user._id,
-          amount: returnCreditUsed,
-          method: "return_credit",
-          status: "received",
-        });
+        if (returnCreditUsed > 0) {
+          await PaymentTransaction.create({
+            order: order._id,
+            deliveryMan: req.user._id,
+            amount: returnCreditUsed,
+            method: "return_credit",
+            status: "received",
+          });
+        }
       }
-
-      // Record the actual cash/cheque collected (only remaining amount)
+      // 2. Record the actual cash/cheque collected (only remaining amount)
       if (cashToCollect > 0) {
         await PaymentTransaction.create({
           order: order._id,
@@ -359,12 +358,10 @@ const deliverOrder = async (req, res) => {
           status: "received",
         });
       }
-
-      // Restore balanceCreditLimit for "Credit limit" billing type customers
+      // 3. Restore balanceCreditLimit for "Credit limit" billing type customers
       if (customer && customer.billingType === "Credit limit") {
         customer.balanceCreditLimit += grandDeliveryAmount;
       }
-
       if (customer) await customer.save();
     }
 
@@ -376,15 +373,21 @@ const deliverOrder = async (req, res) => {
     order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
     await order.save();
 
-    // ✅ CREATE NEW BILL FOR THIS DELIVERY (never update existing)
+    // --- Bill Generation: Only if Credit Limit Was Used ---
     const customerForBill = await Customer.findById(order.customer);
+    // Only generate a bill if:
+    // - Payment is credit
+    // - Not cash/cheque
+    // - Statement type is invoice-based
+    // - AND some credit limit was actually used (not pure store credit)
+    // To check if credit limit was used, see if order.invoiceNumber exists (set only if credit limit was used in packing)
     if (
       order.payment === "credit" &&
       paymentMethod !== "cash" &&
       paymentMethod !== "cheque" &&
-      customerForBill?.statementType === "invoice-based"
+      customerForBill?.statementType === "invoice-based" &&
+      order.invoiceNumber // Only if credit limit was used in packing
     ) {
-      // ✅ Pass specific delivery amount and current invoice number
       const bill = await createInvoiceBasedBill(order, grandDeliveryAmount, order.invoiceNumber);
       if (bill) {
         order.bill = bill._id;
@@ -1681,24 +1684,22 @@ const packOrder = async (req, res) => {
       }
     }
 
-    // Capture how much return credit was applied for the response
+    // --- Robust Credit/Store Credit Deduction Logic ---
     let packReturnCreditUsed = 0;
-
-    // 3. Credit deduction - ✅ NOW USES VAT-INCLUSIVE AMOUNT
+    let packCreditLimitUsed = 0;
     if (order.payment === "credit" && newlyPackedAmount > 0) {
       const customer = await Customer.findById(order.customer);
       if (customer?.billingType === "Credit limit") {
         let remaining = newlyPackedAmount;
 
-        // Use returnCreditBalance first (from previous sales returns)
+        // 1. Use store credit (returnCreditBalance) first
         if ((customer.returnCreditBalance || 0) > 0) {
-          const rcu = parseFloat(Math.min(customer.returnCreditBalance, remaining).toFixed(2));
-          customer.returnCreditBalance -= rcu;
-          packReturnCreditUsed = rcu;
-          remaining = parseFloat((remaining - rcu).toFixed(2));
+          packReturnCreditUsed = Math.min(customer.returnCreditBalance, remaining);
+          customer.returnCreditBalance -= packReturnCreditUsed;
+          remaining = parseFloat((remaining - packReturnCreditUsed).toFixed(2));
         }
 
-        // Then use balanceCreditLimit for the rest
+        // 2. Use credit limit for the rest
         if (remaining > 0) {
           if (customer.balanceCreditLimit < remaining) {
             return res.status(400).json({
@@ -1706,30 +1707,29 @@ const packOrder = async (req, res) => {
             });
           }
           customer.balanceCreditLimit -= remaining;
+          packCreditLimitUsed = remaining;
         }
-
         await customer.save();
       }
     }
 
     // 4. Generate new invoice number ONLY when something new is packed
+    //    Only if any credit limit was used (not for pure store credit)
     let newInvoiceNumber = order.invoiceNumber;
-    if (newlyPackedAmount > 0) {
+    if (newlyPackedAmount > 0 && packCreditLimitUsed > 0) {
       const counter = await InvoiceCounter.findOneAndUpdate(
         {},
         { $inc: { invoiceCount: 1 } },
         { new: true, upsert: true, setDefaultsOnInsert: true }
       );
       newInvoiceNumber = `DEL-${String(counter.invoiceCount).padStart(2, "0")}`;
-      
       if (!order.invoiceHistory) order.invoiceHistory = [];
       order.invoiceHistory.push({
         invoiceNumber: newInvoiceNumber,
         quantity: totalNewlyPackedQty,
-        amount: newlyPackedAmount,  // ✅ VAT-inclusive amount
+        amount: newlyPackedAmount,  // VAT-inclusive amount
         createdAt: new Date(),
         items: newlyPackedItems,
-        // ✅ Store VAT breakdown for invoice PDF
         totalExclVat: newlyPackedExclVat,
         totalVatAmount: newlyPackedVatAmount,
       });
@@ -1754,6 +1754,7 @@ const packOrder = async (req, res) => {
       order,
       invoiceNumber: newInvoiceNumber,
       returnCreditUsed: packReturnCreditUsed,
+      creditLimitUsed: packCreditLimitUsed,
       newlyPacked: {
         quantity: totalNewlyPackedQty,
         amount: newlyPackedAmount,

@@ -364,10 +364,22 @@ const confirmPickup = async (req, res) => {
           $inc: { returnCreditBalance: totalReturnAmount },
         });
       } else {
-        // True credit purchase — restore credit limit
-        await Customer.findByIdAndUpdate(sr.customer, {
-          $inc: { balanceCreditLimit: totalReturnAmount },
-        });
+        // True credit purchase — check for unpaid bill
+        const bills = await Bill.find({
+          orders: order._id,
+          status: { $nin: ["paid", "cancelled"] },
+        }).sort({ createdAt: -1 });
+        if (bills.length > 0) {
+          // Unpaid bill exists: restore credit limit and reduce bill
+          await Customer.findByIdAndUpdate(sr.customer, {
+            $inc: { balanceCreditLimit: totalReturnAmount },
+          });
+        } else {
+          // No unpaid bill: goes to returnCreditBalance
+          await Customer.findByIdAndUpdate(sr.customer, {
+            $inc: { returnCreditBalance: totalReturnAmount },
+          });
+        }
       }
     }
 

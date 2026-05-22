@@ -656,8 +656,9 @@ const downloadBillInvoice = async (req, res) => {
     y = drawDashedLine(y + 2);
 
     // ===== BILL INVOICE TITLE =====
+    const isPaidReceipt = bill.status === "paid" && bill.paidAmount > 0;
     doc.fontSize(9).font("Helvetica-Bold")
-      .text("BILL INVOICE", centerX, y, { width: contentWidth, align: "center" });
+      .text(isPaidReceipt ? "PAYMENT RECEIPT" : "BILL INVOICE", centerX, y, { width: contentWidth, align: "center" });
     y += 14;
 
     if (bill.isOpeningBalance) {
@@ -701,24 +702,15 @@ const downloadBillInvoice = async (req, res) => {
 
     y = drawDashedLine(y + 2);
 
-    // ===== AMOUNT BREAKDOWN =====
-    if (bill.totalExclVat !== undefined && bill.totalExclVat > 0) {
-      printRow("Excl. VAT:", `AED ${bill.totalExclVat.toFixed(2)}`);
+    if (!isPaidReceipt) {
+      // Grand total - larger font for unpaid/partial bills
+      doc.fontSize(9).font("Helvetica-Bold")
+        .text("GRAND TOTAL", centerX, y, { width: labelW + 10 });
+      doc.fontSize(9).font("Helvetica-Bold")
+        .text(`AED ${(bill.grandTotal || bill.amountDue).toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
+      y += 14;
+      y = drawDashedLine(y);
     }
-    if (bill.totalVatAmount !== undefined && bill.totalVatAmount > 0) {
-      printRow("VAT 5%:", `AED ${bill.totalVatAmount.toFixed(2)}`);
-    }
-
-    y = drawDashedLine(y + 2);
-
-    // Grand total - larger font
-    doc.fontSize(9).font("Helvetica-Bold")
-      .text("GRAND TOTAL", centerX, y, { width: labelW + 10 });
-    doc.fontSize(9).font("Helvetica-Bold")
-      .text(`AED ${(bill.grandTotal || bill.amountDue).toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
-    y += 14;
-
-    y = drawDashedLine(y);
 
     // Payment status rows
     printRow("Paid Amount:", `AED ${bill.paidAmount?.toFixed(2) || "0.00"}`);
