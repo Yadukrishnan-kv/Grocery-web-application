@@ -93,7 +93,7 @@ const CreateSalesReturn = () => {
 
 
   // Determine if user is customer
-  const isCustomer = user?.role === "customer";
+  const isCustomer = user?.role?.toString().trim().toLowerCase() === "customer";
 
   // Orders to display: all delivered orders if admin/salesman (no customer selected yet), 
   // or filtered by selected customer, or customer's own orders if customer role

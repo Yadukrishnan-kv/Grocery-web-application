@@ -549,14 +549,23 @@ const getDeliveredOrdersForReturn = async (req, res) => {
     // Build base query
     const query = {
       status: { $in: ["delivered", "partial_delivered"] },
-      updatedAt: { $gte: thirtyDaysAgo },
+      $or: [
+        { deliveredAt: { $gte: thirtyDaysAgo } },
+        { deliveredAt: null, updatedAt: { $gte: thirtyDaysAgo } },
+      ],
     };
 
+    const userRole = String(req.user?.role || "").trim().toLowerCase();
+
     // Filter based on user role
-    if (req.user && req.user.role === "customer") {
+    if (userRole === "customer") {
       // Customer role: only their own orders (ignore customerId query param for security)
-      query.customer = req.user._id;
-    } else if (req.user && req.user.role === "Sales man") {
+      const customer = await Customer.findOne({ user: req.user._id }).select("_id");
+      if (!customer) {
+        return res.json([]);
+      }
+      query.customer = customer._id;
+    } else if (userRole === "sales man" || userRole === "salesman" || userRole === "sales") {
       // Salesman: only their customers' orders
       const myCustomers = await Customer.find({ salesman: req.user._id }).select("_id");
       const myCustomerIds = myCustomers.map((c) => c._id);
@@ -570,7 +579,7 @@ const getDeliveredOrdersForReturn = async (req, res) => {
           return res.status(400).json({ message: "Invalid customer ID format" });
         }
       }
-    } else if (req.user && req.user.role === "admin") {
+    } else if (userRole === "admin") {
       // Admin: optionally filter by specific customer if provided
       if (req.query.customerId) {
         try {
