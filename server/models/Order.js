@@ -124,6 +124,17 @@ const orderSchema = new Schema(
       enum: ["not_packed", "ready_to_deliver", "partially_packed", "fully_packed"],
       default: "not_packed",
     },
+    // ✅ Track payment sources used during packing
+    creditLimitUsed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    returnBalanceUsed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );

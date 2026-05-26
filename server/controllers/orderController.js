@@ -380,15 +380,23 @@ const deliverOrder = async (req, res) => {
     // - Not cash/cheque
     // - Statement type is invoice-based
     // - AND some credit limit was actually used (not pure store credit)
-    // To check if credit limit was used, see if order.invoiceNumber exists (set only if credit limit was used in packing)
+    // To check if credit limit was used, see if order.invoiceNumber exists AND order.creditLimitUsed > 0
     if (
       order.payment === "credit" &&
       paymentMethod !== "cash" &&
       paymentMethod !== "cheque" &&
       customerForBill?.statementType === "invoice-based" &&
-      order.invoiceNumber // Only if credit limit was used in packing
+      order.invoiceNumber && // Invoice created only if credit limit was used in packing
+      order.creditLimitUsed > 0 // ✅ Only generate bill if credit limit was actually used
     ) {
-      const bill = await createInvoiceBasedBill(order, grandDeliveryAmount, order.invoiceNumber);
+      // ✅ FIXED: Calculate the proportional credit limit used for delivered items
+      // The bill should only reflect the portion that was deducted from credit limit,
+      // excluding the portion that came from return balance
+      const totalPackedAmount = (order.creditLimitUsed || 0) + (order.returnBalanceUsed || 0);
+      const creditLimitRatio = totalPackedAmount > 0 ? order.creditLimitUsed / totalPackedAmount : 0;
+      const creditLimitUsedForDelivery = parseFloat((grandDeliveryAmount * creditLimitRatio).toFixed(2));
+      
+      const bill = await createInvoiceBasedBill(order, creditLimitUsedForDelivery, order.invoiceNumber);
       if (bill) {
         order.bill = bill._id;
         await order.save();
@@ -1713,10 +1721,10 @@ const packOrder = async (req, res) => {
       }
     }
 
-    // 4. Generate new invoice number ONLY when something new is packed
-    //    Only if any credit limit was used (not for pure store credit)
+    // 4. Generate new invoice number ALWAYS when something new is packed
+    //    Invoice is generated regardless of payment source (return balance OR credit limit)
     let newInvoiceNumber = order.invoiceNumber;
-    if (newlyPackedAmount > 0 && packCreditLimitUsed > 0) {
+    if (newlyPackedAmount > 0) {
       const counter = await InvoiceCounter.findOneAndUpdate(
         {},
         { $inc: { invoiceCount: 1 } },
@@ -1743,6 +1751,9 @@ const packOrder = async (req, res) => {
     if (allFullyPacked && order.status !== "partial_delivered") {
       order.status = "ready_to_deliver";
     }
+    // ✅ Store credit usage tracking
+    order.creditLimitUsed = (order.creditLimitUsed || 0) + packCreditLimitUsed;
+    order.returnBalanceUsed = (order.returnBalanceUsed || 0) + packReturnCreditUsed;
     await order.save();
 
     // 6. Response

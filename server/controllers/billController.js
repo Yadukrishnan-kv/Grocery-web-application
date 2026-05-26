@@ -290,7 +290,7 @@ const getCustomerBillById = async (req, res) => {
   }
 };
 
-// ✅ FIXED: createInvoiceBasedBill - Properly handles VAT-inclusive amounts
+// ✅ FIXED: createInvoiceBasedBill - Properly handles VAT-inclusive amounts and credit limit used
 const createInvoiceBasedBill = async (order, specificAmount = null, specificInvoiceNumber = null) => {
   try {
     const customer = await Customer.findById(order.customer);
@@ -303,25 +303,38 @@ const createInvoiceBasedBill = async (order, specificAmount = null, specificInvo
     let totalExclVat = 0;
     let totalVatAmount = 0;
 
+    // First, calculate the total delivered amount based on deliveredQuantity
+    let totalDelivered = 0;
+    for (const item of order.orderItems) {
+      const deliveredQty = item.deliveredQuantity || 0;
+      if (deliveredQty > 0 && item.orderedQuantity > 0) {
+        const ratio = deliveredQty / item.orderedQuantity;
+        totalDelivered += (item.totalAmount || 0) * ratio;
+      }
+    }
+
     if (specificAmount !== null) {
-      // When specificAmount is provided (partial delivery), we need to calculate VAT proportionally
-      // Find the items that were delivered and calculate their VAT breakdown
+      // When specificAmount is provided (e.g., only credit limit used portion for billing),
+      // use that as the total, but calculate VAT proportionally
+      totalUsed = specificAmount;
+      
+      // Calculate the scaling ratio to apply to VAT
+      const scalingRatio = totalDelivered > 0 ? specificAmount / totalDelivered : 0;
+      
+      // Calculate VAT breakdown proportional to the delivered items
       for (const item of order.orderItems) {
         const deliveredQty = item.deliveredQuantity || 0;
         if (deliveredQty > 0 && item.orderedQuantity > 0) {
-          // Calculate proportional amounts based on delivered quantity
           const ratio = deliveredQty / item.orderedQuantity;
-          const itemExclVat = (item.exclVatAmount || 0) * ratio;
-          const itemVatAmount = (item.vatAmount || 0) * ratio;
-          const itemTotal = (item.totalAmount || 0) * ratio;
+          const itemExclVat = (item.exclVatAmount || 0) * ratio * scalingRatio;
+          const itemVatAmount = (item.vatAmount || 0) * ratio * scalingRatio;
           
           totalExclVat += itemExclVat;
           totalVatAmount += itemVatAmount;
-          totalUsed += itemTotal;
         }
       }
     } else {
-      // Full order - use stored VAT fields directly
+      // Full order - use delivered amounts directly
       for (const item of order.orderItems) {
         const deliveredQty = item.deliveredQuantity || item.orderedQuantity || 0;
         if (deliveredQty > 0 && item.orderedQuantity > 0) {
@@ -334,7 +347,7 @@ const createInvoiceBasedBill = async (order, specificAmount = null, specificInvo
     }
 
     if (totalUsed <= 0) {
-      console.log(`Order ${order._id} has no delivered value → no bill created`);
+      console.log(`Order ${order._id} has no billing value → no bill created`);
       return null;
     }
 
@@ -349,8 +362,8 @@ const createInvoiceBasedBill = async (order, specificAmount = null, specificInvo
       customer: order.customer,
       cycleStart: deliveryDate,
       cycleEnd: deliveryDate,
-      totalUsed,
-      amountDue: totalUsed,
+      totalUsed: parseFloat(totalUsed.toFixed(2)),
+      amountDue: parseFloat(totalUsed.toFixed(2)),
       dueDate,
       paidAmount: 0,
       status: "pending",
@@ -363,7 +376,7 @@ const createInvoiceBasedBill = async (order, specificAmount = null, specificInvo
       grandTotal: parseFloat(totalUsed.toFixed(2)),
     });
 
-    console.log(`✅ New Invoice-based bill created for order ${order._id}: ${bill._id} (Inv: ${bill.invoiceNumber})`);
+    console.log(`✅ New Invoice-based bill created for order ${order._id}: ${bill._id} (Inv: ${bill.invoiceNumber}) - Amount: AED ${totalUsed.toFixed(2)}`);
     return bill;
   } catch (error) {
     console.error("Error creating invoice-based bill:", error);
