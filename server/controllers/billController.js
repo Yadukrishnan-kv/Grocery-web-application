@@ -250,7 +250,27 @@ const getCustomerBills = async (req, res) => {
     const bills = await Bill.find({ customer: customer._id })
       .sort({ cycleEnd: -1 })
       .populate("orders", "product orderedQuantity totalAmount orderDate status vatPercentage exclVatAmount vatAmount");
-    res.json(bills);
+
+    const billIds = bills.map((bill) => bill._id);
+    const latestTransactions = await BillTransaction.find({ bill: { $in: billIds } })
+      .sort({ createdAt: -1 })
+      .select("bill _id");
+
+    const latestTransactionByBill = latestTransactions.reduce((acc, tx) => {
+      const billId = String(tx.bill);
+      if (!acc[billId]) {
+        acc[billId] = tx._id;
+      }
+      return acc;
+    }, {});
+
+    const billsWithTransactionId = bills.map((bill) => {
+      const billObj = bill.toObject();
+      billObj.receiptTransactionId = latestTransactionByBill[billObj._id.toString()] || null;
+      return billObj;
+    });
+
+    res.json(billsWithTransactionId);
   } catch (error) {
     console.error("getCustomerBills error:", error);
     res.status(500).json({ message: "Server error" });
@@ -426,7 +446,7 @@ const markBillReceived = async (req, res) => {
     
     await bill.save();
     
-    await BillTransaction.create({
+    const transaction = await BillTransaction.create({
       bill: bill._id,
       customer: bill.customer._id,
       recipient: req.user._id,
@@ -451,6 +471,8 @@ const markBillReceived = async (req, res) => {
       newStatus: bill.status,
       remainingDue: bill.amountDue,
       batchReceiptNumber: bill.batchReceiptNumber,
+      transactionId: transaction._id,
+      paidAmount: actualPayment,
     });
   } catch (error) {
     console.error("Mark received error:", error);
@@ -468,9 +490,37 @@ const getBillReceipt = async (req, res) => {
       return res.status(404).json({ message: "Bill not found" });
     }
     
-    const displayReceiptNo = bill.batchReceiptNumber || `REC-${bill.invoiceNumber || "N/A"}`;
+    const { transactionId } = req.query;
+    let receiptTransaction = null;
+    if (transactionId) {
+      receiptTransaction = await BillTransaction.findById(transactionId)
+        .populate("customer", "name phoneNumber address")
+        .populate("recipient", "username")
+        .populate("order", "invoiceNumber");
+    }
+
+    if (!receiptTransaction) {
+      receiptTransaction = await BillTransaction.findOne({ bill: bill._id })
+        .sort({ createdAt: -1 })
+        .populate("customer", "name phoneNumber address")
+        .populate("recipient", "username")
+        .populate("order", "invoiceNumber");
+    }
+
+    const receiptAmount = receiptTransaction?.amount ?? bill.paidAmount ?? 0;
+    const receiptMethod = receiptTransaction?.method || "cash";
+    const receiptCustomer = receiptTransaction?.customer || bill.customer;
+    const displayReceiptNo = receiptTransaction
+      ? `REC-${receiptTransaction._id.toString().slice(-6)}`
+      : bill.batchReceiptNumber || `REC-${bill.invoiceNumber || "N/A"}`;
+    const totalPaid = receiptTransaction
+      ? await BillTransaction.find({
+          bill: bill._id,
+          createdAt: { $lte: receiptTransaction.createdAt },
+        }).then((txs) => txs.reduce((sum, tx) => sum + (tx.amount || 0), 0))
+      : bill.paidAmount || 0;
     const filename = `receipt-${displayReceiptNo}.pdf`;
-    
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     
@@ -540,41 +590,50 @@ const getBillReceipt = async (req, res) => {
     };
 
     printRow("Receipt No:", displayReceiptNo);
-    printRow("Date:", new Date(bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString());
+    printRow("Invoice No:", bill.invoiceNumber || receiptTransaction?.order?.invoiceNumber || "N/A");
+    printRow("Date:", new Date(receiptTransaction?.createdAt || bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString("en-IN"));
 
     y = drawDashedLine(y + 2);
 
     // ===== CUSTOMER INFO =====
     doc.fontSize(7).font("Helvetica-Bold").text("CUSTOMER:", centerX, y);
     y += 11;
-    doc.fontSize(7).font("Helvetica")
-      .text(bill.customer?.name || "N/A", centerX, y);
+    doc.fontSize(7).font("Helvetica").text(receiptCustomer?.name || bill.customer?.name || "N/A", centerX, y);
     y += 10;
-    if (bill.customer?.phoneNumber) {
-      doc.text(bill.customer.phoneNumber, centerX, y);
+    if (receiptCustomer?.phoneNumber || bill.customer?.phoneNumber) {
+      doc.text(receiptCustomer?.phoneNumber || bill.customer?.phoneNumber, centerX, y);
       y += 10;
     }
-    if (bill.customer?.address) {
-      doc.text(bill.customer.address, centerX, y, { width: contentWidth });
+    if (receiptCustomer?.address || bill.customer?.address) {
+      doc.text(receiptCustomer?.address || bill.customer?.address, centerX, y, { width: contentWidth });
       y += 10;
     }
 
     y = drawDashedLine(y + 2);
 
-    // ===== BILL SUMMARY =====
-    printRow("Invoice No:", bill.invoiceNumber || "N/A");
+    printRow("Amount Paid:", `AED ${receiptAmount.toFixed(2)}`);
+    y = drawDashedLine(y + 2);
+    printRow("Method:", receiptMethod.charAt(0).toUpperCase() + receiptMethod.slice(1));
 
-    // Removed Excl. VAT and VAT 5% rows as per requirements
+    if (receiptTransaction?.method === "cheque" && receiptTransaction.chequeDetails) {
+      y = drawDashedLine(y + 2);
+      doc.fontSize(7).font("Helvetica-Bold").text("CHEQUE DETAILS:", centerX, y);
+      y += 11;
+      printRow("Cheque No:", receiptTransaction.chequeDetails.number || "N/A");
+      printRow("Bank:", receiptTransaction.chequeDetails.bank || "N/A");
+      if (receiptTransaction.chequeDetails.date) {
+        printRow("Cheque Date:", new Date(receiptTransaction.chequeDetails.date).toLocaleDateString("en-IN"));
+      }
+    }
 
     y = drawDashedLine(y + 2);
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000")
+      .text("TOTAL PAID", centerX, y, { width: labelW + 10 });
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000")
+      .text(`AED ${totalPaid.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
+    y += 14;
 
-    // Only show Paid Amount
-    doc.fontSize(7).font("Helvetica-Bold").text("Paid Amount:", centerX, y, { width: labelW });
-    doc.fontSize(7).font("Helvetica").text(`AED ${bill.paidAmount?.toFixed(2) || "0.00"}`, centerX + labelW, y, { width: valueW, align: "right" });
-    y += 11;
-    y = drawDashedLine(y + 2);
-
-    // ===== FOOTER =====
+    y = drawDashedLine(y);
     y += 4;
     doc.fontSize(6).font("Helvetica")
       .text("Thank you for your payment!", centerX, y, { width: contentWidth, align: "center" });

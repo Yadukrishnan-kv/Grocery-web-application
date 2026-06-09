@@ -367,9 +367,9 @@ const PaymentRequestsDelivery = () => {
   // ────────────────────────────────────────────────
   // Download Receipt
   // ────────────────────────────────────────────────
-  const downloadReceipt = async (billId, invoiceNumber) => {
+  const downloadReceipt = async (billId, invoiceNumber, transactionId = null) => {
     if (!billId) {
-      toast.error("No bill associated");
+      toast.error("No receipt associated");
       return;
     }
     const token = localStorage.getItem("token");
@@ -377,8 +377,11 @@ const PaymentRequestsDelivery = () => {
       toast.error("Please login again");
       return;
     }
+    const endpoint = transactionId
+      ? `${backendUrl}/api/bill-transactions/receipt/${transactionId}`
+      : `${backendUrl}/api/bills/receipt/${billId}`;
     try {
-      const response = await fetch(`${backendUrl}/api/bills/receipt/${billId}`, {
+      const response = await fetch(endpoint, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -395,7 +398,7 @@ const PaymentRequestsDelivery = () => {
       link.href = url;
       link.download = invoiceNumber
         ? `receipt-${invoiceNumber}.pdf`
-        : `receipt_${billId.slice(-8)}.pdf`;
+        : `receipt_${(transactionId || billId).slice(-8)}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1016,7 +1019,7 @@ const PaymentRequestsDelivery = () => {
                             {hasBill && (
                               <button
                                 className="download-receipt-btn"
-                                onClick={() => downloadReceipt(tx.bill._id, invoiceNo)}
+                                onClick={() => downloadReceipt(tx.bill._id, invoiceNo, tx._id)}
                                 title="Download Receipt"
                               >
                                 Receipt

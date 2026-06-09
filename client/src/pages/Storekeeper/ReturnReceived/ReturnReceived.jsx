@@ -72,6 +72,28 @@ const ReturnReceived = () => {
     }
   };
 
+  const handleDownloadInvoice = async (sr) => {
+    if (!sr?.returnInvoiceNumber) {
+      toast.error("Return invoice not available yet");
+      return;
+    }
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${backendUrl}/api/sales-returns/invoice/${sr._id}`,
+        { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `return-${sr.returnInvoiceNumber}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Return invoice downloaded");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to download return invoice");
+    }
+  };
+
   const totalReturnAmt = (sr) =>
     (sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
 
@@ -196,7 +218,18 @@ const ReturnReceived = () => {
                               Confirm Received
                             </button>
                           ) : (
-                            <span className="rr-status-done">✅ Completed</span>
+                            <>
+                              <span className="rr-status-done">✅ Completed</span>
+                              {sr.returnInvoiceNumber && (
+                                <button
+                                  className="rr-btn-download"
+                                  onClick={() => handleDownloadInvoice(sr)}
+                                  title="Download return invoice"
+                                >
+                                  Download Invoice
+                                </button>
+                              )}
+                            </>
                           )}
                         </td>
                       </tr>

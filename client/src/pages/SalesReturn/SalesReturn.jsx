@@ -231,6 +231,9 @@ const SalesReturn = () => {
     }
   };
 
+  // Determine if user is customer
+  const isCustomer = user?.role?.toString().trim().toLowerCase() === "customer";
+
   return (
     <div className="sr-layout">
       <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} user={user} />
@@ -249,11 +252,17 @@ const SalesReturn = () => {
           <div className="sr-page-header">
             <div>
               <h1 className="sr-page-title">Sales Returns</h1>
-              <p className="sr-page-sub">Manage product return requests from customers</p>
+              <p className="sr-page-sub">
+                {isCustomer
+                  ? "Track the status of your return orders"
+                  : "Manage product return requests from customers"}
+              </p>
             </div>
-            <button className="sr-btn-primary" onClick={() => navigate("/sales-returns/create")}>
-              + Create Return
-            </button>
+            {!isCustomer && (
+              <button className="sr-btn-primary" onClick={() => navigate("/sales-returns/create")}>
+                + Create Return
+              </button>
+            )}
           </div>
 
           {/* Stats */}

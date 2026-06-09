@@ -1,6 +1,8 @@
 // controllers/billTransactionController.js
 const BillTransaction = require("../models/BillTransaction");
 const BillAdminRequest = require("../models/BillAdminRequest");
+const Customer = require("../models/Customer");
+const CompanySettings = require("../models/CompanySettings");
 
 const getMyTransactions = async (req, res) => {
   try {
@@ -221,6 +223,140 @@ const adminMarkReceived = async (req, res) => {
     res.status(500).json({ message: "Server error: " + error.message });
   }
 };
+
+const generateReceipt = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const transaction = await BillTransaction.findById(transactionId)
+      .populate("bill", "invoiceNumber batchReceiptNumber")
+      .populate("customer", "name phoneNumber address user")
+      .populate("recipient", "username role")
+      .populate("order", "invoiceNumber");
+
+    if (!transaction) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    const isCustomer = req.user.role === "Customer";
+    let ownsTransaction = false;
+    if (req.user.role === "Admin") {
+      ownsTransaction = true;
+    } else if (String(transaction.recipient?._id) === String(req.user._id)) {
+      ownsTransaction = true;
+    } else if (isCustomer) {
+      const customer = await Customer.findOne({ user: req.user._id });
+      if (customer && String(customer._id) === String(transaction.customer?._id)) {
+        ownsTransaction = true;
+      }
+    }
+
+    if (!ownsTransaction) {
+      return res.status(403).json({ message: "Not authorized to print this receipt" });
+    }
+
+    const company = await CompanySettings.findOne() || { companyName: "Company" };
+    const invoiceNo = transaction.invoiceNumber || transaction.order?.invoiceNumber || transaction.bill?.invoiceNumber || "N/A";
+    const paidAmount = transaction.amount || 0;
+    const customer = transaction.customer;
+
+    const pageWidth = 226;
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const centerX = margin;
+    const labelW = 75;
+    const valueW = contentWidth - labelW;
+
+    const doc = new (require("pdfkit"))({ size: [pageWidth, 800], margin, bufferPages: true });
+    const filename = `receipt-${invoiceNo}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    doc.pipe(res);
+
+    let y = margin;
+    const drawDashedLine = (yPos) => {
+      doc.save();
+      doc.strokeColor("#000").lineWidth(0.5);
+      const dashLen = 3,
+        gap = 2;
+      for (let x = margin; x < pageWidth - margin; x += dashLen + gap) {
+        doc.moveTo(x, yPos).lineTo(Math.min(x + dashLen, pageWidth - margin), yPos).stroke();
+      }
+      doc.restore();
+      return yPos + 6;
+    };
+
+    const printRow = (label, value) => {
+      doc.fontSize(7).font("Helvetica-Bold").fillColor("#000").text(label, centerX, y, { width: labelW });
+      doc.fontSize(7).font("Helvetica").fillColor("#000").text(String(value), centerX + labelW, y, { width: valueW, align: "right" });
+      y += 11;
+    };
+
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#000").text((company.companyName || "COMPANY").toUpperCase(), centerX, y, { width: contentWidth, align: "center" });
+    y += 14;
+    if (company.companyAddress) {
+      doc.fontSize(6).font("Helvetica").fillColor("#000").text(company.companyAddress, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyPhone) {
+      doc.fontSize(6).font("Helvetica").fillColor("#000").text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+
+    y = drawDashedLine(y + 2);
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("PAYMENT RECEIPT", centerX, y, { width: contentWidth, align: "center" });
+    y += 14;
+    y = drawDashedLine(y);
+
+    printRow("Receipt No:", `REC-${transaction._id.toString().slice(-6)}`);
+    printRow("Invoice No:", invoiceNo);
+    printRow("Date:", new Date(transaction.createdAt).toLocaleDateString("en-IN"));
+
+    y = drawDashedLine(y + 2);
+    doc.fontSize(7).font("Helvetica-Bold").text("CUSTOMER:", centerX, y);
+    y += 11;
+    doc.fontSize(7).font("Helvetica").text(customer?.name || "N/A", centerX, y);
+    y += 10;
+    if (customer?.phoneNumber) {
+      doc.fontSize(7).font("Helvetica").text(customer.phoneNumber, centerX, y);
+      y += 10;
+    }
+    if (customer?.address) {
+      doc.fontSize(7).font("Helvetica").text(customer.address, centerX, y, { width: contentWidth });
+      y += 10;
+    }
+
+    y = drawDashedLine(y + 2);
+    printRow("Amount Paid:", `AED ${paidAmount.toFixed(2)}`);
+    printRow("Method:", transaction.method?.charAt(0).toUpperCase() + transaction.method?.slice(1));
+    if (transaction.method === "cheque" && transaction.chequeDetails) {
+      y = drawDashedLine(y + 2);
+      doc.fontSize(7).font("Helvetica-Bold").fillColor("#000").text("CHEQUE DETAILS:", centerX, y);
+      y += 11;
+      printRow("Cheque No:", transaction.chequeDetails.number || "N/A");
+      printRow("Bank:", transaction.chequeDetails.bank || "N/A");
+      if (transaction.chequeDetails.date) {
+        printRow("Cheque Date:", new Date(transaction.chequeDetails.date).toLocaleDateString("en-IN"));
+      }
+    }
+
+    y = drawDashedLine(y + 2);
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("TOTAL PAID", centerX, y, { width: labelW + 10 });
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text(`AED ${paidAmount.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
+    y += 14;
+
+    y = drawDashedLine(y);
+    y += 4;
+    doc.fontSize(6).font("Helvetica").fillColor("#000").text("Thank you for your payment!", centerX, y, { width: contentWidth, align: "center" });
+    y += 9;
+    doc.text("This is a computer-generated receipt.", centerX, y, { width: contentWidth, align: "center" });
+    doc.end();
+  } catch (error) {
+    console.error("Generate receipt error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Failed to generate receipt" });
+    }
+  }
+};
 // Generate bulk receipt PDF for multiple transactions
 const generateBulkReceipt = async (req, res) => {
   try {
@@ -348,5 +484,6 @@ module.exports = {
   getAdminPending,
   getAdminAll,
   adminMarkReceived,
+  generateReceipt,
   generateBulkReceipt,
 };

@@ -7,32 +7,93 @@ import toast from "react-hot-toast";
 import axios from "axios";
 
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 
 const PackOrders = () => {
-  const pdfRefs = useRef({});
-  // PDF Download Handler
-  const handleDownloadPDF = async (orderId) => {
-    const element = pdfRefs.current[orderId];
-    if (!element) {
-      toast.error("Order details not found for PDF");
+  const orderDataRef = useRef({});
+  
+  // Thermal Paper PDF Handler (80mm width ~ 226pt) - Exact format from HTML
+  const handleDownloadThermalPDF = async (orderId) => {
+    const order = orderDataRef.current[orderId];
+    if (!order) {
+      toast.error("Order details not found");
       return;
     }
     try {
-      const canvas = await html2canvas(element, { scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pageWidth;
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`order-details-${orderId}.pdf`);
-      toast.success("Order PDF downloaded");
+      // 80mm thermal paper: ~226pt wide
+      const pageWidth = 226;
+      const margin = 8;
+      const contentWidth = pageWidth - margin * 2;
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "pt",
+        format: [pageWidth, 1200],
+      });
+
+      let y = margin + 5;
+
+      const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        const date = new Date(dateString);
+        return date.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      };
+
+      // ===== TITLE =====
+      pdf.setFontSize(11).setFont(undefined, "bold");
+      pdf.text("Order Details", margin, y);
+      y += 10;
+
+      // ===== ORDER INFO =====
+      pdf.setFontSize(7).setFont(undefined, "normal");
+      
+      const printLine = (label, value) => {
+        pdf.setFont(undefined, "bold");
+        pdf.text(label, margin, y);
+        pdf.setFont(undefined, "normal");
+        const valueStr = String(value);
+        pdf.text(valueStr, margin + 60, y, { maxWidth: contentWidth - 60 });
+        y += 9;
+      };
+
+      printLine("Order ID:", order._id);
+      printLine("Customer:", order.customer?.name || "N/A");
+      printLine("Order Date:", formatDate(order.orderDate));
+
+      y += 3;
+
+      // ===== PRODUCTS =====
+      pdf.setFont(undefined, "bold");
+      pdf.text("Products:", margin, y);
+      y += 9;
+
+      pdf.setFont(undefined, "normal");
+      (order.orderItems || []).forEach((item, index) => {
+        const productName = item.product?.productName || "Unknown";
+        const qty = item.orderedQuantity || 0;
+        const unit = item.unit || "";
+        const listItem = `• ${productName} - Qty: ${qty} ${unit}`;
+        
+        // Wrap long product names
+        const lines = pdf.splitTextToSize(listItem, contentWidth - 5);
+        lines.forEach((line) => {
+          pdf.text(line, margin + 5, y);
+          y += 8;
+        });
+      });
+
+      y += 3;
+
+      // Save PDF
+      pdf.save(`packing-slip-${order._id?.toString().slice(-8) || "order"}.pdf`);
+      toast.success("Packing slip downloaded for thermal printer");
     } catch (err) {
-      toast.error("Failed to generate PDF");
+      console.error("Thermal PDF error:", err);
+      toast.error("Failed to generate thermal slip");
     }
   };
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -362,34 +423,17 @@ const PackOrders = () => {
                               No Invoice Yet
                             </span>
                           )}
-                          {/* Download/Print PDF button */}
+                          {/* Thermal Printer Packing Slip button */}
                           <button
                             className="order-list-icon-button order-list-download-pdf"
-                            onClick={() => handleDownloadPDF(order._id)}
-                            title="Download/Print Order PDF"
+                            onClick={() => {
+                              orderDataRef.current[order._id] = order;
+                              handleDownloadThermalPDF(order._id);
+                            }}
+                            title="Download thermal receipt format packing slip"
                           >
-                            🖨️ PDF
+                            🖨️ Slip
                           </button>
-                          {/* Hidden order details for PDF generation */}
-                          <div
-                            ref={el => (pdfRefs.current[order._id] = el)}
-                            style={{ position: 'absolute', left: '-9999px', top: 0, background: '#fff', color: '#000', padding: 24, width: 600, fontSize: 14, zIndex: -1 }}
-                          >
-                            <h2>Order Details</h2>
-                            <div><strong>Order ID:</strong> {order._id}</div>
-                            <div><strong>Customer:</strong> {order.customer?.name || "N/A"}</div>
-                            <div><strong>Order Date:</strong> {formatDate(order.orderDate)}</div>
-                            <div><strong>Status:</strong> {order.packedStatus}</div>
-                            <div><strong>Products:</strong></div>
-                            <ul>
-                              {order.orderItems?.map((item, i) => (
-                                <li key={i}>
-                                  {item.product?.productName || "Unknown"} - Qty: {item.orderedQuantity} {item.unit || ""} (Packed: {item.packedQuantity || 0})
-                                </li>
-                              ))}
-                            </ul>
-                            <div><strong>Total Ordered:</strong> {order.totalOrderedQuantity || 0}</div>
-                          </div>
                         </td>
 
                         <td className="pack-cell">

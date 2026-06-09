@@ -195,6 +195,23 @@
 
 .rr-btn-confirm:hover { opacity: 0.9; }
 
+.rr-btn-download {
+  background: #e2e8f0;
+  color: #1f2937;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.35rem;
+  min-width: 120px;
+}
+
+.rr-btn-download:hover {
+  background: #cbd5e1;
+}
+
 /* Modal */
 .rr-modal-overlay {
   position: fixed;

@@ -296,33 +296,32 @@ const getSalesManForCustomer = useCallback(async () => {
     }
   };
 
-  // Handle download invoice
-  const handleDownloadInvoice = async (billId, invoiceNumber) => {
+  const handleDownloadReceipt = async (billId, transactionId, invoiceNumber) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${backendUrl}/api/bills/invoice/download/${billId}`,
-        {
-          responseType: "blob",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const url = transactionId
+        ? `${backendUrl}/api/bills/receipt/${billId}?transactionId=${transactionId}`
+        : `${backendUrl}/api/bills/receipt/${billId}`;
 
-      // Create blob and download
+      const response = await axios.get(url, {
+        responseType: "blob",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
       const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
+      const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = url;
-      link.download = `bill-invoice-${invoiceNumber}.pdf`;
+      link.href = downloadUrl;
+      link.download = `receipt-${invoiceNumber || billId.slice(-8)}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(downloadUrl);
 
-      toast.success("Invoice downloaded successfully");
+      toast.success("Receipt downloaded successfully");
     } catch (error) {
       console.error("Download error:", error);
-      toast.error("Failed to download invoice");
+      toast.error("Failed to download receipt");
     }
   };
 
@@ -566,12 +565,18 @@ const getSalesManForCustomer = useCallback(async () => {
                               </span>
                             </td>
                             <td>
-                              {bill.status === "paid" && bill.invoiceNumber && (
+                              {(bill.receiptTransactionId || bill.status === "paid") && (
                                 <button
                                   className="customer-bills-download-button"
-                                  onClick={() => handleDownloadInvoice(bill._id, bill.invoiceNumber)}
+                                  onClick={() =>
+                                    handleDownloadReceipt(
+                                      bill._id,
+                                      bill.receiptTransactionId,
+                                      bill.invoiceNumber || bill._id.toString().slice(-8)
+                                    )
+                                  }
                                 >
-                                  ⬇ Download
+                                  ⬇ Receipt
                                 </button>
                               )}
                             </td>

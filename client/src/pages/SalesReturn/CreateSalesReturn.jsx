@@ -95,6 +95,13 @@ const CreateSalesReturn = () => {
   // Determine if user is customer
   const isCustomer = user?.role?.toString().trim().toLowerCase() === "customer";
 
+  // Redirect customers away from create return page (they can only view returns)
+  useEffect(() => {
+    if (user && isCustomer) {
+      navigate("/sales-returns");
+    }
+  }, [user, isCustomer, navigate]);
+
   // Orders to display: all delivered orders if admin/salesman (no customer selected yet), 
   // or filtered by selected customer, or customer's own orders if customer role
   const customerOrders = useMemo(() => {

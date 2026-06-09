@@ -190,11 +190,20 @@ const getAllSalesReturns = async (req, res) => {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
 
+    // If user is a customer, restrict to their returns only
+    if (req.user && req.user.role === "customer") {
+      const customer = await Customer.findOne({ user: req.user._id }).select("_id");
+      if (!customer) {
+        return res.json([]);
+      }
+      filter.customer = customer._id;
+    } 
     // If user is a salesman, restrict to their customers' returns only
-    if (req.user && req.user.role === "Sales man") {
+    else if (req.user && req.user.role === "Sales man") {
       const myCustomers = await Customer.find({ salesman: req.user._id }).select("_id");
       filter.customer = { $in: myCustomers.map((c) => c._id) };
     }
+    // If user is admin: no additional filter (see all returns)
 
     const returns = await SalesReturn.find(filter)
       .populate("order", "invoiceNumber orderDate status payment")

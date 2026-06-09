@@ -2,6 +2,7 @@ const Customer = require("../models/Customer");
 const User = require("../models/User");
 const CustomerRequest = require("../models/CustomerRequest");
 const Bill = require("../models/Bill");
+const BillTransaction = require("../models/BillTransaction");
 const Role = require("../models/Role");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
@@ -414,7 +415,7 @@ const getMyCustomerProfile = async (req, res) => {
 
     // ✅ ADD .populate('salesman') HERE
     const customer = await Customer.findOne({ user: req.user._id })
-      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit billingType statementType dueDays salesman openingBalance openingBalanceDueDays')
+      .select('name email phoneNumber address pincode creditLimit balanceCreditLimit returnCreditBalance billingType statementType dueDays salesman openingBalance openingBalanceDueDays')
       .populate('salesman', 'username email role'); // ← Critical addition
 
     if (!customer) {
@@ -940,6 +941,19 @@ const getCustomerOutstandingDetails = async (req, res) => {
       })
       .sort({ dueDate: 1 });
 
+    const billIds = pendingBills.map((bill) => bill._id);
+    const latestTransactions = await BillTransaction.find({ bill: { $in: billIds } })
+      .sort({ createdAt: -1 })
+      .select("bill _id");
+
+    const latestTransactionByBill = latestTransactions.reduce((acc, tx) => {
+      const billId = String(tx.bill);
+      if (!acc[billId]) {
+        acc[billId] = tx._id;
+      }
+      return acc;
+    }, {});
+
     const totalOutstanding = pendingBills.reduce(
       (sum, bill) => sum + (bill.amountDue - bill.paidAmount),
       0
@@ -972,6 +986,7 @@ const getCustomerOutstandingDetails = async (req, res) => {
         status: bill.status,
         daysLeft,
         isOpeningBalance: bill.isOpeningBalance,
+        receiptTransactionId: latestTransactionByBill[bill._id.toString()] || null,
 
         orders: bill.orders.map((order) => {
           // Find the history entry matching this bill's invoice number

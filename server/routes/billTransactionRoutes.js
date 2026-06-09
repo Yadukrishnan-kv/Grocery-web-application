@@ -11,11 +11,13 @@ const {
   getAdminPending,
   getAdminAll,
   adminMarkReceived,
+  generateReceipt,
   generateBulkReceipt,
 } = require("../controllers/billTransactionController");
 
 // Delivery/Sales routes
 router.get("/my-transactions", protect, getMyTransactions);
+router.get("/receipt/:transactionId", protect, generateReceipt);
 router.post("/pay-to-admin/:id", protect, payToAdmin);
 router.post("/bulk-receipt", protect, generateBulkReceipt);
 
