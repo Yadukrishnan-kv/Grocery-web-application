@@ -258,7 +258,7 @@ const SalesReturn = () => {
                   : "Manage product return requests from customers"}
               </p>
             </div>
-            {!isCustomer && (
+            {!isCustomer && user?.role !== "Sales Manager" && (
               <button className="sr-btn-primary" onClick={() => navigate("/sales-returns/create")}>
                 + Create Return
               </button>
@@ -382,7 +382,7 @@ const SalesReturn = () => {
                                 </button>
                               </>
                             )}
-                            {sr.status === "approved" && user?.role === "Admin" && (
+                            {sr.status === "approved" && ["Admin", "Sales Manager"].includes(user?.role) && (
                               <button
                                 className="sr-btn-sm sr-btn-assign"
                                 onClick={() => { setAssignModal(sr); setAssignDeliveryManId(""); }}

@@ -298,6 +298,11 @@ const rejectSalesReturn = async (req, res) => {
 
 const assignReturnPickup = async (req, res) => {
   try {
+    // Only Admin and Sales Manager can assign returns
+    if (!req.user || !["Admin", "Sales Manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only Admin and Sales Manager can assign returns for pickup" });
+    }
+
     const { deliveryManId } = req.body;
     const sr = await SalesReturn.findById(req.params.id);
     if (!sr) return res.status(404).json({ message: "Sales return not found" });

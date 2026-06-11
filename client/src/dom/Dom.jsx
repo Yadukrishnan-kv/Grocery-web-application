@@ -44,7 +44,6 @@ import PaymentRequestsDelivery from "../pages/DeliveryPartner/PaymentRequestsDel
 import PaymentRequestsSales from "../pages/Salesmanpages/PaymentRequestsSales/PaymentRequestsSales";
 import BillWallet from "../pages/BillWallet/BillWallet";
 import AdminOrderRequests from "../pages/Sales/Orders/OrderList/AdminOrderRequests";
-import ManageOrders from "../pages/Sales/Orders/OrderList/ManageOrders";
 import PackOrders from "../pages/Storekeeper/PackOrders/PackOrders";
 import PendingOrders from "../pages/DeliveryPartner/PendingOrders/PendingOrders";
 import SalesmanCustomers from "../pages/Salesmanpages/SalesmanCustomers/SalesmanCustomers";
@@ -188,10 +187,7 @@ function Dom() {
               path="/admin/AdminOrderRequests"
               element={<AdminOrderRequests />}
             />
-            <Route
-              path="/sales/manage-orders"
-              element={<ManageOrders />}
-            />
+            {/* Manage Orders page removed */}
             <Route path="/storekeeper/packed-orders" element={<PackOrders />} />
             <Route path="/storekeeper/remaining-pack-orders" element={<RemainingPackOrders />} />
             <Route

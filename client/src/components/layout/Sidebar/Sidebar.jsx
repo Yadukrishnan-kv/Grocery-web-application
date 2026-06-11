@@ -42,7 +42,6 @@ const MENU_PERMISSIONS = {
   paymentRequestssales: "menu.paymentRequestssales",
   billWallet: "menu.billWallet",
   AdminOrderRequests: "menu.admin.order.requests",
-  ManageOrders: "menu.manage.orders",
   storekeeperpacked: "menu.storekeeper.packed.orders",
   storekeeperRemainingPack: "menu.storekeeper.remaining.pack.orders",
   SalesPendingOrders: "menu.PendingOrders",
@@ -130,12 +129,7 @@ const navItems = [
     icon: "📋",
     path: "/admin/AdminOrderRequests",
   },
-  {
-    id: "ManageOrders",
-    label: "Manage Orders",
-    icon: "🚚",
-    path: "/sales/manage-orders",
-  },
+
 
   {
     id: "Deliveries",
@@ -380,19 +374,16 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
       );
     }
 
-    return itemsToFilter
+    itemsToFilter = itemsToFilter
       .filter((item) => {
         const itemPermission = MENU_PERMISSIONS[item.id];
 
-        // Salesmen can always see Sales Returns status page (read-only view)
-        // but NOT the separate Create Sales Return shortcut (they can create from the list page)
-        if (item.id === "CreateSalesReturn" && user?.role === "Sales man") return false;
-        if (item.id === "SalesReturn" && user?.role === "Sales man") return true;
+        // Sales man and Sales Manager should not see the Create Sales Return shortcut in the sidebar
+        // Both roles should only see the Sales Returns status page entry
+        if (item.id === "CreateSalesReturn" && ["Sales man", "Sales Manager", "Customer"].includes(user?.role)) return false;
+        if (item.id === "SalesReturn" && ["Sales man", "Sales Manager", "Customer"].includes(user?.role)) return true;
 
-        // ManageOrders - Only for Admin and Sales Manager
-        if (item.id === "ManageOrders" && !["Admin", "Sales Manager"].includes(user?.role)) {
-          return false;
-        }
+        // (removed ManageOrders menu)
 
         // If no permission required, show it
         if (!itemPermission) return true;
@@ -432,6 +423,18 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
         }
         return item;
       });
+
+    if (user?.role === "Customer") {
+      const salesReturnIndex = itemsToFilter.findIndex((item) => item.id === "SalesReturn");
+      const creditLimitIndex = itemsToFilter.findIndex((item) => item.id === "CustomerCreditLimit");
+      if (salesReturnIndex !== -1) {
+        const [salesReturnItem] = itemsToFilter.splice(salesReturnIndex, 1);
+        const insertIndex = creditLimitIndex !== -1 ? creditLimitIndex + 1 : itemsToFilter.length;
+        itemsToFilter.splice(insertIndex, 0, salesReturnItem);
+      }
+    }
+
+    return itemsToFilter;
   }, [hasPermission, loading, user]);
 
   const toggleExpand = (itemId) => {

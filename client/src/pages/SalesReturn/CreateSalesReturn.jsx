@@ -95,9 +95,9 @@ const CreateSalesReturn = () => {
   // Determine if user is customer
   const isCustomer = user?.role?.toString().trim().toLowerCase() === "customer";
 
-  // Redirect customers away from create return page (they can only view returns)
+  // Redirect customers and Sales Manager away from create return page
   useEffect(() => {
-    if (user && isCustomer) {
+    if (user && (isCustomer || user?.role === "Sales Manager")) {
       navigate("/sales-returns");
     }
   }, [user, isCustomer, navigate]);

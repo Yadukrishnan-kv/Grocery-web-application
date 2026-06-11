@@ -60,7 +60,8 @@ const PackOrders = () => {
         y += 9;
       };
 
-      printLine("Order ID:", order._id);
+      const displayedOrderId = order.orderId || order._id;
+      printLine("Order ID:", displayedOrderId);
       printLine("Customer:", order.customer?.name || "N/A");
       printLine("Order Date:", formatDate(order.orderDate));
 
@@ -89,7 +90,10 @@ const PackOrders = () => {
       y += 3;
 
       // Save PDF
-      pdf.save(`packing-slip-${order._id?.toString().slice(-8) || "order"}.pdf`);
+      const fileName = order.orderId
+        ? `packing-slip-${order.orderId}.pdf`
+        : `packing-slip-${order._id?.toString().slice(-8) || "order"}.pdf`;
+      pdf.save(fileName);
       toast.success("Packing slip downloaded for thermal printer");
     } catch (err) {
       console.error("Thermal PDF error:", err);
