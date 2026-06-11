@@ -56,7 +56,22 @@ const CreateOrder = () => {
       const response = await axios.get(`${backendUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setUser(response.data.user || response.data);
+      const userData = response.data.user || response.data;
+      
+      // Admin and Sales man can create orders. Sales Manager cannot.
+      if (userData.role === "Sales Manager") {
+        toast.error("Sales Manager cannot create orders. Please use Manage Orders to assign deliveries.");
+        navigate("/dashboard");
+        return;
+      }
+      
+      if (!["Admin", "Sales man"].includes(userData.role)) {
+        toast.error("You don't have permission to create orders.");
+        navigate("/dashboard");
+        return;
+      }
+      
+      setUser(userData);
     } catch (error) {
       localStorage.removeItem("token");
       navigate("/login");

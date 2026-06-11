@@ -2,10 +2,26 @@ const User = require("../models/User");
 const Customer = require("../models/Customer");
 const Role = require("../models/Role");
 
+// Helper function to filter salesman-specific fields based on role
+const filterUserData = (user) => {
+  if (!user) return user;
+  
+  const userObj = user.toObject ? user.toObject() : user;
+  
+  // Only keep salesmanCreditLimit and salesmanBalanceCreditLimit for Sales man role
+  if (userObj.role !== "Sales man") {
+    delete userObj.salesmanCreditLimit;
+    delete userObj.salesmanBalanceCreditLimit;
+  }
+  
+  return userObj;
+};
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select("-password");
-    res.json(users);
+    const filteredUsers = users.map(user => filterUserData(user));
+    res.json(filteredUsers);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -13,19 +29,35 @@ const getAllUsers = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { username, email, password, role, emiratesName, emiratesCode } = req.body;
+    const { username, email, password, role, emiratesName, emiratesCode, creditLimit } = req.body;
 
-    
+    let parsedCreditLimit = 0;
+    if (role === "Sales man") {
+      parsedCreditLimit = creditLimit !== undefined && creditLimit !== null && creditLimit !== "" ? parseFloat(creditLimit) : 0;
+      if (isNaN(parsedCreditLimit) || parsedCreditLimit < 0) {
+        return res.status(400).json({ message: "Invalid credit limit value" });
+      }
+    }
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) {
       return res.status(400).json({ message: "Username or email already in use" });
     }
 
-    const user = await User.create({ username, email, password, role, emiratesName: emiratesName || null, emiratesCode: emiratesCode || null });
+    const user = await User.create({
+      username,
+      email,
+      password,
+      role,
+      emiratesName: role === "Sales man" ? (emiratesName || null) : null,
+      emiratesCode: role === "Sales man" ? (emiratesCode || null) : null,
+      salesmanCreditLimit: role === "Sales man" ? parsedCreditLimit : undefined,
+      salesmanBalanceCreditLimit: role === "Sales man" ? parsedCreditLimit : undefined,
+    });
     const safeUser = await User.findById(user._id).select("-password");
+    const filteredUser = filterUserData(safeUser);
 
-    res.status(201).json(safeUser);
+    res.status(201).json(filteredUser);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -33,7 +65,7 @@ const createUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const { username, email, role, emiratesName, emiratesCode } = req.body;
+    const { username, email, role, emiratesName, emiratesCode, creditLimit } = req.body;
 
     
 
@@ -44,15 +76,45 @@ const updateUser = async (req, res) => {
       }
     }
 
+    const updateFields = {
+      username,
+      email,
+      role,
+      emiratesName: role === "Sales man" ? (emiratesName || null) : null,
+      emiratesCode: role === "Sales man" ? (emiratesCode || null) : null,
+    };
+
+    // Clear salesman fields for non-Sales man roles
+    if (role !== "Sales man") {
+      updateFields.salesmanCreditLimit = undefined;
+      updateFields.salesmanBalanceCreditLimit = undefined;
+    }
+
+    if (role === "Sales man" && creditLimit !== undefined) {
+      const parsedCreditLimit = parseFloat(creditLimit);
+      if (isNaN(parsedCreditLimit) || parsedCreditLimit < 0) {
+        return res.status(400).json({ message: "Invalid credit limit value" });
+      }
+      const userToUpdate = await User.findById(req.params.id);
+      if (!userToUpdate) return res.status(404).json({ message: "User not found" });
+      const usedCredit = (userToUpdate.salesmanCreditLimit || 0) - (userToUpdate.salesmanBalanceCreditLimit || 0);
+      if (parsedCreditLimit < usedCredit) {
+        return res.status(400).json({ message: "Cannot reduce credit limit below already allocated credit" });
+      }
+      updateFields.salesmanCreditLimit = parsedCreditLimit;
+      updateFields.salesmanBalanceCreditLimit = parsedCreditLimit - usedCredit;
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
-      { username, email, role, emiratesName: emiratesName || null, emiratesCode: emiratesCode || null },
+      updateFields,
       { new: true, runValidators: true }
     ).select("-password");
 
     if (!updatedUser) return res.status(404).json({ message: "User not found" });
-
-    res.json(updatedUser);
+    
+    const filteredUser = filterUserData(updatedUser);
+    res.json(filteredUser);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -98,7 +160,12 @@ const getMyProfile = async (req, res) => {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
-    const user = await User.findById(req.user._id).select("username email role");
+    let selectFields = "username email role";
+    if (req.user.role === "Sales man") {
+      selectFields += " salesmanCreditLimit salesmanBalanceCreditLimit emiratesName emiratesCode";
+    }
+
+    const user = await User.findById(req.user._id).select(selectFields);
 
     let profile = { ...user.toObject() };
 
@@ -143,7 +210,7 @@ const updateMyProfile = async (req, res) => {
       req.user._id,
       updateFields,
       { new: true, runValidators: true }
-    ).select("username email role");
+    ).select("username email role salesmanCreditLimit salesmanBalanceCreditLimit emiratesName emiratesCode");
 
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
@@ -193,7 +260,7 @@ const getDeliveryMen = async (req, res) => {
 
 const getSalesMen = async (req, res) => {
   try {
-    const salesMen = await User.find({ role: "Sales man" }).select("username _id emiratesName emiratesCode");
+    const salesMen = await User.find({ role: "Sales man" }).select("username _id emiratesName emiratesCode salesmanCreditLimit salesmanBalanceCreditLimit");
     res.json(salesMen);
   } catch (error) {
     res.status(500).json({ message: "Server error" });

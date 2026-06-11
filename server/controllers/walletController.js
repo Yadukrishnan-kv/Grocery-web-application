@@ -5,6 +5,7 @@ const PDFDocument = require('pdfkit');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const CompanySettings = require('../models/CompanySettings');
+const Bill = require('../models/Bill');
 
 const getDeliveryCashWallet = async (req, res) => {
   try {
@@ -305,6 +306,13 @@ const generatePaymentReceipt = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: 'Associated order not found' });
     }
+    
+    // Calculate total due for this customer across all bills
+    const allBills = await Bill.find({ customer: order.customer._id });
+    const totalDue = allBills.reduce((sum, b) => {
+      const remaining = Math.max(0, (b.grandTotal || b.amountDue || 0) - (b.paidAmount || 0));
+      return sum + remaining;
+    }, 0);
 
     // Determine correct invoice number for this transaction
     let correctInvoiceNumber = 'N/A';
@@ -427,11 +435,11 @@ const generatePaymentReceipt = async (req, res) => {
 
     y = drawDashedLine(y + 2);
 
-    // ===== GRAND TOTAL =====
+    // ===== GRAND TOTAL DUE =====
     doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
-      .text('TOTAL PAID', centerX, y, { width: labelW + 10 });
+      .text('TOTAL DUE', centerX, y, { width: labelW + 10 });
     doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
-      .text(`AED ${transaction.amount.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: 'right' });
+      .text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: 'right' });
     y += 14;
 
     y = drawDashedLine(y);
@@ -484,6 +492,16 @@ const generateBulkPaymentReceipt = async (req, res) => {
       const txDate = new Date(tx.date).toDateString();
       return customerId === firstCustomerId && txDate === firstDate;
     });
+    
+    // Calculate total due for the customer (same for all transactions on same day)
+    let totalDue = 0;
+    if (firstCustomerId) {
+      const allBills = await Bill.find({ customer: firstCustomerId });
+      totalDue = allBills.reduce((sum, b) => {
+        const remaining = Math.max(0, (b.grandTotal || b.amountDue || 0) - (b.paidAmount || 0));
+        return sum + remaining;
+      }, 0);
+    }
 
     const useSingleReceipt = allSameCustomerAndDay && transactions.length > 1;
     const finalReceiptNumber = useSingleReceipt
@@ -622,11 +640,11 @@ const generateBulkPaymentReceipt = async (req, res) => {
 
       y = drawDashedLine(y + 2);
 
-      // ===== GRAND TOTAL =====
+      // ===== GRAND TOTAL DUE =====
       doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
-        .text('TOTAL PAID', centerX, y, { width: labelW + 10 });
+        .text('TOTAL DUE', centerX, y, { width: labelW + 10 });
       doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
-        .text(`AED ${tx.amount.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: 'right' });
+        .text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: 'right' });
       y += 14;
 
       y = drawDashedLine(y);

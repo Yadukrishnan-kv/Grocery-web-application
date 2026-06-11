@@ -280,6 +280,30 @@ const Profile = () => {
                     </div>
                   </>
                 )}
+
+                {profile.role?.toLowerCase().includes('sales') && (
+                  <>
+                    <h3>Credit Allocation</h3>
+                    <div className="detail-row">
+                      <span className="label">Total Credit Limit</span>
+                      <span className="value">AED {profile.salesmanCreditLimit?.toFixed(2) || '0.00'}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="label">Available Credit</span>
+                      <span className="value">AED {profile.salesmanBalanceCreditLimit?.toFixed(2) || '0.00'}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="label">Used Credit</span>
+                      <span className="value">AED {((profile.salesmanCreditLimit || 0) - (profile.salesmanBalanceCreditLimit || 0)).toFixed(2)}</span>
+                    </div>
+                    {profile.emiratesName && (
+                      <div className="detail-row">
+                        <span className="label">Emirates</span>
+                        <span className="value">{profile.emiratesName} ({profile.emiratesCode})</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>

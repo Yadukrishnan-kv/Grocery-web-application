@@ -5,6 +5,7 @@ import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import '../../Customer/CreateCustomer/CreateCustomer.css'; // Reuse same CSS
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const CreateCustomerRequest = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -36,6 +37,8 @@ const CreateCustomerRequest = () => {
   const [emiratesList, setEmiratesList] = useState([]);
   const [salesmanEmiratesName, setSalesmanEmiratesName] = useState('');
   const [salesmanEmiratesCode, setSalesmanEmiratesCode] = useState('');
+  const [salesmanCreditLimit, setSalesmanCreditLimit] = useState(0);
+  const [salesmanBalanceCreditLimit, setSalesmanBalanceCreditLimit] = useState(0);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -54,6 +57,12 @@ const CreateCustomerRequest = () => {
     if (formData.billingType === "Credit limit") {
       if (formData.creditLimit === '' || isNaN(formData.creditLimit) || parseFloat(formData.creditLimit) < 0) {
         newErrors.creditLimit = 'Valid credit limit is required';
+      }
+      
+      // Check if salesman has enough balance credit limit
+      const requestedCredit = parseFloat(formData.creditLimit) || 0;
+      if (requestedCredit > salesmanBalanceCreditLimit) {
+        newErrors.creditLimit = `Insufficient balance credit. Available: AED ${salesmanBalanceCreditLimit.toFixed(2)}, Requested: AED ${requestedCredit.toFixed(2)}`;
       }
       if (!formData.statementType) newErrors.statementType = 'Statement type is required for Credit limit';
       if (!formData.dueDays || isNaN(formData.dueDays) || parseInt(formData.dueDays) < 0) {
@@ -115,7 +124,50 @@ const CreateCustomerRequest = () => {
     e.preventDefault();
     setIsSuccess(false);
 
-    if (!validateForm()) return;
+    const newErrors = {};
+
+    if (!formData.name.trim()) newErrors.name = 'Customer name is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Please provide a valid email';
+    if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Phone number is required';
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    if (!formData.pincode.trim()) newErrors.pincode = 'TRN is required';
+
+    // Validate if Credit limit
+    if (formData.billingType === "Credit limit") {
+      if (formData.creditLimit === '' || isNaN(formData.creditLimit) || parseFloat(formData.creditLimit) < 0) {
+        newErrors.creditLimit = 'Valid credit limit is required';
+      }
+      
+      // Check if salesman has enough balance credit limit
+      const requestedCredit = parseFloat(formData.creditLimit) || 0;
+      if (requestedCredit > salesmanBalanceCreditLimit) {
+        const errorMsg = `Insufficient balance credit. Available: AED ${salesmanBalanceCreditLimit.toFixed(2)}, Requested: AED ${requestedCredit.toFixed(2)}`;
+        newErrors.creditLimit = errorMsg;
+        toast.error(errorMsg);
+      }
+      if (!formData.statementType) newErrors.statementType = 'Statement type is required for Credit limit';
+      if (!formData.dueDays || isNaN(formData.dueDays) || parseInt(formData.dueDays) < 0) {
+        newErrors.dueDays = 'Valid due days is required (non-negative number)';
+      }
+    }
+
+    // Opening balance validation
+    const openingBal = parseFloat(formData.openingBalance) || 0;
+    if (openingBal < 0) {
+      newErrors.openingBalance = 'Opening balance cannot be negative';
+    }
+    if (openingBal > parseFloat(formData.creditLimit || 0)) {
+      newErrors.openingBalance = 'Opening balance cannot exceed credit limit';
+    }
+    if (openingBal > 0) {
+      if (!formData.openingBalanceDueDays || isNaN(formData.openingBalanceDueDays) || parseInt(formData.openingBalanceDueDays) < 0) {
+        newErrors.openingBalanceDueDays = 'Valid due days required when opening balance > 0';
+      }
+    }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
     setIsLoading(true);
 
@@ -194,6 +246,8 @@ const CreateCustomerRequest = () => {
         const salesmanData = res.data.user || res.data;
         setSalesmanEmiratesName(salesmanData.emiratesName || '');
         setSalesmanEmiratesCode(salesmanData.emiratesCode || '');
+        setSalesmanCreditLimit(salesmanData.creditLimit || 0);
+        setSalesmanBalanceCreditLimit(salesmanData.balanceCreditLimit || 0);
       } catch (error) {
         console.error("Failed to load user", error);
         navigate('/login');

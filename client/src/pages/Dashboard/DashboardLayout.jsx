@@ -36,6 +36,10 @@ const DashboardLayout = () => {
   const [packedToday, setPackedToday] = useState(0);
   const [readyToDeliver, setReadyToDeliver] = useState(0);
 
+  // Salesman stats
+  const [salesmanCreditLimit, setSalesmanCreditLimit] = useState(0);
+  const [salesmanBalanceCreditLimit, setSalesmanBalanceCreditLimit] = useState(0);
+
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
 
@@ -83,6 +87,15 @@ const DashboardLayout = () => {
       );
       setTotalUsers(nonAdminUsers.length || 0);
 
+      // If user is salesman, fetch their credit info
+      if (user?.role?.toLowerCase().includes('sales')) {
+        const currentUser = usersRes.data.find(u => u._id === user._id);
+        if (currentUser) {
+          setSalesmanCreditLimit(currentUser.salesmanCreditLimit || 0);
+          setSalesmanBalanceCreditLimit(currentUser.salesmanBalanceCreditLimit || 0);
+        }
+      }
+
       const orders = ordersRes.data || [];
       setTotalOrders(orders.length);
       const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || o.grandTotal || 0), 0);
@@ -95,7 +108,7 @@ const DashboardLayout = () => {
     } finally {
       setStatsLoading(false);
     }
-  }, [backendUrl]);
+  }, [backendUrl, user]);
 
   // Customer Stats
   const fetchCustomerStats = useCallback(async () => {
@@ -269,6 +282,20 @@ const DashboardLayout = () => {
           <h3>Total Users</h3>
           <p>{totalUsers.toLocaleString()}</p>
         </div>
+      )}
+      {user.role.toLowerCase().includes('sales') && (
+        <>
+          <div className="stat-card">
+            <div className="stat-icon credit-limit-icon">💳</div>
+            <h3>Credit Limit</h3>
+            <p>AED {(user.salesmanCreditLimit || 0).toLocaleString()}</p>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon available-credit-icon">✅</div>
+            <h3>Available Credit</h3>
+            <p>AED {(user.salesmanBalanceCreditLimit || 0).toLocaleString()}</p>
+          </div>
+        </>
       )}
       <div className="stat-card">
         <div className="stat-icon revenue-icon">💰</div>

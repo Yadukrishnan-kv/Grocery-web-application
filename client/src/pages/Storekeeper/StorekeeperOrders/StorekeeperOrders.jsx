@@ -95,6 +95,7 @@ const StorekeeperOrders = () => {
         order.customer?.name
           ?.toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
+        order.orderId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order._id?.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Invoice filter
@@ -229,6 +230,7 @@ const StorekeeperOrders = () => {
                   <thead>
                     <tr>
                       <th>No</th>
+                      <th>Order ID</th>
                       <th>Customer</th>
                       <th>Products</th>
                       <th>Packed Qty</th>{" "}
@@ -278,8 +280,8 @@ const StorekeeperOrders = () => {
                       return (
                         <tr key={order._id}>
                           <td>{index + 1}</td>
+                          <td>{order.orderId || order._id}</td>
 
-                         
                           <td>
                             <div className="customer-cell">
                               <span className="customer-name">

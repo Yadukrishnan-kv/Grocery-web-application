@@ -506,7 +506,7 @@ const WalletMoney = () => {
                           <td>{idx + 1}</td>
                           <td>{tx.deliveryMan?.username || "—"}</td>
                           <td>{tx.order?.customer?.name || "—"}</td>
-                          <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
+                          <td>{tx.order?.orderId || tx.order?._id?.slice(-8) || "N/A"}</td>
                           <td>{tx.amount.toFixed(2)}</td>
                           <td>
                             {tx.returnCreditUsed > 0
@@ -673,7 +673,7 @@ const WalletMoney = () => {
                           <td>{idx + 1}</td>
                           <td>{tx.deliveryMan?.username || "—"}</td>
                           <td>{tx.order?.customer?.name || "—"}</td>
-                          <td>{tx.order?._id?.slice(-8) || "N/A"}</td>
+                          <td>{tx.order?.orderId || tx.order?._id?.slice(-8) || "N/A"}</td>
                           <td>{tx.amount.toFixed(2)}</td>
                           <td>
                             {tx.returnCreditUsed > 0

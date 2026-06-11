@@ -20,7 +20,7 @@ const {
   rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,
   getMyOrders,getOrderInvoice,getlastorderdetails,checkFirstOrder,
   getPendingOrderRequests,approveOrderRequest,rejectOrderRequest,getCustomerOrderHistory,createOrderRequest,packOrder,getPendingForPacking,getRemainingForPacking,getMyPendingOrders,getPackedToday,
-  getReadyToDeliver,getPackedInvoice,getUnifiedInvoice,getAllOrdersForStorekeeper
+  getReadyToDeliver,getPackedInvoice,getUnifiedInvoice,getAllOrdersForStorekeeper,getPendingOrdersForAssignment
 } = require("../controllers/orderController");
 
 
@@ -40,6 +40,7 @@ router.post("/cancelorder/:id", cancelOrder);
 router.get("/getdeliveredinvoice/:id", getDeliveredInvoice);
 router.get("/getpendinginvoice/:id", getPendingInvoice);
 router.post("/assign/:id", assignOrderToDeliveryMan);
+router.get("/pending-assignment", protect, getPendingOrdersForAssignment);
 router.get("/my-assigned-orders", getMyAssignedOrders);
 router.post("/accept/:id", acceptAssignedOrder);
 router.post("/reject/:id", rejectAssignedOrder);

@@ -8,6 +8,10 @@ const invoiceCounterSchema = new Schema({
   returnCount: {
     type: Number,
     default: 0
+  },
+  orderCount: {
+    type: Number,
+    default: 4000
   }
 }, { timestamps: true });
 

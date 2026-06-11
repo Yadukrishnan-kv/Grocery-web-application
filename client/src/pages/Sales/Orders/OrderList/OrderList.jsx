@@ -246,9 +246,12 @@ const OrderList = () => {
                   )}
                 </div>
 
-                <Link to="/order/create" className="order-list-create-button">
-                  Create Order
-                </Link>
+                {/* Create Order button - Only for Admin and Sales man, NOT for Sales Manager */}
+                {["Admin", "Sales man"].includes(user?.role) && (
+                  <Link to="/order/create" className="order-list-create-button">
+                    Create Order
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -260,6 +263,7 @@ const OrderList = () => {
                   <thead>
                     <tr>
                       <th scope="col">No</th>
+                      <th scope="col">Order ID</th>
                       <th scope="col">Customer</th>
                       <th scope="col">Products</th>
                       <th scope="col">Total Qty</th>
@@ -283,6 +287,7 @@ const OrderList = () => {
                         return (
                           <tr key={order._id}>
                             <td>{index + 1}</td>
+                            <td>{order.orderId || order._id}</td>
                             <td>{order.customer?.name || "N/A"}</td>
 
                             <td className="products-cell">
@@ -402,9 +407,9 @@ const OrderList = () => {
                                 <button
                                   className="order-list-icon-button order-list-delete-button"
                                   onClick={() =>
-                                    handleDeleteClick(order._id, order._id)
+                                    handleDeleteClick(order._id, order.orderId || order._id)
                                   }
-                                  aria-label={`Delete order ${order._id}`}
+                                  aria-label={`Delete order ${order.orderId || order._id}`}
                                 >
                                   🗑️
                                 </button>

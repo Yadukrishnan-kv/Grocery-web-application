@@ -3,6 +3,7 @@ const BillTransaction = require("../models/BillTransaction");
 const BillAdminRequest = require("../models/BillAdminRequest");
 const Customer = require("../models/Customer");
 const CompanySettings = require("../models/CompanySettings");
+const Bill = require("../models/Bill");
 
 const getMyTransactions = async (req, res) => {
   try {
@@ -258,6 +259,13 @@ const generateReceipt = async (req, res) => {
     const invoiceNo = transaction.invoiceNumber || transaction.order?.invoiceNumber || transaction.bill?.invoiceNumber || "N/A";
     const paidAmount = transaction.amount || 0;
     const customer = transaction.customer;
+    
+    // Calculate total due for this customer across all bills
+    const allBills = await Bill.find({ customer: customer._id });
+    const totalDue = allBills.reduce((sum, b) => {
+      const remaining = Math.max(0, (b.grandTotal || b.amountDue || 0) - (b.paidAmount || 0));
+      return sum + remaining;
+    }, 0);
 
     const pageWidth = 226;
     const margin = 10;
@@ -340,8 +348,8 @@ const generateReceipt = async (req, res) => {
     }
 
     y = drawDashedLine(y + 2);
-    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("TOTAL PAID", centerX, y, { width: labelW + 10 });
-    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text(`AED ${paidAmount.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("TOTAL DUE", centerX, y, { width: labelW + 10 });
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
     y += 14;
 
     y = drawDashedLine(y);
@@ -381,6 +389,18 @@ const generateBulkReceipt = async (req, res) => {
     const allOwned = transactions.every(tx => String(tx.recipient._id) === String(req.user._id));
     if (!allOwned) {
       return res.status(403).json({ message: "Unauthorized" });
+    }
+    
+    // Calculate total due for all unique customers in these transactions
+    const uniqueCustomerIds = [...new Set(transactions.map(tx => tx.customer?._id?.toString()).filter(Boolean))];
+    let totalDueAllCustomers = 0;
+    for (const customerId of uniqueCustomerIds) {
+      const allBills = await Bill.find({ customer: customerId });
+      const customerDue = allBills.reduce((sum, b) => {
+        const remaining = Math.max(0, (b.grandTotal || b.amountDue || 0) - (b.paidAmount || 0));
+        return sum + remaining;
+      }, 0);
+      totalDueAllCustomers += customerDue;
     }
 
     // Extract common batch ID if all share one
@@ -460,7 +480,7 @@ const generateBulkReceipt = async (req, res) => {
 
     // Total
     doc.font("Helvetica-Bold").fontSize(11);
-    doc.text(`TOTAL AMOUNT: AED ${totalAmount.toFixed(2)}`, { align: "right" });
+    doc.text(`TOTAL DUE: AED ${totalDueAllCustomers.toFixed(2)}`, { align: "right" });
     doc.moveDown();
 
     // Footer

@@ -67,6 +67,13 @@ const orderSchema = new Schema(
       ref: "Customer",
       required: [true, "Customer is required"],
     },
+    orderId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+      trim: true,
+    },
     orderItems: {
       type: [orderItemSchema],
       required: [true, "At least one product is required"],
@@ -87,6 +94,11 @@ const orderSchema = new Schema(
       default: Date.now,
     },
     assignedTo: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
       default: null,

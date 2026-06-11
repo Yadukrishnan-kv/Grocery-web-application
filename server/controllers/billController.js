@@ -519,6 +519,13 @@ const getBillReceipt = async (req, res) => {
           createdAt: { $lte: receiptTransaction.createdAt },
         }).then((txs) => txs.reduce((sum, tx) => sum + (tx.amount || 0), 0))
       : bill.paidAmount || 0;
+    
+    // Calculate total due for this customer across all bills
+    const allBills = await Bill.find({ customer: bill.customer._id || receiptCustomer._id });
+    const totalDue = allBills.reduce((sum, b) => {
+      const remaining = Math.max(0, (b.grandTotal || b.amountDue || 0) - (b.paidAmount || 0));
+      return sum + remaining;
+    }, 0);
     const filename = `receipt-${displayReceiptNo}.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
@@ -628,9 +635,9 @@ const getBillReceipt = async (req, res) => {
 
     y = drawDashedLine(y + 2);
     doc.fontSize(9).font("Helvetica-Bold").fillColor("#000")
-      .text("TOTAL PAID", centerX, y, { width: labelW + 10 });
+      .text("TOTAL DUE", centerX, y, { width: labelW + 10 });
     doc.fontSize(9).font("Helvetica-Bold").fillColor("#000")
-      .text(`AED ${totalPaid.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
+      .text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
     y += 14;
 
     y = drawDashedLine(y);

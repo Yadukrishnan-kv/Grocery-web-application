@@ -16,6 +16,7 @@ const User = () => {
     role: '',
     emiratesName: '',
     emiratesCode: '',
+    creditLimit: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -30,8 +31,8 @@ const User = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Whether the selected role is a salesman-type role
-  const isSalesmanRole = formData.role.toLowerCase().replace(/\s+/g, '').includes('salesman');
+  // Whether the selected role is Sales man (only Sales man role, not Sales Manager)
+  const isSalesmanRole = formData.role === "Sales man";
 
   const validateForm = () => {
     const newErrors = {};
@@ -58,6 +59,14 @@ const User = () => {
       newErrors.role = 'Role is required';
     }
 
+    if (isSalesmanRole) {
+      if (formData.creditLimit === '' || isNaN(formData.creditLimit)) {
+        newErrors.creditLimit = 'Credit limit is required for salesmen';
+      } else if (parseFloat(formData.creditLimit) < 0) {
+        newErrors.creditLimit = 'Credit limit cannot be negative';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -77,12 +86,13 @@ const User = () => {
     }
 
     if (name === 'role') {
-      // Clear emirates fields when role changes
+      // Clear emirates fields and credit limit when role changes
       setFormData(prev => ({
         ...prev,
         role: value,
         emiratesName: '',
         emiratesCode: '',
+        creditLimit: '',
       }));
       if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
       return;
@@ -125,6 +135,7 @@ const User = () => {
           role: formData.role,
           emiratesName: isSalesmanRole ? formData.emiratesName : null,
           emiratesCode: isSalesmanRole ? formData.emiratesCode : null,
+          creditLimit: isSalesmanRole ? parseFloat(formData.creditLimit) : undefined,
         }, config);
 
         toast.success('User updated successfully!');
@@ -137,6 +148,7 @@ const User = () => {
           role: formData.role,
           emiratesName: isSalesmanRole ? formData.emiratesName : null,
           emiratesCode: isSalesmanRole ? formData.emiratesCode : null,
+          creditLimit: isSalesmanRole ? parseFloat(formData.creditLimit) : undefined,
         }, config);
 
         toast.success('User created successfully!');
@@ -207,6 +219,7 @@ const User = () => {
               role: userToEdit.role,
               emiratesName: userToEdit.emiratesName || '',
               emiratesCode: userToEdit.emiratesCode || '',
+              creditLimit: (userToEdit.salesmanCreditLimit || userToEdit.creditLimit)?.toString() || '',
             });
             setIsEdit(true);
             setUserId(editId);
@@ -360,37 +373,61 @@ const User = () => {
             </div>
 
             {isSalesmanRole && (
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="emiratesName">Emirates</label>
-                  <select
-                    id="emiratesName"
-                    name="emiratesName"
-                    value={formData.emiratesName}
-                    onChange={handleChange}
-                  >
-                    <option value="">Select Emirates</option>
-                    {emiratesList.map(em => (
-                      <option key={em._id} value={em.emiratesName}>
-                        {em.emiratesName}
-                      </option>
-                    ))}
-                  </select>
+              <>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="emiratesName">Emirates</label>
+                    <select
+                      id="emiratesName"
+                      name="emiratesName"
+                      value={formData.emiratesName}
+                      onChange={handleChange}
+                    >
+                      <option value="">Select Emirates</option>
+                      {emiratesList.map(em => (
+                        <option key={em._id} value={em.emiratesName}>
+                          {em.emiratesName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="emiratesCode">Emirates Code</label>
+                    <input
+                      id="emiratesCode"
+                      name="emiratesCode"
+                      type="text"
+                      value={formData.emiratesCode}
+                      readOnly
+                      placeholder="Auto-filled from Emirates selection"
+                      style={{ backgroundColor: '#f8fafc', cursor: 'default' }}
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="emiratesCode">Emirates Code</label>
-                  <input
-                    id="emiratesCode"
-                    name="emiratesCode"
-                    type="text"
-                    value={formData.emiratesCode}
-                    readOnly
-                    placeholder="Auto-filled from Emirates selection"
-                    style={{ backgroundColor: '#f8fafc', cursor: 'default' }}
-                  />
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="creditLimit">Credit Limit (AED)</label>
+                    <input
+                      id="creditLimit"
+                      name="creditLimit"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.creditLimit}
+                      onChange={handleChange}
+                      aria-invalid={!!errors.creditLimit}
+                      aria-describedby={errors.creditLimit ? 'creditLimit-error' : undefined}
+                    />
+                    {errors.creditLimit && (
+                      <p id="creditLimit-error" className="error-text" role="alert">
+                        {errors.creditLimit}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             <button

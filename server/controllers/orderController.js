@@ -7,6 +7,35 @@ const InvoiceCounter = require("../models/InvoiceCounter");
 const { createInvoiceBasedBill } = require("../controllers/billController"); // ← import it
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Bill = require("../models/Bill");
+
+const getNextOrderId = async () => {
+  // Ensure counter starts at 4000
+  let counter = await InvoiceCounter.findOneAndUpdate(
+    {},
+    { $setOnInsert: { invoiceCount: 0, returnCount: 0, orderCount: 4000 } },
+    { upsert: true, new: true }
+  );
+  
+  // If counter is below 4000, reset it to 4000
+  if (counter.orderCount < 4000) {
+    counter = await InvoiceCounter.findOneAndUpdate(
+      {},
+      { $set: { orderCount: 4000 } },
+      { new: true }
+    );
+  }
+  
+  // Increment to get next order number
+  counter = await InvoiceCounter.findOneAndUpdate(
+    {},
+    { $inc: { orderCount: 1 } },
+    { new: true }
+  );
+
+  const sequence = String(counter.orderCount).padStart(5, "0");
+  const year = new Date().getFullYear();
+  return `SO/${sequence}/${year}`;
+};
 const OrderRequest = require("../models/OrderRequest");
 const mongoose = require("mongoose");
 
@@ -14,6 +43,11 @@ const PDFDocument = require("pdfkit");
 
 const createOrder = async (req, res) => {
   try {
+    // Check if user has permission to create orders (Admin and Sales man allowed, Sales Manager not allowed)
+    if (!req.user || !["Admin", "Sales man"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only Admin and Sales man can create orders" });
+    }
+
     const { customerId, payment, remarks, orderItems, scheduleDays } = req.body;
 
     // Validation
@@ -53,6 +87,7 @@ const createOrder = async (req, res) => {
 
     const order = new Order({
       customer: customerId,
+      orderId: await getNextOrderId(),
       payment,
       remarks: remarks || "",
       scheduleDays: days,
@@ -60,6 +95,7 @@ const createOrder = async (req, res) => {
       orderItems: processedItems,
       status: "pending",
       assignmentStatus: "pending_assignment",
+      createdBy: req.user._id,
     });
 
     await order.save();
@@ -67,7 +103,8 @@ const createOrder = async (req, res) => {
     // ✅ Populate and return with VAT fields
     const populatedOrder = await Order.findById(order._id)
       .populate("customer", "name phone email")
-      .populate("orderItems.product", "productName unit");
+      .populate("orderItems.product", "productName unit")
+      .populate("createdBy", "username role");
 
     res.status(201).json({
       message: "Order created successfully",
@@ -987,8 +1024,37 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
       .text(label, boxX + 5, y + sigBoxHeight - 40, { width: sigBoxWidth - 10, align: "center" });
   });
 };
+
+// Get pending orders for assignment (for Admin and Sales Manager)
+const getPendingOrdersForAssignment = async (req, res) => {
+  try {
+    // Check if user has permission (Admin or Sales Manager)
+    if (!req.user || !["Admin", "Sales man"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only Admin or Sales Manager can view pending orders" });
+    }
+
+    let query = { assignmentStatus: "pending_assignment" };
+
+    // Both Admin and Sales Manager see all pending orders
+    const orders = await Order.find(query)
+      .populate("customer", "name email phoneNumber address pincode")
+      .populate("orderItems.product", "productName price unit vatPercentage")
+      .populate("createdBy", "username role")
+      .sort({ orderDate: -1 });
+
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 const assignOrderToDeliveryMan = async (req, res) => {
   try {
+    // Check if user has permission to assign orders (Admin or Sales Manager)
+    if (!req.user || !["Admin", "Sales Manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only Admin or Sales Manager can assign orders" });
+    }
+
     const { deliveryManId } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -1018,8 +1084,9 @@ const assignOrderToDeliveryMan = async (req, res) => {
     // Fixed populate
     const updatedOrder = await Order.findById(order._id)
       .populate("customer", "name email phoneNumber address pincode")
-      .populate("orderItems.product", "productName price unit") // ← FIXED
-      .populate("assignedTo", "username");
+      .populate("orderItems.product", "productName price unit")
+      .populate("assignedTo", "username")
+      .populate("createdBy", "username role");
 
     res.json({ message: "Order assigned successfully", order: updatedOrder });
   } catch (error) {
@@ -1496,6 +1563,7 @@ const approveOrderRequest = async (req, res) => {
     // Create real order with VAT-inclusive items
     const newOrder = await Order.create({
       customer: request.customer,
+      orderId: await getNextOrderId(),
       orderItems: processedItems, // ✅ Now includes VAT fields
       payment: request.payment,
       remarks: request.remarks,
@@ -2079,5 +2147,6 @@ module.exports = {
   getPackedInvoice,
   getUnifiedInvoice, // ✅ NEW unified invoice showing Ordered/Packed/Delivered
   generateUnifiedInvoicePDF, // ✅ NEW unified invoice PDF generator
- getAllOrdersForStorekeeper
+  getAllOrdersForStorekeeper,
+  getPendingOrdersForAssignment
 };

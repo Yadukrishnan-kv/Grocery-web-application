@@ -42,6 +42,7 @@ const MENU_PERMISSIONS = {
   paymentRequestssales: "menu.paymentRequestssales",
   billWallet: "menu.billWallet",
   AdminOrderRequests: "menu.admin.order.requests",
+  ManageOrders: "menu.manage.orders",
   storekeeperpacked: "menu.storekeeper.packed.orders",
   storekeeperRemainingPack: "menu.storekeeper.remaining.pack.orders",
   SalesPendingOrders: "menu.PendingOrders",
@@ -128,6 +129,12 @@ const navItems = [
     label: " Order Requests",
     icon: "📋",
     path: "/admin/AdminOrderRequests",
+  },
+  {
+    id: "ManageOrders",
+    label: "Manage Orders",
+    icon: "🚚",
+    path: "/sales/manage-orders",
   },
 
   {
@@ -382,6 +389,11 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
         if (item.id === "CreateSalesReturn" && user?.role === "Sales man") return false;
         if (item.id === "SalesReturn" && user?.role === "Sales man") return true;
 
+        // ManageOrders - Only for Admin and Sales Manager
+        if (item.id === "ManageOrders" && !["Admin", "Sales Manager"].includes(user?.role)) {
+          return false;
+        }
+
         // If no permission required, show it
         if (!itemPermission) return true;
 
@@ -392,6 +404,12 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
         if (item.subItems) {
           const filteredSubItems = item.subItems.filter((subItem) => {
             const subPermission = MENU_PERMISSIONS[subItem.id];
+            
+            // Sales Manager cannot access "Orders" (create). Only Admin can.
+            if (subItem.id === "Orders" && user?.role === "Sales Manager") {
+              return false;
+            }
+            
             return !subPermission || hasPermission(subPermission);
           });
 

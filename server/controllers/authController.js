@@ -86,6 +86,10 @@ const getMe = async (req, res) => {
       username: req.user.username,
       email: req.user.email,
       role: req.user.role,
+      ...(req.user.role === "Sales man" && {
+        salesmanCreditLimit: req.user.salesmanCreditLimit || 0,
+        salesmanBalanceCreditLimit: req.user.salesmanBalanceCreditLimit || 0,
+      }),
     },
   });
 };

@@ -85,6 +85,31 @@ const createCustomer = async (req, res) => {
       parsedOpeningBalanceDueDays = parseInt(openingBalanceDueDays);
     }
 
+    const parsedLatitude = latitude !== undefined && latitude !== null && latitude !== ''
+      ? parseFloat(latitude)
+      : null;
+    const parsedLongitude = longitude !== undefined && longitude !== null && longitude !== ''
+      ? parseFloat(longitude)
+      : null;
+
+    if (parsedLatitude !== null && isNaN(parsedLatitude)) {
+      return res.status(400).json({ message: "Invalid latitude value" });
+    }
+    if (parsedLongitude !== null && isNaN(parsedLongitude)) {
+      return res.status(400).json({ message: "Invalid longitude value" });
+    }
+
+    let salesman = null;
+    if (salesmanId) {
+      salesman = await User.findById(salesmanId).select("role salesmanCreditLimit salesmanBalanceCreditLimit");
+      if (!salesman || salesman.role !== "Sales man") {
+        return res.status(400).json({ message: "Invalid salesman selected" });
+      }
+      if (parsedCreditLimit > 0 && salesman.salesmanBalanceCreditLimit < parsedCreditLimit) {
+        return res.status(400).json({ message: "Salesman does not have enough available credit" });
+      }
+    }
+
     // Check duplicates
     const existingCustomer = await Customer.findOne({ email: email.trim().toLowerCase() });
     if (existingCustomer) {
@@ -143,8 +168,8 @@ const createCustomer = async (req, res) => {
       contactPersonName: contactPersonName?.trim() || null,
       contactPersonPhone: contactPersonPhone?.trim() || null,
       contactPersonAddress: contactPersonAddress?.trim() || null,
-      latitude: latitude !== undefined && latitude !== '' ? parseFloat(latitude) : null,
-      longitude: longitude !== undefined && longitude !== '' ? parseFloat(longitude) : null,
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
       emiratesName: emiratesName?.trim() || null,
       emiratesCode: emiratesCode?.trim() || null,
       salesmanEmiratesName,
@@ -178,6 +203,11 @@ const createCustomer = async (req, res) => {
         invoiceNumber,
         isOpeningBalance: true,
       });
+    }
+
+    if (salesman && parsedCreditLimit > 0) {
+      salesman.salesmanBalanceCreditLimit = Math.max(0, (salesman.salesmanBalanceCreditLimit || 0) - parsedCreditLimit);
+      await salesman.save();
     }
 
     const responseData = {
@@ -386,7 +416,25 @@ const deleteCustomer = async (req, res) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    // 2. Find and delete corresponding user (if exists)
+    // 2. Get the full customer creditLimit to refund to salesman
+    const customerCreditLimit = customer.creditLimit || 0;
+    
+    // 3. If customer has a salesman, refund the full customer creditLimit
+    if (customer.salesman && customerCreditLimit > 0) {
+      try {
+        await User.findByIdAndUpdate(
+          customer.salesman,
+          { $inc: { salesmanBalanceCreditLimit: customerCreditLimit } },
+          { new: true }
+        );
+        console.log(`Refunded ${customerCreditLimit} credit limit to salesman for deleted customer: ${customer.email}`);
+      } catch (error) {
+        console.error(`Error refunding credit to salesman:`, error);
+        // Continue with deletion even if refund fails
+      }
+    }
+
+    // 4. Find and delete corresponding user (if exists)
     if (customer.user) {
       const user = await User.findByIdAndDelete(customer.user);
       if (user) {
@@ -394,10 +442,13 @@ const deleteCustomer = async (req, res) => {
       }
     }
 
-    // 3. Delete the customer
+    // 5. Delete the customer
     await Customer.findByIdAndDelete(customerId);
 
-    res.json({ message: "Customer and associated user account deleted successfully" });
+    res.json({ 
+      message: "Customer and associated user account deleted successfully",
+      refundedCredit: customerCreditLimit > 0 ? customerCreditLimit : 0
+    });
   } catch (error) {
     console.error("Delete customer error:", error);
     res.status(500).json({
@@ -519,6 +570,20 @@ const createCustomerRequest = async (req, res) => {
         return res.status(400).json({ message: "Valid due days required for opening balance > 0" });
       }
       parsedOpeningBalanceDueDays = parseInt(openingBalanceDueDays);
+    }
+
+    const parsedLatitude = latitude !== undefined && latitude !== null && latitude !== ''
+      ? parseFloat(latitude)
+      : null;
+    const parsedLongitude = longitude !== undefined && longitude !== null && longitude !== ''
+      ? parseFloat(longitude)
+      : null;
+
+    if (parsedLatitude !== null && isNaN(parsedLatitude)) {
+      return res.status(400).json({ message: "Invalid latitude value" });
+    }
+    if (parsedLongitude !== null && isNaN(parsedLongitude)) {
+      return res.status(400).json({ message: "Invalid longitude value" });
     }
 
     // Check duplicates

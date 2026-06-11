@@ -91,7 +91,7 @@ const PendingOrders = () => {
                     orders.map((o, idx) => (
                       <tr key={o._id}>
                         <td>{idx + 1}</td>
-                        <td>{String(o._id).slice(-8)}</td>
+                        <td>{o.orderId || String(o._id).slice(-8)}</td>
                         <td>{o.customer?.name || "N/A"}</td>
                         <td>{o.orderItems?.length || 0}</td>
                         <td>{(o.orderItems || []).reduce((s, it) => s + Math.max((it.orderedQuantity || 0) - (it.packedQuantity || 0), 0), 0)}</td>

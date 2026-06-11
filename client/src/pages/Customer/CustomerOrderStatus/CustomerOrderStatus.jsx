@@ -85,7 +85,7 @@ const CustomerOrderStatus = () => {
           <div className="order-info">
             <div className="info-row">
               <span className="label">Order ID:</span>
-              <span className="value">{order._id}</span>
+              <span className="value">{order.orderId || order._id}</span>
             </div>
             <div className="info-row">
               <span className="label">Product:</span>

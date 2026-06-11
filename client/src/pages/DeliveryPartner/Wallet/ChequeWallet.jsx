@@ -306,7 +306,7 @@ const ChequeWallet = () => {
                             <span className="customer-name">{tx.order?.customer?.name || "N/A"}</span>
                           </div>
                         </td>
-                        <td className="col-order"><code className="order-id">#{tx.order?._id?.slice(-8)}</code></td>
+                        <td className="col-order"><code className="order-id">#{tx.order?.orderId || tx.order?._id?.slice(-8)}</code></td>
                         <td className="col-amount">
                           <div className="amount-cell">
                             <img src={DirhamSymbol} alt="AED" className="dirham-icon-small" />

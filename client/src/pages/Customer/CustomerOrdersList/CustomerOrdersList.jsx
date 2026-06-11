@@ -278,6 +278,7 @@ const CustomerOrdersList = () => {
                   <thead>
                     <tr>
                       <th scope="col">No</th>
+                      <th scope="col">Order ID</th>
                       <th scope="col">Products</th>
                       <th scope="col">Total Ordered Qty</th>
                       <th scope="col">Total Delivered Qty</th>
@@ -312,6 +313,7 @@ const CustomerOrdersList = () => {
                       return (
                         <tr key={item._id}>
                           <td>{index + 1}</td>
+                          <td>{item.type === "order" ? item.orderId || item._id : "-"}</td>
 
                           <td className="products-cell">
                             {item.orderItems?.length > 0 ? (
