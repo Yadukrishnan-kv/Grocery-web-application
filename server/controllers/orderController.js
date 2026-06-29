@@ -528,7 +528,8 @@ const getDeliveredInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("orderItems.product", "productName price unit");
+      .populate("orderItems.product", "productName price unit")
+      .populate("assignedTo", "username");
     
     if (!order) return res.status(404).json({ message: "Order not found" });
     
@@ -545,7 +546,14 @@ const getDeliveredInvoice = async (req, res) => {
     const filename = `delivered-invoice-${invoiceNo}.pdf`;
     
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateStyledInvoicePDF(doc, order, "DELIVERED INVOICE", invoiceNo);
+      console.log(`[DEBUG_INVOICE] Requesting User: ${req.user ? req.user.username : "None"}, Role: ${req.user ? req.user.role : "None"}`);
+      if (req.user && ["Sales man", "Sales Manager"].includes(req.user.role)) {
+        console.log(`[DEBUG_INVOICE] Matches Sales role. Rendering Daddys Invoice Format.`);
+        await generateDaddysInvoicePDF(doc, order, invoiceNo);
+      } else {
+        console.log(`[DEBUG_INVOICE] Normal role. Rendering original Styled Invoice Format.`);
+        await generateStyledInvoicePDF(doc, order, "DELIVERED INVOICE", invoiceNo);
+      }
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -1023,6 +1031,437 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     doc.fontSize(7).font("Helvetica-Bold").fillColor(darkGray)
       .text(label, boxX + 5, y + sigBoxHeight - 40, { width: sigBoxWidth - 10, align: "center" });
   });
+};
+
+const generateDaddysInvoicePDF = async (doc, order, invoiceNo) => {
+  const fs = require("fs");
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 20;
+  const contentWidth = pageWidth - margin * 2;
+
+  // Fetch dynamic Company Settings
+  const company = await CompanySettings.findOne() || {};
+  const companyName = company.companyName || "DADDYS FOODSTUFF TR. L.L.C.";
+  const companyAddress = company.companyAddress || "No.6, Jurf Industrial Zone, Ajman - U.A.E.";
+  const companyPhone = company.companyPhone || "06 6786779";
+  const companyEmail = company.companyEmail || "daddyskitchenmasala@gmail.com";
+  const companyWebsite = "www.daddyskitchenmasala.com";
+
+  // Colors
+  const navyColor = "#002D62"; // Main brand navy blue
+  const redColor = "#D21F3C";  // Brand red
+
+  // Date formatting
+  const date = new Date(order.orderDate || order.deliveredAt || Date.now());
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const formattedDate = `${date.getDate()}-${monthNames[date.getMonth()]}-${String(date.getFullYear()).slice(-2)}`;
+
+  // Font registration (RTL Arabic support)
+  let fontRegistered = false;
+  try {
+    let fontPath = "C:/Windows/Fonts/arial.ttf";
+    if (process.platform !== "win32") {
+      const linuxPaths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",
+        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf"
+      ];
+      for (const p of linuxPaths) {
+        if (fs.existsSync(p)) {
+          fontPath = p;
+          break;
+        }
+      }
+    }
+    if (fs.existsSync(fontPath)) {
+      doc.registerFont("ArabicFont", fontPath);
+      fontRegistered = true;
+    }
+  } catch (e) {
+    console.error("Font registration error:", e);
+  }
+
+  // Helper to draw outer navy border
+  const drawOuterBorder = () => {
+    doc.rect(margin, margin, contentWidth, pageHeight - margin * 2)
+       .lineWidth(1)
+       .strokeColor(navyColor)
+       .stroke();
+  };
+
+  // Helper to draw watermark
+  const drawWatermark = () => {
+    doc.save();
+    doc.opacity(0.05); // faint
+    
+    const wmX = pageWidth / 2 - 60;
+    const wmY = 340;
+    doc.fillColor(redColor);
+    doc.circle(wmX + 30, wmY + 30, 20).fill();
+    doc.circle(wmX + 55, wmY + 30, 25).fill();
+    doc.circle(wmX + 80, wmY + 30, 20).fill();
+    doc.circle(wmX + 55, wmY + 15, 20).fill();
+    doc.circle(wmX + 40, wmY + 42, 16).fill();
+    doc.circle(wmX + 70, wmY + 42, 16).fill();
+    
+    // Mustache
+    doc.fillColor("#000000");
+    doc.moveTo(wmX + 20, wmY + 55)
+       .quadraticCurveTo(wmX + 42, wmY + 63, wmX + 55, wmY + 58)
+       .quadraticCurveTo(wmX + 68, wmY + 63, wmX + 90, wmY + 55)
+       .quadraticCurveTo(wmX + 68, wmY + 70, wmX + 55, wmY + 63)
+       .quadraticCurveTo(wmX + 42, wmY + 70, wmX + 20, wmY + 55)
+       .fill();
+       
+    doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(12);
+    doc.text("Daddy's", wmX + 15, wmY + 12, { width: 80, align: "center" });
+    doc.text("Kitchen", wmX + 15, wmY + 25, { width: 80, align: "center" });
+    doc.text("Masala", wmX + 15, wmY + 38, { width: 80, align: "center" });
+    
+    doc.fillColor("#000000").font("Helvetica-Bold").fontSize(7);
+    doc.text("NATURAL SPICES", wmX + 15, wmY + 72, { width: 80, align: "center" });
+    
+    doc.restore();
+  };
+
+  const createNewPage = () => {
+    doc.addPage({ size: "A4", margin: 0 });
+    drawOuterBorder();
+    drawWatermark();
+  };
+
+  // Draw initial page decoration
+  drawOuterBorder();
+  drawWatermark();
+
+  let y = margin + 15;
+
+  // ===== HEADER =====
+  const logoX = margin + 10;
+  const logoY = y + 5;
+  
+  // Compact Red cloud logo
+  doc.fillColor(redColor);
+  doc.circle(logoX + 18, logoY + 18, 12).fill();
+  doc.circle(logoX + 32, logoY + 18, 15).fill();
+  doc.circle(logoX + 46, logoY + 18, 12).fill();
+  doc.circle(logoX + 32, logoY + 10, 12).fill();
+  doc.circle(logoX + 24, logoY + 26, 10).fill();
+  doc.circle(logoX + 40, logoY + 26, 10).fill();
+
+  // Logo Text
+  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(7);
+  doc.text("Daddy's", logoX + 8, logoY + 8, { width: 48, align: "center" });
+  doc.text("Kitchen", logoX + 8, logoY + 16, { width: 48, align: "center" });
+  doc.text("Masala", logoX + 8, logoY + 24, { width: 48, align: "center" });
+
+  // Mustache
+  doc.fillColor("#000000");
+  doc.moveTo(logoX + 12, logoY + 33)
+     .quadraticCurveTo(logoX + 25, logoY + 38, logoX + 32, logoY + 35)
+     .quadraticCurveTo(logoX + 39, logoY + 38, logoX + 52, logoY + 33)
+     .quadraticCurveTo(logoX + 39, logoY + 42, logoX + 32, logoY + 38)
+     .quadraticCurveTo(logoX + 25, logoY + 42, logoX + 12, logoY + 33)
+     .fill();
+
+  // Natural Spices text
+  doc.fillColor("#555555").font("Helvetica").fontSize(4.5);
+  doc.text("NATURAL SPICES", logoX + 8, logoY + 42, { width: 48, align: "center" });
+
+  // HACCP Badge
+  const haccpX = logoX + 68;
+  const haccpY = logoY + 10;
+  doc.fillColor("#008000");
+  doc.roundedRect(haccpX, haccpY, 36, 18, 2).fill();
+  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(5.5);
+  doc.text("HACCP", haccpX, haccpY + 3, { width: 36, align: "center" });
+  doc.text("CERTIFIED", haccpX, haccpY + 10, { width: 36, align: "center" });
+
+  // Dynamic Company details on the right
+  const rightColX = margin + 220;
+  const rightColWidth = contentWidth - 230;
+  
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(7.5);
+  doc.text("Manufactured & Distributed By:", rightColX, y, { width: rightColWidth, align: "right" });
+  
+  if (fontRegistered) {
+    try {
+      doc.font("ArabicFont").fontSize(11).fillColor(redColor);
+      // Reversed shaped RTL Arabic sequence for "داديس تجارة المواد الغذائية ذ.م.م"
+      doc.text("\uFEEF\uFEAE\uFE91\uFEF4\uFE93 \uFE94\uFEF2\uFE92\uFE8E\uFE91\uFEF2 \uFEAA\uFE8E\uFEE4\uFE8D \uFE94\uFEAE\uFE92\uFE8E\uFE91 \uFEF4\uFEFC\uFEF2\uFEB3\uFE8D\uFEAA", rightColX, y + 10, { width: rightColWidth, align: "right" });
+    } catch (e) {
+      console.error("Failed to render Arabic header:", e);
+    }
+  }
+
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(13);
+  doc.text(companyName.toUpperCase(), rightColX, y + 25, { width: rightColWidth, align: "right" });
+  
+  doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
+  doc.text(`Tel.: ${companyPhone}, Mob.: ${companyPhone}`, rightColX, y + 42, { width: rightColWidth, align: "right" });
+  doc.text(companyAddress, rightColX, y + 51, { width: rightColWidth, align: "right" });
+  doc.text(`E-mail: ${companyEmail} | ${companyWebsite}`, rightColX, y + 60, { width: rightColWidth, align: "right" });
+  
+  doc.fillColor(redColor).font("Helvetica-Bold").fontSize(10);
+  doc.text("TRN: 100577923400003", rightColX, y + 72, { width: rightColWidth, align: "right" });
+
+  y += 95;
+
+  // ===== CUSTOMER & INVOICE DETAILS ROW =====
+  // Left: To. Box
+  doc.roundedRect(margin + 10, y, 200, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 18, y + 5);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(9.5).text(order.customer?.name || "N/A", margin + 18, y + 16, { width: 184 });
+  
+  let toY = y + 28;
+  if (order.customer?.address) {
+    doc.font("Helvetica").fontSize(7.5).text(order.customer.address, margin + 18, toY, { width: 184, height: 20 });
+    toY += 18;
+  }
+  doc.font("Helvetica").fontSize(7.5).text(`Mob: ${order.customer?.phoneNumber || "N/A"}`, margin + 18, toY);
+  toY += 10;
+  doc.font("Helvetica-Bold").fontSize(8).text(`TRN: ${order.customer?.pincode || "N/A"}`, margin + 18, toY);
+
+  // Center: TAX INVOICE Box
+  doc.fillColor(navyColor).roundedRect(margin + 225, y + 15, 125, 45, 4).fill();
+  if (fontRegistered) {
+    try {
+      doc.font("ArabicFont").fontSize(11).fillColor("#FFFFFF");
+      // "فاتورة ضريبية" in shaped/reversed Arabic sequence
+      doc.text("\uFE94\uFEF2\uFE92\uFEF1\uFEAE\uFEDF \uFE93\uFEAD\uFEEE\uFEB3\uFE8E\uFEB1", margin + 225, y + 23, { width: 125, align: "center" });
+    } catch (e) {
+      console.error("Failed to render Arabic tax invoice title:", e);
+    }
+  }
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#FFFFFF").text("TAX INVOICE", margin + 225, y + 38, { width: 125, align: "center" });
+
+  // Right: Details Box
+  const detailsBoxY = y;
+  const detailsBoxH = 75;
+  const detailsRowH = 18.75;
+  doc.roundedRect(margin + 365, detailsBoxY, 180, detailsBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  
+  // Grid lines
+  doc.lineWidth(0.5).strokeColor(navyColor);
+  doc.moveTo(margin + 365, detailsBoxY + detailsRowH).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH).stroke();
+  doc.moveTo(margin + 365, detailsBoxY + detailsRowH * 2).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH * 2).stroke();
+  doc.moveTo(margin + 365, detailsBoxY + detailsRowH * 3).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH * 3).stroke();
+  doc.moveTo(margin + 365 + 60, detailsBoxY).lineTo(margin + 365 + 60, detailsBoxY + detailsBoxH).stroke();
+
+  const detailsLabels = ["Inv. No.", "Date", "D.O. No.", "Payment"];
+  const detailsValues = [
+    invoiceNo || "N/A",
+    formattedDate,
+    order.deliveryNo || "N/A",
+    order.payment ? order.payment.charAt(0).toUpperCase() + order.payment.slice(1) : "N/A"
+  ];
+  for (let i = 0; i < 4; i++) {
+    const rY = detailsBoxY + i * detailsRowH;
+    doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5).text(detailsLabels[i], margin + 365 + 5, rY + 5, { width: 50 });
+    doc.fillColor("#333333").font("Helvetica").fontSize(7.5).text(detailsValues[i], margin + 365 + 65, rY + 5, { width: 110 });
+  }
+
+  y += 85;
+
+  // ===== ITEMS TABLE =====
+  const colDefs = [
+    { width: 25, header: "S. No.", align: "center" },
+    { width: 170.28, header: "Item Name", align: "left" },
+    { width: 35, header: "Qty.", align: "center" },
+    { width: 35, header: "Unit", align: "center" },
+    { width: 45, header: "U. Price", align: "right" },
+    { width: 50, header: "Excl. VAT", align: "right" },
+    { width: 35, header: "Disc%", align: "center" },
+    { width: 35, header: "VAT%", align: "center" },
+    { width: 55, header: "VAT Amount", align: "right" },
+    { width: 70, header: "TOTAL", align: "right" },
+  ];
+
+  let colX = margin;
+  const cols = colDefs.map((col) => {
+    const result = { ...col, x: colX };
+    colX += col.width;
+    return result;
+  });
+
+  const headerRowHeight = 22;
+  const dataRowHeight = 18;
+
+  const drawTableHeader = (startY) => {
+    doc.lineWidth(1).strokeColor(navyColor);
+    doc.rect(margin, startY, contentWidth, headerRowHeight).stroke();
+    
+    cols.forEach((col) => {
+      doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5)
+         .text(col.header, col.x + 2, startY + 6, { width: col.width - 4, align: col.align });
+      doc.moveTo(col.x, startY).lineTo(col.x, startY + headerRowHeight).stroke();
+    });
+    doc.moveTo(margin + contentWidth, startY).lineTo(margin + contentWidth, startY + headerRowHeight).stroke();
+    
+    return startY + headerRowHeight;
+  };
+
+  y = drawTableHeader(y);
+
+  let grandTotalExclVat = 0;
+  let grandTotalVat = 0;
+  let grandTotalInclVat = 0;
+  let totalWeight = 0;
+  let serialNumber = 1;
+
+  for (const item of order.orderItems) {
+    const qty = item.deliveredQuantity || item.orderedQuantity;
+    if (qty <= 0) continue;
+
+    // Page overflow check (strictly trigger at y = 625 to prevent any footer overlap)
+    if (y + dataRowHeight > 625) {
+      createNewPage();
+      y = margin + 15;
+      y = drawTableHeader(y);
+    }
+
+    const vatPercentage = item.vatPercentage || 5;
+    const unitPrice = item.price || 0;
+    const exclVatAmount = unitPrice * qty;
+    const vatAmount = exclVatAmount * (vatPercentage / 100);
+    const itemTotal = exclVatAmount + vatAmount;
+
+    grandTotalExclVat += exclVatAmount;
+    grandTotalVat += vatAmount;
+    grandTotalInclVat += itemTotal;
+    totalWeight += qty;
+
+    const unit = item.unit || item.product?.unit || "Nos";
+
+    const rowData = [
+      serialNumber.toString(),
+      item.product?.productName || "Unknown Product",
+      qty.toString(),
+      unit,
+      unitPrice.toFixed(2),
+      exclVatAmount.toFixed(2),
+      "0.00",
+      vatPercentage.toString() + "%",
+      vatAmount.toFixed(2),
+      itemTotal.toFixed(2)
+    ];
+
+    doc.lineWidth(0.5).strokeColor(navyColor);
+    doc.moveTo(margin, y + dataRowHeight).lineTo(margin + contentWidth, y + dataRowHeight).stroke();
+
+    cols.forEach((col, i) => {
+      doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
+      doc.moveTo(col.x, y).lineTo(col.x, y + dataRowHeight).stroke();
+      doc.text(rowData[i], col.x + 4, y + 5, { width: col.width - 8, align: i === 1 ? "left" : col.align });
+    });
+    doc.moveTo(margin + contentWidth, y).lineTo(margin + contentWidth, y + dataRowHeight).stroke();
+
+    y += dataRowHeight;
+    serialNumber++;
+  }
+
+  // Check if footer sections need a new page
+  if (y > 625) {
+    createNewPage();
+  }
+
+  // ===== FOOTER DESIGN POSITIONING (Aligned at the bottom) =====
+  const sigBoxW = 131.32;
+  const sigBoxH = 75;
+  const sigGap = 10;
+
+  const sigY = pageHeight - margin - sigBoxH - 10;
+  const chequeY = sigY - 18 - 5;
+  const totalsY = chequeY - 60 - 5;
+
+  // ===== TOTALS BLOCK =====
+  doc.lineWidth(1).strokeColor(navyColor);
+  // Row 1: Total Weight and Total Dhs.
+  doc.rect(margin, totalsY, 265.28, 20).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Total Weight", margin + 10, totalsY + 6);
+  doc.fillColor("#333333").font("Helvetica").fontSize(8).text(totalWeight.toString(), margin + 150, totalsY + 6, { width: 105, align: "right" });
+     
+  doc.rect(margin + 265.28, totalsY, 290, 20).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Total Dhs.", margin + 265.28 + 10, totalsY + 6);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(grandTotalExclVat.toFixed(2), margin + 265.28 + 150, totalsY + 6, { width: 130, align: "right" });
+
+  // Row 2 & 3 Left: Merged Box (Total amount in words)
+  const row2Y = totalsY + 20;
+  doc.rect(margin, row2Y, 265.28, 40).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5).text("Total amount in words", margin + 10, row2Y + 5);
+  doc.fillColor("#333333").font("Helvetica").fontSize(7.5).text(amountToWords(grandTotalInclVat), margin + 10, row2Y + 16, { width: 245 });
+
+  // Row 2 Right: Vat 5%
+  doc.rect(margin + 265.28, row2Y, 290, 20).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Vat 5%", margin + 265.28 + 10, row2Y + 6);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(grandTotalVat.toFixed(2), margin + 265.28 + 150, row2Y + 6, { width: 130, align: "right" });
+
+  // Row 3 Right: Grand Total
+  const row3Y = totalsY + 40;
+  doc.rect(margin + 265.28, row3Y, 290, 20).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8.5).text("Grand Total", margin + 265.28 + 10, row3Y + 6);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8.5).text(grandTotalInclVat.toFixed(2), margin + 265.28 + 150, row3Y + 6, { width: 130, align: "right" });
+
+  // ===== CHEQUE SECTION =====
+  doc.rect(margin, chequeY, contentWidth, 18).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8)
+     .text(`Cheque to be drawn in favour of '${companyName}'`, margin, chequeY + 5, { width: contentWidth, align: "center" });
+
+  // ===== FOOTER SIGNATURE BOXES =====
+  // Box 1: Condition and Receiver's Sign
+  const box1X = margin;
+  doc.roundedRect(box1X, sigY, sigBoxW, sigBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  if (fontRegistered) {
+    try {
+      doc.font("ArabicFont").fontSize(6.5).fillColor(navyColor);
+      // Reversed shaped RTL Arabic for: "استلمنا البضاعة المذكورة في حالة جيدة"
+      doc.text("\uFE94\uFEAE\uFEF2\uFEDF \uFE93\uFEAE\uFE92\uFE8E\uFE91 \uFEF2\uFEDF \uFE94\uFEAE\uFE92\uFE8E\uFE91 \uFE94\uFEA4\uFE8D\uFE94\uFE92\uFE8E\uFE91 \uFE8D\uFEAE\uFE92\uFE8E\uFE91 \uFE8E\uFEEC\uFEAE\uFE92\uFE8E\uFE91", box1X + 5, sigY + 5, { width: sigBoxW - 10, align: "center" });
+    } catch (e) {
+      console.error("Failed to render Arabic condition line 1:", e);
+    }
+  }
+  doc.fillColor(navyColor).font("Helvetica").fontSize(6.5);
+  doc.text("Received above items in good condition.", box1X + 5, sigY + 15, { width: sigBoxW - 10, align: "center" });
+  doc.text("....................................................", box1X + 5, sigY + 40, { width: sigBoxW - 10, align: "center" });
+  doc.font("Helvetica-Bold").fontSize(6.5);
+  doc.text("Receiver's Name & Signature", box1X + 5, sigY + 50, { width: sigBoxW - 10, align: "center" });
+  if (fontRegistered) {
+    try {
+      doc.font("ArabicFont").fontSize(6.5);
+      // Reversed shaped RTL Arabic for: "توقيع المستلم"
+      doc.text("\uFE8E\uFEE4\uFEF4\uFEB4\uFEE3\uFE8E\uFE8E \uFEF4\uFEFC\uFEF2\uFEB3\uFEEE\uFEB3", box1X + 5, sigY + 60, { width: sigBoxW - 10, align: "center" });
+    } catch (e) {
+      console.error("Failed to render Arabic condition signature:", e);
+    }
+  }
+
+  // Box 2: Vehicle No. & Driver
+  const box2X = margin + sigBoxW + sigGap;
+  doc.roundedRect(box2X, sigY, sigBoxW, sigBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5);
+  doc.text("Vehicle No. & Driver", box2X + 5, sigY + 8, { width: sigBoxW - 10, align: "center" });
+  doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
+  if (order.assignedTo?.username) {
+    doc.text(`Driver: ${order.assignedTo.username}`, box2X + 5, sigY + 30, { width: sigBoxW - 10, align: "center" });
+    doc.text("Vehicle No: .................", box2X + 5, sigY + 45, { width: sigBoxW - 10, align: "center" });
+  } else {
+    doc.text("Driver: .........................", box2X + 5, sigY + 30, { width: sigBoxW - 10, align: "center" });
+    doc.text("Vehicle No: .................", box2X + 5, sigY + 45, { width: sigBoxW - 10, align: "center" });
+  }
+
+  // Box 3: Store Sign
+  const box3X = margin + (sigBoxW + sigGap) * 2;
+  doc.roundedRect(box3X, sigY, sigBoxW, sigBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5);
+  doc.text("Store Sign", box3X + 5, sigY + 8, { width: sigBoxW - 10, align: "center" });
+  doc.text(".................................", box3X + 5, sigY + sigBoxH - 25, { width: sigBoxW - 10, align: "center" });
+
+  // Box 4: for DADDYS FOODSTUFF TR. L.L.C.
+  const box4X = margin + (sigBoxW + sigGap) * 3;
+  doc.roundedRect(box4X, sigY, sigBoxW, sigBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5);
+  doc.text(`for ${companyName}`, box4X + 5, sigY + sigBoxH - 18, { width: sigBoxW - 10, align: "center" });
 };
 
 // Get pending orders for assignment (for Admin and Sales Manager)
