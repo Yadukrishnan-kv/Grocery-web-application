@@ -157,8 +157,6 @@ const RemainingPackOrders = () => {
     });
   }, [orders, searchTerm]);
 
-  const clearSearch = () => setSearchTerm("");
-
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);

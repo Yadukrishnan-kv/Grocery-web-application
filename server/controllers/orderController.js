@@ -1077,10 +1077,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
 
   // Helper to draw outer navy border
   const drawOuterBorder = () => {
-    doc.rect(margin, margin, contentWidth, pageHeight - margin * 2)
-       .lineWidth(1)
-       .strokeColor(navyColor)
-       .stroke();
+    // Border removed
   };
 
   // Helper to draw watermark
@@ -1128,74 +1125,38 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   drawOuterBorder();
   drawWatermark();
 
-  let y = margin + 15;
+  let y = 10;
 
   // ===== HEADER =====
   const logoX = margin + 10;
-  const logoY = y + 5;
+  const logoY = y;
   
-  // Compact Red cloud logo
-  doc.fillColor(redColor);
-  doc.circle(logoX + 18, logoY + 18, 12).fill();
-  doc.circle(logoX + 32, logoY + 18, 15).fill();
-  doc.circle(logoX + 46, logoY + 18, 12).fill();
-  doc.circle(logoX + 32, logoY + 10, 12).fill();
-  doc.circle(logoX + 24, logoY + 26, 10).fill();
-  doc.circle(logoX + 40, logoY + 26, 10).fill();
-
-  // Logo Text
-  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(7);
-  doc.text("Daddy's", logoX + 8, logoY + 8, { width: 48, align: "center" });
-  doc.text("Kitchen", logoX + 8, logoY + 16, { width: 48, align: "center" });
-  doc.text("Masala", logoX + 8, logoY + 24, { width: 48, align: "center" });
-
-  // Mustache
-  doc.fillColor("#000000");
-  doc.moveTo(logoX + 12, logoY + 33)
-     .quadraticCurveTo(logoX + 25, logoY + 38, logoX + 32, logoY + 35)
-     .quadraticCurveTo(logoX + 39, logoY + 38, logoX + 52, logoY + 33)
-     .quadraticCurveTo(logoX + 39, logoY + 42, logoX + 32, logoY + 38)
-     .quadraticCurveTo(logoX + 25, logoY + 42, logoX + 12, logoY + 33)
-     .fill();
-
-  // Natural Spices text
-  doc.fillColor("#555555").font("Helvetica").fontSize(4.5);
-  doc.text("NATURAL SPICES", logoX + 8, logoY + 42, { width: 48, align: "center" });
-
-  // HACCP Badge
-  const haccpX = logoX + 68;
-  const haccpY = logoY + 10;
-  doc.fillColor("#008000");
-  doc.roundedRect(haccpX, haccpY, 36, 18, 2).fill();
-  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(5.5);
-  doc.text("HACCP", haccpX, haccpY + 3, { width: 36, align: "center" });
-  doc.text("CERTIFIED", haccpX, haccpY + 10, { width: 36, align: "center" });
+  // Logo image
+  const logoPath = require("path").join(__dirname, "../uploads/logos/LOGO.jpg");
+  doc.image(logoPath, logoX, logoY, { width: 80 });
 
   // Dynamic Company details on the right
   const rightColX = margin + 220;
   const rightColWidth = contentWidth - 230;
   
-  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(7.5);
-  doc.text("Manufactured & Distributed By:", rightColX, y, { width: rightColWidth, align: "right" });
-  
   if (fontRegistered) {
     try {
-      doc.font("ArabicFont").fontSize(11).fillColor(redColor);
-      // Reversed shaped RTL Arabic sequence for "داديس تجارة المواد الغذائية ذ.م.م"
-      doc.text("\uFEEF\uFEAE\uFE91\uFEF4\uFE93 \uFE94\uFEF2\uFE92\uFE8E\uFE91\uFEF2 \uFEAA\uFE8E\uFEE4\uFE8D \uFE94\uFEAE\uFE92\uFE8E\uFE91 \uFEF4\uFEFC\uFEF2\uFEB3\uFE8D\uFEAA", rightColX, y + 10, { width: rightColWidth, align: "right" });
+      doc.font("ArabicFont").fontSize(25).fillColor(redColor);
+      doc.text("داديس تجارة المواد الغذائية ذ.م.م", 0, y + 5, { width: pageWidth, align: "center" });
+      doc.font("Helvetica-Bold").fontSize(25).fillColor("#000000");
+      doc.text(companyName.toUpperCase(), 0, y + 40, { width: pageWidth, align: "center" });
+      const haccpPath = require("path").join(__dirname, "../uploads/logos/HACCP.png");
+      doc.image(haccpPath, margin + 100, y + 66, { width: 36 });
+      doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
+      doc.text(`Tel.: ${companyPhone}, Mob.: ${companyPhone}`, 0, y + 70, { width: pageWidth, align: "center" });
+      doc.text(companyAddress, 0, y + 79, { width: pageWidth, align: "center" });
+      doc.text(`E-mail: ${companyEmail}`, 0, y + 88, { width: pageWidth, align: "center" });
+      doc.text(companyWebsite, 0, y + 96, { width: pageWidth, align: "center" });
     } catch (e) {
       console.error("Failed to render Arabic header:", e);
     }
   }
 
-  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(13);
-  doc.text(companyName.toUpperCase(), rightColX, y + 25, { width: rightColWidth, align: "right" });
-  
-  doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
-  doc.text(`Tel.: ${companyPhone}, Mob.: ${companyPhone}`, rightColX, y + 42, { width: rightColWidth, align: "right" });
-  doc.text(companyAddress, rightColX, y + 51, { width: rightColWidth, align: "right" });
-  doc.text(`E-mail: ${companyEmail} | ${companyWebsite}`, rightColX, y + 60, { width: rightColWidth, align: "right" });
-  
   doc.fillColor(redColor).font("Helvetica-Bold").fontSize(10);
   doc.text("TRN: 100577923400003", rightColX, y + 72, { width: rightColWidth, align: "right" });
 
@@ -1203,18 +1164,18 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
 
   // ===== CUSTOMER & INVOICE DETAILS ROW =====
   // Left: To. Box
-  doc.roundedRect(margin + 10, y, 200, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
-  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 18, y + 5);
-  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(9.5).text(order.customer?.name || "N/A", margin + 18, y + 16, { width: 184 });
+  doc.roundedRect(margin, y, 200, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 8, y + 5);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(9.5).text(order.customer?.name || "N/A", margin + 8, y + 16, { width: 184 });
   
   let toY = y + 28;
   if (order.customer?.address) {
-    doc.font("Helvetica").fontSize(7.5).text(order.customer.address, margin + 18, toY, { width: 184, height: 20 });
+    doc.font("Helvetica").fontSize(7.5).text(order.customer.address, margin + 8, toY, { width: 184, height: 20 });
     toY += 18;
   }
-  doc.font("Helvetica").fontSize(7.5).text(`Mob: ${order.customer?.phoneNumber || "N/A"}`, margin + 18, toY);
+  doc.font("Helvetica").fontSize(7.5).text(`Mob: ${order.customer?.phoneNumber || "N/A"}`, margin + 8, toY);
   toY += 10;
-  doc.font("Helvetica-Bold").fontSize(8).text(`TRN: ${order.customer?.pincode || "N/A"}`, margin + 18, toY);
+  doc.font("Helvetica-Bold").fontSize(8).text(`TRN: ${order.customer?.pincode || "N/A"}`, margin + 8, toY);
 
   // Center: TAX INVOICE Box
   doc.fillColor(navyColor).roundedRect(margin + 225, y + 15, 125, 45, 4).fill();
@@ -1233,14 +1194,15 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   const detailsBoxY = y;
   const detailsBoxH = 75;
   const detailsRowH = 18.75;
-  doc.roundedRect(margin + 365, detailsBoxY, 180, detailsBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  const detailsBoxX = margin + contentWidth - 180;
+  doc.roundedRect(detailsBoxX, detailsBoxY, 180, detailsBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
   
   // Grid lines
   doc.lineWidth(0.5).strokeColor(navyColor);
-  doc.moveTo(margin + 365, detailsBoxY + detailsRowH).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH).stroke();
-  doc.moveTo(margin + 365, detailsBoxY + detailsRowH * 2).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH * 2).stroke();
-  doc.moveTo(margin + 365, detailsBoxY + detailsRowH * 3).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH * 3).stroke();
-  doc.moveTo(margin + 365 + 60, detailsBoxY).lineTo(margin + 365 + 60, detailsBoxY + detailsBoxH).stroke();
+  doc.moveTo(detailsBoxX, detailsBoxY + detailsRowH).lineTo(detailsBoxX + 180, detailsBoxY + detailsRowH).stroke();
+  doc.moveTo(detailsBoxX, detailsBoxY + detailsRowH * 2).lineTo(detailsBoxX + 180, detailsBoxY + detailsRowH * 2).stroke();
+  doc.moveTo(detailsBoxX, detailsBoxY + detailsRowH * 3).lineTo(detailsBoxX + 180, detailsBoxY + detailsRowH * 3).stroke();
+  doc.moveTo(detailsBoxX + 60, detailsBoxY).lineTo(detailsBoxX + 60, detailsBoxY + detailsBoxH).stroke();
 
   const detailsLabels = ["Inv. No.", "Date", "D.O. No.", "Payment"];
   const detailsValues = [
@@ -1251,8 +1213,8 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   ];
   for (let i = 0; i < 4; i++) {
     const rY = detailsBoxY + i * detailsRowH;
-    doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5).text(detailsLabels[i], margin + 365 + 5, rY + 5, { width: 50 });
-    doc.fillColor("#333333").font("Helvetica").fontSize(7.5).text(detailsValues[i], margin + 365 + 65, rY + 5, { width: 110 });
+    doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5).text(detailsLabels[i], detailsBoxX + 5, rY + 5, { width: 50 });
+    doc.fillColor("#333333").font("Helvetica").fontSize(7.5).text(detailsValues[i], detailsBoxX + 65, rY + 5, { width: 110 });
   }
 
   y += 85;
@@ -1295,6 +1257,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     return startY + headerRowHeight;
   };
 
+  let tableStartY = y;
   y = drawTableHeader(y);
 
   let grandTotalExclVat = 0;
@@ -1312,6 +1275,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
       createNewPage();
       y = margin + 15;
       y = drawTableHeader(y);
+      tableStartY = y - headerRowHeight;
     }
 
     const vatPercentage = item.vatPercentage || 5;
@@ -1395,6 +1359,10 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   doc.rect(margin + 265.28, row3Y, 290, 20).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8.5).text("Grand Total", margin + 265.28 + 10, row3Y + 6);
   doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8.5).text(grandTotalInclVat.toFixed(2), margin + 265.28 + 150, row3Y + 6, { width: 130, align: "right" });
+
+  // Outer border around the entire table (from S. No. header to totals)
+  doc.lineWidth(1).strokeColor(navyColor);
+  doc.rect(margin, tableStartY, contentWidth, (totalsY + 60) - tableStartY).stroke();
 
   // ===== CHEQUE SECTION =====
   doc.rect(margin, chequeY, contentWidth, 18).stroke();
