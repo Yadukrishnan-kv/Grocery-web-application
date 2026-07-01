@@ -348,7 +348,7 @@ const generateReceipt = async (req, res) => {
     }
 
     y = drawDashedLine(y + 2);
-    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("TOTAL DUE", centerX, y, { width: labelW + 10 });
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("BALANCE DUE", centerX, y, { width: labelW + 10 });
     doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
     y += 14;
 
@@ -480,7 +480,7 @@ const generateBulkReceipt = async (req, res) => {
 
     // Total
     doc.font("Helvetica-Bold").fontSize(11);
-    doc.text(`TOTAL DUE: AED ${totalDueAllCustomers.toFixed(2)}`, { align: "right" });
+    doc.text(`BALANCE DUE: AED ${totalDueAllCustomers.toFixed(2)}`, { align: "right" });
     doc.moveDown();
 
     // Footer

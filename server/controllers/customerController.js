@@ -726,6 +726,21 @@ const acceptCustomerRequest = async (req, res) => {
       await customer.save();
     }
 
+    // Deduct credit limit from salesman's balance
+    const finalCreditLimit = customer.creditLimit || 0;
+    if (request.salesman && finalCreditLimit > 0) {
+      try {
+        await User.findByIdAndUpdate(
+          request.salesman,
+          { $inc: { salesmanBalanceCreditLimit: -finalCreditLimit } },
+          { new: true }
+        );
+        console.log(`Deducted ${finalCreditLimit} credit limit from salesman for new customer: ${customer.email}`);
+      } catch (error) {
+        console.error(`Error deducting credit from salesman:`, error);
+      }
+    }
+
     // Create bill for opening balance if applicable
     if ((request.openingBalance || 0) > 0 && request.openingBalanceDueDays) {
       const openingDueDate = new Date();

@@ -546,14 +546,7 @@ const getDeliveredInvoice = async (req, res) => {
     const filename = `delivered-invoice-${invoiceNo}.pdf`;
     
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      console.log(`[DEBUG_INVOICE] Requesting User: ${req.user ? req.user.username : "None"}, Role: ${req.user ? req.user.role : "None"}`);
-      if (req.user && ["Sales man", "Sales Manager"].includes(req.user.role)) {
-        console.log(`[DEBUG_INVOICE] Matches Sales role. Rendering Daddys Invoice Format.`);
-        await generateDaddysInvoicePDF(doc, order, invoiceNo);
-      } else {
-        console.log(`[DEBUG_INVOICE] Normal role. Rendering original Styled Invoice Format.`);
-        await generateStyledInvoicePDF(doc, order, "DELIVERED INVOICE", invoiceNo);
-      }
+      await generateDaddysInvoicePDF(doc, order, invoiceNo, "DELIVERED INVOICE");
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -614,7 +607,7 @@ const getPendingInvoice = async (req, res) => {
     };
 
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateStyledInvoicePDF(doc, pendingOrder, "PENDING INVOICE", invoiceNo);
+      await generateDaddysInvoicePDF(doc, pendingOrder, invoiceNo, "PENDING INVOICE");
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -1033,7 +1026,7 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   });
 };
 
-const generateDaddysInvoicePDF = async (doc, order, invoiceNo) => {
+const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TAX INVOICE") => {
   const fs = require("fs");
   const pageWidth = 595.28;
   const pageHeight = 841.89;
@@ -1234,7 +1227,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo) => {
       console.error("Failed to render Arabic tax invoice title:", e);
     }
   }
-  doc.font("Helvetica-Bold").fontSize(11).fillColor("#FFFFFF").text("TAX INVOICE", margin + 225, y + 38, { width: 125, align: "center" });
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#FFFFFF").text(invoiceType, margin + 225, y + 38, { width: 125, align: "center" });
 
   // Right: Details Box
   const detailsBoxY = y;
@@ -1576,7 +1569,7 @@ const getOrderInvoice = async (req, res) => {
     const filename = `order-invoice-${order._id.toString().slice(-8)}.pdf`;
 
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateStyledInvoicePDF(doc, order, "ORDER INVOICE", `ORD-${order._id.toString().slice(-6)}`);
+      await generateDaddysInvoicePDF(doc, order, `ORD-${order._id.toString().slice(-6)}`, "ORDER INVOICE");
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -2505,7 +2498,7 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     })),
   };
 
-  await generateStyledInvoicePDF(doc, wrapperOrder, invoiceType, invoiceNo);
+  await generateDaddysInvoicePDF(doc, wrapperOrder, invoiceNo, invoiceType);
 };
 // ✅ PACKED INVOICE PDF - New Tax Invoice Style (uses packed quantities)
 const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
@@ -2526,7 +2519,7 @@ const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     })),
   };
 
-  await generateStyledInvoicePDF(doc, wrapperOrder, invoiceType, invoiceNo);
+  await generateDaddysInvoicePDF(doc, wrapperOrder, invoiceNo, invoiceType);
 };
 
 const getAllOrdersForStorekeeper = async (req, res) => {

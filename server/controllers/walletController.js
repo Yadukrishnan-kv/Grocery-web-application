@@ -437,7 +437,7 @@ const generatePaymentReceipt = async (req, res) => {
 
     // ===== GRAND TOTAL DUE =====
     doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
-      .text('TOTAL DUE', centerX, y, { width: labelW + 10 });
+      .text('BALANCE DUE', centerX, y, { width: labelW + 10 });
     doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
       .text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: 'right' });
     y += 14;
@@ -642,7 +642,7 @@ const generateBulkPaymentReceipt = async (req, res) => {
 
       // ===== GRAND TOTAL DUE =====
       doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
-        .text('TOTAL DUE', centerX, y, { width: labelW + 10 });
+        .text('BALANCE DUE', centerX, y, { width: labelW + 10 });
       doc.fontSize(9).font('Helvetica-Bold').fillColor('#000')
         .text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: 'right' });
       y += 14;

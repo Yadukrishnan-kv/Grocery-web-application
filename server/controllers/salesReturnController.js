@@ -673,7 +673,466 @@ const getSalesReturnsByOrder = async (req, res) => {
   }
 };
 
-// ─── PDF: Return Invoice ──────────────────────────────────────────────────────
+// ─── PDF: Return Invoice (Daddy's Design) ─────────────────────────────────────
+
+const generateDaddysReturnInvoicePDF = async (doc, sr, settings) => {
+  const fs = require("fs");
+  const company = settings || {};
+  const companyName = company.companyName || "DADDYS FOODSTUFF TR. L.L.C.";
+  const companyAddress = company.companyAddress || "No.6, Jurf Industrial Zone, Ajman - U.A.E.";
+  const companyPhone = company.companyPhone || "06 6786779";
+  const companyEmail = company.companyEmail || "daddyskitchenmasala@gmail.com";
+  const companyWebsite = "www.daddyskitchenmasala.com";
+
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 20;
+  const contentWidth = pageWidth - margin * 2;
+
+  // Colors
+  const navyColor = "#002D62";
+  const redColor = "#D21F3C";
+  const gray = "#999999";
+  const darkGray = "#333333";
+  const headerBg = "#d9d9d9";
+
+  // Date formatting
+  const date = new Date(sr.completedAt || sr.createdAt || Date.now());
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const formattedDate = `${date.getDate()}-${monthNames[date.getMonth()]}-${String(date.getFullYear()).slice(-2)}`;
+
+  // Font registration (RTL Arabic support)
+  let fontRegistered = false;
+  try {
+    let fontPath = "C:/Windows/Fonts/arial.ttf";
+    if (process.platform !== "win32") {
+      const linuxPaths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",
+        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf"
+      ];
+      for (const p of linuxPaths) {
+        if (fs.existsSync(p)) {
+          fontPath = p;
+          break;
+        }
+      }
+    }
+    if (fs.existsSync(fontPath)) {
+      doc.registerFont("ArabicFont", fontPath);
+      fontRegistered = true;
+    }
+  } catch (e) {
+    console.error("Font registration error:", e);
+  }
+
+  // Helper to draw outer navy border
+  const drawOuterBorder = () => {
+    doc.rect(margin, margin, contentWidth, pageHeight - margin * 2)
+       .lineWidth(1)
+       .strokeColor(navyColor)
+       .stroke();
+  };
+
+  // Helper to draw watermark
+  const drawWatermark = () => {
+    doc.save();
+    doc.opacity(0.05);
+    const wmX = pageWidth / 2 - 60;
+    const wmY = 340;
+    doc.fillColor(redColor);
+    doc.circle(wmX + 30, wmY + 30, 20).fill();
+    doc.circle(wmX + 55, wmY + 30, 25).fill();
+    doc.circle(wmX + 80, wmY + 30, 20).fill();
+    doc.circle(wmX + 55, wmY + 15, 20).fill();
+    doc.circle(wmX + 40, wmY + 42, 16).fill();
+    doc.circle(wmX + 70, wmY + 42, 16).fill();
+    doc.fillColor("#000000");
+    doc.moveTo(wmX + 20, wmY + 55)
+       .quadraticCurveTo(wmX + 42, wmY + 63, wmX + 55, wmY + 58)
+       .quadraticCurveTo(wmX + 68, wmY + 63, wmX + 90, wmY + 55)
+       .quadraticCurveTo(wmX + 68, wmY + 70, wmX + 55, wmY + 63)
+       .quadraticCurveTo(wmX + 42, wmY + 70, wmX + 20, wmY + 55)
+       .fill();
+    doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(12);
+    doc.text("Daddy's", wmX + 15, wmY + 12, { width: 80, align: "center" });
+    doc.text("Kitchen", wmX + 15, wmY + 25, { width: 80, align: "center" });
+    doc.text("Masala", wmX + 15, wmY + 38, { width: 80, align: "center" });
+    doc.fillColor("#000000").font("Helvetica-Bold").fontSize(7);
+    doc.text("NATURAL SPICES", wmX + 15, wmY + 72, { width: 80, align: "center" });
+    doc.restore();
+  };
+
+  const createNewPage = () => {
+    doc.addPage({ size: "A4", margin: 0 });
+    drawOuterBorder();
+    drawWatermark();
+  };
+
+  // Draw initial page decoration
+  drawOuterBorder();
+  drawWatermark();
+
+  let y = margin + 15;
+
+  // ===== HEADER =====
+  const logoX = margin + 10;
+  const logoY = y + 5;
+
+  // Compact Red cloud logo
+  doc.fillColor(redColor);
+  doc.circle(logoX + 18, logoY + 18, 12).fill();
+  doc.circle(logoX + 32, logoY + 18, 15).fill();
+  doc.circle(logoX + 46, logoY + 18, 12).fill();
+  doc.circle(logoX + 32, logoY + 10, 12).fill();
+  doc.circle(logoX + 24, logoY + 26, 10).fill();
+  doc.circle(logoX + 40, logoY + 26, 10).fill();
+
+  // Logo Text
+  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(7);
+  doc.text("Daddy's", logoX + 8, logoY + 8, { width: 48, align: "center" });
+  doc.text("Kitchen", logoX + 8, logoY + 16, { width: 48, align: "center" });
+  doc.text("Masala", logoX + 8, logoY + 24, { width: 48, align: "center" });
+
+  // Mustache
+  doc.fillColor("#000000");
+  doc.moveTo(logoX + 12, logoY + 33)
+     .quadraticCurveTo(logoX + 25, logoY + 38, logoX + 32, logoY + 35)
+     .quadraticCurveTo(logoX + 39, logoY + 38, logoX + 52, logoY + 33)
+     .quadraticCurveTo(logoX + 39, logoY + 42, logoX + 32, logoY + 38)
+     .quadraticCurveTo(logoX + 25, logoY + 42, logoX + 12, logoY + 33)
+     .fill();
+
+  // Natural Spices text
+  doc.fillColor("#555555").font("Helvetica").fontSize(4.5);
+  doc.text("NATURAL SPICES", logoX + 8, logoY + 42, { width: 48, align: "center" });
+
+  // HACCP Badge
+  const haccpX = logoX + 68;
+  const haccpY = logoY + 10;
+  doc.fillColor("#008000");
+  doc.roundedRect(haccpX, haccpY, 36, 18, 2).fill();
+  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(5.5);
+  doc.text("HACCP", haccpX, haccpY + 3, { width: 36, align: "center" });
+  doc.text("CERTIFIED", haccpX, haccpY + 10, { width: 36, align: "center" });
+
+  // Dynamic Company details on the right
+  const rightColX = margin + 220;
+  const rightColWidth = contentWidth - 230;
+
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(7.5);
+  doc.text("Manufactured & Distributed By:", rightColX, y, { width: rightColWidth, align: "right" });
+
+  if (fontRegistered) {
+    try {
+      doc.font("ArabicFont").fontSize(11).fillColor(redColor);
+      doc.text("\uFEEF\uFEAE\uFE91\uFEF4\uFE93 \uFE94\uFEF2\uFE92\uFE8E\uFE91\uFEF2 \uFEAA\uFE8E\uFEE4\uFE8D \uFE94\uFEAE\uFE92\uFE8E\uFE91 \uFEF4\uFEFC\uFEF2\uFEB3\uFE8D\uFEAA", rightColX, y + 10, { width: rightColWidth, align: "right" });
+    } catch (e) {
+      console.error("Failed to render Arabic header:", e);
+    }
+  }
+
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(13);
+  doc.text(companyName.toUpperCase(), rightColX, y + 25, { width: rightColWidth, align: "right" });
+
+  doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
+  doc.text(`Tel.: ${companyPhone}, Mob.: ${companyPhone}`, rightColX, y + 42, { width: rightColWidth, align: "right" });
+  doc.text(companyAddress, rightColX, y + 51, { width: rightColWidth, align: "right" });
+  doc.text(`E-mail: ${companyEmail} | ${companyWebsite}`, rightColX, y + 60, { width: rightColWidth, align: "right" });
+
+  doc.fillColor(redColor).font("Helvetica-Bold").fontSize(10);
+  doc.text("TRN: 100577923400003", rightColX, y + 72, { width: rightColWidth, align: "right" });
+
+  y += 95;
+
+  // ===== CUSTOMER & INVOICE DETAILS ROW =====
+  // Left: To. Box
+  doc.roundedRect(margin + 10, y, 200, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 18, y + 5);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(9.5).text(sr.customer?.name || "N/A", margin + 18, y + 16, { width: 184 });
+
+  let toY = y + 28;
+  if (sr.customer?.address) {
+    doc.font("Helvetica").fontSize(7.5).text(sr.customer.address, margin + 18, toY, { width: 184, height: 20 });
+    toY += 18;
+  }
+  doc.font("Helvetica").fontSize(7.5).text(`Mob: ${sr.customer?.phoneNumber || "N/A"}`, margin + 18, toY);
+  toY += 10;
+  doc.font("Helvetica-Bold").fontSize(8).text(`TRN: ${sr.customer?.pincode || "N/A"}`, margin + 18, toY);
+
+  // Center: SALES RETURN CREDIT NOTE Box
+  doc.fillColor(navyColor).roundedRect(margin + 225, y + 15, 125, 45, 4).fill();
+  if (fontRegistered) {
+    try {
+      doc.font("ArabicFont").fontSize(11).fillColor("#FFFFFF");
+      doc.text("\uFE94\uFEF2\uFE92\uFEF1\uFEAE\uFEDF \uFE93\uFEAD\uFEEE\uFEB3\uFE8E\uFEB1", margin + 225, y + 23, { width: 125, align: "center" });
+    } catch (e) {
+      console.error("Failed to render Arabic title:", e);
+    }
+  }
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#FFFFFF").text("SALES RETURN", margin + 225, y + 38, { width: 125, align: "center" });
+  doc.font("Helvetica-Bold").fontSize(7).fillColor("#FFFFFF").text("CREDIT NOTE", margin + 225, y + 50, { width: 125, align: "center" });
+
+  // Right: Details Box
+  const detailsBoxY = y;
+  const detailsBoxH = 75;
+  const detailsRowH = 18.75;
+  doc.roundedRect(margin + 365, detailsBoxY, 180, detailsBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
+
+  // Grid lines
+  doc.lineWidth(0.5).strokeColor(navyColor);
+  doc.moveTo(margin + 365, detailsBoxY + detailsRowH).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH).stroke();
+  doc.moveTo(margin + 365, detailsBoxY + detailsRowH * 2).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH * 2).stroke();
+  doc.moveTo(margin + 365, detailsBoxY + detailsRowH * 3).lineTo(margin + 365 + 180, detailsBoxY + detailsRowH * 3).stroke();
+  doc.moveTo(margin + 365 + 60, detailsBoxY).lineTo(margin + 365 + 60, detailsBoxY + detailsBoxH).stroke();
+
+  const detailsLabels = ["CRN No.", "Date", "Orig. Order", "Refund"];
+  const detailsValues = [
+    sr.returnInvoiceNumber || "N/A",
+    formattedDate,
+    sr.order?.invoiceNumber || "N/A",
+    (sr.refundMethod || "none").replace(/_/g, " ")
+  ];
+  for (let i = 0; i < 4; i++) {
+    const rY = detailsBoxY + i * detailsRowH;
+    doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5).text(detailsLabels[i], margin + 365 + 5, rY + 5, { width: 50 });
+    doc.fillColor("#333333").font("Helvetica").fontSize(7.5).text(detailsValues[i], margin + 365 + 65, rY + 5, { width: 110 });
+  }
+
+  y += 85;
+
+  // ===== RETURN REASON BOX =====
+  doc.roundedRect(margin + 10, y, contentWidth - 20, 30, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Return Reason:", margin + 18, y + 5);
+  doc.fillColor("#333333").font("Helvetica").fontSize(8).text(sr.returnReason || "Not specified", margin + 100, y + 5, { width: contentWidth - 120 });
+
+  y += 38;
+
+  // ===== ITEMS TABLE =====
+  const colDefs = [
+    { width: 25, header: "S. No.", align: "center" },
+    { width: 170.28, header: "Item Name", align: "left" },
+    { width: 35, header: "Ret.Qty", align: "center" },
+    { width: 35, header: "Unit", align: "center" },
+    { width: 45, header: "U. Price", align: "right" },
+    { width: 50, header: "Excl. VAT", align: "right" },
+    { width: 35, header: "Disc%", align: "center" },
+    { width: 35, header: "VAT%", align: "center" },
+    { width: 55, header: "VAT Amount", align: "right" },
+    { width: 70, header: "TOTAL", align: "right" },
+  ];
+
+  let colX = margin;
+  const cols = colDefs.map((col) => {
+    const result = { ...col, x: colX };
+    colX += col.width;
+    return result;
+  });
+
+  const rightEdge = pageWidth - margin;
+  const headerRowHeight = 22;
+  const dataRowHeight = 18;
+  const footerSpaceNeeded = 310;
+
+  const drawTableHeader = (startY) => {
+    doc.rect(margin, startY, contentWidth, headerRowHeight).fillColor(navyColor).fill();
+    doc.rect(margin, startY, contentWidth, headerRowHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+    cols.forEach((col) => {
+      doc.fontSize(7).font("Helvetica-Bold").fillColor("#FFFFFF")
+        .text(col.header, col.x + 2, startY + 6, { width: col.width - 4, align: col.align });
+      doc.moveTo(col.x, startY).lineTo(col.x, startY + headerRowHeight)
+        .lineWidth(0.5).strokeColor(navyColor).stroke();
+    });
+    doc.moveTo(rightEdge, startY).lineTo(rightEdge, startY + headerRowHeight)
+      .lineWidth(0.5).strokeColor(navyColor).stroke();
+    return startY + headerRowHeight;
+  };
+
+  y = drawTableHeader(y);
+
+  // Data rows
+  let grandTotalExclVat = 0;
+  let grandTotalVat = 0;
+  let grandTotalInclVat = 0;
+  let totalWeight = 0;
+  let serialNumber = 1;
+
+  sr.returnItems.forEach((item) => {
+    const qty = item.returnedQuantity || 0;
+    if (qty <= 0) return;
+
+    // Page overflow check
+    if (y + dataRowHeight + footerSpaceNeeded > pageHeight) {
+      createNewPage();
+      y = margin + 15;
+      y = drawTableHeader(y);
+    }
+
+    const vatPercentage = item.vatPercentage || 5;
+    const unitPrice = item.price || 0;
+    const exclVatAmount = item.exclVatAmount || unitPrice * qty;
+    const vatAmount = item.vatAmount || exclVatAmount * (vatPercentage / 100);
+    const itemTotal = item.totalAmount || exclVatAmount + vatAmount;
+
+    grandTotalExclVat += exclVatAmount;
+    grandTotalVat += vatAmount;
+    grandTotalInclVat += itemTotal;
+    totalWeight += qty;
+
+    const unit = item.unit || item.product?.unit || "Nos";
+    const rowData = [
+      serialNumber.toString(),
+      item.product?.productName || "Unknown Product",
+      qty.toString(),
+      unit,
+      unitPrice.toFixed(2),
+      exclVatAmount.toFixed(2),
+      "0",
+      vatPercentage.toString(),
+      vatAmount.toFixed(2),
+      itemTotal.toFixed(2),
+    ];
+
+    doc.rect(margin, y, contentWidth, dataRowHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+    cols.forEach((col, i) => {
+      doc.fontSize(8).font("Helvetica").fillColor("#000000")
+        .text(rowData[i], col.x + 2, y + 4, { width: col.width - 4, align: i === 1 ? "left" : "center" });
+      doc.moveTo(col.x, y).lineTo(col.x, y + dataRowHeight)
+        .lineWidth(0.5).strokeColor(navyColor).stroke();
+    });
+    doc.moveTo(rightEdge, y).lineTo(rightEdge, y + dataRowHeight)
+      .lineWidth(0.5).strokeColor(navyColor).stroke();
+
+    y += dataRowHeight;
+    serialNumber++;
+  });
+
+  // Check if footer sections need a new page
+  if (y + footerSpaceNeeded > pageHeight) {
+    createNewPage();
+    y = margin + 15;
+  }
+
+  // ===== BALANCE SECTION =====
+  y += 5;
+  const balanceRowHeight = 28;
+  const balW1 = contentWidth * 0.35;
+  const balW2 = contentWidth * 0.15;
+  const balW3 = contentWidth * 0.1;
+  const balW4 = contentWidth * 0.15;
+  const balW5 = contentWidth * 0.25;
+
+  doc.rect(margin, y, contentWidth, balanceRowHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+
+  const balSeps = [margin, margin + balW1, margin + balW1 + balW2, margin + balW1 + balW2 + balW3, margin + balW1 + balW2 + balW3 + balW4, rightEdge];
+  balSeps.forEach((sepX) => {
+    doc.moveTo(sepX, y).lineTo(sepX, y + balanceRowHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+  });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(navyColor)
+    .text(`Refund Amount : ${(sr.refundAmount || grandTotalInclVat).toFixed(2)}`, margin + 5, y + 4, { width: balW1 - 10 })
+    .text(`Status : ${(sr.refundStatus || "pending").toUpperCase()}`, margin + 5, y + 16, { width: balW1 - 10 });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(navyColor)
+    .text("Total Returned", margin + balW1 + 3, y + 10, { width: balW2 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica").fillColor(darkGray)
+    .text(totalWeight.toString(), margin + balW1 + balW2 + 3, y + 10, { width: balW3 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(navyColor)
+    .text("Total Dhs.", margin + balW1 + balW2 + balW3 + 3, y + 10, { width: balW4 - 6, align: "center" });
+
+  doc.fontSize(7).font("Helvetica-Bold").fillColor(navyColor)
+    .text(grandTotalExclVat.toFixed(2), margin + balW1 + balW2 + balW3 + balW4 + 5, y + 10, { width: balW5 - 10, align: "right" });
+
+  y += balanceRowHeight;
+
+  // ===== WORDS SECTION =====
+  y += 5;
+  const wordsHeight = 48;
+  doc.rect(margin, y, contentWidth, wordsHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+
+  const grandTotalWords = amountToWords(grandTotalInclVat);
+  const vatWords = amountToWords(grandTotalVat);
+
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(navyColor)
+    .text("Total amount in words", margin + 8, y + 5);
+  doc.fontSize(8).font("Helvetica").fillColor(darkGray)
+    .text(grandTotalWords, margin + 8, y + 17, { width: contentWidth - 16 })
+    .text(`${vatWords} (AED ${grandTotalVat.toFixed(2)})`, margin + 8, y + 32, { width: contentWidth - 16 });
+
+  y += wordsHeight;
+
+  // ===== VAT & TOTAL RETURN AMOUNT =====
+  y += 5;
+  const vatRowHeight = 22;
+  const vatLabelWidth = contentWidth * 0.75;
+  const vatValueWidth = contentWidth * 0.25;
+
+  // VAT row
+  doc.rect(margin, y, vatLabelWidth, vatRowHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+  doc.rect(margin + vatLabelWidth, y, vatValueWidth, vatRowHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(navyColor)
+    .text("Vat 5%", margin, y + 6, { width: vatLabelWidth, align: "center" });
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(navyColor)
+    .text(grandTotalVat.toFixed(2), margin + vatLabelWidth + 5, y + 6, { width: vatValueWidth - 10, align: "right" });
+  y += vatRowHeight;
+
+  // Total Return Amount row
+  doc.rect(margin, y, vatLabelWidth, vatRowHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+  doc.rect(margin + vatLabelWidth, y, vatValueWidth, vatRowHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(navyColor)
+    .text("Total Return Amount", margin, y + 6, { width: vatLabelWidth, align: "center" });
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(navyColor)
+    .text(grandTotalInclVat.toFixed(2), margin + vatLabelWidth + 5, y + 6, { width: vatValueWidth - 10, align: "right" });
+  y += vatRowHeight;
+
+  // ===== REFUND METHOD SECTION =====
+  y += 5;
+  const refundHeight = 25;
+  doc.rect(margin, y, contentWidth, refundHeight).lineWidth(1.5).strokeColor(navyColor).stroke();
+  doc.fontSize(8).font("Helvetica-Bold").fillColor("#FFFFFF")
+    .text(`Refund via: ${(sr.refundMethod || "none").replace(/_/g, " ").toUpperCase()}`, margin, y + 8, { width: contentWidth, align: "center" });
+  // Fill background
+  doc.rect(margin, y, contentWidth, refundHeight).fillColor(navyColor).fill();
+  doc.fontSize(8).font("Helvetica-Bold").fillColor("#FFFFFF")
+    .text(`Refund via: ${(sr.refundMethod || "none").replace(/_/g, " ").toUpperCase()}`, margin, y + 8, { width: contentWidth, align: "center" });
+  y += refundHeight;
+
+  // ===== FOOTER SECTION =====
+  y += 8;
+  const conditionHeight = 38;
+  doc.rect(margin, y, contentWidth, conditionHeight).lineWidth(0.5).strokeColor(navyColor).stroke();
+  doc.fontSize(7).font("Helvetica").fillColor(darkGray)
+    .text("This is a computer-generated Sales Return Credit Note.", margin + 8, y + 5, { width: contentWidth - 16 });
+  doc.fontSize(6).font("Helvetica")
+    .text("..................................................", margin + 8, y + 18, { width: contentWidth - 16, align: "center" })
+    .text("Authorized Signature", margin + 8, y + 27, { width: contentWidth - 16, align: "center" });
+  y += conditionHeight;
+
+  // ===== SIGNATURE BOXES =====
+  y += 8;
+  const sigGap = 8;
+  const sigBoxWidth = (contentWidth - sigGap * 3) / 4;
+  const sigBoxHeight = 90;
+
+  const signatures = [
+    "Customer Acknowledgment",
+    "Return Verified By",
+    "Store Keeper Sign",
+    `for ${companyName}`,
+  ];
+
+  signatures.forEach((label, i) => {
+    const boxX = margin + i * (sigBoxWidth + sigGap);
+    doc.roundedRect(boxX, y, sigBoxWidth, sigBoxHeight, 3)
+      .lineWidth(1.5).strokeColor(navyColor).stroke();
+    doc.fontSize(7).font("Helvetica-Bold").fillColor(navyColor)
+      .text(label, boxX + 5, y + sigBoxHeight - 40, { width: sigBoxWidth - 10, align: "center" });
+  });
+};
+
+// ─── PDF: Return Invoice (Legacy Styled Design) ──────────────────────────────
 
 const generateReturnInvoicePDF = async (doc, sr, settings) => {
   const company = settings;
@@ -1060,7 +1519,7 @@ const getReturnInvoice = async (req, res) => {
 
     const settings = await CompanySettings.findOne();
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateReturnInvoicePDF(doc, sr, settings);
+      await generateDaddysReturnInvoicePDF(doc, sr, settings);
     });
 
     res.setHeader("Content-Type", "application/pdf");

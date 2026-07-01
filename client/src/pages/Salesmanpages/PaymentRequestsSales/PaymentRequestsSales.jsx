@@ -1030,7 +1030,7 @@ const PaymentRequestsSales = () => {
               >
                 Showing <strong>{filteredPendingBills.length}</strong> pending bill
                 {filteredPendingBills.length !== 1 ? "s" : ""} for "
-                <strong>{pendingSearch}</strong>" — Total Due:{" "}
+                <strong>{pendingSearch}</strong>" — Balance Due:{" "}
                 <strong>AED {filteredPendingTotal.toFixed(2)}</strong>
               </div>
             )}
@@ -1606,7 +1606,7 @@ const PaymentRequestsSales = () => {
           <div className="pay-modal bulk-modal">
             <h3>Mark {selectedPendingBills.length} Bills as Received</h3>
             <div className="pay-modal-info">
-              <p>Total Due: AED {selectedPendingTotal.toFixed(2)}</p>
+              <p>Balance Due: AED {selectedPendingTotal.toFixed(2)}</p>
             </div>
             <div className="pay-modal-input-group">
               <label>Payment Method (applied to all)</label>

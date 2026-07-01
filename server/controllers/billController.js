@@ -635,7 +635,7 @@ const getBillReceipt = async (req, res) => {
 
     y = drawDashedLine(y + 2);
     doc.fontSize(9).font("Helvetica-Bold").fillColor("#000")
-      .text("TOTAL DUE", centerX, y, { width: labelW + 10 });
+      .text("BALANCE DUE", centerX, y, { width: labelW + 10 });
     doc.fontSize(9).font("Helvetica-Bold").fillColor("#000")
       .text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
     y += 14;
