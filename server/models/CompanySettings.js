@@ -16,7 +16,15 @@ const companySettingsSchema = new Schema(
       type: String,
       trim: true,
     },
+    companyTel: {
+      type: String,
+      trim: true,
+    },
     companyEmail: {
+      type: String,
+      trim: true,
+    },
+    companyWebsite: {
       type: String,
       trim: true,
     },

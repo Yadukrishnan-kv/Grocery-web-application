@@ -706,12 +706,20 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     doc.text(company.companyAddress, margin + 5, infoY, { width: leftColWidth - 10 });
     infoY += 10;
   }
+  if (company.companyTel) {
+    doc.text(`Tel.: ${company.companyTel}`, margin + 5, infoY, { width: leftColWidth - 10 });
+    infoY += 10;
+  }
   if (company.companyPhone) {
-    doc.text(`Tel.: ${company.companyPhone}`, margin + 5, infoY, { width: leftColWidth - 10 });
+    doc.text(`Mob.: ${company.companyPhone}`, margin + 5, infoY, { width: leftColWidth - 10 });
     infoY += 10;
   }
   if (company.companyEmail) {
     doc.text(`E-mail: ${company.companyEmail}`, margin + 5, infoY, { width: leftColWidth - 10 });
+    infoY += 10;
+  }
+  if (company.companyWebsite) {
+    doc.text(`Web: ${company.companyWebsite}`, margin + 5, infoY, { width: leftColWidth - 10 });
     infoY += 10;
   }
 
@@ -1038,8 +1046,9 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   const companyName = company.companyName || "DADDYS FOODSTUFF TR. L.L.C.";
   const companyAddress = company.companyAddress || "No.6, Jurf Industrial Zone, Ajman - U.A.E.";
   const companyPhone = company.companyPhone || "06 6786779";
+  const companyTel = company.companyTel || "";
   const companyEmail = company.companyEmail || "daddyskitchenmasala@gmail.com";
-  const companyWebsite = "www.daddyskitchenmasala.com";
+  const companyWebsite = company.companyWebsite || "www.daddyskitchenmasala.com";
 
   // Colors
   const navyColor = "#002D62"; // Main brand navy blue
@@ -1148,10 +1157,12 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
       const haccpPath = require("path").join(__dirname, "../uploads/logos/HACCP.png");
       doc.image(haccpPath, margin + 100, y + 66, { width: 36 });
       doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
-      doc.text(`Tel.: ${companyPhone}, Mob.: ${companyPhone}`, 0, y + 70, { width: pageWidth, align: "center" });
+      doc.text(`Tel.: ${companyTel}${companyPhone ? `, Mob.: ${companyPhone}` : ""}`, 0, y + 70, { width: pageWidth, align: "center" });
       doc.text(companyAddress, 0, y + 79, { width: pageWidth, align: "center" });
       doc.text(`E-mail: ${companyEmail}`, 0, y + 88, { width: pageWidth, align: "center" });
-      doc.text(companyWebsite, 0, y + 96, { width: pageWidth, align: "center" });
+      if (companyWebsite) {
+        doc.text(companyWebsite, 0, y + 96, { width: pageWidth, align: "center" });
+      }
     } catch (e) {
       console.error("Failed to render Arabic header:", e);
     }

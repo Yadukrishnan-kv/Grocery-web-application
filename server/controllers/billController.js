@@ -573,7 +573,17 @@ const getBillReceipt = async (req, res) => {
     }
     if (company.companyPhone) {
       doc.fontSize(6).font("Helvetica")
-        .text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: "center" });
+        .text(`Mob: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyTel) {
+      doc.fontSize(6).font("Helvetica")
+        .text(`Tel.: ${company.companyTel}`, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyWebsite) {
+      doc.fontSize(6).font("Helvetica")
+        .text(company.companyWebsite, centerX, y, { width: contentWidth, align: "center" });
       y += 9;
     }
 
@@ -723,12 +733,22 @@ const downloadBillInvoice = async (req, res) => {
     }
     if (company.companyPhone) {
       doc.fontSize(6).font("Helvetica")
-        .text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: "center" });
+        .text(`Mob: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyTel) {
+      doc.fontSize(6).font("Helvetica")
+        .text(`Tel.: ${company.companyTel}`, centerX, y, { width: contentWidth, align: "center" });
       y += 9;
     }
     if (company.companyEmail) {
       doc.fontSize(6).font("Helvetica")
         .text(company.companyEmail, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyWebsite) {
+      doc.fontSize(6).font("Helvetica")
+        .text(company.companyWebsite, centerX, y, { width: contentWidth, align: "center" });
       y += 9;
     }
 

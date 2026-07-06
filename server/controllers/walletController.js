@@ -381,7 +381,17 @@ const generatePaymentReceipt = async (req, res) => {
     }
     if (company.companyPhone) {
       doc.fontSize(6).font('Helvetica').fillColor('#000')
-        .text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: 'center' });
+        .text(`Mob: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: 'center' });
+      y += 9;
+    }
+    if (company.companyTel) {
+      doc.fontSize(6).font('Helvetica').fillColor('#000')
+        .text(`Tel.: ${company.companyTel}`, centerX, y, { width: contentWidth, align: 'center' });
+      y += 9;
+    }
+    if (company.companyWebsite) {
+      doc.fontSize(6).font('Helvetica').fillColor('#000')
+        .text(company.companyWebsite, centerX, y, { width: contentWidth, align: 'center' });
       y += 9;
     }
 
@@ -581,7 +591,17 @@ const generateBulkPaymentReceipt = async (req, res) => {
       }
       if (company.companyPhone) {
         doc.fontSize(6).font('Helvetica').fillColor('#000')
-          .text(`Tel: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: 'center' });
+          .text(`Mob: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: 'center' });
+        y += 9;
+      }
+      if (company.companyTel) {
+        doc.fontSize(6).font('Helvetica').fillColor('#000')
+          .text(`Tel.: ${company.companyTel}`, centerX, y, { width: contentWidth, align: 'center' });
+        y += 9;
+      }
+      if (company.companyWebsite) {
+        doc.fontSize(6).font('Helvetica').fillColor('#000')
+          .text(company.companyWebsite, centerX, y, { width: contentWidth, align: 'center' });
         y += 9;
       }
 

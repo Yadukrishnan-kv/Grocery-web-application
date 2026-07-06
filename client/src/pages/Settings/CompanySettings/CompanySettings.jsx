@@ -11,7 +11,9 @@ const CompanySettings = () => {
     companyName: "",
     companyAddress: "",
     companyPhone: "",
+    companyTel: "",
     companyEmail: "",
+    companyWebsite: "",
     bankName: "",
     bankAccountNumber: "",
   });
@@ -54,7 +56,9 @@ const CompanySettings = () => {
             companyName: settingsRes.data.companyName || "",
             companyAddress: settingsRes.data.companyAddress || "",
             companyPhone: settingsRes.data.companyPhone || "",
+            companyTel: settingsRes.data.companyTel || "",
             companyEmail: settingsRes.data.companyEmail || "",
+            companyWebsite: settingsRes.data.companyWebsite || "",
             bankName: settingsRes.data.bankName || "",
             bankAccountNumber: settingsRes.data.bankAccountNumber || "",
           });
@@ -210,6 +214,18 @@ const CompanySettings = () => {
               </div>
 
               <div className="form-group">
+                <label htmlFor="companyTel">Tel</label>
+                <input
+                  id="companyTel"
+                  name="companyTel"
+                  type="text"
+                  value={formData.companyTel}
+                  onChange={handleChange}
+                  placeholder="e.g. 06 6786779"
+                />
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="companyEmail">Company Email</label>
                 <input
                   id="companyEmail"
@@ -218,6 +234,18 @@ const CompanySettings = () => {
                   value={formData.companyEmail}
                   onChange={handleChange}
                   placeholder="e.g. contact@yourcompany.com"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="companyWebsite">Website</label>
+                <input
+                  id="companyWebsite"
+                  name="companyWebsite"
+                  type="text"
+                  value={formData.companyWebsite}
+                  onChange={handleChange}
+                  placeholder="e.g. www.yourcompany.com"
                 />
               </div>
             </div>
