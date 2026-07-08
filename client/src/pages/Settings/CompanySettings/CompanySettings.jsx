@@ -14,6 +14,7 @@ const CompanySettings = () => {
     companyTel: "",
     companyEmail: "",
     companyWebsite: "",
+    companyNameArabic: "",
     bankName: "",
     bankAccountNumber: "",
   });
@@ -59,6 +60,7 @@ const CompanySettings = () => {
             companyTel: settingsRes.data.companyTel || "",
             companyEmail: settingsRes.data.companyEmail || "",
             companyWebsite: settingsRes.data.companyWebsite || "",
+            companyNameArabic: settingsRes.data.companyNameArabic || "",
             bankName: settingsRes.data.bankName || "",
             bankAccountNumber: settingsRes.data.bankAccountNumber || "",
           });
@@ -156,20 +158,19 @@ const CompanySettings = () => {
         className={`company-main-content ${sidebarOpen ? "sidebar-open" : ""}`}
       >
         <div className="company-container">
-          <h1>Company Invoice Settings</h1>
-          <p className="company-subtitle">
-            These details will appear on all generated invoices (DELIVERED &
-            PENDING)
-          </p>
-
-          {!settingsExist && (
-            <div className="info-banner">
-              No company invoice details configured yet. Please fill in the form
-              below to create them.
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="company-form">
+            <h1>Company Invoice Settings</h1>
+            <p className="company-subtitle">
+              These details will appear on all generated invoices (DELIVERED &
+              PENDING)
+            </p>
+
+            {!settingsExist && (
+              <div className="info-banner">
+                No company invoice details configured yet. Please fill in the form
+                below to create them.
+              </div>
+            )}
             <div className="form-group">
               <label htmlFor="companyName">
                 Company Name <span className="required">*</span>
@@ -197,6 +198,20 @@ const CompanySettings = () => {
                 required
                 rows="3"
                 placeholder="Full address including city, state, PIN, country"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="companyNameArabic">
+                Company Name (Arabic)
+              </label>
+              <input
+                id="companyNameArabic"
+                name="companyNameArabic"
+                type="text"
+                value={formData.companyNameArabic}
+                onChange={handleChange}
+                placeholder="Enter company name in Arabic"
               />
             </div>
 

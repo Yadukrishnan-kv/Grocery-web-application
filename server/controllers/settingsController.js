@@ -18,6 +18,7 @@ const createCompanySettings = async (req, res) => {
       companyTel,
       companyEmail,
       companyWebsite,
+      companyNameArabic,
       bankName,
       bankAccountNumber,
     } = req.body;
@@ -35,6 +36,7 @@ const createCompanySettings = async (req, res) => {
       companyTel,
       companyEmail,
       companyWebsite,
+      companyNameArabic,
       bankName,
       bankAccountNumber,
       updatedBy: req.user._id,
@@ -71,6 +73,7 @@ const updateCompanySettings = async (req, res) => {
       companyTel,
       companyEmail,
       companyWebsite,
+      companyNameArabic,
       bankName,
       bankAccountNumber,
     } = req.body;
@@ -90,6 +93,7 @@ const updateCompanySettings = async (req, res) => {
         companyTel,
         companyEmail,
         companyWebsite,
+        companyNameArabic,
         bankName,
         bankAccountNumber,
         updatedBy: req.user._id,

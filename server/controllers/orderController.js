@@ -5,8 +5,19 @@ const User = require("../models/User");
 const CompanySettings = require("../models/CompanySettings");
 const InvoiceCounter = require("../models/InvoiceCounter");
 const { createInvoiceBasedBill } = require("../controllers/billController"); // ← import it
+const arabicReshaper = require("arabic-reshaper");
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Bill = require("../models/Bill");
+
+const formatArabicForPdf = (text) => {
+  if (!text) return "";
+  try {
+    const reshaped = arabicReshaper.convertArabic(text);
+    return reshaped.split("").reverse().join("");
+  } catch {
+    return text;
+  }
+};
 
 const getNextOrderId = async () => {
   // Ensure counter starts at 4000
@@ -1044,6 +1055,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // Fetch dynamic Company Settings
   const company = await CompanySettings.findOne() || {};
   const companyName = company.companyName || "DADDYS FOODSTUFF TR. L.L.C.";
+  const companyNameArabic = company.companyNameArabic || "";
   const companyAddress = company.companyAddress || "No.6, Jurf Industrial Zone, Ajman - U.A.E.";
   const companyPhone = company.companyPhone || "06 6786779";
   const companyTel = company.companyTel || "";
@@ -1151,7 +1163,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   if (fontRegistered) {
     try {
       doc.font("ArabicFont").fontSize(25).fillColor(redColor);
-      doc.text("داديس تجارة المواد الغذائية ذ.م.م", 0, y + 5, { width: pageWidth, align: "center" });
+      doc.text(formatArabicForPdf(company.companyNameArabic), 0, y + 5, { width: pageWidth, align: "center" });
       doc.font("Helvetica-Bold").fontSize(25).fillColor("#000000");
       doc.text(companyName.toUpperCase(), 0, y + 40, { width: pageWidth, align: "center" });
       const haccpPath = require("path").join(__dirname, "../uploads/logos/HACCP.png");

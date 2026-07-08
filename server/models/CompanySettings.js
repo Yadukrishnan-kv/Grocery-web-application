@@ -28,6 +28,10 @@ const companySettingsSchema = new Schema(
       type: String,
       trim: true,
     },
+    companyNameArabic: {
+      type: String,
+      trim: true,
+    },
     bankName: {
       type: String,
       trim: true,
