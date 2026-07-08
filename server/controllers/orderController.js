@@ -556,12 +556,15 @@ const getDeliveredInvoice = async (req, res) => {
     const invoiceNo = order.invoiceNumber; // ← Use existing DEL-XX
     const filename = `delivered-invoice-${invoiceNo}.pdf`;
     
+    const designType = req.query.type === "preprinted" ? "preprinted" : "normal";
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateDaddysInvoicePDF(doc, order, invoiceNo, "DELIVERED INVOICE");
+      await generateDaddysInvoicePDF(doc, order, invoiceNo, "TAX INVOICE", designType);
     });
 
+    const suffix = designType === "preprinted" ? "-preprinted" : "";
+    const finalFilename = filename.replace(".pdf", `${suffix}.pdf`);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${finalFilename}"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
   } catch (error) {
@@ -617,12 +620,15 @@ const getPendingInvoice = async (req, res) => {
       })),
     };
 
+    const designType = req.query.type === "preprinted" ? "preprinted" : "normal";
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateDaddysInvoicePDF(doc, pendingOrder, invoiceNo, "PENDING INVOICE");
+      await generateDaddysInvoicePDF(doc, pendingOrder, invoiceNo, "PENDING INVOICE", designType);
     });
 
+    const suffix = designType === "preprinted" ? "-preprinted" : "";
+    const finalFilename = filename.replace(".pdf", `${suffix}.pdf`);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${finalFilename}"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
   } catch (error) {
@@ -1045,7 +1051,7 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   });
 };
 
-const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TAX INVOICE") => {
+const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TAX INVOICE", designType = "normal") => {
   const fs = require("fs");
   const pageWidth = 595.28;
   const pageHeight = 841.89;
@@ -1152,36 +1158,38 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   const logoX = margin + 10;
   const logoY = y;
   
-  // Logo image
-  const logoPath = require("path").join(__dirname, "../uploads/logos/LOGO.jpg");
-  doc.image(logoPath, logoX, logoY, { width: 80 });
+  if (designType !== "preprinted") {
+    // Logo image
+    const logoPath = require("path").join(__dirname, "../uploads/logos/LOGO.jpg");
+    doc.image(logoPath, logoX, logoY, { width: 80 });
 
-  // Dynamic Company details on the right
-  const rightColX = margin + 220;
-  const rightColWidth = contentWidth - 230;
-  
-  if (fontRegistered) {
-    try {
-      doc.font("ArabicFont").fontSize(25).fillColor(redColor);
-      doc.text(formatArabicForPdf(company.companyNameArabic), 0, y + 5, { width: pageWidth, align: "center" });
-      doc.font("Helvetica-Bold").fontSize(25).fillColor("#000000");
-      doc.text(companyName.toUpperCase(), 0, y + 40, { width: pageWidth, align: "center" });
-      const haccpPath = require("path").join(__dirname, "../uploads/logos/HACCP.png");
-      doc.image(haccpPath, margin + 100, y + 66, { width: 36 });
-      doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
-      doc.text(`Tel.: ${companyTel}${companyPhone ? `, Mob.: ${companyPhone}` : ""}`, 0, y + 70, { width: pageWidth, align: "center" });
-      doc.text(companyAddress, 0, y + 79, { width: pageWidth, align: "center" });
-      doc.text(`E-mail: ${companyEmail}`, 0, y + 88, { width: pageWidth, align: "center" });
-      if (companyWebsite) {
-        doc.text(companyWebsite, 0, y + 96, { width: pageWidth, align: "center" });
+    // Dynamic Company details on the right
+    const rightColX = margin + 220;
+    const rightColWidth = contentWidth - 230;
+    
+    if (fontRegistered) {
+      try {
+        doc.font("ArabicFont").fontSize(25).fillColor(redColor);
+        doc.text(formatArabicForPdf(company.companyNameArabic), 0, y + 5, { width: pageWidth, align: "center" });
+        doc.font("Helvetica-Bold").fontSize(25).fillColor("#000000");
+        doc.text(companyName.toUpperCase(), 0, y + 40, { width: pageWidth, align: "center" });
+        const haccpPath = require("path").join(__dirname, "../uploads/logos/HACCP.png");
+        doc.image(haccpPath, margin + 100, y + 66, { width: 36 });
+        doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
+        doc.text(`Tel.: ${companyTel}${companyPhone ? `, Mob.: ${companyPhone}` : ""}`, 0, y + 70, { width: pageWidth, align: "center" });
+        doc.text(companyAddress, 0, y + 79, { width: pageWidth, align: "center" });
+        doc.text(`E-mail: ${companyEmail}`, 0, y + 88, { width: pageWidth, align: "center" });
+        if (companyWebsite) {
+          doc.text(companyWebsite, 0, y + 96, { width: pageWidth, align: "center" });
+        }
+      } catch (e) {
+        console.error("Failed to render Arabic header:", e);
       }
-    } catch (e) {
-      console.error("Failed to render Arabic header:", e);
     }
-  }
 
-  doc.fillColor(redColor).font("Helvetica-Bold").fontSize(10);
-  doc.text("TRN: 100577923400003", rightColX, y + 72, { width: rightColWidth, align: "right" });
+    doc.fillColor(redColor).font("Helvetica-Bold").fontSize(10);
+    doc.text("TRN: 100577923400003", rightColX, y + 72, { width: rightColWidth, align: "right" });
+  }
 
   y += 95;
 
@@ -1559,12 +1567,15 @@ const getOrderInvoice = async (req, res) => {
 
     const filename = `order-invoice-${order._id.toString().slice(-8)}.pdf`;
 
+    const designType = req.query.type === "preprinted" ? "preprinted" : "normal";
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateDaddysInvoicePDF(doc, order, `ORD-${order._id.toString().slice(-6)}`, "ORDER INVOICE");
+      await generateDaddysInvoicePDF(doc, order, `ORD-${order._id.toString().slice(-6)}`, "ORDER INVOICE", designType);
     });
 
+    const suffix = designType === "preprinted" ? "-preprinted" : "";
+    const finalFilename = filename.replace(".pdf", `${suffix}.pdf`);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${finalFilename}"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
   } catch (error) {
@@ -2390,14 +2401,17 @@ const getPackedInvoice = async (req, res) => {
     // ✅✅✅ USE EXISTING INVOICE NUMBER (DEL-XX) ✅✅✅
     const invoiceNumber = order.invoiceNumber || `DEL-${order._id.toString().slice(-6).toUpperCase()}`;
     
+    const designType = req.query.type === "preprinted" ? "preprinted" : "normal";
     const filename = `packed-invoice-${invoiceNumber}.pdf`;
     
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", invoiceNumber);
+      await generatePackedInvoicePDF(doc, order, "PACKED INVOICE", invoiceNumber, designType);
     });
 
+    const suffix = designType === "preprinted" ? "-preprinted" : "";
+    const finalFilename = filename.replace(".pdf", `${suffix}.pdf`);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${finalFilename}"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
   } catch (error) {
@@ -2423,14 +2437,17 @@ const getUnifiedInvoice = async (req, res) => {
     if (!order.invoiceHistory.some(h => h.invoiceNumber === targetInvoiceNo)) {
       return res.status(404).json({ message: "Specified invoice not found in order history" });
     }
+    const designType = req.query.type === "preprinted" ? "preprinted" : "normal";
     const filename = `unified-invoice-${targetInvoiceNo}.pdf`;
 
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateUnifiedInvoicePDF(doc, order, "INVOICE", targetInvoiceNo);
+      await generateUnifiedInvoicePDF(doc, order, "INVOICE", targetInvoiceNo, designType);
     });
 
+    const suffix = designType === "preprinted" ? "-preprinted" : "";
+    const finalFilename = filename.replace(".pdf", `${suffix}.pdf`);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${finalFilename}"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
   } catch (error) {
@@ -2441,7 +2458,7 @@ const getUnifiedInvoice = async (req, res) => {
   }
 };
 // ✅ UNIFIED INVOICE PDF - New Tax Invoice Style
-const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
+const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo, designType = "normal") => {
   // Gather items from history or fallback to order items
   const historyEntry = order.invoiceHistory?.find(h => h.invoiceNumber === invoiceNo);
   let unifiedItems = [];
@@ -2489,10 +2506,10 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => 
     })),
   };
 
-  await generateDaddysInvoicePDF(doc, wrapperOrder, invoiceNo, invoiceType);
+  await generateDaddysInvoicePDF(doc, wrapperOrder, invoiceNo, invoiceType, designType);
 };
 // ✅ PACKED INVOICE PDF - New Tax Invoice Style (uses packed quantities)
-const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
+const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo, designType = "normal") => {
   // Build wrapper with packed quantities so generateStyledInvoicePDF renders them
   const wrapperOrder = {
     ...order,
@@ -2510,7 +2527,7 @@ const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
     })),
   };
 
-  await generateDaddysInvoicePDF(doc, wrapperOrder, invoiceNo, invoiceType);
+  await generateDaddysInvoicePDF(doc, wrapperOrder, invoiceNo, invoiceType, designType);
 };
 
 const getAllOrdersForStorekeeper = async (req, res) => {

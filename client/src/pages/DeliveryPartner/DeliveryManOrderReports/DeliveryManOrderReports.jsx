@@ -4,6 +4,7 @@ import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './DeliveryManOrderReports.css';
 import axios from 'axios';
+import InvoiceDownloadModal from '../../../components/InvoiceDownloadModal/InvoiceDownloadModal';
 
 const DeliveryManOrderReports = () => {
   const [orders, setOrders] = useState([]);
@@ -12,6 +13,8 @@ const DeliveryManOrderReports = () => {
   const [activeItem, setActiveItem] = useState('Delivered Orders');
   const [user, setUser] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -59,15 +62,15 @@ const DeliveryManOrderReports = () => {
     fetchAllAcceptedOrders();
   }, [fetchCurrentUser, fetchAllAcceptedOrders]);
 
-  const downloadDeliveredInvoice = async (orderId) => {
+  const downloadDeliveredInvoice = async (orderId, type = "normal") => {
     setDownloadingOrderId(orderId);
     try {
       const token = localStorage.getItem('token');
       
       // Create a temporary link element for direct download
       const link = document.createElement('a');
-      link.href = `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?token=${token}`;
-      link.download = `delivered-invoice-${orderId}.pdf`;
+      link.href = `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?token=${token}&type=${type}`;
+      link.download = type === "preprinted" ? `delivered-invoice-${orderId}-preprinted.pdf` : `delivered-invoice-${orderId}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -79,15 +82,15 @@ const DeliveryManOrderReports = () => {
     }
   };
 
-  const downloadPendingInvoice = async (orderId) => {
+  const downloadPendingInvoice = async (orderId, type = "normal") => {
     setDownloadingOrderId(orderId);
     try {
       const token = localStorage.getItem('token');
       
       // Create a temporary link element for direct download
       const link = document.createElement('a');
-      link.href = `${backendUrl}/api/orders/getpendinginvoice/${orderId}?token=${token}`;
-      link.download = `pending-invoice-${orderId}.pdf`;
+      link.href = `${backendUrl}/api/orders/getpendinginvoice/${orderId}?token=${token}&type=${type}`;
+      link.download = type === "preprinted" ? `pending-invoice-${orderId}-preprinted.pdf` : `pending-invoice-${orderId}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -180,7 +183,10 @@ const DeliveryManOrderReports = () => {
                               {hasDeliveredQty && (
                                 <button
                                   className="invoice-button delivered"
-                                  onClick={() => downloadDeliveredInvoice(order._id)}
+                                  onClick={() => {
+                                    setPendingInvoiceData({ type: "delivered", orderId: order._id });
+                                    setShowInvoiceModal(true);
+                                  }}
                                   disabled={downloadingOrderId === order._id}
                                 >
                                   {downloadingOrderId === order._id ? 'Downloading...' : 'Delivered Invoice'}
@@ -190,7 +196,10 @@ const DeliveryManOrderReports = () => {
                               {hasPendingQty && (
                                 <button
                                   className="invoice-button pending"
-                                  onClick={() => downloadPendingInvoice(order._id)}
+                                  onClick={() => {
+                                    setPendingInvoiceData({ type: "pending", orderId: order._id });
+                                    setShowInvoiceModal(true);
+                                  }}
                                   disabled={downloadingOrderId === order._id}
                                 >
                                   {downloadingOrderId === order._id ? 'Downloading...' : 'Pending Invoice'}
@@ -214,6 +223,19 @@ const DeliveryManOrderReports = () => {
           )}
         </div>
       </main>
+
+      <InvoiceDownloadModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={(type) => {
+          setShowInvoiceModal(false);
+          if (pendingInvoiceData?.type === "delivered") {
+            downloadDeliveredInvoice(pendingInvoiceData.orderId, type);
+          } else if (pendingInvoiceData?.type === "pending") {
+            downloadPendingInvoice(pendingInvoiceData.orderId, type);
+          }
+        }}
+      />
     </div>
   );
 };

@@ -6,6 +6,7 @@ import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./CustomerOrderReports.css";
 import axios from "axios";
 import toast from "react-hot-toast";
+import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 
 const CustomerOrderReports = () => {
   const [orders, setOrders] = useState([]);
@@ -15,6 +16,8 @@ const CustomerOrderReports = () => {
   const [activeItem, setActiveItem] = useState("Order Reports");
   const [user, setUser] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [pendingInvoiceOrderId, setPendingInvoiceOrderId] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -91,12 +94,12 @@ const CustomerOrderReports = () => {
     });
   }, [orders, searchTerm, fromDate, toDate]);
 
-  const downloadDeliveredInvoice = async (orderId) => {
+  const downloadDeliveredInvoice = async (orderId, type = "normal") => {
     setDownloadingOrderId(orderId);
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}`,
+        `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?type=${type}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
@@ -328,9 +331,10 @@ const CustomerOrderReports = () => {
                               {hasDelivered && (
                                 <button
                                   className="customer-reports-invoice-button delivered"
-                                  onClick={() =>
-                                    downloadDeliveredInvoice(order._id)
-                                  }
+                                  onClick={() => {
+                                    setPendingInvoiceOrderId(order._id);
+                                    setShowInvoiceModal(true);
+                                  }}
                                   disabled={downloadingOrderId === order._id}
                                 >
                                   {downloadingOrderId === order._id
@@ -350,6 +354,15 @@ const CustomerOrderReports = () => {
           </div>
         </div>
       </main>
+
+      <InvoiceDownloadModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={(type) => {
+          setShowInvoiceModal(false);
+          downloadDeliveredInvoice(pendingInvoiceOrderId, type);
+        }}
+      />
     </div>
   );
 };

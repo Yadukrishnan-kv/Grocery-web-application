@@ -6,6 +6,7 @@ import Sidebar from "../../components/layout/Sidebar/Sidebar";
 import toast from "react-hot-toast";
 import axios from "axios";
 import "./SalesReturn.css";
+import InvoiceDownloadModal from "../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 
 const STATUS_LABELS = {
   pending_admin_approval: "Pending Approval",
@@ -42,6 +43,8 @@ const SalesReturn = () => {
   const [approveModal, setApproveModal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
   const [assignModal, setAssignModal] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [pendingInvoiceSr, setPendingInvoiceSr] = useState(null);
 
   const [approveForm, setApproveForm] = useState({ adminRemarks: "", deliveryManId: "" });
   const [rejectForm, setRejectForm] = useState({ adminRemarks: "" });
@@ -213,17 +216,18 @@ const SalesReturn = () => {
     }
   };
 
-  const handleDownloadInvoice = async (sr) => {
+  const handleDownloadInvoice = async (sr, type = "normal") => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${backendUrl}/api/sales-returns/invoice/${sr._id}`,
+        `${backendUrl}/api/sales-returns/invoice/${sr._id}?type=${type}`,
         { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
       );
       const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const link = document.createElement("a");
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.download = `return-${sr.returnInvoiceNumber}${suffix}.pdf`;
       link.href = url;
-      link.download = `return-${sr.returnInvoiceNumber}.pdf`;
       link.click();
       window.URL.revokeObjectURL(url);
     } catch {
@@ -401,7 +405,10 @@ const SalesReturn = () => {
                             {sr.status === "completed" && sr.returnInvoiceNumber && (
                               <button
                                 className="sr-btn-sm sr-btn-invoice"
-                                onClick={() => handleDownloadInvoice(sr)}
+                                onClick={() => {
+                                  setPendingInvoiceSr(sr);
+                                  setShowInvoiceModal(true);
+                                }}
                               >
                                 Invoice
                               </button>
@@ -417,6 +424,17 @@ const SalesReturn = () => {
           </div>
         </div>
       </main>
+
+      <InvoiceDownloadModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={(type) => {
+          setShowInvoiceModal(false);
+          if (pendingInvoiceSr) {
+            handleDownloadInvoice(pendingInvoiceSr, type);
+          }
+        }}
+      />
 
       {/* ── Detail Modal ─────────────────────────────────────── */}
       {detailReturn && (
@@ -482,7 +500,10 @@ const SalesReturn = () => {
               {detailReturn.status === "completed" && detailReturn.returnInvoiceNumber && (
                 <button
                   className="sr-btn-primary sr-mt"
-                  onClick={() => { handleDownloadInvoice(detailReturn); setDetailReturn(null); }}
+                  onClick={() => {
+                    setPendingInvoiceSr(detailReturn);
+                    setShowInvoiceModal(true);
+                  }}
                 >
                   Download Return Invoice
                 </button>

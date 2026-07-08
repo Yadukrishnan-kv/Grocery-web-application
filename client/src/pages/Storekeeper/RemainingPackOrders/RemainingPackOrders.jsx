@@ -4,6 +4,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import toast from "react-hot-toast";
 import axios from "axios";
 import "./RemainingPackOrders.css";
+import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 
 const RemainingPackOrders = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -11,6 +12,8 @@ const RemainingPackOrders = () => {
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState("Remaining Pack Orders");
   const [user, setUser] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [packInputs, setPackInputs] = useState({});
@@ -110,7 +113,7 @@ const RemainingPackOrders = () => {
     }
   };
 
-  const downloadUnifiedInvoice = async (orderId, invoiceNumber) => {
+  const downloadUnifiedInvoice = async (orderId, invoiceNumber, type = "normal") => {
     if (!invoiceNumber) {
       toast.error("No invoice number available for this order yet");
       return;
@@ -119,7 +122,7 @@ const RemainingPackOrders = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}`,
+        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}&type=${type}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
@@ -129,7 +132,8 @@ const RemainingPackOrders = () => {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `unified-invoice-${invoiceNumber}.pdf`);
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.setAttribute("download", `unified-invoice-${invoiceNumber}${suffix}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -287,9 +291,10 @@ const RemainingPackOrders = () => {
                             {order.invoiceNumber && (
                               <button
                                 className="order-list-icon-button order-list-view-button"
-                                onClick={() =>
-                                  downloadUnifiedInvoice(order._id, order.invoiceNumber)
-                                }
+                                onClick={() => {
+                                  setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                  setShowInvoiceModal(true);
+                                }}
                                 title={`Download Invoice ${order.invoiceNumber}`}
                               >
                                 📄 Invoice ({order.invoiceNumber})
@@ -316,6 +321,17 @@ const RemainingPackOrders = () => {
           </div>
         </div>
       </main>
+
+      <InvoiceDownloadModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={(type) => {
+          setShowInvoiceModal(false);
+          if (pendingInvoiceData) {
+            downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+          }
+        }}
+      />
 
       {/* Packing Modal */}
       {selectedOrder && (

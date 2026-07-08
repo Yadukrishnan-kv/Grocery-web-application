@@ -5,10 +5,13 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import toast from "react-hot-toast";
 import axios from "axios";
 import "./ReturnPickups.css";
+import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 
 const ReturnPickups = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
   const [pickups, setPickups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
@@ -70,11 +73,11 @@ const ReturnPickups = () => {
     }
   };
 
-  const handleDownloadInvoice = async (id, invoiceNumber) => {
+  const handleDownloadInvoice = async (id, invoiceNumber, type = "normal") => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${backendUrl}/api/sales-returns/invoice/${id}`,
+        `${backendUrl}/api/sales-returns/invoice/${id}?type=${type}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
@@ -83,7 +86,8 @@ const ReturnPickups = () => {
       const url = window.URL.createObjectURL(response.data);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `return-${invoiceNumber}.pdf`);
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.setAttribute("download", `return-${invoiceNumber}${suffix}.pdf`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -283,7 +287,10 @@ const ReturnPickups = () => {
                                 {sr.returnInvoiceNumber ? (
                                   <button
                                     className="rp-btn-download"
-                                    onClick={() => handleDownloadInvoice(sr._id, sr.returnInvoiceNumber)}
+                                    onClick={() => {
+                                      setPendingInvoiceData({ id: sr._id, invoiceNumber: sr.returnInvoiceNumber });
+                                      setShowInvoiceModal(true);
+                                    }}
                                     title="Download invoice"
                                   >
                                     📥 Invoice
@@ -364,7 +371,10 @@ const ReturnPickups = () => {
                                   {sr.returnInvoiceNumber ? (
                                     <button
                                       className="rp-btn-download"
-                                      onClick={() => handleDownloadInvoice(sr._id, sr.returnInvoiceNumber)}
+                                      onClick={() => {
+                                        setPendingInvoiceData({ id: sr._id, invoiceNumber: sr.returnInvoiceNumber });
+                                        setShowInvoiceModal(true);
+                                      }}
                                       title="Download invoice"
                                     >
                                       📥 Invoice
@@ -386,6 +396,17 @@ const ReturnPickups = () => {
           )}
         </div>
       </main>
+
+      <InvoiceDownloadModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={(type) => {
+          setShowInvoiceModal(false);
+          if (pendingInvoiceData) {
+            handleDownloadInvoice(pendingInvoiceData.id, pendingInvoiceData.invoiceNumber, type);
+          }
+        }}
+      />
 
       {/* Detail Modal */}
       {detailItem && (

@@ -5,6 +5,7 @@ import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "react-hot-toast";
 import axios from "axios";
 import "./StorekeeperOrders.css";
+import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 
 const StorekeeperOrders = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -12,6 +13,8 @@ const StorekeeperOrders = () => {
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState("All Orders");
   const [user, setUser] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // "all" | "not_packed" | "partially_packed" | "fully_packed"
   const [invoiceFilter, setInvoiceFilter] = useState("");
@@ -56,11 +59,11 @@ const StorekeeperOrders = () => {
   }, [fetchCurrentUser, fetchAllOrders]);
 
   // ✅ Download invoice with correct filename
-  const downloadUnifiedInvoice = async (orderId, invoiceNumber) => {
+  const downloadUnifiedInvoice = async (orderId, invoiceNumber, type = "normal") => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}`,
+        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}&type=${type}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
@@ -69,12 +72,11 @@ const StorekeeperOrders = () => {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute(
-        "download",
-        invoiceNumber
-          ? `unified-invoice-${invoiceNumber}.pdf`
-          : `unified-invoice-${orderId.slice(-8)}.pdf`,
-      );
+      const baseName = invoiceNumber
+        ? `unified-invoice-${invoiceNumber}`
+        : `unified-invoice-${orderId.slice(-8)}`;
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.setAttribute("download", `${baseName}${suffix}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -359,12 +361,10 @@ const StorekeeperOrders = () => {
                               order.packedStatus !== "not_packed" && (
                                 <button
                                   className="order-list-icon-button order-list-view-button"
-                                  onClick={() =>
-                                    downloadUnifiedInvoice(
-                                      order._id,
-                                      order.invoiceNumber,
-                                    )
-                                  }
+                                  onClick={() => {
+                                    setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                    setShowInvoiceModal(true);
+                                  }}
                                   title={`Download invoice ${order.invoiceNumber || "N/A"}`}
                                   disabled={!order.invoiceNumber}
                                 >
@@ -382,6 +382,17 @@ const StorekeeperOrders = () => {
           </div>
         </div>
       </main>
+
+      <InvoiceDownloadModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={(type) => {
+          setShowInvoiceModal(false);
+          if (pendingInvoiceData) {
+            downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+          }
+        }}
+      />
     </div>
   );
 };

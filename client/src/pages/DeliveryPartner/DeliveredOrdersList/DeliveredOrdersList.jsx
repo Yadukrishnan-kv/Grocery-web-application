@@ -6,6 +6,7 @@ import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "react-hot-toast";
 import axios from "axios";
 import "./DeliveredOrdersList.css";
+import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 
 const DeliveredOrdersList = () => {
   const [orders, setOrders] = useState([]);
@@ -13,6 +14,8 @@ const DeliveredOrdersList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Delivered Orders");
   const [user, setUser] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -177,15 +180,16 @@ const DeliveredOrdersList = () => {
   };
 
   // ✅ Download unified invoice showing Ordered/Packed/Delivered
-  const downloadUnifiedInvoice = async (orderId, invoiceNumber) => {
+  const downloadUnifiedInvoice = async (orderId, invoiceNumber, type = "normal") => {
     try {
       const token = localStorage.getItem("token");
-      const filename = invoiceNumber
-        ? `invoice-${invoiceNumber}.pdf`
-        : `invoice-${orderId.slice(-8)}.pdf`;
+      const baseName = invoiceNumber
+        ? `invoice-${invoiceNumber}`
+        : `invoice-${orderId.slice(-8)}`;
+      const filename = type === "preprinted" ? `${baseName}-preprinted.pdf` : `${baseName}.pdf`;
 
       const res = await axios.get(
-        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}`,
+        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}&type=${type}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
@@ -436,12 +440,10 @@ const DeliveredOrdersList = () => {
                           <td>
                             <button
                               className="invoice-btn"
-                              onClick={() =>
-                                downloadUnifiedInvoice(
-                                  order._id,
-                                  order.invoiceNumber,
-                                )
-                              }
+                              onClick={() => {
+                                setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                setShowInvoiceModal(true);
+                              }}
                             >
                               Download Invoice
                             </button>
@@ -609,6 +611,15 @@ const DeliveredOrdersList = () => {
           );
         })()}
       </main>
+
+      <InvoiceDownloadModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={(type) => {
+          setShowInvoiceModal(false);
+          downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+        }}
+      />
     </div>
   );
 };

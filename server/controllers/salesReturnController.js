@@ -686,7 +686,7 @@ const getSalesReturnsByOrder = async (req, res) => {
 
 // ─── PDF: Return Invoice (Daddy's Design) ─────────────────────────────────────
 
-const generateDaddysReturnInvoicePDF = async (doc, sr, settings) => {
+const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "normal") => {
   const fs = require("fs");
   const company = settings || {};
   const companyName = company.companyName || "DADDYS FOODSTUFF TR. L.L.C.";
@@ -763,36 +763,38 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings) => {
   const logoX = margin + 10;
   const logoY = y;
 
-  // Logo image
-  const logoPath = require("path").join(__dirname, "../uploads/logos/LOGO.jpg");
-  doc.image(logoPath, logoX, logoY, { width: 80 });
+  if (designType !== "preprinted") {
+    // Logo image
+    const logoPath = require("path").join(__dirname, "../uploads/logos/LOGO.jpg");
+    doc.image(logoPath, logoX, logoY, { width: 80 });
 
-  // Dynamic Company details on the right
-  const rightColX = margin + 220;
-  const rightColWidth = contentWidth - 230;
+    // Dynamic Company details on the right
+    const rightColX = margin + 220;
+    const rightColWidth = contentWidth - 230;
 
-  if (fontRegistered) {
-    try {
-      doc.font("ArabicFont").fontSize(25).fillColor(redColor);
-      doc.text(formatArabicForPdf(companyNameArabic), 0, y + 5, { width: pageWidth, align: "center" });
-      doc.font("Helvetica-Bold").fontSize(25).fillColor("#000000");
-      doc.text(companyName.toUpperCase(), 0, y + 40, { width: pageWidth, align: "center" });
-      const haccpPath = require("path").join(__dirname, "../uploads/logos/HACCP.png");
-      doc.image(haccpPath, margin + 100, y + 66, { width: 36 });
-      doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
-      doc.text(`Tel.: ${companyTel}${companyPhone ? `, Mob.: ${companyPhone}` : ""}`, 0, y + 70, { width: pageWidth, align: "center" });
-      doc.text(companyAddress, 0, y + 79, { width: pageWidth, align: "center" });
-      doc.text(`E-mail: ${companyEmail}`, 0, y + 88, { width: pageWidth, align: "center" });
-      if (companyWebsite) {
-        doc.text(companyWebsite, 0, y + 96, { width: pageWidth, align: "center" });
+    if (fontRegistered) {
+      try {
+        doc.font("ArabicFont").fontSize(25).fillColor(redColor);
+        doc.text(formatArabicForPdf(companyNameArabic), 0, y + 5, { width: pageWidth, align: "center" });
+        doc.font("Helvetica-Bold").fontSize(25).fillColor("#000000");
+        doc.text(companyName.toUpperCase(), 0, y + 40, { width: pageWidth, align: "center" });
+        const haccpPath = require("path").join(__dirname, "../uploads/logos/HACCP.png");
+        doc.image(haccpPath, margin + 100, y + 66, { width: 36 });
+        doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
+        doc.text(`Tel.: ${companyTel}${companyPhone ? `, Mob.: ${companyPhone}` : ""}`, 0, y + 70, { width: pageWidth, align: "center" });
+        doc.text(companyAddress, 0, y + 79, { width: pageWidth, align: "center" });
+        doc.text(`E-mail: ${companyEmail}`, 0, y + 88, { width: pageWidth, align: "center" });
+        if (companyWebsite) {
+          doc.text(companyWebsite, 0, y + 96, { width: pageWidth, align: "center" });
+        }
+      } catch (e) {
+        console.error("Failed to render Arabic header:", e);
       }
-    } catch (e) {
-      console.error("Failed to render Arabic header:", e);
     }
-  }
 
-  doc.fillColor(redColor).font("Helvetica-Bold").fontSize(10);
-  doc.text("TRN: 100577923400003", rightColX, y + 72, { width: rightColWidth, align: "right" });
+    doc.fillColor(redColor).font("Helvetica-Bold").fontSize(10);
+    doc.text("TRN: 100577923400003", rightColX, y + 72, { width: rightColWidth, align: "right" });
+  }
 
   y += 95;
 
@@ -1439,14 +1441,17 @@ const getReturnInvoice = async (req, res) => {
     }
 
     const settings = await CompanySettings.findOne();
+    const designType = req.query.type === "preprinted" ? "preprinted" : "normal";
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateDaddysReturnInvoicePDF(doc, sr, settings);
+      await generateDaddysReturnInvoicePDF(doc, sr, settings, designType);
     });
 
+    const suffix = designType === "preprinted" ? "-preprinted" : "";
+    const finalFilename = `return-${sr.returnInvoiceNumber}${suffix}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="return-${sr.returnInvoiceNumber}.pdf"`
+      `attachment; filename="${finalFilename}"`
     );
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);

@@ -5,10 +5,13 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import toast from "react-hot-toast";
 import axios from "axios";
 import "./ReturnReceived.css";
+import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 
 const ReturnReceived = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [pendingInvoiceSr, setPendingInvoiceSr] = useState(null);
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState(null);
@@ -72,20 +75,21 @@ const ReturnReceived = () => {
     }
   };
 
-  const handleDownloadInvoice = async (sr) => {
+  const handleDownloadInvoice = async (sr, type = "normal") => {
     if (!sr?.returnInvoiceNumber) {
       toast.error("Return invoice not available yet");
       return;
     }
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get(`${backendUrl}/api/sales-returns/invoice/${sr._id}`,
+      const res = await axios.get(`${backendUrl}/api/sales-returns/invoice/${sr._id}?type=${type}`,
         { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
       );
       const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = `return-${sr.returnInvoiceNumber}.pdf`;
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.download = `return-${sr.returnInvoiceNumber}${suffix}.pdf`;
       link.click();
       window.URL.revokeObjectURL(url);
       toast.success("Return invoice downloaded");
@@ -223,7 +227,10 @@ const ReturnReceived = () => {
                               {sr.returnInvoiceNumber && (
                                 <button
                                   className="rr-btn-download"
-                                  onClick={() => handleDownloadInvoice(sr)}
+                                  onClick={() => {
+                                    setPendingInvoiceSr(sr);
+                                    setShowInvoiceModal(true);
+                                  }}
                                   title="Download return invoice"
                                 >
                                   Download Invoice
@@ -241,6 +248,17 @@ const ReturnReceived = () => {
           )}
         </div>
       </main>
+
+      <InvoiceDownloadModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        onSelect={(type) => {
+          setShowInvoiceModal(false);
+          if (pendingInvoiceSr) {
+            handleDownloadInvoice(pendingInvoiceSr, type);
+          }
+        }}
+      />
 
       {/* ── Confirm Received Modal ────────────────────────────── */}
       {confirmModal && (
