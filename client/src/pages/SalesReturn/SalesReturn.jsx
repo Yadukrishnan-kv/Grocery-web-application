@@ -406,8 +406,12 @@ const SalesReturn = () => {
                               <button
                                 className="sr-btn-sm sr-btn-invoice"
                                 onClick={() => {
-                                  setPendingInvoiceSr(sr);
-                                  setShowInvoiceModal(true);
+                                  if (isCustomer) {
+                                    handleDownloadInvoice(sr);
+                                  } else {
+                                    setPendingInvoiceSr(sr);
+                                    setShowInvoiceModal(true);
+                                  }
                                 }}
                               >
                                 Invoice
@@ -425,16 +429,18 @@ const SalesReturn = () => {
         </div>
       </main>
 
-      <InvoiceDownloadModal
-        isOpen={showInvoiceModal}
-        onClose={() => setShowInvoiceModal(false)}
-        onSelect={(type) => {
-          setShowInvoiceModal(false);
-          if (pendingInvoiceSr) {
-            handleDownloadInvoice(pendingInvoiceSr, type);
-          }
-        }}
-      />
+      {!isCustomer && (
+        <InvoiceDownloadModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          onSelect={(type) => {
+            setShowInvoiceModal(false);
+            if (pendingInvoiceSr) {
+              handleDownloadInvoice(pendingInvoiceSr, type);
+            }
+          }}
+        />
+      )}
 
       {/* ── Detail Modal ─────────────────────────────────────── */}
       {detailReturn && (

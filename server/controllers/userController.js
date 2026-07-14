@@ -172,7 +172,7 @@ const getMyProfile = async (req, res) => {
     // If Customer → attach customer details
     if (user.role === "Customer") {
       const customer = await Customer.findOne({ user: req.user._id }).select(
-        "name phoneNumber address pincode creditLimit balanceCreditLimit billingType"
+        "name phoneNumber address pincode creditLimit balanceCreditLimit billingType statementType dueDays openingBalance openingBalanceDueDays contactPersonName contactPersonPhone contactPersonAddress latitude longitude emiratesName emiratesCode returnCreditBalance"
       );
 
       if (customer) {

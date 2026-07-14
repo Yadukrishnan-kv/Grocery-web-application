@@ -1189,7 +1189,7 @@ const generateReturnInvoicePDF = async (doc, sr, settings) => {
     doc.text(sr.customer.phoneNumber, margin + 8, toY);
     toY += 10;
   }
-  doc.text("TRN :", margin + 8, toY);
+  doc.text(`TRN : ${sr.customer?.pincode || "N/A"}`, margin + 8, toY);
 
   // Return reason box alongside "To" box
   const reasonX = margin + toBoxWidth + 8;
@@ -1430,7 +1430,7 @@ const getReturnInvoice = async (req, res) => {
   try {
     const sr = await SalesReturn.findById(req.params.id)
       .populate("order", "invoiceNumber orderDate payment")
-      .populate("customer", "name phoneNumber address")
+      .populate("customer", "name phoneNumber address pincode")
       .populate("returnItems.product", "productName unit");
 
     if (!sr) return res.status(404).json({ message: "Sales return not found" });

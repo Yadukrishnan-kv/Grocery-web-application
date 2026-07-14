@@ -235,19 +235,6 @@ const navItems = [
     icon: "💰",
     path: "/admin/BillWallet",
   },
-
-  {
-    id: "Settings",
-    label: "Settings",
-    icon: "⚙️",
-    subItems: [
-      {
-        id: "CompanySettings",
-        label: "Company Settings",
-        path: "/company-settings",
-      },
-    ],
-  },
   {
     id: "CreateCustomerRequest",
     label: "Create Customer ",
@@ -332,6 +319,12 @@ const navItems = [
   label: 'Emirates',
   icon: '🌍',
   path: '/emirates',
+},
+{
+  id: "CompanySettings",
+  label: "Company Settings",
+  icon: "⚙️",
+  path: "/company-settings",
 },
 ];
 
