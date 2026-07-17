@@ -65,10 +65,6 @@ const CustomerOrdersList = () => {
     fetchCustomerHistory();
   }, [fetchCurrentUser, fetchCustomerHistory]);
 
-  const handleCreateOrder = () => {
-    window.location.href = "/customer/create-order";
-  };
-
   // ✅ Helper: Calculate VAT breakdown for order items
   const calculateOrderVAT = (orderItems) => {
     if (!orderItems || !Array.isArray(orderItems)) {
@@ -254,13 +250,7 @@ const CustomerOrdersList = () => {
                   )}
                 </div>
 
-                {/* Create Button */}
-                <button
-                  className="customer-orders-create-button"
-                  onClick={handleCreateOrder}
-                >
-                  Create Order
-                </button>
+
               </div>
             </div>
 

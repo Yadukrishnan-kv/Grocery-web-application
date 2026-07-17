@@ -345,6 +345,11 @@
   width: 1%;
 }
 
+.order-list-data-table td:last-child .order-list-icon-button {
+  width: 100%;
+  justify-content: center;
+}
+
 .order-list-view-button {
   background: #dbeafe;
   color: #1e40af;

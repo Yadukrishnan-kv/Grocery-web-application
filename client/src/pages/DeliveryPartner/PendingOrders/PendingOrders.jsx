@@ -11,7 +11,7 @@ const PendingOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState("Pending Orders");
+  const [activeItem, setActiveItem] = useState("PendingOrdersForPacking");
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -116,11 +116,7 @@ const PendingOrders = () => {
       <main className={`pending-orders-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="pending-orders-container-wrapper">
           <div className="pending-orders-container">
-            <h2 className="pending-orders-page-title">Pending Orders (Awaiting Stock)</h2>
-            <p className="pending-orders-description">
-              These orders are assigned to you and waiting for the storekeeper to pack. 
-              Check back when stock is available.
-            </p>
+            <h2 className="pending-orders-page-title">Pending Orders For Packing</h2>
 
             <div className="pending-orders-controls-group">
               <div className="pending-orders-filter-group">

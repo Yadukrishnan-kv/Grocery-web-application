@@ -65,7 +65,7 @@ const createUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const { username, email, role, emiratesName, emiratesCode, creditLimit } = req.body;
+    const { username, email, password, role, emiratesName, emiratesCode, creditLimit } = req.body;
 
     
 
@@ -76,18 +76,23 @@ const updateUser = async (req, res) => {
       }
     }
 
-    const updateFields = {
-      username,
-      email,
-      role,
-      emiratesName: role === "Sales man" ? (emiratesName || null) : null,
-      emiratesCode: role === "Sales man" ? (emiratesCode || null) : null,
-    };
+    const userToUpdate = await User.findById(req.params.id);
+    if (!userToUpdate) return res.status(404).json({ message: "User not found" });
+
+    userToUpdate.username = username;
+    userToUpdate.email = email;
+    userToUpdate.role = role;
+    userToUpdate.emiratesName = role === "Sales man" ? (emiratesName || null) : null;
+    userToUpdate.emiratesCode = role === "Sales man" ? (emiratesCode || null) : null;
+
+    if (password) {
+      userToUpdate.password = password;
+    }
 
     // Clear salesman fields for non-Sales man roles
     if (role !== "Sales man") {
-      updateFields.salesmanCreditLimit = undefined;
-      updateFields.salesmanBalanceCreditLimit = undefined;
+      userToUpdate.salesmanCreditLimit = undefined;
+      userToUpdate.salesmanBalanceCreditLimit = undefined;
     }
 
     if (role === "Sales man" && creditLimit !== undefined) {
@@ -95,23 +100,15 @@ const updateUser = async (req, res) => {
       if (isNaN(parsedCreditLimit) || parsedCreditLimit < 0) {
         return res.status(400).json({ message: "Invalid credit limit value" });
       }
-      const userToUpdate = await User.findById(req.params.id);
-      if (!userToUpdate) return res.status(404).json({ message: "User not found" });
       const usedCredit = (userToUpdate.salesmanCreditLimit || 0) - (userToUpdate.salesmanBalanceCreditLimit || 0);
       if (parsedCreditLimit < usedCredit) {
         return res.status(400).json({ message: "Cannot reduce credit limit below already allocated credit" });
       }
-      updateFields.salesmanCreditLimit = parsedCreditLimit;
-      updateFields.salesmanBalanceCreditLimit = parsedCreditLimit - usedCredit;
+      userToUpdate.salesmanCreditLimit = parsedCreditLimit;
+      userToUpdate.salesmanBalanceCreditLimit = parsedCreditLimit - usedCredit;
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      req.params.id,
-      updateFields,
-      { new: true, runValidators: true }
-    ).select("-password");
-
-    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+    const updatedUser = await userToUpdate.save();
     
     const filteredUser = filterUserData(updatedUser);
     res.json(filteredUser);

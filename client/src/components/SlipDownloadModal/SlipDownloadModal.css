@@ -1,0 +1,127 @@
+.slip-type-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.slip-type-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem 2rem 1.5rem;
+  width: 400px;
+  max-width: 92vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.slip-type-modal h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.slip-type-modal > p {
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+@media (max-width: 480px) {
+  .slip-type-modal {
+    padding: 1.25rem 0.75rem 1rem;
+    border-radius: 12px;
+    width: 95vw;
+    max-width: 95vw;
+    margin: 0 8px;
+  }
+  .slip-type-modal h3 {
+    font-size: 1.1rem;
+  }
+  .slip-type-modal > p {
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+  }
+}
+
+.slip-type-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.slip-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1.25rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fafbfc;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.slip-type-btn:hover {
+  border-color: #6366f1;
+  background: #f0f0ff;
+  transform: translateY(-1px);
+}
+
+.slip-type-icon {
+  font-size: 1.75rem;
+}
+
+.slip-type-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.slip-type-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.slip-type-cancel {
+  margin-top: 1rem;
+  padding: 0.6rem 2rem;
+  background: transparent;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.slip-type-cancel:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+@media (max-width: 480px) {
+  .slip-type-btn {
+    padding: 0.9rem 0.75rem;
+  }
+  .slip-type-icon {
+    font-size: 1.4rem;
+  }
+  .slip-type-label {
+    font-size: 0.9rem;
+  }
+  .slip-type-desc {
+    font-size: 0.72rem;
+  }
+  .slip-type-cancel {
+    padding: 0.5rem 1.5rem;
+    font-size: 0.82rem;
+  }
+}

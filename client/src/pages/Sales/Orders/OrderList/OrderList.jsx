@@ -1,6 +1,6 @@
 // src/pages/Order/OrderList.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "../../../../components/layout/Header/Header";
 import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../../Assets/aed-symbol.png";
@@ -9,6 +9,7 @@ import axios from "axios";
 import toast from 'react-hot-toast';
 
 const OrderList = () => {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -397,13 +398,23 @@ const OrderList = () => {
                             <td>{formatDate(order.orderDate)}</td>
                             <td>
                               <div className="order-list-action-buttons">
-                                <Link
-                                  to={`/order/create?edit=${order._id}`}
+                                <button
                                   className="order-list-icon-button order-list-edit-button"
+                                  onClick={() => {
+                                    if (order.packedStatus && order.packedStatus !== "not_packed") {
+                                      toast.error("Cannot edit an order that has been packed");
+                                      return;
+                                    }
+                                    if (order.assignmentStatus === "accepted") {
+                                      toast.error("Cannot edit an order that has been accepted by delivery partner");
+                                      return;
+                                    }
+                                    navigate(`/order/create?edit=${order._id}`);
+                                  }}
                                   aria-label={`Edit order ${order._id}`}
                                 >
                                   ✎
-                                </Link>
+                                </button>
                                 <button
                                   className="order-list-icon-button order-list-delete-button"
                                   onClick={() =>

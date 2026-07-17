@@ -153,7 +153,7 @@ const navItems = [
       },
       {
         id: "PendingOrdersForPacking",
-        label: "Pending Orders",
+        label: "Pending Orders For Packing",
         path: "/PendingOrdersForPacking",
       },
       {

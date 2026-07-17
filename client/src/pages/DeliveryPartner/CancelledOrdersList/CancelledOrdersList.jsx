@@ -13,8 +13,6 @@ const CancelledOrdersList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Cancelled Orders"); // fixed typo
   const [user, setUser] = useState(null);
-  const [cancellingOrderId, setCancellingOrderId] = useState(null);
-
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -58,53 +56,6 @@ const CancelledOrdersList = () => {
     fetchCurrentUser();
     fetchCancellableOrders();
   }, [fetchCurrentUser, fetchCancellableOrders]);
-
-  const handleCancelOrder = async (orderId) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to cancel this order? This action cannot be undone.",
-      )
-    )
-      return;
-
-    setCancellingOrderId(orderId);
-    try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${backendUrl}/api/orders/cancelorder/${orderId}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      fetchCancellableOrders();
-    } catch (error) {
-      console.error("Error cancelling order:", error);
-      alert("Failed to cancel order. Please try again.");
-    } finally {
-      setCancellingOrderId(null);
-    }
-  };
-
-  const handleReacceptOrder = async (orderId) => {
-  if (!window.confirm("Re-accept this rejected order?")) return;
-  
-  try {
-    const token = localStorage.getItem('token');
-    await axios.post(
-      `${backendUrl}/api/orders/accept/${orderId}`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    fetchCancellableOrders();
-    alert("Order re-accepted successfully.");
-  } catch (error) {
-    console.error('Error re-accepting order:', error);
-    if (error.response?.status === 400) {
-      alert("Order is already assigned to someone else or not available for re-accept.");
-    } else {
-      alert("Failed to re-accept order. Please try again.");
-    }
-  }
-};
 
   // Helper function to format date as DD/MM/YYYY
   const formatDate = (dateString) => {
@@ -156,9 +107,6 @@ const CancelledOrdersList = () => {
                       <th scope="col">Price</th>
                       <th scope="col">Total Amount</th>
                       <th scope="col">Order Date</th>
-                                            <th scope="col">Re-accept Order</th>
-
-                      <th scope="col">Cancel Order</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -187,7 +135,7 @@ const CancelledOrdersList = () => {
                                   paddingTop: "3px",
                                 }}
                               />
-                              <span>{order.price.toFixed(2)}</span>
+                              <span>{order.price != null ? Number(order.price).toFixed(2) : "0.00"}</span>
                             </div>
                           </td>
                           <td>
@@ -207,47 +155,15 @@ const CancelledOrdersList = () => {
                                   paddingTop: "3px",
                                 }}
                               />
-                              <span>{order.totalAmount.toFixed(2)}</span>
+                              <span>{order.totalAmount != null ? Number(order.totalAmount).toFixed(2) : "0.00"}</span>
                             </div>
                           </td>
                           <td>{formatDate(order.orderDate)}</td>
-                          <td>
-  {order.assignmentStatus === "accepted" && (
-    <button
-      className="cancelled-orders-cancel-button"
-      onClick={() => handleCancelOrder(order._id)}
-      disabled={cancellingOrderId === order._id}
-    >
-      {cancellingOrderId === order._id ? 'Cancelling...' : 'Cancel'}
-    </button>
-  )}
-
-  {order.assignmentStatus === "rejected" && (
-    <button
-      className="cancelled-orders-reaccept-button"
-      onClick={() => handleReacceptOrder(order._id)}
-      disabled={cancellingOrderId === order._id}
-    >
-      Re-accept
-    </button>
-  )}
-</td>
-                          <td>
-                            <button
-                              className="cancelled-orders-cancel-button"
-                              onClick={() => handleCancelOrder(order._id)}
-                              disabled={cancellingOrderId === order._id}
-                            >
-                              {cancellingOrderId === order._id
-                                ? "Cancelling..."
-                                : "Cancel"}
-                            </button>
-                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="9" className="cancelled-orders-no-data">
+                        <td colSpan="7" className="cancelled-orders-no-data">
                           No orders available for cancellation
                         </td>
                       </tr>

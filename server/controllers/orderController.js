@@ -241,56 +241,79 @@ const getSalesmanDeliveredOrders = async (req, res) => {
 
 const updateOrder = async (req, res) => {
   try {
-    const { orderedQuantity, payment } = req.body;
+    const { customerId, payment, remarks, orderItems, scheduleDays } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
     if (order.status !== "pending") {
-      return res
-        .status(400)
-        .json({ message: "Cannot update non-pending order" });
+      return res.status(400).json({ message: "Cannot update non-pending order" });
     }
 
-    // For simplicity, assume updating quantity requires adjusting inventory and credit
-    // This is complex; in production, handle reversals
-    const product = await Product.findById(order.product);
-    const customer = await Customer.findById(order.customer);
-
-    // Revert old
-    product.quantity += order.orderedQuantity;
-    if (order.payment === "credit") {
-      customer.balanceCreditLimit += order.totalAmount;
+    if (order.packedStatus && order.packedStatus !== "not_packed") {
+      return res.status(400).json({ message: "Cannot edit an order that has been packed" });
     }
 
-    // Apply new
-    if (orderedQuantity !== undefined) {
-      if (product.quantity < orderedQuantity) {
-        return res
-          .status(400)
-          .json({ message: "Insufficient product quantity" });
-      }
-      order.orderedQuantity = orderedQuantity;
-      order.totalAmount = order.price * orderedQuantity;
-    }
-    if (payment !== undefined) {
-      order.payment = payment;
+    if (order.assignmentStatus === "accepted") {
+      return res.status(400).json({ message: "Cannot edit an order accepted by delivery partner" });
     }
 
-    product.quantity -= order.orderedQuantity;
-    if (order.payment === "credit") {
-      if (customer.balanceCreditLimit < order.totalAmount) {
-        return res.status(400).json({ message: "Insufficient credit balance" });
-      }
-      customer.balanceCreditLimit -= order.totalAmount;
+    if (customerId) order.customer = customerId;
+    if (payment) order.payment = payment;
+    if (remarks !== undefined) order.remarks = remarks;
+
+    if (scheduleDays !== undefined) {
+      const days = parseInt(scheduleDays) || 0;
+      order.scheduleDays = days;
+      const packableAfter = new Date();
+      packableAfter.setDate(packableAfter.getDate() + days);
+      packableAfter.setHours(0, 0, 0, 0);
+      order.packableAfter = days > 0 ? packableAfter : null;
     }
 
-    await product.save();
-    await customer.save();
+    if (orderItems && orderItems.length > 0) {
+      const processedItems = orderItems.map((item) => {
+        const qty = parseInt(item.orderedQuantity);
+        const price = parseFloat(item.price);
+        const vatPercent = parseFloat(item.vatPercentage) || 5;
+
+        const exclVatAmount = qty * price;
+        const vatAmount = (exclVatAmount * vatPercent) / 100;
+        const totalAmount = exclVatAmount + vatAmount;
+
+        return {
+          product: item.productId,
+          orderedQuantity: qty,
+          price: price,
+          vatPercentage: vatPercent,
+          exclVatAmount: parseFloat(exclVatAmount.toFixed(2)),
+          vatAmount: parseFloat(vatAmount.toFixed(2)),
+          totalAmount: parseFloat(totalAmount.toFixed(2)),
+          packedQuantity: 0,
+          deliveredQuantity: 0,
+          invoicedQuantity: 0,
+          remarks: item.remarks || "",
+        };
+      });
+      order.orderItems = processedItems;
+    }
+
+    order.status = "pending";
+    order.assignmentStatus = "pending_assignment";
+
     await order.save();
 
-    res.json(order);
+    const populatedOrder = await Order.findById(order._id)
+      .populate("customer", "name phone email")
+      .populate("orderItems.product", "productName unit")
+      .populate("createdBy", "username role");
+
+    res.json({
+      message: "Order updated successfully",
+      order: populatedOrder,
+    });
   } catch (error) {
+    console.error("Update order error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

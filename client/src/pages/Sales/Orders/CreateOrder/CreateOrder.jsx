@@ -1,10 +1,10 @@
 // src/pages/Orders/CreateOrder/CreateOrder.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import ProductSearchDropdown from "../../../../components/common/ProductSearchDropdown";
 import Header from "../../../../components/layout/Header/Header";
 import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
 import "./CreateOrder.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 
@@ -42,6 +42,9 @@ const CreateOrder = () => {
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editOrderId = searchParams.get("edit");
+  const isEditMode = Boolean(editOrderId);
 
   // ────────────────────────────────────────────────
   // Fetch Data
@@ -121,6 +124,68 @@ const CreateOrder = () => {
       fetchCustomers();
     }
   }, [user, fetchCustomers]);
+
+  // ── Edit mode: fetch order and pre-fill form ──
+  const fetchEditOrder = useCallback(async () => {
+    if (!editOrderId || !user) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${backendUrl}/api/orders/getorderbyid/${editOrderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const order = res.data;
+
+      if (order.status !== "pending") {
+        toast.error("Only pending orders can be edited");
+        navigate("/order/list");
+        return;
+      }
+
+      if (order.packedStatus && order.packedStatus !== "not_packed") {
+        toast.error("Cannot edit an order that has been packed");
+        navigate("/order/list");
+        return;
+      }
+
+      if (order.assignmentStatus === "accepted") {
+        toast.error("Cannot edit an order that has been accepted by delivery partner");
+        navigate("/order/list");
+        return;
+      }
+
+      const items = order.orderItems.map((item) => ({
+        productId: item.product?._id || item.product,
+        orderedQuantity: String(item.orderedQuantity),
+        price: item.price?.toFixed(2) || "",
+        exclVat: item.exclVatAmount?.toFixed(2) || "0.00",
+        vatPercentage: item.vatPercentage || 5,
+        vatAmount: item.vatAmount?.toFixed(2) || "0.00",
+        total: item.totalAmount?.toFixed(2) || "0.00",
+        prevPrice: "",
+      }));
+
+      setFormData({
+        customerId: order.customer?._id || "",
+        payment: order.payment || "credit",
+        remarks: order.remarks || "",
+        scheduleDays: String(order.scheduleDays || ""),
+        orderItems: items,
+      });
+
+      updateGrandTotal(items);
+    } catch (err) {
+      toast.error("Failed to load order for editing");
+      navigate("/order/list");
+    }
+  }, [editOrderId, user, backendUrl, navigate]);
+
+  const editFetchedRef = useRef(false);
+  useEffect(() => {
+    if (user && editOrderId && !editFetchedRef.current) {
+      editFetchedRef.current = true;
+      fetchEditOrder();
+    }
+  }, [user, editOrderId, fetchEditOrder]);
 
   // ────────────────────────────────────────────────
   // ✅ VAT Calculation Functions
@@ -314,14 +379,20 @@ const CreateOrder = () => {
         })),
       };
 
-      await axios.post(`${backendUrl}/api/orders/createorder`, submitData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      toast.success("Order created successfully!");
+      if (isEditMode) {
+        await axios.put(`${backendUrl}/api/orders/updateorder/${editOrderId}`, submitData, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        toast.success("Order updated successfully!");
+      } else {
+        await axios.post(`${backendUrl}/api/orders/createorder`, submitData, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        toast.success("Order created successfully!");
+      }
       setTimeout(() => navigate("/order/list"), 1500);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to create order");
+      toast.error(err.response?.data?.message || "Failed to save order");
     } finally {
       setIsLoading(false);
     }
@@ -345,7 +416,7 @@ const CreateOrder = () => {
       />
       <main className={`order-main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="order-form-card">
-          <h1>Create New Order</h1>
+          <h1>{isEditMode ? "Edit Order" : "Create New Order"}</h1>
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -552,7 +623,7 @@ const CreateOrder = () => {
             </div>
 
             <button type="submit" className="submit-btn" disabled={isLoading}>
-              {isLoading ? "Creating..." : "Create Order"}
+              {isLoading ? "Saving..." : isEditMode ? "Update Order" : "Create Order"}
             </button>
           </form>
         </div>

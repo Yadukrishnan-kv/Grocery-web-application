@@ -56,7 +56,7 @@ const UserTable = () => {
       });
 
       const filteredUsers = res.data.filter(
-        user => user.role !== 'Admin' && user.role !== 'superadmin'
+        user => user.role !== 'Admin' && user.role !== 'superadmin' && user.role !== 'Customer'
       );
 
       const uniqueRoles = [...new Set(

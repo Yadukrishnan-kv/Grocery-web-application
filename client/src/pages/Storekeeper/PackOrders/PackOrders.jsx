@@ -5,7 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 
 import toast from "react-hot-toast";
 import axios from "axios";
-import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
+import SlipDownloadModal from "../../../components/SlipDownloadModal/SlipDownloadModal";
 
 import jsPDF from "jspdf";
 
@@ -101,13 +101,139 @@ const PackOrders = () => {
       toast.error("Failed to generate thermal slip");
     }
   };
+
+  // Standard A4 PDF Slip Handler - Table layout
+  const handleDownloadPDFSlip = async (orderId) => {
+    const order = orderDataRef.current[orderId];
+    if (!order) {
+      toast.error("Order details not found");
+      return;
+    }
+    try {
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageWidth = 210;
+      const margin = 15;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin + 10;
+
+      const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        const date = new Date(dateString);
+        return date.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      };
+
+      // ── Header Section with background ──
+      pdf.setFillColor(41, 128, 185);
+      pdf.rect(margin, y, contentWidth, 12, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(14).setFont(undefined, "bold");
+      pdf.text("PACKING SLIP", margin + 5, y + 8);
+      y += 18;
+      pdf.setTextColor(0, 0, 0);
+
+      // ── Order Info Box ──
+      pdf.setFillColor(248, 249, 250);
+      pdf.roundedRect(margin, y, contentWidth, 28, 3, 3, "F");
+      pdf.setFontSize(10).setFont(undefined, "normal");
+
+      const displayedOrderId = order.orderId || order._id;
+      const orderDate = formatDate(order.orderDate);
+      const customerName = order.customer?.name || "N/A";
+
+      pdf.setFont(undefined, "bold");
+      pdf.text("Order ID:", margin + 5, y + 6);
+      pdf.text("Customer:", margin + 5, y + 14);
+      pdf.text("Order Date:", margin + 5, y + 22);
+      pdf.setFont(undefined, "normal");
+      pdf.text(String(displayedOrderId), margin + 35, y + 6);
+      pdf.text(customerName, margin + 35, y + 14);
+      pdf.text(orderDate, margin + 35, y + 22);
+      y += 36;
+
+      // ── Table ──
+      const colProduct = margin + 5;
+      const colQty = margin + 160;
+      const colWProduct = colQty - colProduct - 5;
+      const headerH = 8;
+
+      // Table header
+      pdf.setFillColor(41, 128, 185);
+      pdf.rect(margin, y, contentWidth, headerH, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(10).setFont(undefined, "bold");
+      pdf.text("Product", colProduct, y + 5.5);
+      pdf.text("Qty", colQty, y + 5.5);
+      y += headerH;
+
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(9).setFont(undefined, "normal");
+
+      let rowIndex = 0;
+      (order.orderItems || []).forEach((item) => {
+        const productName = item.product?.productName || "Unknown";
+        const qty = item.orderedQuantity || 0;
+
+        const lines = pdf.splitTextToSize(productName, colWProduct);
+        const rowH = Math.max(lines.length * 5 + 2, 8);
+
+        if (y + rowH > 285) {
+          pdf.addPage();
+          y = margin + 10;
+          // Repeat header on new page
+          pdf.setFillColor(41, 128, 185);
+          pdf.rect(margin, y, contentWidth, headerH, "F");
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(10).setFont(undefined, "bold");
+          pdf.text("Product", colProduct, y + 5.5);
+          pdf.text("Qty", colQty, y + 5.5);
+          y += headerH;
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFontSize(9).setFont(undefined, "normal");
+        }
+
+        // Row background alternation
+        if (rowIndex % 2 === 0) {
+          pdf.setFillColor(242, 244, 246);
+          pdf.rect(margin, y, contentWidth, rowH, "F");
+        }
+
+        pdf.text(lines, colProduct, y + 4);
+        pdf.text(String(qty), colQty, y + 4);
+        y += rowH + 1;
+        rowIndex++;
+      });
+
+      // Bottom line
+      pdf.setDrawColor(41, 128, 185);
+      pdf.line(margin, y, margin + contentWidth, y);
+
+      const fileName = order.orderId
+        ? `packing-slip-${order.orderId}.pdf`
+        : `packing-slip-${order._id?.toString().slice(-8) || "order"}.pdf`;
+      pdf.save(fileName);
+      toast.success("Packing slip downloaded as PDF");
+    } catch (err) {
+      console.error("PDF slip error:", err);
+      toast.error("Failed to generate PDF slip");
+    }
+  };
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState("Pack Orders");
   const [user, setUser] = useState(null);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
+  const [showSlipModal, setShowSlipModal] = useState(false);
+  const [pendingSlipData, setPendingSlipData] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -211,42 +337,6 @@ const PackOrders = () => {
       toast.error(err.response?.data?.message || "Failed to submit packing");
     } finally {
       setProcessing(false);
-    }
-  };
-
-  // ────────────────────────────────────────────────────────────────
-  //  FIXED: Now correctly passes the specific invoiceNumber
-  // ────────────────────────────────────────────────────────────────
-  const downloadUnifiedInvoice = async (orderId, invoiceNumber, type = "normal") => {
-    if (!invoiceNumber) {
-      toast.error("No invoice number available for this order yet");
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(
-        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}&type=${type}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      const suffix = type === "preprinted" ? "-preprinted" : "";
-      link.setAttribute("download", `unified-invoice-${invoiceNumber}${suffix}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      toast.success(`Invoice ${invoiceNumber} downloaded`);
-    } catch (err) {
-      console.error("Invoice download failed:", err);
-      toast.error("Failed to download invoice");
     }
   };
 
@@ -415,31 +505,15 @@ const PackOrders = () => {
                         </td>
 
                         <td className="actions-cell">
-                          {/* Invoice button – only shown when invoice exists */}
-                          {order.invoiceNumber ? (
-                            <button
-                              className="order-list-icon-button order-list-view-button"
-                              onClick={() => {
-                                setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
-                                setShowInvoiceModal(true);
-                              }}
-                              title={`Download Invoice ${order.invoiceNumber}`}
-                            >
-                              📄 Invoice ({order.invoiceNumber})
-                            </button>
-                          ) : (
-                            <span className="no-invoice-text" title="Invoice generated after first packing">
-                              No Invoice Yet
-                            </span>
-                          )}
-                          {/* Thermal Printer Packing Slip button */}
+                          {/* Packing Slip button */}
                           <button
                             className="order-list-icon-button order-list-download-pdf"
                             onClick={() => {
                               orderDataRef.current[order._id] = order;
-                              handleDownloadThermalPDF(order._id);
+                              setPendingSlipData({ orderId: order._id });
+                              setShowSlipModal(true);
                             }}
-                            title="Download thermal receipt format packing slip"
+                            title="Download packing slip"
                           >
                             🖨️ Slip
                           </button>
@@ -469,13 +543,17 @@ const PackOrders = () => {
         </div>
       </main>
 
-      <InvoiceDownloadModal
-        isOpen={showInvoiceModal}
-        onClose={() => setShowInvoiceModal(false)}
+      <SlipDownloadModal
+        isOpen={showSlipModal}
+        onClose={() => setShowSlipModal(false)}
         onSelect={(type) => {
-          setShowInvoiceModal(false);
-          if (pendingInvoiceData) {
-            downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+          setShowSlipModal(false);
+          if (pendingSlipData) {
+            if (type === "thermal") {
+              handleDownloadThermalPDF(pendingSlipData.orderId);
+            } else {
+              handleDownloadPDFSlip(pendingSlipData.orderId);
+            }
           }
         }}
       />

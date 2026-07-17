@@ -36,9 +36,6 @@ const DashboardLayout = () => {
   const [packedToday, setPackedToday] = useState(0);
   const [readyToDeliver, setReadyToDeliver] = useState(0);
 
-  // Salesman stats
-  const [salesmanCreditLimit, setSalesmanCreditLimit] = useState(0);
-  const [salesmanBalanceCreditLimit, setSalesmanBalanceCreditLimit] = useState(0);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -87,14 +84,6 @@ const DashboardLayout = () => {
       );
       setTotalUsers(nonAdminUsers.length || 0);
 
-      // If user is salesman, fetch their credit info
-      if (user?.role?.toLowerCase().includes('sales')) {
-        const currentUser = usersRes.data.find(u => u._id === user._id);
-        if (currentUser) {
-          setSalesmanCreditLimit(currentUser.salesmanCreditLimit || 0);
-          setSalesmanBalanceCreditLimit(currentUser.salesmanBalanceCreditLimit || 0);
-        }
-      }
 
       const orders = ordersRes.data || [];
       setTotalOrders(orders.length);
@@ -108,7 +97,7 @@ const DashboardLayout = () => {
     } finally {
       setStatsLoading(false);
     }
-  }, [backendUrl, user]);
+  }, [backendUrl]);
 
   // Customer Stats
   const fetchCustomerStats = useCallback(async () => {
@@ -217,7 +206,7 @@ const DashboardLayout = () => {
 
     const role = user.role.toLowerCase().trim();
 
-    if (role.includes('admin') || role.includes('sales')) {
+    if (role.includes('admin') || role.includes('sales') || role.includes('manager')) {
       fetchAdminSalesmanStats();
     } else if (role.includes('customer')) {
       fetchCustomerStats();
@@ -276,7 +265,7 @@ const DashboardLayout = () => {
 
   const renderAdminSalesmanStats = () => (
     <div className="stats-grid">
-      {user.role.toLowerCase().includes('admin') && (
+      {(user.role.toLowerCase().includes('admin') || user.role.toLowerCase().includes('manager')) && (
         <div className="stat-card">
           <div className="stat-icon users-icon">👥</div>
           <h3>Total Users</h3>
@@ -396,7 +385,7 @@ const DashboardLayout = () => {
             </div>
           ) : (
             <div className="stats-container">
-              {(user.role.toLowerCase().includes('admin') || user.role.toLowerCase().includes('sales')) &&
+              {(user.role.toLowerCase().includes('admin') || user.role.toLowerCase().includes('sales') || user.role.toLowerCase().includes('manager')) &&
                 renderAdminSalesmanStats()}
               {user.role.toLowerCase().includes('customer') && renderCustomerStats()}
               {(user.role.toLowerCase().includes('delivery') || user.role.toLowerCase().includes('delivery man')) &&

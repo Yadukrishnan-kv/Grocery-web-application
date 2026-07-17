@@ -35,7 +35,7 @@ const ProductSearchDropdown = ({ products, value, onChange, placeholder = "Selec
   // Show selected product in input, but allow search
   let inputValue = search;
   if (!open && selectedProduct && search === "") {
-    inputValue = `${selectedProduct.productName} - ${selectedProduct.unit}`;
+    inputValue = `${selectedProduct.productName}`;
   }
 
   // Open dropdown on input focus or arrow click
@@ -117,7 +117,7 @@ const ProductSearchDropdown = ({ products, value, onChange, placeholder = "Selec
                 className={`dropdown-item${p._id === value ? " selected" : ""}`}
                 onMouseDown={() => handleSelect(p)}
               >
-                {p.productName} - {p.unit}
+                {p.productName}
               </div>
             ))
           )}

@@ -129,14 +129,18 @@ const User = () => {
 
       if (isEdit) {
         // Update existing user
-        await axios.put(`${backendUrl}/api/users/updateUser/${userId}`, {
+        const updateData = {
           username: formData.username,
           email: formData.email,
           role: formData.role,
           emiratesName: isSalesmanRole ? formData.emiratesName : null,
           emiratesCode: isSalesmanRole ? formData.emiratesCode : null,
           creditLimit: isSalesmanRole ? parseFloat(formData.creditLimit) : undefined,
-        }, config);
+        };
+        if (formData.password) {
+          updateData.password = formData.password;
+        }
+        await axios.put(`${backendUrl}/api/users/updateUser/${userId}`, updateData, config);
 
         toast.success('User updated successfully!');
       } else {
@@ -328,15 +332,15 @@ const User = () => {
               </div>
             </div>
 
-            {!isEdit && (
-              <div className="form-group">
-                <label htmlFor="password">Password</label>
+            <div className="form-group">
+                <label htmlFor="password" style={{ marginTop: "10px" }}>Password {isEdit && <div className="optional-text">(leave blank to keep current)</div>}</label>
                 <input
                   id="password"
                   name="password"
                   type="password"
                   value={formData.password}
                   onChange={handleChange}
+                  placeholder={isEdit ? "Enter new password" : ""}
                   aria-invalid={!!errors.password}
                   aria-describedby={errors.password ? "password-error" : undefined}
                 />
@@ -346,7 +350,6 @@ const User = () => {
                   </p>
                 )}
               </div>
-            )}
 
             <div className="form-group">
               <label htmlFor="role">Role</label>
