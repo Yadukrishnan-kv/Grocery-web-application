@@ -442,3 +442,58 @@
   cursor: not-allowed;
   border-color: #e2e8f0;
 }
+
+/* Custom Price Input */
+.custom-price-input {
+  border-color: #f59e0b !important;
+  background-color: #fffbeb !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+
+/* Side Badge (Global price + Reset) */
+.price-side-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, #eff6ff, #f0f9ff);
+  border: 1px solid #bfdbfe;
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+}
+
+.global-price-label {
+  font-size: 0.73rem;
+  color: #1e40af;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.reset-price-btn {
+  font-size: 0.7rem;
+  padding: 3px 10px;
+  background: #ffffff;
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+  color: #2563eb;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.reset-price-btn:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+.reset-price-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}

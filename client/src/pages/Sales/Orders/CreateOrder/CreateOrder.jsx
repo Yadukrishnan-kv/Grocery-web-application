@@ -27,6 +27,7 @@ const CreateOrder = () => {
         vatAmount: "0.00",
         total: "0.00",
         prevPrice: "",
+        isCustomPrice: false,
       },
     ],
   });
@@ -34,6 +35,8 @@ const CreateOrder = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [customPrices, setCustomPrices] = useState({});
+  const customPricesRef = useRef({});
   
   // ✅ NEW: Grand Total Breakdown States
   const [grandTotal, setGrandTotal] = useState("0.00");
@@ -162,6 +165,7 @@ const CreateOrder = () => {
         vatAmount: item.vatAmount?.toFixed(2) || "0.00",
         total: item.totalAmount?.toFixed(2) || "0.00",
         prevPrice: "",
+        isCustomPrice: false,
       }));
 
       setFormData({
@@ -172,12 +176,13 @@ const CreateOrder = () => {
         orderItems: items,
       });
 
+      fetchCustomPrices(order.customer?._id || "");
       updateGrandTotal(items);
     } catch (err) {
       toast.error("Failed to load order for editing");
       navigate("/order/list");
     }
-  }, [editOrderId, user, backendUrl, navigate]);
+  }, [editOrderId, user, backendUrl, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const editFetchedRef = useRef(false);
   useEffect(() => {
@@ -240,6 +245,7 @@ const CreateOrder = () => {
           vatAmount: "0.00",
           total: "0.00",
           prevPrice: "",
+          isCustomPrice: false,
         },
       ],
     }));
@@ -271,12 +277,39 @@ const CreateOrder = () => {
     });
   };
 
-  const handleProductSelect = (index, productId) => {
+  const handleProductSelect = async (index, productId) => {
     const selectedProduct = products.find((p) => p._id === productId);
+
+    // Try to get custom price: first from ref, then from API
+    let customPrice = customPricesRef.current[productId];
+    if (customPrice === undefined && formData.customerId && productId) {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get(`${backendUrl}/api/customer-product-prices`, {
+          params: { customerId: formData.customerId, productId },
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.data && res.data.price !== undefined) {
+          customPrice = res.data.price;
+          customPricesRef.current = { ...customPricesRef.current, [productId]: customPrice };
+          setCustomPrices((prev) => ({ ...prev, [productId]: customPrice }));
+        }
+      } catch (err) {
+        // No custom price found
+      }
+    }
+
     setFormData((prev) => {
       const newItems = [...prev.orderItems];
       newItems[index].productId = productId;
-      newItems[index].price = selectedProduct ? selectedProduct.price.toFixed(2) : "";
+
+      if (customPrice !== undefined) {
+        newItems[index].price = parseFloat(customPrice).toFixed(2);
+        newItems[index].isCustomPrice = true;
+      } else {
+        newItems[index].price = selectedProduct ? selectedProduct.price.toFixed(2) : "";
+        newItems[index].isCustomPrice = false;
+      }
 
       const calculated = calculateItemVAT(newItems[index]);
       newItems[index].exclVat = calculated.exclVat;
@@ -289,6 +322,73 @@ const CreateOrder = () => {
 
     if (formData.customerId) {
       fetchPreviousPrice(formData.customerId, productId, index);
+    }
+  };
+
+  const handlePriceChange = (index, value) => {
+    setFormData((prev) => {
+      const newItems = [...prev.orderItems];
+      newItems[index].price = value;
+      newItems[index].isCustomPrice = true;
+
+      const calculated = calculateItemVAT(newItems[index]);
+      newItems[index].exclVat = calculated.exclVat;
+      newItems[index].vatAmount = calculated.vatAmount;
+      newItems[index].total = calculated.total;
+
+      updateGrandTotal(newItems);
+      return { ...prev, orderItems: newItems };
+    });
+  };
+
+  const handlePriceBlur = (index) => {
+    const item = formData.orderItems[index];
+    if (formData.customerId && item.productId && item.price) {
+      saveCustomPrice(formData.customerId, item.productId, item.price);
+    }
+  };
+
+  const resetToGlobalPrice = async (index) => {
+    const item = formData.orderItems[index];
+    const selectedProduct = products.find((p) => p._id === item.productId);
+    if (!selectedProduct) return;
+
+    setFormData((prev) => {
+      const newItems = [...prev.orderItems];
+      newItems[index].price = selectedProduct.price.toFixed(2);
+      newItems[index].isCustomPrice = false;
+
+      const calculated = calculateItemVAT(newItems[index]);
+      newItems[index].exclVat = calculated.exclVat;
+      newItems[index].vatAmount = calculated.vatAmount;
+      newItems[index].total = calculated.total;
+
+      updateGrandTotal(newItems);
+      return { ...prev, orderItems: newItems };
+    });
+
+    // Remove custom price from backend
+    if (formData.customerId && item.productId) {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get(`${backendUrl}/api/customer-product-prices`, {
+          params: { customerId: formData.customerId, productId: item.productId },
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.data && res.data._id) {
+          await axios.delete(`${backendUrl}/api/customer-product-prices/${res.data._id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+        setCustomPrices((prev) => {
+          const next = { ...prev };
+          delete next[item.productId];
+          return next;
+        });
+        delete customPricesRef.current[item.productId];
+      } catch (err) {
+        console.error("Failed to delete custom price:", err);
+      }
     }
   };
 
@@ -316,10 +416,50 @@ const CreateOrder = () => {
     }
   }, [backendUrl]);
 
+  const fetchCustomPrices = useCallback(async (customerId) => {
+    if (!customerId) {
+      setCustomPrices({});
+      customPricesRef.current = {};
+      return;
+    }
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${backendUrl}/api/customer-product-prices`, {
+        params: { customerId },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const map = {};
+      res.data.forEach((entry) => {
+        const pid = entry.product?._id || entry.product;
+        map[pid] = entry.price;
+      });
+      setCustomPrices(map);
+      customPricesRef.current = map;
+    } catch (err) {
+      console.error("Failed to fetch custom prices:", err);
+      setCustomPrices({});
+      customPricesRef.current = {};
+    }
+  }, [backendUrl]);
+
+  const saveCustomPrice = useCallback(async (customerId, productId, price) => {
+    if (!customerId || !productId) return;
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${backendUrl}/api/customer-product-prices`,
+        { customerId, productId, price: parseFloat(price) },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setCustomPrices((prev) => ({ ...prev, [productId]: parseFloat(price) }));
+    } catch (err) {
+      console.error("Failed to save custom price:", err);
+    }
+  }, [backendUrl]);
+
   const handleCustomerChange = (e) => {
     const selectedCustomerId = e.target.value;
     const selectedCustomer = customers.find((c) => c._id === selectedCustomerId);
-    // Map billingType to default payment (user can still override)
     const defaultPayment =
       selectedCustomer?.billingType === "Cash" ? "cash" : "credit";
 
@@ -328,6 +468,8 @@ const CreateOrder = () => {
       customerId: selectedCustomerId,
       payment: defaultPayment,
     });
+
+    fetchCustomPrices(selectedCustomerId);
 
     formData.orderItems.forEach((item, idx) => {
       if (item.productId) {
@@ -479,13 +621,46 @@ const CreateOrder = () => {
 
                 <div className="item-field">
                   <label>Price (AED)</label>
-                  <input
-                    type="text"
-                    value={item.price}
-                    readOnly
-                    className="readonly-input"
-                    placeholder="Auto-filled"
-                  />
+                  {user?.role === "Admin" ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Price"
+                      value={item.price}
+                      onChange={(e) => handlePriceChange(index, e.target.value)}
+                      onBlur={() => handlePriceBlur(index)}
+                      className={item.isCustomPrice ? "custom-price-input" : ""}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={item.price}
+                      readOnly
+                      className="readonly-input"
+                      placeholder="Auto-filled"
+                    />
+                  )}
+                  {user?.role === "Admin" && item.productId && (() => {
+                    const prod = products.find((p) => p._id === item.productId);
+                    const globalPrice = prod?.price?.toFixed(2);
+                    const customPrice = customPrices[item.productId];
+                    if (customPrice !== undefined && customPrice.toFixed(2) !== globalPrice) {
+                      return (
+                        <div className="price-side-badge">
+                          <span className="global-price-label">Global: AED {globalPrice}</span>
+                          <button
+                            type="button"
+                            className="reset-price-btn"
+                            onClick={() => resetToGlobalPrice(index)}
+                          >
+                            Reset to Global
+                          </button>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* ✅ VAT Fields */}
