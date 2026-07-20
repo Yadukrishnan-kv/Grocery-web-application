@@ -440,3 +440,16 @@
     max-width: 150px;
   }
 }
+
+/* Invoice Buttons Group */
+.invoice-buttons-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.invoice-btn {
+  font-size: 0.75rem !important;
+  padding: 4px 8px !important;
+  white-space: nowrap;
+}

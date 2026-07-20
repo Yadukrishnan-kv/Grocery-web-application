@@ -440,6 +440,30 @@ const deliverOrder = async (req, res) => {
     const totalOrdered = order.orderItems.reduce((s, i) => s + i.orderedQuantity, 0);
     const totalDelivered = order.orderItems.reduce((s, i) => s + i.deliveredQuantity, 0);
 
+    // Generate delivered invoice number for this delivery batch
+    let deliveredInvoiceNo = order.deliveredInvoiceNumber;
+    if (grandDeliveryAmount > 0) {
+      const dCounter = await InvoiceCounter.findOneAndUpdate(
+        {},
+        { $inc: { deliveredInvoiceCount: 1 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+      deliveredInvoiceNo = `DIV-${String(dCounter.deliveredInvoiceCount).padStart(2, "0")}`;
+      if (!order.deliveredInvoiceHistory) order.deliveredInvoiceHistory = [];
+      order.deliveredInvoiceHistory.push({
+        invoiceNumber: deliveredInvoiceNo,
+        quantity: deliveredItems.reduce((sum, item) => sum + Number(item.quantity), 0),
+        amount: grandDeliveryAmount,
+        createdAt: new Date(),
+        items: deliveredItems.map((item) => ({
+          product: item.product,
+          quantity: Number(item.quantity),
+          price: 0,
+        })),
+      });
+      order.deliveredInvoiceNumber = deliveredInvoiceNo;
+    }
+
     order.status = totalDelivered >= totalOrdered ? "delivered" : "partial_delivered";
     order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
     await order.save();
@@ -570,18 +594,45 @@ const getDeliveredInvoice = async (req, res) => {
     if (order.totalDeliveredQuantity === 0) {
       return res.status(400).json({ message: "No delivered quantity" });
     }
-    
-    // ✅✅✅ USE EXISTING INVOICE NUMBER (DEL-XX) ✅✅✅
-    if (!order.invoiceNumber) {
-      return res.status(400).json({ message: "Invoice will be generated after order is packed" });
+
+    // Accept specific delivered invoice number from query
+    const targetInvoiceNo = req.query.invoiceNumber || order.deliveredInvoiceNumber || order.invoiceNumber;
+    if (!targetInvoiceNo) {
+      return res.status(400).json({ message: "No delivered invoice available" });
     }
-    
-    const invoiceNo = order.invoiceNumber; // ← Use existing DEL-XX
+
+    // If requesting a specific historical delivered invoice, filter the order items to that batch
+    let invoiceOrder = order;
+    if (req.query.invoiceNumber && order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0) {
+      const historyEntry = order.deliveredInvoiceHistory.find(h => h.invoiceNumber === req.query.invoiceNumber);
+      if (!historyEntry) {
+        return res.status(404).json({ message: "Delivered invoice not found in history" });
+      }
+      // Create a filtered order with only delivered items from this batch
+      invoiceOrder = {
+        ...order.toObject(),
+        orderItems: order.orderItems.map(item => {
+          const historyItem = historyEntry.items.find(
+            hi => (hi.product?.toString() || hi.product) === (item.product?._id?.toString() || item.product?.toString())
+          );
+          if (historyItem) {
+            return {
+              ...item.toObject(),
+              deliveredQuantity: historyItem.quantity,
+              orderedQuantity: historyItem.quantity,
+            };
+          }
+          return { ...item.toObject(), deliveredQuantity: 0, orderedQuantity: 0 };
+        }).filter(item => item.orderedQuantity > 0),
+      };
+    }
+
+    const invoiceNo = req.query.invoiceNumber || order.deliveredInvoiceNumber || order.invoiceNumber;
     const filename = `delivered-invoice-${invoiceNo}.pdf`;
     
     const designType = req.query.type === "preprinted" ? "preprinted" : "normal";
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateDaddysInvoicePDF(doc, order, invoiceNo, "TAX INVOICE", designType);
+      await generateDaddysInvoicePDF(doc, invoiceOrder, invoiceNo, "TAX INVOICE", designType);
     });
 
     const suffix = designType === "preprinted" ? "-preprinted" : "";

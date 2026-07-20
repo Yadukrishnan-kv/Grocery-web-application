@@ -210,6 +210,32 @@ const DeliveredOrdersList = () => {
     }
   };
 
+  // Download delivered invoice (specific batch from deliveredInvoiceHistory)
+  const downloadDeliveredInvoice = async (orderId, invoiceNumber, type = "normal") => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?invoiceNumber=${invoiceNumber}&type=${type}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        },
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.setAttribute("download", `delivered-invoice-${invoiceNumber}${suffix}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`Delivered invoice ${invoiceNumber} downloaded`);
+    } catch (err) {
+      toast.error("Failed to download delivered invoice");
+    }
+  };
+
   const getDeliveryStatus = (order) => {
     const totalOrdered =
       order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
@@ -438,31 +464,75 @@ const DeliveredOrdersList = () => {
                           <td>{formatDate(order.orderDate)}</td>
 
                           <td>
-                            <button
-                              className="invoice-btn"
-                              onClick={() => {
-                                setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
-                                setShowInvoiceModal(true);
-                              }}
-                            >
-                              Download Invoice
-                            </button>
+                            <div className="actions-cell-stack">
+                              {/* Packed Invoices */}
+                              {order.invoiceHistory && order.invoiceHistory.length > 0 && (
+                                <div className="invoice-section">
+                                  <span className="invoice-section-label">Packed</span>
+                                  <div className="invoice-buttons-group">
+                                    {order.invoiceHistory.map((inv, i) => (
+                                      <button
+                                        key={i}
+                                        className="invoice-btn packed-invoice-btn"
+                                        onClick={() => {
+                                          setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                          setShowInvoiceModal(true);
+                                        }}
+                                      >
+                                        📄 {inv.invoiceNumber}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
-                            {isPacked ? (
-                              <button
-                                className="deliver-btn"
-                                onClick={() => openDeliveryModal(order)}
-                                disabled={deliveringOrderId === order._id}
-                              >
-                                {deliveringOrderId === order._id
-                                  ? "Delivering..."
-                                  : "Deliver"}
-                              </button>
-                            ) : (
-                              <span className="completed-text">
-                                Awaiting Packing
-                              </span>
-                            )}
+                              {/* Delivered Invoices */}
+                              {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 && (
+                                <div className="invoice-section">
+                                  <span className="invoice-section-label delivered">Delivered</span>
+                                  <div className="invoice-buttons-group">
+                                    {order.deliveredInvoiceHistory.map((inv, i) => (
+                                      <button
+                                        key={i}
+                                        className="invoice-btn delivered-invoice-btn"
+                                        onClick={() => downloadDeliveredInvoice(order._id, inv.invoiceNumber)}
+                                      >
+                                        🧾 {inv.invoiceNumber}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Fallback: single packed invoice */}
+                              {(!order.invoiceHistory || order.invoiceHistory.length === 0) && order.invoiceNumber && (
+                                <button
+                                  className="invoice-btn"
+                                  onClick={() => {
+                                    setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                    setShowInvoiceModal(true);
+                                  }}
+                                >
+                                  Download Invoice
+                                </button>
+                              )}
+
+                              {isPacked ? (
+                                <button
+                                  className="deliver-btn"
+                                  onClick={() => openDeliveryModal(order)}
+                                  disabled={deliveringOrderId === order._id}
+                                >
+                                  {deliveringOrderId === order._id
+                                    ? "Delivering..."
+                                    : "Deliver"}
+                                </button>
+                              ) : (
+                                <span className="completed-text">
+                                  Awaiting Packing
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

@@ -1052,3 +1052,62 @@
 tr.ready-to-deliver {
   background-color: #ecfdf5;
 }
+
+/* Invoice Buttons Group */
+.invoice-buttons-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.invoice-buttons-group .invoice-btn {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  margin-right: 0;
+  white-space: nowrap;
+}
+
+/* Actions Cell Stack */
+.actions-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Invoice Section */
+.invoice-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.invoice-section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6366f1;
+}
+
+.invoice-section-label.delivered {
+  color: #059669;
+}
+
+/* Packed Invoice Button */
+.packed-invoice-btn {
+  background: #8b5cf6 !important;
+}
+
+.packed-invoice-btn:hover {
+  background: #7c3aed !important;
+}
+
+/* Delivered Invoice Button */
+.delivered-invoice-btn {
+  background: #10b981 !important;
+}
+
+.delivered-invoice-btn:hover {
+  background: #059669 !important;
+}

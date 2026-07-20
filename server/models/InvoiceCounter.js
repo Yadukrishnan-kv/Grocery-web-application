@@ -5,6 +5,10 @@ const invoiceCounterSchema = new Schema({
     type: Number,
     default: 0
   },
+  deliveredInvoiceCount: {
+    type: Number,
+    default: 0
+  },
   returnCount: {
     type: Number,
     default: 0

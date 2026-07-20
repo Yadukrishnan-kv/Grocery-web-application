@@ -356,21 +356,39 @@ const StorekeeperOrders = () => {
                           <td>{formatDate(order.orderDate)}</td>
 
                           <td>
-                            {/* ✅ Download button uses current invoiceNumber */}
                             {order.packedStatus &&
-                              order.packedStatus !== "not_packed" && (
+                              order.packedStatus !== "not_packed" &&
+                              order.invoiceHistory &&
+                              order.invoiceHistory.length > 0 ? (
+                                <div className="invoice-buttons-group">
+                                  {order.invoiceHistory.map((inv, i) => (
+                                    <button
+                                      key={i}
+                                      className="order-list-icon-button order-list-view-button invoice-btn"
+                                      onClick={() => {
+                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                        setShowInvoiceModal(true);
+                                      }}
+                                      title={`Download ${inv.invoiceNumber}`}
+                                    >
+                                      📄 {inv.invoiceNumber}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : order.packedStatus &&
+                                order.packedStatus !== "not_packed" &&
+                                order.invoiceNumber ? (
                                 <button
                                   className="order-list-icon-button order-list-view-button"
                                   onClick={() => {
                                     setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
                                     setShowInvoiceModal(true);
                                   }}
-                                  title={`Download invoice ${order.invoiceNumber || "N/A"}`}
-                                  disabled={!order.invoiceNumber}
+                                  title={`Download invoice ${order.invoiceNumber}`}
                                 >
                                   📄 Invoice
                                 </button>
-                              )}
+                              ) : null}
                           </td>
                         </tr>
                       );

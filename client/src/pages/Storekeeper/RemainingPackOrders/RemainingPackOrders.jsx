@@ -288,7 +288,23 @@ const RemainingPackOrders = () => {
                           </td>
 
                           <td className="actions-cell">
-                            {order.invoiceNumber && (
+                            {order.invoiceHistory && order.invoiceHistory.length > 0 ? (
+                              <div className="invoice-buttons-group">
+                                {order.invoiceHistory.map((inv, i) => (
+                                  <button
+                                    key={i}
+                                    className="order-list-icon-button order-list-view-button invoice-btn"
+                                    onClick={() => {
+                                      setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                      setShowInvoiceModal(true);
+                                    }}
+                                    title={`Download ${inv.invoiceNumber}`}
+                                  >
+                                    📄 {inv.invoiceNumber}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : order.invoiceNumber ? (
                               <button
                                 className="order-list-icon-button order-list-view-button"
                                 onClick={() => {
@@ -299,7 +315,7 @@ const RemainingPackOrders = () => {
                               >
                                 📄 Invoice ({order.invoiceNumber})
                               </button>
-                            )}
+                            ) : null}
                           </td>
 
                           <td className="pack-cell">

@@ -377,8 +377,23 @@ const OrderArrivedList = () => {
 
                         <td>
                           <div className="order-arrived-action-buttons">
-                            {/* ✅ Added: Invoice Download Button (same as DeliveredOrdersList) */}
-                            {order.invoiceNumber && (
+                            {order.invoiceHistory && order.invoiceHistory.length > 0 ? (
+                              <div className="invoice-buttons-group">
+                                {order.invoiceHistory.map((inv, i) => (
+                                  <button
+                                    key={i}
+                                    className="invoice-btn"
+                                    onClick={() => {
+                                      setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                      setShowInvoiceModal(true);
+                                    }}
+                                    title={`Download ${inv.invoiceNumber}`}
+                                  >
+                                    📄 {inv.invoiceNumber}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : order.invoiceNumber ? (
                               <button
                                 className="invoice-btn"
                                 onClick={() => {
@@ -389,7 +404,7 @@ const OrderArrivedList = () => {
                               >
                                 📄 Invoice
                               </button>
-                            )}
+                            ) : null}
 
                             <button
                               className="order-arrived-accept-button"
