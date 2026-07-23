@@ -448,11 +448,10 @@ const BillWallet = () => {
                   </thead>
                   <tbody>
                     {receivedTx.map((tx, idx) => {
-                      const invoiceNo =
-                        tx.invoiceNumber ||
-                        tx.bill?.invoiceNumber ||
-                        tx.order?.invoiceNumber ||
-                        "N/A";
+                      const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
+                        ? tx.bill.packingInvoiceNumbers
+                        : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
+                      const invoiceNoDisplay = invoiceNos.join(", ");
                       const isProcessing = processingId === tx._id;
                       return (
                         <tr
@@ -478,7 +477,7 @@ const BillWallet = () => {
                           </td>
                           <td>{tx.customer?.name || "—"}</td>
                           <td>
-                            <strong>{invoiceNo}</strong>
+                            <strong>{invoiceNoDisplay}</strong>
                           </td>
                           <td>{tx.amount.toFixed(2)}</td>
                           <td>{tx.method?.toUpperCase() || "—"}</td>
@@ -582,11 +581,10 @@ const BillWallet = () => {
                   <tbody>
                     {filteredRequests.map((req, idx) => {
                       const tx = req.transaction || {};
-                      const invoiceNo =
-                        tx.invoiceNumber ||
-                        tx.bill?.invoiceNumber ||
-                        tx.order?.invoiceNumber ||
-                        "N/A";
+                      const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
+                        ? tx.bill.packingInvoiceNumbers
+                        : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
+                      const invoiceNoDisplay = invoiceNos.join(", ");
                       return (
                         <tr
                           key={req._id}
@@ -611,7 +609,7 @@ const BillWallet = () => {
                           </td>
                           <td>{tx.customer?.name || "—"}</td>
                           <td>
-                            <strong>{invoiceNo}</strong>
+                            <strong>{invoiceNoDisplay}</strong>
                           </td>
                           <td>{req.amount?.toFixed(2)}</td>
                           <td>{req.method?.toUpperCase() || "—"}</td>
@@ -675,11 +673,10 @@ const BillWallet = () => {
                   </thead>
                   <tbody>
                     {paidTx.map((tx, idx) => {
-                      const invoiceNo =
-                        tx.invoiceNumber ||
-                        tx.bill?.invoiceNumber ||
-                        tx.order?.invoiceNumber ||
-                        "N/A";
+                      const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
+                        ? tx.bill.packingInvoiceNumbers
+                        : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
+                      const invoiceNoDisplay = invoiceNos.join(", ");
                       return (
                         <tr key={tx._id}>
                           <td>{idx + 1}</td>
@@ -689,7 +686,7 @@ const BillWallet = () => {
                           </td>
                           <td>{tx.customer?.name || "—"}</td>
                           <td>
-                            <strong>{invoiceNo}</strong>
+                            <strong>{invoiceNoDisplay}</strong>
                           </td>
                           <td>{tx.amount.toFixed(2)}</td>
                           <td>{tx.method?.toUpperCase() || "—"}</td>

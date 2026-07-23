@@ -67,12 +67,15 @@ const getMyPaymentRequests = async (req, res) => {
     }
     
     const requests = await PaymentRequest.find({ recipient: req.user._id })
-      .populate("bill", "amountDue totalUsed dueDate status invoiceNumber")  // ✅ Include invoiceNumber
-      .populate("customer", "name")
       .populate({
-        path: "bill.orders",  // ✅ Populate orders to get invoiceNumber
-        select: "invoiceNumber"
+        path: "bill",
+        select: "amountDue totalUsed dueDate status invoiceNumber packingInvoiceNumbers orders totalExclVat totalVatAmount grandTotal",
+        populate: {
+          path: "orders",
+          select: "invoiceNumber invoiceHistory deliveredInvoiceNumber deliveredInvoiceHistory"
+        }
       })
+      .populate("customer", "name")
       .sort({ createdAt: -1 });
     
     res.json(requests);

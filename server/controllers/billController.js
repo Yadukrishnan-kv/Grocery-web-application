@@ -311,7 +311,7 @@ const getCustomerBillById = async (req, res) => {
 };
 
 // ✅ FIXED: createInvoiceBasedBill - Properly handles VAT-inclusive amounts and credit limit used
-const createInvoiceBasedBill = async (order, specificAmount = null, specificInvoiceNumber = null) => {
+const createInvoiceBasedBill = async (order, specificAmount = null, specificInvoiceNumber = null, packingInvoiceNumbers = null) => {
   try {
     const customer = await Customer.findById(order.customer);
     if (!customer || customer.statementType !== "invoice-based") {
@@ -389,6 +389,11 @@ const createInvoiceBasedBill = async (order, specificAmount = null, specificInvo
       status: "pending",
       orders: [order._id],
       invoiceNumber: specificInvoiceNumber || order.invoiceNumber || `BILL-${order._id.toString().slice(-8)}`,
+      packingInvoiceNumbers: (packingInvoiceNumbers && packingInvoiceNumbers.length > 0)
+        ? packingInvoiceNumbers
+        : (order.invoiceHistory && order.invoiceHistory.length > 0)
+          ? [...new Set(order.invoiceHistory.map(h => h.invoiceNumber).filter(Boolean))]
+          : [specificInvoiceNumber || order.invoiceNumber].filter(Boolean),
       isOpeningBalance: false,
       // ✅ Store VAT breakdown for reporting
       totalExclVat: parseFloat(totalExclVat.toFixed(2)),
@@ -606,8 +611,11 @@ const getBillReceipt = async (req, res) => {
       y += 11;
     };
 
-    printRow("Receipt No:", displayReceiptNo);
-    printRow("Invoice No:", bill.invoiceNumber || receiptTransaction?.order?.invoiceNumber || "N/A");
+
+    const displayInvoiceNo = (bill.packingInvoiceNumbers && bill.packingInvoiceNumbers.length > 0)
+      ? bill.packingInvoiceNumbers.join(", ")
+      : (bill.invoiceNumber || receiptTransaction?.order?.invoiceNumber || "N/A");
+    printRow("Invoice No:", displayInvoiceNo);
     printRow("Date:", new Date(receiptTransaction?.createdAt || bill.updatedAt || bill.createdAt || Date.now()).toLocaleDateString("en-IN"));
 
     y = drawDashedLine(y + 2);

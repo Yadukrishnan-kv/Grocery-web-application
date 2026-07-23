@@ -9,10 +9,14 @@ const getMyTransactions = async (req, res) => {
   try {
     const transactions = await BillTransaction.find({ recipient: req.user._id })
       .populate("customer", "name")
-      .populate("bill", "amountDue status invoiceNumber totalExclVat totalVatAmount grandTotal")
+      .populate({
+        path: "bill",
+        select: "amountDue status invoiceNumber packingInvoiceNumbers orders totalExclVat totalVatAmount grandTotal",
+        populate: { path: "orders", select: "invoiceNumber invoiceHistory" }
+      })
       .populate({
         path: "order",
-        select: "invoiceNumber totalAmount totalExclVat totalVatAmount grandTotal"
+        select: "invoiceNumber invoiceHistory totalAmount totalExclVat totalVatAmount grandTotal"
       })
       .sort({ createdAt: -1 });
     
@@ -158,7 +162,7 @@ const getAdminPending = async (req, res) => {
         path: "transaction",
         populate: [
           { path: "customer", select: "name" },
-          { path: "bill", select: "_id" }
+          { path: "bill", select: "_id invoiceNumber packingInvoiceNumbers" }
         ]
       })
       .populate("sender", "username role")
@@ -175,7 +179,7 @@ const getAdminAll = async (req, res) => {
     const transactions = await BillTransaction.find({})
       .populate("recipient", "username role")
       .populate("customer", "name")
-      .populate("bill", "_id")
+      .populate("bill", "_id invoiceNumber packingInvoiceNumbers")
       .populate({
         path: "adminRequest",  // Virtual populate (see Step 2)
         select: "status updatedAt",
@@ -229,7 +233,7 @@ const generateReceipt = async (req, res) => {
   try {
     const { transactionId } = req.params;
     const transaction = await BillTransaction.findById(transactionId)
-      .populate("bill", "invoiceNumber batchReceiptNumber")
+      .populate("bill", "invoiceNumber batchReceiptNumber packingInvoiceNumbers")
       .populate("customer", "name phoneNumber address user")
       .populate("recipient", "username role")
       .populate("order", "invoiceNumber");
@@ -256,7 +260,9 @@ const generateReceipt = async (req, res) => {
     }
 
     const company = await CompanySettings.findOne() || { companyName: "Company" };
-    const invoiceNo = transaction.invoiceNumber || transaction.order?.invoiceNumber || transaction.bill?.invoiceNumber || "N/A";
+    const invoiceNo = (transaction.bill && transaction.bill.packingInvoiceNumbers && transaction.bill.packingInvoiceNumbers.length > 0)
+      ? transaction.bill.packingInvoiceNumbers.join(", ")
+      : (transaction.invoiceNumber || transaction.order?.invoiceNumber || transaction.bill?.invoiceNumber || "N/A");
     const paidAmount = transaction.amount || 0;
     const customer = transaction.customer;
     
@@ -323,7 +329,7 @@ const generateReceipt = async (req, res) => {
     y += 14;
     y = drawDashedLine(y);
 
-    printRow("Receipt No:", `REC-${transaction._id.toString().slice(-6)}`);
+
     printRow("Invoice No:", invoiceNo);
     printRow("Date:", new Date(transaction.createdAt).toLocaleDateString("en-IN"));
 
@@ -385,7 +391,7 @@ const generateBulkReceipt = async (req, res) => {
     // Fetch all transactions with order and invoice info
     const transactions = await BillTransaction.find({ _id: { $in: transactionIds } })
       .populate("customer", "name address")
-      .populate("bill", "_id totalUsed amountDue paidAmount batchReceiptNumber invoiceNumber") // ✅ Ensure invoiceNumber is populated
+      .populate("bill", "_id totalUsed amountDue paidAmount batchReceiptNumber invoiceNumber packingInvoiceNumbers") // ✅ Ensure invoiceNumber is populated
       .populate("recipient", "username")
       .populate("order", "invoiceNumber");
 
@@ -422,7 +428,8 @@ const generateBulkReceipt = async (req, res) => {
 
     // ✅ Improved filename: Use unique invoices or generic
     const uniqueInvoices = [...new Set(transactions.map(tx => 
-      tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "NA"
+      (tx.bill?.packingInvoiceNumbers && tx.bill.packingInvoiceNumbers.length > 0) ? tx.bill.packingInvoiceNumbers.join("_") :
+      (tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "NA")
     ))];
     let suggestedFilename = uniqueInvoices.length === 1 && uniqueInvoices[0] !== "NA" 
       ? `bulk-receipt-${uniqueInvoices[0]}` 
@@ -472,9 +479,11 @@ const generateBulkReceipt = async (req, res) => {
 
      
 
-      // ✅ FIXED PRIORITY: bill.invoiceNumber > tx.invoiceNumber > tx.order.invoiceNumber
+      // ✅ FIXED PRIORITY: bill.packingInvoiceNumbers > bill.invoiceNumber > tx.invoiceNumber > tx.order.invoiceNumber
       // This ensures DEL-01 shows for its bill, even if order is shared/updated
-      const invoiceNum = tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "N/A";
+      const invoiceNum = (tx.bill?.packingInvoiceNumbers && tx.bill.packingInvoiceNumbers.length > 0)
+        ? tx.bill.packingInvoiceNumbers.join(", ")
+        : (tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "N/A");
       doc.text(invoiceNum, tableX + colWidth * 2, rowY, { width: colWidth });
 
       doc.text((tx.amount || 0).toFixed(2), tableX + colWidth * 3, rowY, { width: colWidth, align: "right" });

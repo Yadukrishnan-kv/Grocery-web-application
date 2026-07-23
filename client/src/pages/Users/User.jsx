@@ -376,7 +376,7 @@ const User = () => {
             </div>
 
             {isSalesmanRole && (
-              <>
+              <div style={{ marginTop: '20px' }}>
                 <div className="form-row">
                   <div className="form-group">
                     <label htmlFor="emiratesName">Emirates</label>
@@ -430,7 +430,7 @@ const User = () => {
                     )}
                   </div>
                 </div>
-              </>
+              </div>
             )}
 
             <button

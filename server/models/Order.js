@@ -125,6 +125,7 @@ const orderSchema = new Schema(
             product: { type: Schema.Types.ObjectId, ref: "Product" },
             quantity: Number,
             price: Number,
+            deliveredQuantity: { type: Number, default: 0, min: 0 },
           },
         ],
       },

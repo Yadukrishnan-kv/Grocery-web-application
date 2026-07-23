@@ -92,26 +92,29 @@ const CustomerOrderReports = () => {
     });
   }, [orders, searchTerm, fromDate, toDate]);
 
-  const downloadDeliveredInvoice = async (orderId, type = "normal") => {
+  const downloadDeliveredInvoice = async (orderId, invoiceNumber, type = "normal") => {
     setDownloadingOrderId(orderId);
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?type=${type}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        },
-      );
+      let url = `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?type=${type}`;
+      if (invoiceNumber) {
+        url += `&invoiceNumber=${encodeURIComponent(invoiceNumber)}`;
+      }
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `delivered-invoice-${orderId}.pdf`);
+      link.href = blobUrl;
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.setAttribute("download", `delivered-invoice-${invoiceNumber || orderId}${suffix}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success(`Invoice ${invoiceNumber || ""} downloaded`);
     } catch (err) {
       console.error("Error downloading delivered invoice:", err);
       toast.error(
@@ -326,7 +329,20 @@ const CustomerOrderReports = () => {
 
                           <td>
                             <div className="customer-reports-action-buttons">
-                              {hasDelivered && (
+                              {hasDelivered && order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
+                                order.deliveredInvoiceHistory.map((inv, i) => (
+                                  <button
+                                    key={i}
+                                    className="customer-reports-invoice-button delivered"
+                                    onClick={() => downloadDeliveredInvoice(order._id, inv.invoiceNumber)}
+                                    disabled={downloadingOrderId === order._id}
+                                  >
+                                    {downloadingOrderId === order._id
+                                      ? "Downloading..."
+                                      : `🧾 ${inv.invoiceNumber} (${inv.quantity} qty)`}
+                                  </button>
+                                ))
+                              ) : hasDelivered ? (
                                 <button
                                   className="customer-reports-invoice-button delivered"
                                   onClick={() => downloadDeliveredInvoice(order._id)}
@@ -336,7 +352,7 @@ const CustomerOrderReports = () => {
                                     ? "Downloading..."
                                     : "Delivered Invoice"}
                                 </button>
-                              )}
+                              ) : null}
                             </div>
                           </td>
                         </tr>

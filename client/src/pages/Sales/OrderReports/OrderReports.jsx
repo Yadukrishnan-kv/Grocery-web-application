@@ -16,7 +16,7 @@ const OrderReports = () => {
   const [user, setUser] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [pendingInvoiceOrderId, setPendingInvoiceOrderId] = useState(null);
+  const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
 
   // New filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -121,27 +121,29 @@ const OrderReports = () => {
     });
   }, [orders, searchTerm, fromDate, toDate]);
 
-  const downloadDeliveredInvoice = async (orderId, type = "normal") => {
+  const downloadDeliveredInvoice = async (orderId, invoiceNumber, type = "normal") => {
     setDownloadingOrderId(orderId);
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?type=${type}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        },
-      );
+      let url = `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?type=${type}`;
+      if (invoiceNumber) {
+        url += `&invoiceNumber=${encodeURIComponent(invoiceNumber)}`;
+      }
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `delivered-invoice-${orderId}.pdf`);
+      link.href = blobUrl;
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.setAttribute("download", `delivered-invoice-${invoiceNumber || orderId}${suffix}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Invoice downloaded");
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success(`Invoice ${invoiceNumber || ""} downloaded`);
     } catch (error) {
       console.error("Error downloading delivered invoice:", error);
       if (error.response?.status === 400) {
@@ -364,11 +366,27 @@ const OrderReports = () => {
 
                           <td>
                             <div className="order-reports-action-buttons">
-                              {hasDelivered && (
+                              {hasDelivered && order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
+                                order.deliveredInvoiceHistory.map((inv, i) => (
+                                  <button
+                                    key={i}
+                                    className="order-reports-invoice-button delivered"
+                                    onClick={() => {
+                                      setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                      setShowInvoiceModal(true);
+                                    }}
+                                    disabled={downloadingOrderId === order._id}
+                                  >
+                                    {downloadingOrderId === order._id
+                                      ? "Downloading..."
+                                      : `🧾 ${inv.invoiceNumber} (${inv.quantity} qty)`}
+                                  </button>
+                                ))
+                              ) : hasDelivered ? (
                                 <button
                                   className="order-reports-invoice-button delivered"
                                   onClick={() => {
-                                    setPendingInvoiceOrderId(order._id);
+                                    setPendingInvoiceData({ orderId: order._id, invoiceNumber: null });
                                     setShowInvoiceModal(true);
                                   }}
                                   disabled={downloadingOrderId === order._id}
@@ -377,7 +395,7 @@ const OrderReports = () => {
                                     ? "Downloading..."
                                     : "Delivered Invoice"}
                                 </button>
-                              )}
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -396,7 +414,9 @@ const OrderReports = () => {
         onClose={() => setShowInvoiceModal(false)}
         onSelect={(type) => {
           setShowInvoiceModal(false);
-          downloadDeliveredInvoice(pendingInvoiceOrderId, type);
+          if (pendingInvoiceData) {
+            downloadDeliveredInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+          }
         }}
       />
     </div>

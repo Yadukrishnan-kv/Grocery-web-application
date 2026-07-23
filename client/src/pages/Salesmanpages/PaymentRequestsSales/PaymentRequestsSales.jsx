@@ -8,6 +8,40 @@ import axios from "axios";
 import "../../DeliveryPartner/PaymentRequestsDelivery/PaymentRequests.css";
 
 const PaymentRequestsSales = () => {
+  // Helper: extract all relevant invoice numbers from a bill
+  const getInvoiceNumbers = (bill) => {
+    if (!bill) return ["N/A"];
+    const invoices = [];
+    if (bill.packingInvoiceNumbers && bill.packingInvoiceNumbers.length > 0) {
+      for (const inv of bill.packingInvoiceNumbers) {
+        if (inv && !invoices.includes(inv)) invoices.push(inv);
+      }
+    }
+    if (invoices.length === 0 && bill.invoiceNumber) {
+      invoices.push(bill.invoiceNumber);
+    }
+    if (invoices.length === 0 && bill.orders && bill.orders.length > 0) {
+      for (const order of bill.orders) {
+        if (order.invoiceHistory && order.invoiceHistory.length > 0) {
+          for (const inv of order.invoiceHistory) {
+            if (inv.invoiceNumber && !invoices.includes(inv.invoiceNumber)) {
+              invoices.push(inv.invoiceNumber);
+            }
+          }
+        }
+        if (order.invoiceNumber && !invoices.includes(order.invoiceNumber)) {
+          invoices.push(order.invoiceNumber);
+        }
+      }
+    }
+    if (invoices.length > 0) {
+      return [...new Set(invoices)].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+      );
+    }
+    return ["N/A"];
+  };
+
   const [requests, setRequests] = useState([]);
   const [cashRequests, setCashRequests] = useState([]);
   const [chequeRequests, setChequeRequests] = useState([]);
@@ -167,6 +201,7 @@ const PaymentRequestsSales = () => {
     return pendingBills.filter(
       (bill) =>
         bill.customer?.name?.toLowerCase().includes(term) ||
+        getInvoiceNumbers(bill).join(", ").toLowerCase().includes(term) ||
         bill.invoiceNumber?.toLowerCase().includes(term) ||
         bill._id?.toLowerCase().includes(term)
     );
@@ -178,6 +213,7 @@ const PaymentRequestsSales = () => {
     return billTransactions.filter(
       (tx) =>
         tx.customer?.name?.toLowerCase().includes(term) ||
+        getInvoiceNumbers(tx.bill).join(", ").toLowerCase().includes(term) ||
         tx.order?.invoiceNumber?.toLowerCase().includes(term) ||
         tx.invoiceNumber?.toLowerCase().includes(term) ||
         tx.bill?.invoiceNumber?.toLowerCase().includes(term)
@@ -191,6 +227,7 @@ const PaymentRequestsSales = () => {
     return cashRequests.filter(
       (req) =>
         req.customer?.name?.toLowerCase().includes(term) ||
+        getInvoiceNumbers(req.bill).join(", ").toLowerCase().includes(term) ||
         req.invoiceNumber?.toLowerCase().includes(term) ||
         req._id?.toLowerCase().includes(term)
     );
@@ -203,6 +240,7 @@ const PaymentRequestsSales = () => {
     return chequeRequests.filter(
       (req) =>
         req.customer?.name?.toLowerCase().includes(term) ||
+        getInvoiceNumbers(req.bill).join(", ").toLowerCase().includes(term) ||
         req.invoiceNumber?.toLowerCase().includes(term) ||
         req._id?.toLowerCase().includes(term)
     );
@@ -922,18 +960,14 @@ const PaymentRequestsSales = () => {
                       <th>Date</th>
                       <th>Status</th>
                       <th>Actions</th>
+                      <th>Pay to Admin</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredWalletTx.map((tx, idx) => {
                       const isReady = tx.status === "received";
                       const hasBill = !!tx.bill?._id;
-                      const invoiceNo =
-                        tx.bill?.invoiceNumber ||
-                        tx.invoiceNumber ||
-                        tx.order?.invoiceNumber ||
-                        tx.bill?.orders?.[0]?.invoiceNumber ||
-                        "N/A";
+                      const invoiceNos = getInvoiceNumbers(tx.bill);
                       return (
                         <tr
                           key={tx._id}
@@ -950,7 +984,7 @@ const PaymentRequestsSales = () => {
                           <td>{idx + 1}</td>
                           <td>{tx.customer?.name || "—"}</td>
                           <td>
-                            <strong className="invoice-number-cell">{invoiceNo}</strong>
+                            <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
                           </td>
                           <td>{tx.amount.toFixed(2)}</td>
                           <td>
@@ -969,21 +1003,23 @@ const PaymentRequestsSales = () => {
                             </span>
                           </td>
                           <td className="actions-col">
+                            {hasBill && (
+                              <button
+                                className="download-receipt-btn"
+                                onClick={() => downloadReceipt(tx.bill._id, invoiceNos[0], tx._id)}
+                                title="Download Receipt"
+                              >
+                                Receipt
+                              </button>
+                            )}
+                          </td>
+                          <td className="pay-admin-col">
                             {isReady && (
                               <button
                                 className="pay-admin-btn"
                                 onClick={() => handlePayToAdminClick(tx._id)}
                               >
                                 Pay to Admin
-                              </button>
-                            )}
-                            {hasBill && (
-                              <button
-                                className="download-receipt-btn"
-                                onClick={() => downloadReceipt(tx.bill._id, invoiceNo, tx._id)}
-                                title="Download Receipt"
-                              >
-                                Receipt
                               </button>
                             )}
                           </td>
@@ -1086,10 +1122,7 @@ const PaymentRequestsSales = () => {
                   </thead>
                   <tbody>
                     {filteredPendingBills.map((bill, idx) => {
-                      const invoiceNo =
-                        bill.invoiceNumber ||
-                        bill.orders?.[0]?.invoiceNumber ||
-                        "N/A";
+                      const invoiceNos = getInvoiceNumbers(bill);
                       return (
                         <tr
                           key={bill._id}
@@ -1106,7 +1139,7 @@ const PaymentRequestsSales = () => {
                           <td>{idx + 1}</td>
                           <td>{bill.customer?.name || "—"}</td>
                           <td>
-                            <strong className="invoice-number-cell">{invoiceNo}</strong>
+                            <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
                           </td>
                           <td>{bill.amountDue.toFixed(2)}</td>
                           <td>{new Date(bill.dueDate).toLocaleDateString()}</td>
@@ -1120,7 +1153,7 @@ const PaymentRequestsSales = () => {
                               <button
                                 className="mark-received-btn"
                                 onClick={() =>
-                                  handleMarkReceivedClick(bill._id, bill.amountDue, invoiceNo, bill.grandTotal, bill.paidAmount)
+                                  handleMarkReceivedClick(bill._id, bill.amountDue, invoiceNos.join(", "), bill.grandTotal, bill.paidAmount)
                                 }
                                 disabled={processingId === bill._id}
                               >
@@ -1130,7 +1163,7 @@ const PaymentRequestsSales = () => {
                             {(bill.status === "paid" || bill.status === "partial") && (
                               <button
                                 className="download-receipt-btn"
-                                onClick={() => downloadReceipt(bill._id, invoiceNo)}
+                                onClick={() => downloadReceipt(bill._id, invoiceNos[0])}
                               >
                                 Receipt
                               </button>
@@ -1243,11 +1276,7 @@ const PaymentRequestsSales = () => {
                   </thead>
                   <tbody>
                     {filteredCashRequests.map((req, idx) => {
-                      const invoiceNo =
-                        req.invoiceNumber ||
-                        req.bill?.invoiceNumber ||
-                        req.bill?.orders?.[0]?.invoiceNumber ||
-                        "N/A";
+                      const invoiceNos = getInvoiceNumbers(req.bill);
                       return (
                         <tr
                           key={req._id}
@@ -1264,7 +1293,7 @@ const PaymentRequestsSales = () => {
                           <td>{idx + 1}</td>
                           <td>{req.customer?.name || "—"}</td>
                           <td>
-                            <strong className="invoice-number-cell">{invoiceNo}</strong>
+                            <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
                           </td>
                           <td>{req.amount.toFixed(2)}</td>
                           <td>{new Date(req.createdAt).toLocaleDateString()}</td>
@@ -1399,11 +1428,7 @@ const PaymentRequestsSales = () => {
                   </thead>
                   <tbody>
                     {filteredChequeRequests.map((req, idx) => {
-                      const invoiceNo =
-                        req.invoiceNumber ||
-                        req.bill?.invoiceNumber ||
-                        req.bill?.orders?.[0]?.invoiceNumber ||
-                        "N/A";
+                      const invoiceNos = getInvoiceNumbers(req.bill);
                       return (
                         <tr
                           key={req._id}
@@ -1420,7 +1445,7 @@ const PaymentRequestsSales = () => {
                           <td>{idx + 1}</td>
                           <td>{req.customer?.name || "—"}</td>
                           <td>
-                            <strong className="invoice-number-cell">{invoiceNo}</strong>
+                            <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
                           </td>
                           <td>{req.amount.toFixed(2)}</td>
                           <td>

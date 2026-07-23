@@ -30,6 +30,55 @@ const CustomerBillStatement = () => {
   const [user, setUser] = useState(null);
   const [customerProfile, setCustomerProfile] = useState(null);
 
+  // Helper: extract all relevant invoice numbers from a bill.
+  // Since the backend now correctly stores only the invoices consumed in a given
+  // delivery run inside packingInvoiceNumbers, we can trust it directly:
+  //   Combined delivery (DEL-01 + DEL-02 packed, delivered together) → ["DEL-01", "DEL-02"]
+  //   Split delivery run (DEL-03 delivered alone)                    → ["DEL-03"]
+  //   Split delivery run (DEL-04 delivered alone)                    → ["DEL-04"]
+  const getInvoiceNumbers = (bill) => {
+    if (!bill) return ["N/A"];
+
+    // 1. packingInvoiceNumbers — now always scoped to THIS delivery run.
+    if (bill.packingInvoiceNumbers && bill.packingInvoiceNumbers.length > 0) {
+      const invoices = bill.packingInvoiceNumbers.filter(Boolean);
+      if (invoices.length > 0) {
+        return [...new Set(invoices)].sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+        );
+      }
+    }
+
+    // 2. Fallback to the single invoiceNumber on the bill.
+    if (bill.invoiceNumber) {
+      return [bill.invoiceNumber];
+    }
+
+    // 3. Last resort: scan order-level invoice history.
+    const invoices = [];
+    if (bill.orders && bill.orders.length > 0) {
+      for (const order of bill.orders) {
+        if (order.invoiceHistory && order.invoiceHistory.length > 0) {
+          for (const inv of order.invoiceHistory) {
+            if (inv.invoiceNumber && !invoices.includes(inv.invoiceNumber)) {
+              invoices.push(inv.invoiceNumber);
+            }
+          }
+        }
+        if (order.invoiceNumber && !invoices.includes(order.invoiceNumber)) {
+          invoices.push(order.invoiceNumber);
+        }
+      }
+    }
+    if (invoices.length > 0) {
+      return [...new Set(invoices)].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+      );
+    }
+
+    return ["N/A"];
+  };
+
   // Payment request modal states
   const [showPayModal, setShowPayModal] = useState(false);
   const [billToPay, setBillToPay] = useState(null);
@@ -478,22 +527,20 @@ const getSalesManForCustomer = useCallback(async () => {
                             <td>{formatDate(bill.cycleEnd)}</td>
                             <td>
                               <span>
-                                  {bill.invoiceNumber || 
-                                   bill.orders?.[0]?.invoiceNumber || 
-                                   `DEL-${bill._id.toString().slice(-8)}`}
-                                  {bill.isOpeningBalance && (
-                                    <span style={{ 
-                                      marginLeft: "8px", 
-                                      backgroundColor: "#FFA500", 
-                                      color: "white", 
-                                      padding: "2px 6px", 
-                                      borderRadius: "3px", 
-                                      fontSize: "11px", 
-                                      fontWeight: "bold" 
-                                    }}>
-                                      OB
-                                    </span>
-                                  )}
+                                {getInvoiceNumbers(bill).join(", ")}
+                                {bill.isOpeningBalance && (
+                                  <span style={{ 
+                                    marginLeft: "8px", 
+                                    backgroundColor: "#FFA500", 
+                                    color: "white", 
+                                    padding: "2px 6px", 
+                                    borderRadius: "3px", 
+                                    fontSize: "11px", 
+                                    fontWeight: "bold" 
+                                  }}>
+                                    OB
+                                  </span>
+                                )}
                               </span>
                             </td>
                             <td>
@@ -572,7 +619,7 @@ const getSalesManForCustomer = useCallback(async () => {
                                     handleDownloadReceipt(
                                       bill._id,
                                       bill.receiptTransactionId,
-                                      bill.invoiceNumber || bill._id.toString().slice(-8)
+                                      getInvoiceNumbers(bill).join("_") || bill._id.toString().slice(-8)
                                     )
                                   }
                                 >

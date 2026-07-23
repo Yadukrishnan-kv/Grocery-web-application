@@ -21,6 +21,7 @@ const billSchema = new Schema(
     },
     orders: [{ type: Schema.Types.ObjectId, ref: "Order" }],
     invoiceNumber: { type: String, index: true },
+    packingInvoiceNumbers: [{ type: String }],
     batchReceiptNumber: { type: String },
     isOpeningBalance: { type: Boolean, default: false },
     

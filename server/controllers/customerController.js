@@ -7,12 +7,28 @@ const Role = require("../models/Role");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
-// Generate CustomerId: [3-char emiratesCode][3-char salesmanName][4-digit sequential starting from 1001]
-// Total 10 characters. Sequential number increments until unique.
+// Generate CustomerId: [3-char emiratesCode][3-char salesmanName][4-digit sequential]
+// The sequential number is GLOBAL — it finds the highest suffix across all existing
+// customers and increments from there, so it never resets when a different salesman
+// or Emirates Code is used.
 const generateCustomerId = async (emiratesCode, salesmanName) => {
-  const pad = (str, len) => (str || "XXX").replace(/[^A-Za-z0-9]/g, "").toUpperCase().padEnd(len, "X").slice(0, len);
+  const pad = (str, len) =>
+    (str || "XXX").replace(/[^A-Za-z0-9]/g, "").toUpperCase().padEnd(len, "X").slice(0, len);
   const prefix = pad(emiratesCode, 3) + pad(salesmanName, 3);
-  let counter = 1001;
+
+  // Find the highest 4-digit suffix used across ALL customers (global counter).
+  const allCustomers = await Customer.find({ customerId: /\d{4}$/ }, { customerId: 1, _id: 0 });
+  let maxCounter = 1000;
+  for (const c of allCustomers) {
+    const match = c.customerId && c.customerId.match(/(\d{4})$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxCounter) maxCounter = num;
+    }
+  }
+
+  // Start from maxCounter+1 and ensure the candidate is unique (safety loop).
+  let counter = maxCounter + 1;
   let candidate = prefix + String(counter);
   while (await Customer.exists({ customerId: candidate })) {
     counter++;
@@ -20,6 +36,7 @@ const generateCustomerId = async (emiratesCode, salesmanName) => {
   }
   return candidate;
 };
+
 
 const createCustomer = async (req, res) => {
   try {

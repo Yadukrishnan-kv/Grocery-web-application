@@ -62,15 +62,20 @@ const DeliveryManOrderReports = () => {
     fetchAllAcceptedOrders();
   }, [fetchCurrentUser, fetchAllAcceptedOrders]);
 
-  const downloadDeliveredInvoice = async (orderId, type = "normal") => {
+  const downloadDeliveredInvoice = async (orderId, invoiceNumber, type = "normal") => {
     setDownloadingOrderId(orderId);
     try {
       const token = localStorage.getItem('token');
       
+      let url = `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?token=${token}&type=${type}`;
+      if (invoiceNumber) {
+        url += `&invoiceNumber=${encodeURIComponent(invoiceNumber)}`;
+      }
       // Create a temporary link element for direct download
       const link = document.createElement('a');
-      link.href = `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?token=${token}&type=${type}`;
-      link.download = type === "preprinted" ? `delivered-invoice-${orderId}-preprinted.pdf` : `delivered-invoice-${orderId}.pdf`;
+      link.href = url;
+      const suffix = type === "preprinted" ? "-preprinted" : "";
+      link.download = `delivered-invoice-${invoiceNumber || orderId}${suffix}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -180,18 +185,34 @@ const DeliveryManOrderReports = () => {
                           <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                           <td>
                             <div className="action-buttons">
-                              {hasDeliveredQty && (
+                              {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
+                                order.deliveredInvoiceHistory.map((inv, i) => (
+                                  <button
+                                    key={i}
+                                    className="invoice-button delivered"
+                                    onClick={() => {
+                                      setPendingInvoiceData({ type: "delivered", orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                      setShowInvoiceModal(true);
+                                    }}
+                                    disabled={downloadingOrderId === order._id}
+                                  >
+                                    {downloadingOrderId === order._id
+                                      ? 'Downloading...'
+                                      : `🧾 ${inv.invoiceNumber} (${inv.quantity} qty)`}
+                                  </button>
+                                ))
+                              ) : hasDeliveredQty ? (
                                 <button
                                   className="invoice-button delivered"
                                   onClick={() => {
-                                    setPendingInvoiceData({ type: "delivered", orderId: order._id });
+                                    setPendingInvoiceData({ type: "delivered", orderId: order._id, invoiceNumber: null });
                                     setShowInvoiceModal(true);
                                   }}
                                   disabled={downloadingOrderId === order._id}
                                 >
                                   {downloadingOrderId === order._id ? 'Downloading...' : 'Delivered Invoice'}
                                 </button>
-                              )}
+                              ) : null}
                               
                               {hasPendingQty && (
                                 <button
@@ -230,7 +251,7 @@ const DeliveryManOrderReports = () => {
         onSelect={(type) => {
           setShowInvoiceModal(false);
           if (pendingInvoiceData?.type === "delivered") {
-            downloadDeliveredInvoice(pendingInvoiceData.orderId, type);
+            downloadDeliveredInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
           } else if (pendingInvoiceData?.type === "pending") {
             downloadPendingInvoice(pendingInvoiceData.orderId, type);
           }

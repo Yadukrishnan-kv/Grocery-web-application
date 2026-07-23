@@ -440,58 +440,151 @@ const deliverOrder = async (req, res) => {
     const totalOrdered = order.orderItems.reduce((s, i) => s + i.orderedQuantity, 0);
     const totalDelivered = order.orderItems.reduce((s, i) => s + i.deliveredQuantity, 0);
 
-    // Generate delivered invoice number for this delivery batch
-    let deliveredInvoiceNo = order.deliveredInvoiceNumber;
-    if (grandDeliveryAmount > 0) {
-      const dCounter = await InvoiceCounter.findOneAndUpdate(
-        {},
-        { $inc: { deliveredInvoiceCount: 1 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
+    // ── Match delivered items to packing invoices ──────────────────────────
+    // For each delivered item, find which packing invoices (DEL-XX) still had
+    // remaining quantity for that product and deduct accordingly.
+    const packingInvoiceMap = new Map(); // invoiceNumber → true (deduplicated)
+    const invoiceDeliveries = new Map(); // invoiceNumber → array of items delivered
+
+    if (order.invoiceHistory && order.invoiceHistory.length > 0) {
+      // Build remaining-to-deliver per product from this delivery batch
+      const deliveryRemaining = {};
+      for (const dItem of deliveredItems) {
+        // Resolve orderItem._id to product ID
+        const orderItem = order.orderItems.id(dItem.product);
+        const pid = orderItem ? String(orderItem.product) : String(dItem.product);
+        deliveryRemaining[pid] = (deliveryRemaining[pid] || 0) + Number(dItem.quantity);
+      }
+
+      // Process invoices oldest-first so earlier invoices are consumed first
+      const sortedHistory = [...order.invoiceHistory].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
       );
-      deliveredInvoiceNo = `DIV-${String(dCounter.deliveredInvoiceCount).padStart(2, "0")}`;
-      if (!order.deliveredInvoiceHistory) order.deliveredInvoiceHistory = [];
-      order.deliveredInvoiceHistory.push({
-        invoiceNumber: deliveredInvoiceNo,
-        quantity: deliveredItems.reduce((sum, item) => sum + Number(item.quantity), 0),
-        amount: grandDeliveryAmount,
-        createdAt: new Date(),
-        items: deliveredItems.map((item) => ({
-          product: item.product,
-          quantity: Number(item.quantity),
-          price: 0,
-        })),
-      });
-      order.deliveredInvoiceNumber = deliveredInvoiceNo;
+      for (const histEntry of sortedHistory) {
+        if (!histEntry.items || histEntry.items.length === 0) continue;
+        let matched = false;
+        for (const hItem of histEntry.items) {
+          const pid = String(hItem.product);
+          const invRemaining = (hItem.quantity || 0) - (hItem.deliveredQuantity || 0);
+          if (invRemaining > 0 && deliveryRemaining[pid] > 0) {
+            matched = true;
+            break;
+          }
+        }
+        if (matched) {
+          packingInvoiceMap.set(histEntry.invoiceNumber, true);
+          const deliveredUnderThisInvoice = [];
+
+          // Deduct delivered quantities from this invoice's items
+          for (const hItem of histEntry.items) {
+            const pid = String(hItem.product);
+            const invRemaining = (hItem.quantity || 0) - (hItem.deliveredQuantity || 0);
+            if (invRemaining > 0 && deliveryRemaining[pid] > 0) {
+              const consumed = Math.min(invRemaining, deliveryRemaining[pid]);
+              hItem.deliveredQuantity = (hItem.deliveredQuantity || 0) + consumed;
+              deliveryRemaining[pid] -= consumed;
+              if (deliveryRemaining[pid] <= 0) delete deliveryRemaining[pid];
+
+              const orderItem = order.orderItems.find(oi => String(oi.product) === pid);
+
+              deliveredUnderThisInvoice.push({
+                product: hItem.product,
+                quantity: consumed,
+                price: hItem.price || (orderItem ? orderItem.price : 0),
+                vatPercentage: orderItem ? (orderItem.vatPercentage || 5) : 5,
+                orderItemTotalAmount: orderItem ? orderItem.totalAmount : null,
+                orderItemOrderedQuantity: orderItem ? orderItem.orderedQuantity : null,
+              });
+            }
+          }
+
+          if (deliveredUnderThisInvoice.length > 0) {
+            invoiceDeliveries.set(histEntry.invoiceNumber, deliveredUnderThisInvoice);
+          }
+        }
+        // Stop early if all delivery items have been matched
+        if (Object.keys(deliveryRemaining).length === 0) break;
+      }
+    }
+
+    // Now record the delivered invoices under deliveredInvoiceHistory
+    let lastDeliveredInvoiceNo = order.deliveredInvoiceNumber;
+    if (!order.deliveredInvoiceHistory) order.deliveredInvoiceHistory = [];
+
+    if (invoiceDeliveries.size > 0) {
+      for (const [invNo, itemsList] of invoiceDeliveries.entries()) {
+        const totalQty = itemsList.reduce((sum, item) => sum + item.quantity, 0);
+        let totalAmount = 0;
+        for (const item of itemsList) {
+          const qtyToDeliver = item.quantity;
+          const ratio = qtyToDeliver / (item.orderItemOrderedQuantity || qtyToDeliver);
+          const itemTotalWithVat = item.orderItemTotalAmount
+            ? item.orderItemTotalAmount * ratio
+            : qtyToDeliver * item.price * (1 + (item.vatPercentage || 5) / 100);
+          totalAmount += parseFloat(itemTotalWithVat.toFixed(2));
+        }
+
+        order.deliveredInvoiceHistory.push({
+          invoiceNumber: invNo,
+          quantity: totalQty,
+          amount: parseFloat(totalAmount.toFixed(2)),
+          createdAt: new Date(),
+          items: itemsList.map(item => ({
+            product: item.product,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+        });
+        lastDeliveredInvoiceNo = invNo;
+      }
+      order.deliveredInvoiceNumber = lastDeliveredInvoiceNo;
+    } else {
+      // Fallback: If no packing invoice was matched, keep the packing time format (DEL-xx)
+      if (grandDeliveryAmount > 0) {
+        const invNo = order.invoiceNumber || "DEL-fallback";
+        order.deliveredInvoiceHistory.push({
+          invoiceNumber: invNo,
+          quantity: deliveredItems.reduce((sum, item) => sum + Number(item.quantity), 0),
+          amount: parseFloat(grandDeliveryAmount.toFixed(2)),
+          createdAt: new Date(),
+          items: deliveredItems.map((item) => {
+            const orderItem = order.orderItems.id(item.product);
+            return {
+              product: orderItem ? orderItem.product : item.product,
+              quantity: Number(item.quantity),
+              price: orderItem ? orderItem.price : 0,
+            };
+          }),
+        });
+        order.deliveredInvoiceNumber = invNo;
+      }
     }
 
     order.status = totalDelivered >= totalOrdered ? "delivered" : "partial_delivered";
     order.deliveredAt = deliveredAt ? new Date(deliveredAt) : new Date();
+
+    // Use invoiceDeliveries (not packingInvoiceMap) so that only invoices that
+    // had quantity actually consumed in THIS delivery run are recorded on the bill.
+    // packingInvoiceMap can include earlier invoices that were scanned but had no
+    // remaining quantity in this run (e.g. DEL-03 showing up on the DEL-04 bill).
+    const relevantPackingInvoices = [...invoiceDeliveries.keys()];
     await order.save();
 
     // --- Bill Generation: Only if Credit Limit Was Used ---
     const customerForBill = await Customer.findById(order.customer);
-    // Only generate a bill if:
-    // - Payment is credit
-    // - Not cash/cheque
-    // - Statement type is invoice-based
-    // - AND some credit limit was actually used (not pure store credit)
-    // To check if credit limit was used, see if order.invoiceNumber exists AND order.creditLimitUsed > 0
     if (
       order.payment === "credit" &&
       paymentMethod !== "cash" &&
       paymentMethod !== "cheque" &&
       customerForBill?.statementType === "invoice-based" &&
-      order.invoiceNumber && // Invoice created only if credit limit was used in packing
-      order.creditLimitUsed > 0 // ✅ Only generate bill if credit limit was actually used
+      order.invoiceNumber &&
+      order.creditLimitUsed > 0
     ) {
-      // ✅ FIXED: Calculate the proportional credit limit used for delivered items
-      // The bill should only reflect the portion that was deducted from credit limit,
-      // excluding the portion that came from return balance
       const totalPackedAmount = (order.creditLimitUsed || 0) + (order.returnBalanceUsed || 0);
       const creditLimitRatio = totalPackedAmount > 0 ? order.creditLimitUsed / totalPackedAmount : 0;
       const creditLimitUsedForDelivery = parseFloat((grandDeliveryAmount * creditLimitRatio).toFixed(2));
-      
-      const bill = await createInvoiceBasedBill(order, creditLimitUsedForDelivery, order.invoiceNumber);
+
+      const bill = await createInvoiceBasedBill(order, creditLimitUsedForDelivery, order.invoiceNumber, relevantPackingInvoices);
       if (bill) {
         order.bill = bill._id;
         await order.save();

@@ -405,7 +405,7 @@ const generatePaymentReceipt = async (req, res) => {
     y = drawDashedLine(y);
 
     // ===== RECEIPT INFO =====
-    printRow('Receipt No:', `REC-${transaction._id.toString().slice(-6)}`);
+
     printRow('Invoice No:', correctInvoiceNumber);
     printRow('Date:', new Date(transaction.date).toLocaleDateString('en-IN'));
 

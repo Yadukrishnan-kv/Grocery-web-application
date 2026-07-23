@@ -218,7 +218,9 @@ const CustomerOutstandingDetails = () => {
                         <div className="bill-header">
                           <div className="bill-main-info">
                             <div className="bill-invoice">
-                              <span className="invoice-number">{bill.invoiceNumber}</span>
+                              <span className="invoice-number">
+                                {bill.packingInvoiceNumbers?.length > 0 ? bill.packingInvoiceNumbers.join(", ") : bill.invoiceNumber}
+                              </span>
                               {bill.isOpeningBalance && (
                                 <span className="opening-badge">Opening Balance</span>
                               )}
