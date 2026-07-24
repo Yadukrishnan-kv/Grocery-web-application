@@ -131,7 +131,6 @@ const customerSchema = new Schema(
     customerId: {
       type: String,
       trim: true,
-      uppercase: true,
       default: null,
       sparse: true,
     },

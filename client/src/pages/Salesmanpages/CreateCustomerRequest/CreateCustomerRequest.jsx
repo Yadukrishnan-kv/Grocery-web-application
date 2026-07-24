@@ -495,7 +495,7 @@ const CreateCustomerRequest = () => {
             </div>
 
             {/* Customer ID Preview */}
-            {formData.emiratesCode && user?.username && (
+            {formData.emiratesCode && user?._id && (
               <div className="customer-form-row">
                 <div className="customer-form-group">
                   <label>Customer ID Preview</label>
@@ -504,14 +504,15 @@ const CreateCustomerRequest = () => {
                     value={(() => {
                       const pad = (str, len) =>
                         (str || "XXX").replace(/[^A-Za-z0-9]/g, "").toUpperCase().padEnd(len, "X").slice(0, len);
-                      return pad(formData.emiratesCode, 3) + pad(user.username, 3) + "1001+";
+                      const idSuffix = user._id ? user._id.toString().slice(-3) : "ADM";
+                      return pad(formData.emiratesCode, 3) + idSuffix + "1001+";
                     })()}
                     readOnly
                     className="customer-input"
                     style={{ backgroundColor: "#f8fafc", cursor: "default", fontFamily: "monospace", letterSpacing: "0.1em" }}
                   />
                   <small style={{ color: "#888", fontSize: "0.78rem" }}>
-                    Format: [Emirates 3] + [Salesman 3] + [Sequential from 1001]. Exact number assigned on approval.
+                    Format: [Emirates 3] + [Salesman ID last 3] + [Sequential from 1001]. Exact number assigned on approval.
                   </small>
                 </div>
               </div>

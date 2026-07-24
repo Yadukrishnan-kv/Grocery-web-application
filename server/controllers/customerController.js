@@ -7,14 +7,22 @@ const Role = require("../models/Role");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
-// Generate CustomerId: [3-char emiratesCode][3-char salesmanName][4-digit sequential]
+// Generate CustomerId: [3-char emiratesCode][last-3-char of salesman _id][4-digit sequential]
 // The sequential number is GLOBAL — it finds the highest suffix across all existing
 // customers and increments from there, so it never resets when a different salesman
 // or Emirates Code is used.
-const generateCustomerId = async (emiratesCode, salesmanName) => {
+const generateCustomerId = async (emiratesCode, salesmanId) => {
   const pad = (str, len) =>
     (str || "XXX").replace(/[^A-Za-z0-9]/g, "").toUpperCase().padEnd(len, "X").slice(0, len);
-  const prefix = pad(emiratesCode, 3) + pad(salesmanName, 3);
+
+  // Use last 3 chars of salesman's ObjectId, or "ADM" if no salesman assigned
+  let salesmanSuffix = "ADM";
+  if (salesmanId) {
+    const idStr = typeof salesmanId === "string" ? salesmanId : salesmanId.toString();
+    salesmanSuffix = idStr.slice(-3);
+  }
+
+  const prefix = pad(emiratesCode, 3) + salesmanSuffix;
 
   // Find the highest 4-digit suffix used across ALL customers (global counter).
   const allCustomers = await Customer.find({ customerId: /\d{4}$/ }, { customerId: 1, _id: 0 });
@@ -150,21 +158,19 @@ const createCustomer = async (req, res) => {
       role: "Customer",
     });
 
-    // Fetch salesman info for customerId generation and salesman-emirates fields
-    let salesmanUsername = "ADM";
+    // Fetch salesman info for salesman-emirates fields
     let salesmanEmiratesName = null;
     let salesmanEmiratesCode = null;
     if (salesmanId) {
-      const salesman = await User.findById(salesmanId).select("username emiratesName emiratesCode");
+      const salesman = await User.findById(salesmanId).select("emiratesName emiratesCode");
       if (salesman) {
-        salesmanUsername = salesman.username;
         salesmanEmiratesName = salesman.emiratesName || null;
         salesmanEmiratesCode = salesman.emiratesCode || null;
       }
     }
 
-    // CustomerId: [customer's emiratesCode 3] + [salesman name 3] + [4-digit sequential from 1001]
-    const generatedCustomerId = await generateCustomerId(emiratesCode, salesmanUsername);
+    // CustomerId: [customer's emiratesCode 3] + [last-3-char of salesman _id] + [4-digit sequential from 1001]
+    const generatedCustomerId = await generateCustomerId(emiratesCode, salesmanId);
 
     // Create customer with new fields
     const customer = await Customer.create({
@@ -271,7 +277,7 @@ const createCustomer = async (req, res) => {
 
 const getAllCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ name: 1 });
+    const customers = await Customer.find().sort({ createdAt: 1 });
     res.json(customers);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -709,10 +715,9 @@ const acceptCustomerRequest = async (req, res) => {
       role: "Customer",
     });
 
-    const salesmanUser = await User.findById(request.salesman).select("username emiratesName emiratesCode");
-    const salesmanUsername = salesmanUser ? salesmanUser.username : "ADM";
-    // Use the customer's own emiratesCode for customerId generation
-    const generatedCustomerId = await generateCustomerId(request.emiratesCode, salesmanUsername);
+    const salesmanUser = await User.findById(request.salesman).select("emiratesName emiratesCode");
+    // Use the customer's own emiratesCode for customerId generation (salesman _id last 3 chars)
+    const generatedCustomerId = await generateCustomerId(request.emiratesCode, request.salesman);
 
     const customer = await Customer.create({
       user: user._id,
@@ -885,7 +890,7 @@ const getAllCustomersWithDue = async (req, res) => {
   try {
     const customers = await Customer.find()
       .populate("salesman", "username email emiratesName emiratesCode")
-      .sort({ name: 1 });
+      .sort({ createdAt: 1, _id: 1 });
 
     const customersWithDue = await Promise.all(
       customers.map(async (customer) => {
