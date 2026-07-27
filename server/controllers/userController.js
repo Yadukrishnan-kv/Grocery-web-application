@@ -76,7 +76,7 @@ const updateUser = async (req, res) => {
       }
     }
 
-    const userToUpdate = await User.findById(req.params.id);
+    const userToUpdate = await User.findById(req.params.id).select("+password");
     if (!userToUpdate) return res.status(404).json({ message: "User not found" });
 
     userToUpdate.username = username;
@@ -184,36 +184,50 @@ const getMyProfile = async (req, res) => {
   }
 };
 
-// 2. Update basic profile (username & email only)
+// 2. Update basic profile (username, email & optional password change)
 const updateMyProfile = async (req, res) => {
   try {
-    const { username, email } = req.body;
+    const { username, email, currentPassword, newPassword } = req.body;
 
-    if (!username && !email) {
+    if (!username && !email && !newPassword) {
       return res.status(400).json({ message: "No fields to update" });
     }
 
-    const updateFields = {};
-    if (username) updateFields.username = username.trim();
+    const user = await User.findById(req.user._id).select("+password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update username
+    if (username) user.username = username.trim();
+
+    // Update email
     if (email) {
       const existing = await User.findOne({ email: email.trim().toLowerCase() });
       if (existing && existing._id.toString() !== req.user._id.toString()) {
         return res.status(400).json({ message: "Email already in use" });
       }
-      updateFields.email = email.trim().toLowerCase();
+      user.email = email.trim().toLowerCase();
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user._id,
-      updateFields,
-      { new: true, runValidators: true }
-    ).select("username email role salesmanCreditLimit salesmanBalanceCreditLimit emiratesName emiratesCode");
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
+    // Change password if requested
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ message: "Current password is required to change password" });
+      }
+      const isMatch = await user.comparePassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+      user.password = newPassword; // pre-save hook will hash it
     }
 
-    res.json({ message: "Profile updated successfully", user: updatedUser });
+    await user.save();
+
+    const safeUser = await User.findById(user._id).select("username email role salesmanCreditLimit salesmanBalanceCreditLimit emiratesName emiratesCode");
+
+    res.json({ message: "Profile updated successfully", user: safeUser });
   } catch (error) {
     console.error("Update profile error:", error);
     res.status(500).json({ message: "Server error" });

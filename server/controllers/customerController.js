@@ -639,8 +639,8 @@ const createCustomerRequest = async (req, res) => {
       contactPersonName: contactPersonName?.trim() || null,
       contactPersonPhone: contactPersonPhone?.trim() || null,
       contactPersonAddress: contactPersonAddress?.trim() || null,
-      latitude: latitude !== undefined && latitude !== '' ? parseFloat(latitude) : null,
-      longitude: longitude !== undefined && longitude !== '' ? parseFloat(longitude) : null,
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
     });
 
     res.status(201).json({
