@@ -143,7 +143,7 @@ const ChequeWallet = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.info("📄 Receipt downloaded!");
+        toast.success("📄 Receipt downloaded!");
       }
       setTimeout(() => window.URL.revokeObjectURL(url), 10000);
       if (isBulk) setSelectedTxIds([]);

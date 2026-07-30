@@ -107,7 +107,7 @@ const ReturnReceived = () => {
 
   return (
     <div className="rr-layout">
-      <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} user={user} />
+      <Header sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} user={user} />
       <Sidebar
         isOpen={sidebarOpen}
         activeItem="ReturnReceived"

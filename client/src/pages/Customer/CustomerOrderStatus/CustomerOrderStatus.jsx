@@ -38,7 +38,7 @@ const CustomerOrderStatus = () => {
   const fetchOrderDetails = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${backendUrl}/api/orders/customer-order/${id}`, {
+      const response = await axios.get(`${backendUrl}/api/orders/customerorder/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setOrder(response.data);
@@ -88,24 +88,30 @@ const CustomerOrderStatus = () => {
               <span className="value">{order.orderId || order._id}</span>
             </div>
             <div className="info-row">
-              <span className="label">Product:</span>
-              <span className="value">{order.product?.productName || 'N/A'}</span>
+              <span className="label">Products:</span>
+              <span className="value">
+                {(order.orderItems || [])
+                  .map((it) => it.product?.productName || 'N/A')
+                  .join(', ') || 'N/A'}
+              </span>
             </div>
             <div className="info-row">
               <span className="label">Ordered Quantity:</span>
-              <span className="value">{order.orderedQuantity}</span>
+              <span className="value">
+                {(order.orderItems || []).reduce((s, it) => s + (it.orderedQuantity || 0), 0)}
+              </span>
             </div>
             <div className="info-row">
               <span className="label">Delivered Quantity:</span>
-              <span className="value">{order.deliveredQuantity}</span>
-            </div>
-            <div className="info-row">
-              <span className="label">Price:</span>
-              <span className="value">${order.price.toFixed(2)}</span>
+              <span className="value">
+                {(order.orderItems || []).reduce((s, it) => s + (it.deliveredQuantity || 0), 0)}
+              </span>
             </div>
             <div className="info-row">
               <span className="label">Total Amount:</span>
-              <span className="value">${order.totalAmount.toFixed(2)}</span>
+              <span className="value">
+                ${(order.orderItems || []).reduce((s, it) => s + (it.totalAmount || 0), 0).toFixed(2)}
+              </span>
             </div>
             <div className="info-row">
               <span className="label">Payment Method:</span>

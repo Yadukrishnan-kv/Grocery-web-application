@@ -107,7 +107,7 @@ const ReturnPickups = () => {
 
   return (
     <div className="rp-layout">
-      <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} user={user} />
+      <Header sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} user={user} />
       <Sidebar
         isOpen={sidebarOpen}
         activeItem="ReturnPickups"

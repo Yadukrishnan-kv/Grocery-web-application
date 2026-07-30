@@ -83,9 +83,12 @@ const getMe = async (req, res) => {
   res.json({
     user: {
       id: req.user._id,
+      _id: req.user._id,
       username: req.user.username,
       email: req.user.email,
       role: req.user.role,
+      emiratesName: req.user.emiratesName || "",
+      emiratesCode: req.user.emiratesCode || "",
       ...(req.user.role === "Sales man" && {
         salesmanCreditLimit: req.user.salesmanCreditLimit || 0,
         salesmanBalanceCreditLimit: req.user.salesmanBalanceCreditLimit || 0,

@@ -339,7 +339,7 @@ const CustomerOrderReports = () => {
                                   >
                                     {downloadingOrderId === order._id
                                       ? "Downloading..."
-                                      : `🧾 ${inv.invoiceNumber} (${inv.quantity} qty)`}
+                                      : `🧾 ${inv.invoiceNumber}`}
                                   </button>
                                 ))
                               ) : hasDelivered ? (

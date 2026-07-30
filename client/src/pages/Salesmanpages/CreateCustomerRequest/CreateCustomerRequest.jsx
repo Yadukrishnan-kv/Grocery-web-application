@@ -35,8 +35,6 @@ const CreateCustomerRequest = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [emiratesList, setEmiratesList] = useState([]);
-  const [salesmanEmiratesName, setSalesmanEmiratesName] = useState('');
-  const [salesmanEmiratesCode, setSalesmanEmiratesCode] = useState('');
   const [salesmanBalanceCreditLimit, setSalesmanBalanceCreditLimit] = useState(0);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
@@ -200,10 +198,7 @@ const CreateCustomerRequest = () => {
           navigate('/dashboard');
         }
 
-        // Store salesman's own emirates in separate state (not editable)
         const salesmanData = res.data.user || res.data;
-        setSalesmanEmiratesName(salesmanData.emiratesName || '');
-        setSalesmanEmiratesCode(salesmanData.emiratesCode || '');
         setSalesmanBalanceCreditLimit(salesmanData.salesmanBalanceCreditLimit || 0);
       } catch (error) {
         console.error("Failed to load user", error);
@@ -494,30 +489,6 @@ const CreateCustomerRequest = () => {
               </div>
             </div>
 
-            {/* Customer ID Preview */}
-            {formData.emiratesCode && user?._id && (
-              <div className="customer-form-row">
-                <div className="customer-form-group">
-                  <label>Customer ID Preview</label>
-                  <input
-                    type="text"
-                    value={(() => {
-                      const pad = (str, len) =>
-                        (str || "XXX").replace(/[^A-Za-z0-9]/g, "").toUpperCase().padEnd(len, "X").slice(0, len);
-                      const idSuffix = user._id ? user._id.toString().slice(-3) : "ADM";
-                      return pad(formData.emiratesCode, 3) + idSuffix + "1001+";
-                    })()}
-                    readOnly
-                    className="customer-input"
-                    style={{ backgroundColor: "#f8fafc", cursor: "default", fontFamily: "monospace", letterSpacing: "0.1em" }}
-                  />
-                  <small style={{ color: "#888", fontSize: "0.78rem" }}>
-                    Format: [Emirates 3] + [Salesman ID last 3] + [Sequential from 1001]. Exact number assigned on approval.
-                  </small>
-                </div>
-              </div>
-            )}
-
             {/* Contact Person & Location */}
             <div className="customer-form-row">
               <div className="customer-form-group">
@@ -596,32 +567,6 @@ const CreateCustomerRequest = () => {
                 />
               </div>
             </div>
-
-            {/* Salesman's own emirates (readonly info) */}
-            {(salesmanEmiratesName || salesmanEmiratesCode) && (
-              <div className="customer-form-row">
-                <div className="customer-form-group">
-                  <label>Your Emirates</label>
-                  <input
-                    type="text"
-                    value={salesmanEmiratesName}
-                    readOnly
-                    className="customer-input"
-                    style={{ backgroundColor: "#f8fafc", cursor: "default" }}
-                  />
-                </div>
-                <div className="customer-form-group">
-                  <label>Your Emirates Code</label>
-                  <input
-                    type="text"
-                    value={salesmanEmiratesCode}
-                    readOnly
-                    className="customer-input"
-                    style={{ backgroundColor: "#f8fafc", cursor: "default" }}
-                  />
-                </div>
-              </div>
-            )}
 
             <button
               type="submit"

@@ -100,6 +100,7 @@ const PaymentRequestsSales = () => {
   const [showBulkPayModal, setShowBulkPayModal] = useState(false);
   const [showBulkRequestModal, setShowBulkRequestModal] = useState(false);
   const [bulkRequestAction, setBulkRequestAction] = useState(null);
+  const [bulkRequestSection, setBulkRequestSection] = useState(null); // "cash" | "cheque"
 
   // ✅ Pay to Admin Modal States (Single)
   const [showPayToAdminModal, setShowPayToAdminModal] = useState(false);
@@ -639,6 +640,7 @@ const PaymentRequestsSales = () => {
       toast.error("Please select at least one cash request");
       return;
     }
+    setBulkRequestSection("cash");
     setBulkRequestAction("accept");
     setShowBulkRequestModal(true);
   };
@@ -648,6 +650,7 @@ const PaymentRequestsSales = () => {
       toast.error("Please select at least one cash request");
       return;
     }
+    setBulkRequestSection("cash");
     setBulkRequestAction("reject");
     setShowBulkRequestModal(true);
   };
@@ -658,6 +661,7 @@ const PaymentRequestsSales = () => {
       toast.error("Please select at least one cheque request");
       return;
     }
+    setBulkRequestSection("cheque");
     setBulkRequestAction("accept");
     setShowBulkRequestModal(true);
   };
@@ -667,6 +671,7 @@ const PaymentRequestsSales = () => {
       toast.error("Please select at least one cheque request");
       return;
     }
+    setBulkRequestSection("cheque");
     setBulkRequestAction("reject");
     setShowBulkRequestModal(true);
   };
@@ -816,11 +821,12 @@ const PaymentRequestsSales = () => {
       const token = localStorage.getItem("token");
       let success = 0,
         fail = 0;
-      // Determine which requests to process based on action
+      // Only process the section the bulk action was triggered from
+      // (cash vs cheque), so a selection in one table can't be actioned by the other.
       const selectedIds =
-        bulkRequestAction === "accept"
-          ? [...selectedCashRequests, ...selectedChequeRequests]
-          : [...selectedCashRequests, ...selectedChequeRequests];
+        bulkRequestSection === "cheque"
+          ? [...selectedChequeRequests]
+          : [...selectedCashRequests];
       for (const reqId of selectedIds) {
         const req = requests.find((r) => r._id === reqId);
         if (!req || req.status !== "pending") continue;
@@ -850,6 +856,7 @@ const PaymentRequestsSales = () => {
       setSelectAllCashRequests(false);
       setSelectAllChequeRequests(false);
       setBulkRequestAction(null);
+      setBulkRequestSection(null);
     }
   };
 

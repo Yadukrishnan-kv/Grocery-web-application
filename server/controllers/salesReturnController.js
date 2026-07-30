@@ -202,7 +202,7 @@ const getAllSalesReturns = async (req, res) => {
     if (req.query.status) filter.status = req.query.status;
 
     // If user is a customer, restrict to their returns only
-    if (req.user && req.user.role === "customer") {
+    if (req.user && req.user.role === "Customer") {
       const customer = await Customer.findOne({ user: req.user._id }).select("_id");
       if (!customer) {
         return res.json([]);

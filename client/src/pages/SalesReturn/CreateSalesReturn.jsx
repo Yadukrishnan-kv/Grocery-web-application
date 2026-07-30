@@ -230,7 +230,7 @@ const CreateSalesReturn = () => {
 
   return (
     <div className="csr-layout">
-      <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} user={user} />
+      <Header sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} user={user} />
       <Sidebar
         isOpen={sidebarOpen}
         activeItem="SalesReturn"

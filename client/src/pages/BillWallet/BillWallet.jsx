@@ -247,6 +247,10 @@ const BillWallet = () => {
     setConfirmAction("reject");
     setShowConfirmModal(true);
   };
+  const closeConfirmModal = () => {
+    setShowConfirmModal(false);
+    setTxToProcess(null);
+  };
   const confirmSingle = async () => {
     if (!txToProcess) return;
     setShowConfirmModal(false);
@@ -279,6 +283,7 @@ const BillWallet = () => {
       toast.error("No pending requests selected");
       return;
     }
+    setTxToProcess(null); // ensure the shared modal routes to the bulk handler
     setConfirmAction(action);
     setShowConfirmModal(true);
   };
@@ -808,16 +813,14 @@ const BillWallet = () => {
             <div className="confirm-actions">
               <button
                 className="confirm-cancel"
-                onClick={() => setShowConfirmModal(false)}
+                onClick={closeConfirmModal}
               >
                 Cancel
               </button>
               <button
                 className={`confirm-${confirmAction}`}
                 onClick={
-                  selectedRequests.length > 0
-                    ? confirmBulkAcceptReject
-                    : confirmSingle
+                  txToProcess ? confirmSingle : confirmBulkAcceptReject
                 }
                 disabled={processingId || bulkProcessing}
               >

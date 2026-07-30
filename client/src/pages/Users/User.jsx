@@ -223,7 +223,7 @@ const User = () => {
               role: userToEdit.role,
               emiratesName: userToEdit.emiratesName || '',
               emiratesCode: userToEdit.emiratesCode || '',
-              creditLimit: (userToEdit.salesmanCreditLimit || userToEdit.creditLimit)?.toString() || '',
+              creditLimit: (userToEdit.salesmanCreditLimit ?? userToEdit.creditLimit ?? '').toString(),
             });
             setIsEdit(true);
             setUserId(editId);

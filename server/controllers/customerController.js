@@ -351,6 +351,18 @@ const updateCustomer = async (req, res) => {
     // Map salesmanId → salesman field
     if (updateData.salesmanId !== undefined) {
       updateData.salesman = updateData.salesmanId || null;
+
+      // Re-derive the salesman emirates snapshot server-side so it never goes
+      // stale when the customer is reassigned to a different salesman.
+      if (updateData.salesmanId) {
+        const salesman = await User.findById(updateData.salesmanId).select("emiratesName emiratesCode");
+        updateData.salesmanEmiratesName = salesman?.emiratesName || null;
+        updateData.salesmanEmiratesCode = salesman?.emiratesCode || null;
+      } else {
+        updateData.salesmanEmiratesName = null;
+        updateData.salesmanEmiratesCode = null;
+      }
+
       delete updateData.salesmanId;
     }
 
@@ -738,6 +750,14 @@ const acceptCustomerRequest = async (req, res) => {
       emiratesCode: request.emiratesCode || null,
       salesmanEmiratesName: salesmanUser?.emiratesName || null,
       salesmanEmiratesCode: salesmanUser?.emiratesCode || null,
+      // Carry over contact person + location captured on the salesman's request.
+      // Each is copied independently, so a partially-filled set is preserved
+      // (whatever was entered shows; blanks stay null) instead of all being dropped.
+      contactPersonName: request.contactPersonName || null,
+      contactPersonPhone: request.contactPersonPhone || null,
+      contactPersonAddress: request.contactPersonAddress || null,
+      latitude: request.latitude ?? null,
+      longitude: request.longitude ?? null,
       customerId: generatedCustomerId,
     });
 
@@ -810,6 +830,13 @@ const acceptCustomerRequest = async (req, res) => {
         dueDays: customer.dueDays,              // NEW
         openingBalance: customer.openingBalance,
         openingBalanceDueDays: customer.openingBalanceDueDays,
+        emiratesName: customer.emiratesName,
+        emiratesCode: customer.emiratesCode,
+        contactPersonName: customer.contactPersonName,
+        contactPersonPhone: customer.contactPersonPhone,
+        contactPersonAddress: customer.contactPersonAddress,
+        latitude: customer.latitude,
+        longitude: customer.longitude,
         createdAt: customer.createdAt,
       },
     }

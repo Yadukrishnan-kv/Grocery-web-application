@@ -12,13 +12,13 @@ const { protect } = require("../middleware/authMiddleware");
 
 
 // Personal profile routes
-router.put("/edit-profile", editProfile);
+router.put("/edit-profile", protect, editProfile);
 
 // Superadmin only: Manage all users
-router.get("/getAllUsers", getAllUsers);
-router.post("/createUser",  createUser);
-router.put("/updateUser/:id",  updateUser);
-router.delete("/deleteUser/:id",  deleteUser);
+router.get("/getAllUsers", protect, getAllUsers);
+router.post("/createUser", protect, createUser);
+router.put("/updateUser/:id", protect, updateUser);
+router.delete("/deleteUser/:id", protect, deleteUser);
 router.get("/my-profile", protect, getMyProfile);
 router.put("/my-profile", protect, updateMyProfile);
 router.put("/change-password", protect, changePassword);

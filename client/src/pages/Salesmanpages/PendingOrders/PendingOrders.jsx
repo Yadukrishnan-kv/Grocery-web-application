@@ -79,13 +79,12 @@ const PendingOrders = () => {
                     <th>Items</th>
                     <th>Qty Pending</th>
                     <th>Status</th>
-                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="order-list-no-data">No pending orders</td>
+                      <td colSpan={6} className="order-list-no-data">No pending orders</td>
                     </tr>
                   ) : (
                     orders.map((o, idx) => (
@@ -96,9 +95,6 @@ const PendingOrders = () => {
                         <td>{o.orderItems?.length || 0}</td>
                         <td>{(o.orderItems || []).reduce((s, it) => s + Math.max((it.orderedQuantity || 0) - (it.packedQuantity || 0), 0), 0)}</td>
                         <td>{o.status}</td>
-                        <td>
-                          <button className="order-list-icon-button">👁️</button>
-                        </td>
                       </tr>
                     ))
                   )}

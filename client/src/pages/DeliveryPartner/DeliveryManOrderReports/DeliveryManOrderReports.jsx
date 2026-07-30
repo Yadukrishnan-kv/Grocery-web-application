@@ -62,23 +62,33 @@ const DeliveryManOrderReports = () => {
     fetchAllAcceptedOrders();
   }, [fetchCurrentUser, fetchAllAcceptedOrders]);
 
+  const triggerBlobDownload = (data, filename) => {
+    const blob = new Blob([data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+  };
+
   const downloadDeliveredInvoice = async (orderId, invoiceNumber, type = "normal") => {
     setDownloadingOrderId(orderId);
     try {
       const token = localStorage.getItem('token');
-      
-      let url = `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?token=${token}&type=${type}`;
+
+      let url = `${backendUrl}/api/orders/getdeliveredinvoice/${orderId}?type=${type}`;
       if (invoiceNumber) {
         url += `&invoiceNumber=${encodeURIComponent(invoiceNumber)}`;
       }
-      // Create a temporary link element for direct download
-      const link = document.createElement('a');
-      link.href = url;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
       const suffix = type === "preprinted" ? "-preprinted" : "";
-      link.download = `delivered-invoice-${invoiceNumber || orderId}${suffix}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      triggerBlobDownload(response.data, `delivered-invoice-${invoiceNumber || orderId}${suffix}.pdf`);
     } catch (error) {
       console.error('Error downloading delivered invoice:', error);
       alert('Failed to download delivered invoice');
@@ -91,14 +101,18 @@ const DeliveryManOrderReports = () => {
     setDownloadingOrderId(orderId);
     try {
       const token = localStorage.getItem('token');
-      
-      // Create a temporary link element for direct download
-      const link = document.createElement('a');
-      link.href = `${backendUrl}/api/orders/getpendinginvoice/${orderId}?token=${token}&type=${type}`;
-      link.download = type === "preprinted" ? `pending-invoice-${orderId}-preprinted.pdf` : `pending-invoice-${orderId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+
+      const response = await axios.get(
+        `${backendUrl}/api/orders/getpendinginvoice/${orderId}?type=${type}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+      const filename = type === "preprinted"
+        ? `pending-invoice-${orderId}-preprinted.pdf`
+        : `pending-invoice-${orderId}.pdf`;
+      triggerBlobDownload(response.data, filename);
     } catch (error) {
       console.error('Error downloading pending invoice:', error);
       alert('Failed to download pending invoice');
@@ -107,11 +121,19 @@ const DeliveryManOrderReports = () => {
     }
   };
 
-  // Helper function to get delivery status
+  // Helper: aggregate quantities across all order items
+  const sumOrdered = (order) =>
+    (order.orderItems || []).reduce((s, it) => s + (it.orderedQuantity || 0), 0);
+  const sumDelivered = (order) =>
+    (order.orderItems || []).reduce((s, it) => s + (it.deliveredQuantity || 0), 0);
+
+  // Helper function to get delivery status (across all items)
   const getDeliveryStatus = (order) => {
-    if (order.deliveredQuantity === 0) {
+    const delivered = sumDelivered(order);
+    const ordered = sumOrdered(order);
+    if (delivered === 0) {
       return 'Not Delivered';
-    } else if (order.deliveredQuantity < order.orderedQuantity) {
+    } else if (delivered < ordered) {
       return 'Partially Delivered';
     } else {
       return 'Fully Delivered';
@@ -163,25 +185,33 @@ const DeliveryManOrderReports = () => {
                 <tbody>
                   {orders.length > 0 ? (
                     orders.map((order, index) => {
-                      const pendingQty = order.orderedQuantity - order.deliveredQuantity;
-                      const hasDeliveredQty = order.deliveredQuantity > 0;
+                      const items = order.orderItems || [];
+                      const orderedQty = sumOrdered(order);
+                      const deliveredQty = sumDelivered(order);
+                      const pendingQty = orderedQty - deliveredQty;
+                      const grandTotal = items.reduce((s, it) => s + (it.totalAmount || 0), 0);
+                      const productNames = items
+                        .map((it) => it.product?.productName || 'N/A')
+                        .join(', ');
+                      const singlePrice = items.length === 1 ? items[0].price : null;
+                      const hasDeliveredQty = deliveredQty > 0;
                       const hasPendingQty = pendingQty > 0;
-                      
+
                       return (
                         <tr key={order._id}>
                           <td>{index + 1}</td>
                           <td>{order.customer?.name || 'N/A'}</td>
-                          <td>{order.product?.productName || 'N/A'}</td>
-                          <td>{order.orderedQuantity}</td>
-                          <td>{order.deliveredQuantity}</td>
+                          <td>{productNames || 'N/A'}</td>
+                          <td>{orderedQty}</td>
+                          <td>{deliveredQty}</td>
                           <td>{pendingQty}</td>
                           <td>
                             <span className={`status-badge status-${getDeliveryStatus(order).replace(' ', '-').toLowerCase()}`}>
                               {getDeliveryStatus(order)}
                             </span>
                           </td>
-                          <td>${order.price.toFixed(2)}</td>
-                          <td>${order.totalAmount.toFixed(2)}</td>
+                          <td>{singlePrice != null ? `$${Number(singlePrice).toFixed(2)}` : '—'}</td>
+                          <td>${Number(grandTotal).toFixed(2)}</td>
                           <td>{new Date(order.orderDate).toLocaleDateString()}</td>
                           <td>
                             <div className="action-buttons">
@@ -198,7 +228,7 @@ const DeliveryManOrderReports = () => {
                                   >
                                     {downloadingOrderId === order._id
                                       ? 'Downloading...'
-                                      : `🧾 ${inv.invoiceNumber} (${inv.quantity} qty)`}
+                                      : `🧾 ${inv.invoiceNumber}`}
                                   </button>
                                 ))
                               ) : hasDeliveredQty ? (

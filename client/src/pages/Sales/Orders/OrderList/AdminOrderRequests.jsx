@@ -204,10 +204,7 @@ const AdminOrderRequests = () => {
                             </button>
                             <button
                               className="admin-requests-reject-btn"
-                              onClick={() => {
-                                const reason = prompt('Enter rejection reason (optional):');
-                                handleReject(req._id, reason);
-                              }}
+                              onClick={() => handleReject(req._id)}
                             >
                               Reject
                             </button>

@@ -1,4 +1,4 @@
-﻿// src/pages/Emirates/Emirates.jsx
+// src/pages/Emirates/Emirates.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
@@ -115,7 +115,7 @@ const Emirates = () => {
     <div className="emirates-layout">
       <Header
         sidebarOpen={sidebarOpen}
-        onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
       <Sidebar

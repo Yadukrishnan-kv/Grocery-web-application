@@ -71,7 +71,7 @@ const CreateEmirates = () => {
     <div className="ce-layout">
       <Header
         sidebarOpen={sidebarOpen}
-        onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
       <Sidebar

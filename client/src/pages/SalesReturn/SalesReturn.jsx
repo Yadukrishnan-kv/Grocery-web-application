@@ -240,7 +240,7 @@ const SalesReturn = () => {
 
   return (
     <div className="sr-layout">
-      <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} user={user} />
+      <Header sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} user={user} />
       <Sidebar
         isOpen={sidebarOpen}
         activeItem="SalesReturn"
