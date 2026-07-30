@@ -15,6 +15,7 @@ const OrderList = () => {
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState("Orders");
   const [user, setUser] = useState(null);
+  const canAssignDelivery = user?.role === "Admin" || user?.role === "Sales Manager";
   const [deliveryPartners, setDeliveryPartners] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -338,8 +339,8 @@ const OrderList = () => {
                             </td>
 
                             <td>
-                              {order.assignmentStatus === "pending_assignment" ||
-                              order.assignmentStatus === "rejected" ? (
+                              {canAssignDelivery && (order.assignmentStatus === "pending_assignment" ||
+                              order.assignmentStatus === "rejected") ? (
                                 <select
                                   className="order-list-delivery-partner-select"
                                   onChange={(e) => {

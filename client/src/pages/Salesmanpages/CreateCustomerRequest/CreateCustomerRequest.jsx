@@ -204,7 +204,7 @@ const CreateCustomerRequest = () => {
         const salesmanData = res.data.user || res.data;
         setSalesmanEmiratesName(salesmanData.emiratesName || '');
         setSalesmanEmiratesCode(salesmanData.emiratesCode || '');
-        setSalesmanBalanceCreditLimit(salesmanData.balanceCreditLimit || 0);
+        setSalesmanBalanceCreditLimit(salesmanData.salesmanBalanceCreditLimit || 0);
       } catch (error) {
         console.error("Failed to load user", error);
         navigate('/login');

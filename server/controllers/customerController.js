@@ -944,7 +944,7 @@ const getMyCustomersWithDue = async (req, res) => {
     }
 
     const customers = await Customer.find({ salesman: req.user._id })
-      .select('name email phoneNumber address pincode customerId emiratesName emiratesCode creditLimit balanceCreditLimit returnCreditBalance billingType openingBalance')
+      .select('name email phoneNumber address pincode customerId emiratesName emiratesCode creditLimit balanceCreditLimit returnCreditBalance billingType openingBalance contactPersonName contactPersonPhone contactPersonAddress')
       .sort({ name: 1 });
 
     const customersWithDetails = await Promise.all(
@@ -984,6 +984,9 @@ const getMyCustomersWithDue = async (req, res) => {
           emiratesName: customer.emiratesName,
           emiratesCode: customer.emiratesCode,
           returnCreditBalance: customer.returnCreditBalance,
+          contactPersonName: customer.contactPersonName,
+          contactPersonPhone: customer.contactPersonPhone,
+          contactPersonAddress: customer.contactPersonAddress,
           totalOutstanding,
           pendingBillDaysLeft: daysLeft,
           pendingDueDate: latestPendingBill?.dueDate,

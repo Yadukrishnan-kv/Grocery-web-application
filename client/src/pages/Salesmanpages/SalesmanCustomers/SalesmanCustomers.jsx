@@ -96,6 +96,11 @@ const SalesmanCustomers = () => {
     });
   }, [customers, searchTerm]); // ✅ Removed dueDaysFilter dependency
 
+  const hasContactData = useMemo(
+    () => filteredCustomers.some(c => c.contactPersonName || c.contactPersonPhone || c.contactPersonAddress),
+    [filteredCustomers]
+  );
+
   // Show loading while fetching user
   if (!user) {
     return <div className="customer-list-loading">Loading...</div>;
@@ -165,6 +170,9 @@ const SalesmanCustomers = () => {
                       <th scope="col">Name</th>
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
+                      {hasContactData && <th scope="col">Contact Person</th>}
+                      {hasContactData && <th scope="col">Contact Phone</th>}
+                      {hasContactData && <th scope="col">Contact Address</th>}
                       <th scope="col">Address</th>
                       <th scope="col">TRN</th>
                       <th scope="col">Emirates</th>
@@ -196,6 +204,9 @@ const SalesmanCustomers = () => {
                           <td>{customer.name || "-"}</td>
                           <td>{customer.email || "-"}</td>
                           <td>{customer.phoneNumber || "-"}</td>
+                          {hasContactData && <td>{customer.contactPersonName || "-"}</td>}
+                          {hasContactData && <td>{customer.contactPersonPhone || "-"}</td>}
+                          {hasContactData && <td>{customer.contactPersonAddress || "-"}</td>}
                           <td>{customer.address || "-"}</td>
                           <td>{customer.pincode || "-"}</td>
                           <td>{customer.emiratesName || "-"}</td>

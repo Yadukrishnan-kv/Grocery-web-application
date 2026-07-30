@@ -103,7 +103,7 @@ const navItems = [
     id: "CreateSalesReturn",
     label: "Sales Returns",
     icon: "↩️",
-    path: "/sales-returns/create",
+    path: "/sales-returns",
   },
   {
     id: "SalesPendingOrders",

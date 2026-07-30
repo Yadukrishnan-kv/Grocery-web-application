@@ -153,6 +153,11 @@ const CustomerList = () => {
     });
   }, [customers, searchTerm, dueDaysFilter]);
 
+  const hasContactData = useMemo(
+    () => filteredCustomers.some(c => c.contactPersonName || c.contactPersonPhone || c.contactPersonAddress),
+    [filteredCustomers]
+  );
+
   if (!user) {
     return <div className="customer-list-loading">Loading...</div>;
   }
@@ -247,9 +252,9 @@ const CustomerList = () => {
                       <th scope="col">Name</th>
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
-                      <th scope="col">Contact Person</th>
-                      <th scope="col">Contact Phone</th>
-                      <th scope="col">Contact Address</th>
+                      {hasContactData && <th scope="col">Contact Person</th>}
+                      {hasContactData && <th scope="col">Contact Phone</th>}
+                      {hasContactData && <th scope="col">Contact Address</th>}
                       <th scope="col">Address</th>
                       <th scope="col">TRN</th>
                       <th scope="col">Emirates</th>
@@ -297,9 +302,9 @@ const CustomerList = () => {
                           <td>{customer.name || "-"}</td>
                           <td>{customer.email || "-"}</td>
                           <td>{customer.phoneNumber || "-"}</td>
-                          <td>{customer.contactPersonName || "-"}</td>
-                          <td>{customer.contactPersonPhone || "-"}</td>
-                          <td>{customer.contactPersonAddress || "-"}</td>
+                          {hasContactData && <td>{customer.contactPersonName || "-"}</td>}
+                          {hasContactData && <td>{customer.contactPersonPhone || "-"}</td>}
+                          {hasContactData && <td>{customer.contactPersonAddress || "-"}</td>}
                           <td>{customer.address || "-"}</td>
                           <td>{customer.pincode || "-"}</td>
                           <td>{customer.emiratesName || "-"}</td>

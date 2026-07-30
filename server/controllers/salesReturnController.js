@@ -310,7 +310,7 @@ const rejectSalesReturn = async (req, res) => {
 const assignReturnPickup = async (req, res) => {
   try {
     // Only Admin and Sales Manager can assign returns
-    if (!req.user || !["Admin", "Sales Manager"].includes(req.user.role)) {
+    if (!req.user || !["Admin", "Manager", "Sales Manager"].includes(req.user.role)) {
       return res.status(403).json({ message: "Only Admin and Sales Manager can assign returns for pickup" });
     }
 
