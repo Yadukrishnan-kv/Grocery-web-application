@@ -90,12 +90,17 @@ const PackOrders = () => {
 
       y += 3;
 
-      // Save PDF
-      const fileName = order.orderId
-        ? `packing-slip-${order.orderId}.pdf`
-        : `packing-slip-${order._id?.toString().slice(-8) || "order"}.pdf`;
-      pdf.save(fileName);
-      toast.success("Packing slip downloaded for thermal printer");
+      // Open the print dialog directly (hidden iframe, no new tab)
+      const blobUrl = pdf.output("bloburl");
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      };
+      toast.success("Opening print dialog for thermal slip");
     } catch (err) {
       console.error("Thermal PDF error:", err);
       toast.error("Failed to generate thermal slip");
@@ -216,11 +221,17 @@ const PackOrders = () => {
       pdf.setDrawColor(41, 128, 185);
       pdf.line(margin, y, margin + contentWidth, y);
 
-      const fileName = order.orderId
-        ? `packing-slip-${order.orderId}.pdf`
-        : `packing-slip-${order._id?.toString().slice(-8) || "order"}.pdf`;
-      pdf.save(fileName);
-      toast.success("Packing slip downloaded as PDF");
+      // Open the print dialog directly (hidden iframe, no new tab)
+      const blobUrl = pdf.output("bloburl");
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      };
+      toast.success("Opening print dialog for PDF slip");
     } catch (err) {
       console.error("PDF slip error:", err);
       toast.error("Failed to generate PDF slip");

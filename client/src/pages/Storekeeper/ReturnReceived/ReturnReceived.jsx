@@ -86,13 +86,16 @@ const ReturnReceived = () => {
         { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
       );
       const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
-      const link = document.createElement("a");
-      link.href = url;
-      const suffix = type === "preprinted" ? "-preprinted" : "";
-      link.download = `return-${sr.returnInvoiceNumber}${suffix}.pdf`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-      toast.success("Return invoice downloaded");
+      // Open the print dialog instead of downloading
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      };
+      toast.success("Opening print dialog for return invoice");
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to download return invoice");
     }

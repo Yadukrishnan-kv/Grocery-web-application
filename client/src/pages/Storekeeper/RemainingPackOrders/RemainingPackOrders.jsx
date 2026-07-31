@@ -129,17 +129,20 @@ const RemainingPackOrders = () => {
         }
       );
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      const suffix = type === "preprinted" ? "-preprinted" : "";
-      link.setAttribute("download", `unified-invoice-${invoiceNumber}${suffix}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const url = window.URL.createObjectURL(
+        new Blob([res.data], { type: "application/pdf" })
+      );
+      // Open the print dialog instead of downloading
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      };
 
-      toast.success(`Invoice ${invoiceNumber} downloaded`);
+      toast.success(`Opening print dialog for invoice ${invoiceNumber}`);
     } catch (err) {
       console.error("Invoice download failed:", err);
       toast.error("Failed to download invoice");

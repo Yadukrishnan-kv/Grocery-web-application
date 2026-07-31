@@ -69,19 +69,19 @@ const StorekeeperOrders = () => {
           responseType: "blob",
         },
       );
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      const baseName = invoiceNumber
-        ? `unified-invoice-${invoiceNumber}`
-        : `unified-invoice-${orderId.slice(-8)}`;
-      const suffix = type === "preprinted" ? "-preprinted" : "";
-      link.setAttribute("download", `${baseName}${suffix}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Invoice downloaded");
+      const url = window.URL.createObjectURL(
+        new Blob([res.data], { type: "application/pdf" })
+      );
+      // Open the print dialog instead of downloading
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      };
+      toast.success("Opening print dialog for invoice");
     } catch (err) {
       console.error("Download error:", err);
       toast.error("Failed to download invoice");
