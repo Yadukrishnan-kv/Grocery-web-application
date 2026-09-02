@@ -40,6 +40,11 @@ const companySettingsSchema = new Schema(
       type: String,
       trim: true,
     },
+    entriesPerPage: {
+      type: Number,
+      enum: [10, 20, 50, 100],
+      default: 10,
+    },
     updatedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

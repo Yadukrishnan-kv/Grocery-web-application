@@ -1,7 +1,7 @@
 // src/components/layout/Header/Header.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from "../../../utils/toast"; // ← NEW IMPORT
 import './Header.css';
 
 const Header = ({ sidebarOpen, onToggleSidebar, user }) => {

@@ -7,6 +7,9 @@ import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import './MyCustomerRequests.css'; // New CSS file (below)
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAppSettings } from '../../../context/AppSettingsContext';
+import { usePaginatedData } from '../../../hooks/usePagination';
+import Pagination from '../../../components/common/Pagination';
 
 const MyCustomerRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -65,6 +68,13 @@ const MyCustomerRequests = () => {
       return matchesSearch && matchesStatus;
     });
   }, [requests, searchTerm, statusFilter]);
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(
+    filteredRequests,
+    entriesPerPage,
+    `${statusFilter}|${searchTerm}`
+  );
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -143,82 +153,96 @@ const MyCustomerRequests = () => {
                   : "No requests match your search/filter"}
               </div>
             ) : (
-              <div className="requests-table-wrapper">
-                <table className="requests-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Phone</th>
-                      <th scope="col">Credit Limit</th>
-                      <th scope="col">Billing Type</th>
-                      <th scope="col">Statement Type</th>
-                      <th scope="col">Due Days</th>
-                      <th scope="col">Opening Balance</th>
-                      <th scope="col">Opening Due Days</th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Created</th>
-                      {requests.some(r => r.status === 'rejected') && <th scope="col">Reason</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRequests.map((request, index) => (
-                      <tr key={request._id}>
-                        <td>{index + 1}</td>
-                        <td>{request.name}</td>
-                        <td>{request.email}</td>
-                        <td>{request.phoneNumber}</td>
-                        <td><div
-                                                    style={{
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      gap: "4px",
-                                                    }}
-                                                  >
-                                                    <img
-                                                      src={DirhamSymbol}
-                                                      alt="Dirham Symbol"
-                                                      width={15}
-                                                      height={15}
-                                                       style={{
-                                                        paddingTop: "3px",
-                                                      }}
-                                                    />
-                                                    <span>{request.creditLimit.toFixed(2)}</span></div></td>
-                        <td>{request.billingType}</td>
-                        <td>
-                          {request.statementType
-                            ? request.statementType.charAt(0).toUpperCase() +
-                              request.statementType.slice(1)
-                            : "-"}
-                        </td>
-                        <td>{request.dueDays || "-"}</td>
-                        <td>
-                          {request.openingBalance > 0
-                            ? request.openingBalance.toFixed(2)
-                            : "-"}
-                        </td>
-                        <td>
-                          {request.openingBalanceDueDays
-                            ? `${request.openingBalanceDueDays} days`
-                            : "-"}
-                        </td>
-                        <td>
-                          <span className={`requests-status-badge requests-status-${request.status}`}>
-                            {request.status === 'pending' ? 'Pending' :
-                             request.status === 'accepted' ? 'Accepted' : 'Rejected'}
-                          </span>
-                        </td>
-                        <td>{new Date(request.createdAt).toLocaleDateString()}</td>
-                        {request.status === 'rejected' && (
-                          <td>{request.rejectionReason || 'No reason provided'}</td>
-                        )}
+              <>
+                <div className="requests-table-wrapper">
+                  <table className="requests-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Phone</th>
+                        <th scope="col">Credit Limit</th>
+                        <th scope="col">Billing Type</th>
+                        <th scope="col">Statement Type</th>
+                        <th scope="col">Due Days</th>
+                        <th scope="col">Opening Balance</th>
+                        <th scope="col">Opening Due Days</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Created</th>
+                        {requests.some(r => r.status === 'rejected') && <th scope="col">Reason</th>}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((request, index) => (
+                        <tr key={request._id}>
+                          <td>{pagination.showingFrom + index}</td>
+                          <td>{request.name}</td>
+                          <td>{request.email}</td>
+                          <td>{request.phoneNumber}</td>
+                          <td><div
+                                                      style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "4px",
+                                                      }}
+                                                    >
+                                                      <img
+                                                        src={DirhamSymbol}
+                                                        alt="Dirham Symbol"
+                                                        width={15}
+                                                        height={15}
+                                                         style={{
+                                                          paddingTop: "3px",
+                                                        }}
+                                                      />
+                                                      <span>{request.creditLimit.toFixed(2)}</span></div></td>
+                          <td>{request.billingType}</td>
+                          <td>
+                            {request.statementType
+                              ? request.statementType.charAt(0).toUpperCase() +
+                                request.statementType.slice(1)
+                              : "-"}
+                          </td>
+                          <td>{request.dueDays || "-"}</td>
+                          <td>
+                            {request.openingBalance > 0
+                              ? request.openingBalance.toFixed(2)
+                              : "-"}
+                          </td>
+                          <td>
+                            {request.openingBalanceDueDays
+                              ? `${request.openingBalanceDueDays} days`
+                              : "-"}
+                          </td>
+                          <td>
+                            <span className={`requests-status-badge requests-status-${request.status}`}>
+                              {request.status === 'pending' ? 'Pending' :
+                               request.status === 'accepted' ? 'Accepted' : 'Rejected'}
+                            </span>
+                          </td>
+                          <td>{new Date(request.createdAt).toLocaleDateString()}</td>
+                          {request.status === 'rejected' && (
+                            <td>{request.rejectionReason || 'No reason provided'}</td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

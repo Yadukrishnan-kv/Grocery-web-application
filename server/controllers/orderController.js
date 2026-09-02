@@ -8,6 +8,7 @@ const { createInvoiceBasedBill } = require("../controllers/billController"); // 
 const arabicReshaper = require("arabic-reshaper");
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Bill = require("../models/Bill");
+const { getPaginationParams, buildPaginatedResponse } = require("../utils/paginate");
 
 const formatArabicForPdf = (text) => {
   if (!text) return "";
@@ -130,12 +131,24 @@ const createOrder = async (req, res) => {
 
 const getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find()
-      .populate("customer", "name email phoneNumber address pincode")
-      .populate("orderItems.product", "productName price unit")
-      .populate("assignedTo", "username")
-      .sort({ orderDate: -1 });
-    res.json(orders);
+    const sort = { orderDate: -1 };
+    const populateOrders = (query) =>
+      query
+        .populate("customer", "name email phoneNumber address pincode")
+        .populate("orderItems.product", "productName price unit")
+        .populate("assignedTo", "username");
+
+    if (!req.query.page) {
+      const orders = await populateOrders(Order.find()).sort(sort);
+      return res.json(orders);
+    }
+
+    const { page, limit, skip } = getPaginationParams(req.query);
+    const [orders, totalRecords] = await Promise.all([
+      populateOrders(Order.find()).sort(sort).skip(skip).limit(limit),
+      Order.countDocuments(),
+    ]);
+    res.json(buildPaginatedResponse(orders, totalRecords, page, limit));
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -165,13 +178,25 @@ const getSalesmanOrders = async (req, res) => {
     const customerIds = myCustomers.map(c => c._id);
 
     // Fetch orders for these customers only
-    const orders = await Order.find({ customer: { $in: customerIds } })
-      .populate("customer", "name email phoneNumber address pincode")
-      .populate("orderItems.product", "productName price unit")
-      .populate("assignedTo", "username")
-      .sort({ orderDate: -1 });
+    const filter = { customer: { $in: customerIds } };
+    const sort = { orderDate: -1 };
+    const populateOrders = (query) =>
+      query
+        .populate("customer", "name email phoneNumber address pincode")
+        .populate("orderItems.product", "productName price unit")
+        .populate("assignedTo", "username");
 
-    res.json(orders);
+    if (!req.query.page) {
+      const orders = await populateOrders(Order.find(filter)).sort(sort);
+      return res.json(orders);
+    }
+
+    const { page, limit, skip } = getPaginationParams(req.query);
+    const [orders, totalRecords] = await Promise.all([
+      populateOrders(Order.find(filter)).sort(sort).skip(skip).limit(limit),
+      Order.countDocuments(filter),
+    ]);
+    res.json(buildPaginatedResponse(orders, totalRecords, page, limit));
   } catch (error) {
     console.error("Get salesman orders error:", error);
     res.status(500).json({ message: "Server error", error: error.message });

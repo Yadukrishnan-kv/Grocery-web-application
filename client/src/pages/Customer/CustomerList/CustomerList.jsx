@@ -6,9 +6,14 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./CustomerList.css";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const CustomerList = () => {
+  // Full list — only fetched/used when a search or due-days filter is active,
+  // so client-side filtering can search the whole dataset (not just one page).
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,6 +21,15 @@ const CustomerList = () => {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dueDaysFilter, setDueDaysFilter] = useState("all");
+
+  const { entriesPerPage } = useAppSettings();
+  const isFiltering = dueDaysFilter !== "all" || searchTerm.trim() !== "";
+
+  // Server-side pagination state (used when no filter/search is active)
+  const [pageCustomers, setPageCustomers] = useState([]);
+  const [serverPage, setServerPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalRecords, setServerTotalRecords] = useState(0);
 
   // Delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -41,7 +55,7 @@ const CustomerList = () => {
     }
   }, [backendUrl]);
 
-  const fetchCustomers = useCallback(async () => {
+  const fetchAllCustomers = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
@@ -59,10 +73,48 @@ const CustomerList = () => {
     }
   }, [backendUrl]);
 
+  const fetchCustomersPage = useCallback(
+    async (page) => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${backendUrl}/api/customers/getallcustomerswithdue`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { page, limit: entriesPerPage },
+          },
+        );
+        setPageCustomers(response.data.data);
+        setServerTotalPages(response.data.totalPages);
+        setServerTotalRecords(response.data.totalRecords);
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        toast.error("Failed to load customers");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [backendUrl, entriesPerPage],
+  );
+
   useEffect(() => {
     fetchCurrentUser();
-    fetchCustomers();
-  }, [fetchCurrentUser, fetchCustomers]);
+  }, [fetchCurrentUser]);
+
+  useEffect(() => {
+    if (isFiltering) {
+      fetchAllCustomers();
+    } else {
+      fetchCustomersPage(serverPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFiltering, serverPage, entriesPerPage]);
+
+  useEffect(() => {
+    if (!isFiltering) setServerPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFiltering]);
 
   const handleDeleteClick = (id, customerName) => {
     setCustomerToDelete({ id, customerName });
@@ -86,7 +138,7 @@ const CustomerList = () => {
       toast.success(
         `Customer "${customerToDelete.customerName}" deleted successfully!`,
       );
-      fetchCustomers();
+      refetchCurrent();
     } catch (error) {
       console.error("Error deleting customer:", error);
       toast.error("Failed to delete customer. Please try again.");
@@ -153,9 +205,30 @@ const CustomerList = () => {
     });
   }, [customers, searchTerm, dueDaysFilter]);
 
+  const clientPagination = usePaginatedData(
+    filteredCustomers,
+    entriesPerPage,
+    `${dueDaysFilter}|${searchTerm}`
+  );
+  const serverPagination = {
+    page: serverPage,
+    totalPages: serverTotalPages,
+    totalRecords: serverTotalRecords,
+    showingFrom: serverTotalRecords === 0 ? 0 : (serverPage - 1) * entriesPerPage + 1,
+    showingTo: Math.min(serverPage * entriesPerPage, serverTotalRecords),
+    canPrev: serverPage > 1,
+    canNext: serverPage < serverTotalPages,
+    goPrev: () => setServerPage((p) => Math.max(1, p - 1)),
+    goNext: () => setServerPage((p) => Math.min(serverTotalPages, p + 1)),
+  };
+  const visibleCustomers = isFiltering ? clientPagination.pageData : pageCustomers;
+  const activePagination = isFiltering ? clientPagination : serverPagination;
+  const refetchCurrent = () =>
+    isFiltering ? fetchAllCustomers() : fetchCustomersPage(serverPage);
+
   const hasContactData = useMemo(
-    () => filteredCustomers.some(c => c.contactPersonName || c.contactPersonPhone || c.contactPersonAddress),
-    [filteredCustomers]
+    () => visibleCustomers.some(c => c.contactPersonName || c.contactPersonPhone || c.contactPersonAddress),
+    [visibleCustomers]
   );
 
   if (!user) {
@@ -236,7 +309,7 @@ const CustomerList = () => {
 
             {loading ? (
               <div className="customer-list-loading">Loading customers...</div>
-            ) : filteredCustomers.length === 0 ? (
+            ) : visibleCustomers.length === 0 ? (
               <div className="customer-list-no-data">
                 No customers found
                 {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
@@ -276,7 +349,7 @@ const CustomerList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCustomers.map((customer, index) => {
+                    {visibleCustomers.map((customer, index) => {
                       const daysLeft = getDaysRemaining(customer);
                       const dueStatusText = getDueStatusText(daysLeft);
                       const dueClass = getDueClass(daysLeft);
@@ -293,7 +366,7 @@ const CustomerList = () => {
 
                       return (
                         <tr key={customer._id}>
-                          <td>{index + 1}</td>
+                          <td>{activePagination.showingFrom + index}</td>
                           <td>
                             <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
                               {customer.customerId || "-"}
@@ -436,6 +509,18 @@ const CustomerList = () => {
                 </table>
               </div>
             )}
+
+            <Pagination
+              page={activePagination.page}
+              totalPages={activePagination.totalPages}
+              totalRecords={activePagination.totalRecords}
+              showingFrom={activePagination.showingFrom}
+              showingTo={activePagination.showingTo}
+              canPrev={activePagination.canPrev}
+              canNext={activePagination.canNext}
+              onPrev={activePagination.goPrev}
+              onNext={activePagination.goNext}
+            />
           </div>
         </div>
       </main>

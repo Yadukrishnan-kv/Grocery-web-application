@@ -6,11 +6,16 @@ import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../../Assets/aed-symbol.png";
 import "./OrderList.css";
 import axios from "axios";
-import toast from 'react-hot-toast';
+import toast from "../../../../utils/toast";
+import { useAppSettings } from "../../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../../hooks/usePagination";
+import Pagination from "../../../../components/common/Pagination";
 
 const OrderList = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Full list — only fetched/used when a search or status filter is active,
+  // so client-side filtering can search the whole dataset (not just one page).
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState("Orders");
@@ -19,6 +24,15 @@ const OrderList = () => {
   const [deliveryPartners, setDeliveryPartners] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const { entriesPerPage } = useAppSettings();
+  const isFiltering = statusFilter !== "all" || searchTerm.trim() !== "";
+
+  // Server-side pagination state (used when no filter/search is active)
+  const [pageOrders, setPageOrders] = useState([]);
+  const [serverPage, setServerPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalRecords, setServerTotalRecords] = useState(0);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
@@ -43,20 +57,18 @@ const OrderList = () => {
     }
   }, [backendUrl]);
 
-  const fetchOrders = useCallback(async () => {
+  const ordersEndpoint = useCallback(
+    () =>
+      user?.role === "Sales man"
+        ? `${backendUrl}/api/orders/salesman-orders`
+        : `${backendUrl}/api/orders/getallorders`,
+    [backendUrl, user]
+  );
+
+  const fetchAllOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      let endpoint;
-      
-      // ✅ ROLE-BASED ENDPOINT SELECTION
-      if (user?.role === "Sales man") {
-        endpoint = `${backendUrl}/api/orders/salesman-orders`;
-      } else {
-        // Admin or other roles see all orders
-        endpoint = `${backendUrl}/api/orders/getallorders`;
-      }
-      
-      const response = await axios.get(endpoint, {
+      const response = await axios.get(ordersEndpoint(), {
         headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(response.data);
@@ -66,7 +78,29 @@ const OrderList = () => {
     } finally {
       setLoading(false);
     }
-  }, [backendUrl, user]);
+  }, [ordersEndpoint]);
+
+  const fetchOrdersPage = useCallback(
+    async (page) => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const response = await axios.get(ordersEndpoint(), {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { page, limit: entriesPerPage },
+        });
+        setPageOrders(response.data.data);
+        setServerTotalPages(response.data.totalPages);
+        setServerTotalRecords(response.data.totalRecords);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        toast.error("Failed to load orders");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [ordersEndpoint, entriesPerPage]
+  );
 
   const fetchDeliveryPartners = useCallback(async () => {
     try {
@@ -92,10 +126,19 @@ const OrderList = () => {
   }, [fetchCurrentUser, fetchDeliveryPartners]);
 
   useEffect(() => {
-    if (user) {
-      fetchOrders();
+    if (!user) return;
+    if (isFiltering) {
+      fetchAllOrders();
+    } else {
+      fetchOrdersPage(serverPage);
     }
-  }, [user, fetchOrders]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isFiltering, serverPage, entriesPerPage]);
+
+  useEffect(() => {
+    if (!isFiltering) setServerPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFiltering]);
   // ============================================================
 
   const filteredOrders = useMemo(() => {
@@ -111,6 +154,27 @@ const OrderList = () => {
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
+
+  const clientPagination = usePaginatedData(
+    filteredOrders,
+    entriesPerPage,
+    `${statusFilter}|${searchTerm}`
+  );
+  const serverPagination = {
+    page: serverPage,
+    totalPages: serverTotalPages,
+    totalRecords: serverTotalRecords,
+    showingFrom: serverTotalRecords === 0 ? 0 : (serverPage - 1) * entriesPerPage + 1,
+    showingTo: Math.min(serverPage * entriesPerPage, serverTotalRecords),
+    canPrev: serverPage > 1,
+    canNext: serverPage < serverTotalPages,
+    goPrev: () => setServerPage((p) => Math.max(1, p - 1)),
+    goNext: () => setServerPage((p) => Math.min(serverTotalPages, p + 1)),
+  };
+  const visibleOrders = isFiltering ? clientPagination.pageData : pageOrders;
+  const activePagination = isFiltering ? clientPagination : serverPagination;
+  const refetchCurrent = () =>
+    isFiltering ? fetchAllOrders() : fetchOrdersPage(serverPage);
 
   const handleDeleteClick = (id, orderId) => {
     setOrderToDelete({ id, orderId });
@@ -129,7 +193,7 @@ const OrderList = () => {
       });
 
       toast.success(`Order deleted successfully!`);
-      fetchOrders();
+      refetchCurrent();
     } catch (error) {
       console.error("Error deleting order:", error);
       toast.error("Failed to delete order. Please try again.");
@@ -150,7 +214,7 @@ const OrderList = () => {
       );
 
       toast.success("Delivery partner assigned successfully!");
-      fetchOrders();
+      refetchCurrent();
     } catch (error) {
       console.error("Error assigning delivery partner:", error);
       toast.error("Failed to assign delivery partner. Please try again.");
@@ -283,12 +347,12 @@ const OrderList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.length > 0 ? (
-                      filteredOrders.map((order, index) => {
+                    {visibleOrders.length > 0 ? (
+                      visibleOrders.map((order, index) => {
                         const { exclVat, vatAmount, grandTotal } = getVatBreakdown(order);
                         return (
                           <tr key={order._id}>
-                            <td>{index + 1}</td>
+                            <td>{activePagination.showingFrom + index}</td>
                             <td>{order.orderId || order._id}</td>
                             <td>{order.customer?.name || "N/A"}</td>
 
@@ -433,7 +497,7 @@ const OrderList = () => {
                     ) : (
                       <tr>
                         <td colSpan="14" className="order-list-no-data">
-                          {orders.length === 0
+                          {activePagination.totalRecords === 0
                             ? "No orders found"
                             : "No orders match your filters"}
                         </td>
@@ -443,6 +507,18 @@ const OrderList = () => {
                 </table>
               </div>
             )}
+
+            <Pagination
+              page={activePagination.page}
+              totalPages={activePagination.totalPages}
+              totalRecords={activePagination.totalRecords}
+              showingFrom={activePagination.showingFrom}
+              showingTo={activePagination.showingTo}
+              canPrev={activePagination.canPrev}
+              canNext={activePagination.canNext}
+              onPrev={activePagination.goPrev}
+              onNext={activePagination.goNext}
+            />
           </div>
         </div>
       </main>

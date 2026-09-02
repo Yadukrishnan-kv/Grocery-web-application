@@ -2,10 +2,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
 import axios from "axios";
 import "./ReturnReceived.css";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const ReturnReceived = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -108,6 +111,9 @@ const ReturnReceived = () => {
   const completedReturns = returns.filter((r) => r.status === "completed");
   const visibleReturns = activeTab === "pending" ? pendingReturns : completedReturns;
 
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(visibleReturns, entriesPerPage, `${activeTab}`);
+
   return (
     <div className="rr-layout">
       <Header sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} user={user} />
@@ -165,88 +171,102 @@ const ReturnReceived = () => {
             </div>
           ) : (
             <div className="rr-card">
-              <div className="rr-table-wrap">
-                <table className="rr-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Customer</th>
-                      <th>Original Order</th>
-                      <th>Return Invoice</th>
-                      <th>Delivery Man</th>
-                      <th>Items</th>
-                      <th>Return Amount</th>
-                      <th>Picked Up At</th>
-                      <th>Return Reason</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleReturns.map((sr, idx) => (
-                      <tr key={sr._id}>
-                        <td>{idx + 1}</td>
-                        <td>
-                          <div className="rr-name">{sr.customer?.name || "—"}</div>
-                          <div className="rr-phone">{sr.customer?.phoneNumber || ""}</div>
-                        </td>
-                        <td>
-                          <span className="rr-inv-badge">
-                            {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
-                          </span>
-                        </td>
-                        <td>
-                          {sr.returnInvoiceNumber ? (
-                            <span className="rr-inv-badge" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
-                              {sr.returnInvoiceNumber}
-                            </span>
-                          ) : (
-                            <span className="rr-muted">—</span>
-                          )}
-                        </td>
-                        <td>{sr.assignedTo?.username || <span className="rr-muted">—</span>}</td>
-                        <td>
-                          <button className="rr-items-btn" onClick={() => setDetailItem(sr)}>
-                            {(sr.returnItems || []).length} item(s) — View
-                          </button>
-                        </td>
-                        <td className="rr-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
-                        <td className="rr-muted">
-                          {sr.pickedUpAt
-                            ? new Date(sr.pickedUpAt).toLocaleString("en-GB")
-                            : "—"}
-                        </td>
-                        <td className="rr-reason">{sr.returnReason || "—"}</td>
-                        <td>
-                          {sr.status === "picked_up" ? (
-                            <button
-                              className="rr-btn-confirm"
-                              onClick={() => setConfirmModal(sr)}
-                            >
-                              Confirm Received
-                            </button>
-                          ) : (
-                            <>
-                              <span className="rr-status-done">✅ Completed</span>
-                              {sr.returnInvoiceNumber && (
-                                <button
-                                  className="rr-btn-download"
-                                  onClick={() => {
-                                    setPendingInvoiceSr(sr);
-                                    setShowInvoiceModal(true);
-                                  }}
-                                  title="Download return invoice"
-                                >
-                                  Download Invoice
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </td>
+              <>
+                <div className="rr-table-wrap">
+                  <table className="rr-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Customer</th>
+                        <th>Original Order</th>
+                        <th>Return Invoice</th>
+                        <th>Delivery Man</th>
+                        <th>Items</th>
+                        <th>Return Amount</th>
+                        <th>Picked Up At</th>
+                        <th>Return Reason</th>
+                        <th>Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((sr, idx) => (
+                        <tr key={sr._id}>
+                          <td>{pagination.showingFrom + idx}</td>
+                          <td>
+                            <div className="rr-name">{sr.customer?.name || "—"}</div>
+                            <div className="rr-phone">{sr.customer?.phoneNumber || ""}</div>
+                          </td>
+                          <td>
+                            <span className="rr-inv-badge">
+                              {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
+                            </span>
+                          </td>
+                          <td>
+                            {sr.returnInvoiceNumber ? (
+                              <span className="rr-inv-badge" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
+                                {sr.returnInvoiceNumber}
+                              </span>
+                            ) : (
+                              <span className="rr-muted">—</span>
+                            )}
+                          </td>
+                          <td>{sr.assignedTo?.username || <span className="rr-muted">—</span>}</td>
+                          <td>
+                            <button className="rr-items-btn" onClick={() => setDetailItem(sr)}>
+                              {(sr.returnItems || []).length} item(s) — View
+                            </button>
+                          </td>
+                          <td className="rr-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
+                          <td className="rr-muted">
+                            {sr.pickedUpAt
+                              ? new Date(sr.pickedUpAt).toLocaleString("en-GB")
+                              : "—"}
+                          </td>
+                          <td className="rr-reason">{sr.returnReason || "—"}</td>
+                          <td>
+                            {sr.status === "picked_up" ? (
+                              <button
+                                className="rr-btn-confirm"
+                                onClick={() => setConfirmModal(sr)}
+                              >
+                                Confirm Received
+                              </button>
+                            ) : (
+                              <>
+                                <span className="rr-status-done">✅ Completed</span>
+                                {sr.returnInvoiceNumber && (
+                                  <button
+                                    className="rr-btn-download"
+                                    onClick={() => {
+                                      setPendingInvoiceSr(sr);
+                                      setShowInvoiceModal(true);
+                                    }}
+                                    title="Download return invoice"
+                                  >
+                                    Download Invoice
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             </div>
           )}
         </div>

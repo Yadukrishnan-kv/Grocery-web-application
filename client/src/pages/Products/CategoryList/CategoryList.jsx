@@ -5,7 +5,10 @@ import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CategoryList.css';
 import axios from 'axios';
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from "../../../utils/toast"; // ← NEW IMPORT
+import { useAppSettings } from '../../../context/AppSettingsContext';
+import { usePaginatedData } from '../../../hooks/usePagination';
+import Pagination from '../../../components/common/Pagination';
 
 const CategoryList = () => {
   const [categories, setCategories] = useState([]);
@@ -105,6 +108,13 @@ const CategoryList = () => {
     setSearchQuery('');
   };
 
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(
+    filteredCategories,
+    entriesPerPage,
+    `${searchQuery}`
+  );
+
   if (!user) {
     return <div className="category-list-loading">Loading...</div>;
   }
@@ -163,44 +173,58 @@ const CategoryList = () => {
                 No categories found {searchQuery.trim() ? `matching "${searchQuery}"` : ''}
               </div>
             ) : (
-              <div className="category-list-table-wrapper">
-                <table className="category-list-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Category Name</th>
-                      <th scope="col">Edit</th>
-                      <th scope="col">Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCategories.map((category, index) => (
-                      <tr key={category._id}>
-                        <td>{index + 1}</td>
-                        <td>{category.CategoryName}</td>
-                        <td>
-                          <Link
-                            to={`/category/create?edit=${category._id}`}
-                            className="category-list-icon-button category-list-edit-button"
-                            aria-label={`Edit category ${category.CategoryName}`}
-                          >
-                            ✎
-                          </Link>
-                        </td>
-                        <td>
-                          <button
-                            className="category-list-icon-button category-list-delete-button"
-                            onClick={() => handleDeleteClick(category._id, category.CategoryName)}
-                            aria-label={`Delete category ${category.CategoryName}`}
-                          >
-                            🗑️
-                          </button>
-                        </td>
+              <>
+                <div className="category-list-table-wrapper">
+                  <table className="category-list-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Category Name</th>
+                        <th scope="col">Edit</th>
+                        <th scope="col">Delete</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((category, index) => (
+                        <tr key={category._id}>
+                          <td>{pagination.showingFrom + index}</td>
+                          <td>{category.CategoryName}</td>
+                          <td>
+                            <Link
+                              to={`/category/create?edit=${category._id}`}
+                              className="category-list-icon-button category-list-edit-button"
+                              aria-label={`Edit category ${category.CategoryName}`}
+                            >
+                              ✎
+                            </Link>
+                          </td>
+                          <td>
+                            <button
+                              className="category-list-icon-button category-list-delete-button"
+                              onClick={() => handleDeleteClick(category._id, category.CategoryName)}
+                              aria-label={`Delete category ${category.CategoryName}`}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

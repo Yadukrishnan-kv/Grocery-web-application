@@ -6,7 +6,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./ReceiptDetails.css";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
 
 const ReceiptDetails = () => {
   const { receiptId } = useParams();

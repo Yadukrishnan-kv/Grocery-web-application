@@ -5,7 +5,7 @@ import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CreateSubCategory.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import toast from 'react-hot-toast'; // ← NEW
+import toast from "../../../utils/toast"; // ← NEW
 
 const CreateSubCategory = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

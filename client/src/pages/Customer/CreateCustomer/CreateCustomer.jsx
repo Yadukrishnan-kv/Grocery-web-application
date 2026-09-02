@@ -5,7 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import "./CreateCustomer.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
 
 const CreateCustomer = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

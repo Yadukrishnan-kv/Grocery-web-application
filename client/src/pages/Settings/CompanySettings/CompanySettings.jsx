@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
-import toast from "react-hot-toast"; // ← NEW IMPORT
+import toast from "../../../utils/toast"; // ← NEW IMPORT
 import "./CompanySettings.css";
 
 const CompanySettings = () => {
@@ -17,6 +17,7 @@ const CompanySettings = () => {
     companyNameArabic: "",
     bankName: "",
     bankAccountNumber: "",
+    entriesPerPage: 10,
   });
   const [settingsId, setSettingsId] = useState(null); // for update
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +64,7 @@ const CompanySettings = () => {
             companyNameArabic: settingsRes.data.companyNameArabic || "",
             bankName: settingsRes.data.bankName || "",
             bankAccountNumber: settingsRes.data.bankAccountNumber || "",
+            entriesPerPage: settingsRes.data.entriesPerPage || 10,
           });
         } else {
           setSettingsExist(false);
@@ -83,7 +85,10 @@ const CompanySettings = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "entriesPerPage" ? Number(value) : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -292,6 +297,30 @@ const CompanySettings = () => {
                   onChange={handleChange}
                   placeholder="e.g. 123456789012"
                 />
+              </div>
+            </div>
+
+            <hr className="divider" />
+
+            <h3>Display Settings</h3>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="entriesPerPage">Entries per page</label>
+                <select
+                  id="entriesPerPage"
+                  name="entriesPerPage"
+                  value={formData.entriesPerPage}
+                  onChange={handleChange}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <small className="field-hint">
+                  Number of rows shown per page across all list tables.
+                </small>
               </div>
             </div>
 

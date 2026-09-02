@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import axios from 'axios';
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from "../../utils/toast"; // ← NEW IMPORT
 import './Profile.css';
 
 const Profile = () => {

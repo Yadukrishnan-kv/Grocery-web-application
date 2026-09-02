@@ -21,6 +21,7 @@ const createCompanySettings = async (req, res) => {
       companyNameArabic,
       bankName,
       bankAccountNumber,
+      entriesPerPage,
     } = req.body;
 
     if (!companyName || !companyAddress) {
@@ -39,6 +40,7 @@ const createCompanySettings = async (req, res) => {
       companyNameArabic,
       bankName,
       bankAccountNumber,
+      entriesPerPage,
       updatedBy: req.user._id,
     });
 
@@ -76,6 +78,7 @@ const updateCompanySettings = async (req, res) => {
       companyNameArabic,
       bankName,
       bankAccountNumber,
+      entriesPerPage,
     } = req.body;
 
     if (!companyName || !companyAddress) {
@@ -96,6 +99,7 @@ const updateCompanySettings = async (req, res) => {
         companyNameArabic,
         bankName,
         bankAccountNumber,
+        entriesPerPage,
         updatedBy: req.user._id,
       },
       { new: true, runValidators: true },

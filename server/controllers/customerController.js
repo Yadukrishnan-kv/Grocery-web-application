@@ -6,6 +6,7 @@ const BillTransaction = require("../models/BillTransaction");
 const Role = require("../models/Role");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const { getPaginationParams, buildPaginatedResponse } = require("../utils/paginate");
 
 // Generate CustomerId: [3-char emiratesCode][last-3-char of salesman _id][4-digit sequential]
 // The sequential number is GLOBAL — it finds the highest suffix across all existing
@@ -277,8 +278,19 @@ const createCustomer = async (req, res) => {
 
 const getAllCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: 1 });
-    res.json(customers);
+    const sort = { createdAt: 1 };
+
+    if (!req.query.page) {
+      const customers = await Customer.find().sort(sort);
+      return res.json(customers);
+    }
+
+    const { page, limit, skip } = getPaginationParams(req.query);
+    const [customers, totalRecords] = await Promise.all([
+      Customer.find().sort(sort).skip(skip).limit(limit),
+      Customer.countDocuments(),
+    ]);
+    res.json(buildPaginatedResponse(customers, totalRecords, page, limit));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -915,30 +927,41 @@ function getDaysRemaining(dueDate) {
 
 const getAllCustomersWithDue = async (req, res) => {
   try {
-    const customers = await Customer.find()
-      .populate("salesman", "username email emiratesName emiratesCode")
-      .sort({ createdAt: 1, _id: 1 });
+    const sort = { createdAt: 1, _id: 1 };
+    const populateOpts = ["salesman", "username email emiratesName emiratesCode"];
 
-    const customersWithDue = await Promise.all(
-      customers.map(async (customer) => {
-        const latestPendingBill = await Bill.findOne({
-          customer: customer._id,
-          status: "pending"
-        }).sort({ cycleEnd: -1 });
+    const attachDue = async (customer) => {
+      const latestPendingBill = await Bill.findOne({
+        customer: customer._id,
+        status: "pending"
+      }).sort({ cycleEnd: -1 });
 
-        const daysLeft = latestPendingBill
-          ? getDaysRemaining(latestPendingBill.dueDate)
-          : null;
+      const daysLeft = latestPendingBill
+        ? getDaysRemaining(latestPendingBill.dueDate)
+        : null;
 
-        return {
-          ...customer.toObject(),
-          pendingBillDaysLeft: daysLeft,
-          pendingDueDate: latestPendingBill?.dueDate
-        };
-      })
-    );
+      return {
+        ...customer.toObject(),
+        pendingBillDaysLeft: daysLeft,
+        pendingDueDate: latestPendingBill?.dueDate
+      };
+    };
 
-    res.json(customersWithDue);
+    if (!req.query.page) {
+      const customers = await Customer.find()
+        .populate(...populateOpts)
+        .sort(sort);
+      const customersWithDue = await Promise.all(customers.map(attachDue));
+      return res.json(customersWithDue);
+    }
+
+    const { page, limit, skip } = getPaginationParams(req.query);
+    const [customers, totalRecords] = await Promise.all([
+      Customer.find().populate(...populateOpts).sort(sort).skip(skip).limit(limit),
+      Customer.countDocuments(),
+    ]);
+    const customersWithDue = await Promise.all(customers.map(attachDue));
+    res.json(buildPaginatedResponse(customersWithDue, totalRecords, page, limit));
   } catch (error) {
     console.error("Error in getAllCustomersWithDue:", error);
     res.status(500).json({ message: "Server error", error: error.message });

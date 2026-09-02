@@ -2,10 +2,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
 import axios from "axios";
 import "./ReturnPickups.css";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const ReturnPickups = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -105,6 +108,11 @@ const ReturnPickups = () => {
   const pickedUp = pickups.filter((p) => p.status === "picked_up");
   const completed = pickups.filter((p) => p.status === "completed");
 
+  const { entriesPerPage } = useAppSettings();
+  const assignedPagination = usePaginatedData(assigned, entriesPerPage, `${activeTab}|assigned`);
+  const pickedUpPagination = usePaginatedData(pickedUp, entriesPerPage, `${activeTab}|pickedUp`);
+  const completedPagination = usePaginatedData(completed, entriesPerPage, `${activeTab}|completed`);
+
   return (
     <div className="rp-layout">
       <Header sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} user={user} />
@@ -179,57 +187,71 @@ const ReturnPickups = () => {
                     Awaiting Pickup ({assigned.length})
                   </h2>
                   <div className="rp-card">
-                    <div className="rp-table-wrap">
-                      <table className="rp-table">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Customer</th>
-                            <th>Address</th>
-                            <th>Original Order</th>
-                            <th>Items</th>
-                            <th>Return Amount</th>
-                            <th>Requested</th>
-                            <th>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {assigned.map((sr, idx) => (
-                            <tr key={sr._id}>
-                              <td>{idx + 1}</td>
-                              <td>
-                                <div className="rp-name">{sr.customer?.name || "—"}</div>
-                                <div className="rp-phone">{sr.customer?.phoneNumber || ""}</div>
-                              </td>
-                              <td className="rp-address">{sr.customer?.address || "—"}</td>
-                              <td>
-                                <span className="rp-inv-badge">
-                                  {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
-                                </span>
-                              </td>
-                              <td>
-                                <button className="rp-items-btn" onClick={() => setDetailItem(sr)}>
-                                  {(sr.returnItems || []).length} item(s)
-                                </button>
-                              </td>
-                              <td className="rp-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
-                              <td className="rp-muted">
-                                {new Date(sr.createdAt).toLocaleDateString("en-GB")}
-                              </td>
-                              <td>
-                                <button
-                                  className="rp-btn-confirm"
-                                  onClick={() => handleConfirmPickup(sr._id)}
-                                  disabled={processingId === sr._id}
-                                >
-                                  {processingId === sr._id ? "..." : "Confirm Pickup"}
-                                </button>
-                              </td>
+                    <>
+                      <div className="rp-table-wrap">
+                        <table className="rp-table">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Customer</th>
+                              <th>Address</th>
+                              <th>Original Order</th>
+                              <th>Items</th>
+                              <th>Return Amount</th>
+                              <th>Requested</th>
+                              <th>Action</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {assignedPagination.pageData.map((sr, idx) => (
+                              <tr key={sr._id}>
+                                <td>{assignedPagination.showingFrom + idx}</td>
+                                <td>
+                                  <div className="rp-name">{sr.customer?.name || "—"}</div>
+                                  <div className="rp-phone">{sr.customer?.phoneNumber || ""}</div>
+                                </td>
+                                <td className="rp-address">{sr.customer?.address || "—"}</td>
+                                <td>
+                                  <span className="rp-inv-badge">
+                                    {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button className="rp-items-btn" onClick={() => setDetailItem(sr)}>
+                                    {(sr.returnItems || []).length} item(s)
+                                  </button>
+                                </td>
+                                <td className="rp-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
+                                <td className="rp-muted">
+                                  {new Date(sr.createdAt).toLocaleDateString("en-GB")}
+                                </td>
+                                <td>
+                                  <button
+                                    className="rp-btn-confirm"
+                                    onClick={() => handleConfirmPickup(sr._id)}
+                                    disabled={processingId === sr._id}
+                                  >
+                                    {processingId === sr._id ? "..." : "Confirm Pickup"}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <Pagination
+                        page={assignedPagination.page}
+                        totalPages={assignedPagination.totalPages}
+                        totalRecords={assignedPagination.totalRecords}
+                        showingFrom={assignedPagination.showingFrom}
+                        showingTo={assignedPagination.showingTo}
+                        canPrev={assignedPagination.canPrev}
+                        canNext={assignedPagination.canNext}
+                        onPrev={assignedPagination.goPrev}
+                        onNext={assignedPagination.goNext}
+                      />
+                    </>
                   </div>
                 </div>
               )}
@@ -242,84 +264,7 @@ const ReturnPickups = () => {
                     Picked Up — Deliver to Storekeeper ({pickedUp.length})
                   </h2>
                   <div className="rp-card">
-                    <div className="rp-table-wrap">
-                      <table className="rp-table">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Customer</th>
-                            <th>Original Order</th>
-                            <th>Items</th>
-                            <th>Return Amount</th>
-                            <th>Picked Up At</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pickedUp.map((sr, idx) => (
-                            <tr key={sr._id}>
-                              <td>{idx + 1}</td>
-                              <td>
-                                <div className="rp-name">{sr.customer?.name || "—"}</div>
-                                <div className="rp-phone">{sr.customer?.phoneNumber || ""}</div>
-                              </td>
-                              <td>
-                                <span className="rp-inv-badge">
-                                  {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
-                                </span>
-                              </td>
-                              <td>
-                                <button className="rp-items-btn" onClick={() => setDetailItem(sr)}>
-                                  {(sr.returnItems || []).length} item(s)
-                                </button>
-                              </td>
-                              <td className="rp-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
-                              <td className="rp-muted">
-                                {sr.pickedUpAt
-                                  ? new Date(sr.pickedUpAt).toLocaleString("en-GB")
-                                  : "—"}
-                              </td>
-                              <td>
-                                <span className="rp-badge-cyan">Bring to Store</span>
-                              </td>
-                              <td>
-                                {sr.returnInvoiceNumber ? (
-                                  <button
-                                    className="rp-btn-download"
-                                    onClick={() => {
-                                      setPendingInvoiceData({ id: sr._id, invoiceNumber: sr.returnInvoiceNumber });
-                                      setShowInvoiceModal(true);
-                                    }}
-                                    title="Download invoice"
-                                  >
-                                    📥 Invoice
-                                  </button>
-                                ) : (
-                                  <span className="rp-muted">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-              </>
-              ))}
-
-              {/* History Tab */}
-              {activeTab === "history" && (
-                completed.length === 0 ? (
-                  <div className="rp-empty-card">
-                    <div className="rp-empty-icon">📋</div>
-                    <p>No completed return pickups yet.</p>
-                  </div>
-                ) : (
-                  <div className="rp-section">
-                    <div className="rp-card">
+                    <>
                       <div className="rp-table-wrap">
                         <table className="rp-table">
                           <thead>
@@ -327,18 +272,17 @@ const ReturnPickups = () => {
                               <th>#</th>
                               <th>Customer</th>
                               <th>Original Order</th>
-                              <th>Return Invoice</th>
                               <th>Items</th>
                               <th>Return Amount</th>
-                              <th>Completed At</th>
+                              <th>Picked Up At</th>
                               <th>Status</th>
                               <th>Action</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {completed.map((sr, idx) => (
+                            {pickedUpPagination.pageData.map((sr, idx) => (
                               <tr key={sr._id}>
-                                <td>{idx + 1}</td>
+                                <td>{pickedUpPagination.showingFrom + idx}</td>
                                 <td>
                                   <div className="rp-name">{sr.customer?.name || "—"}</div>
                                   <div className="rp-phone">{sr.customer?.phoneNumber || ""}</div>
@@ -349,24 +293,19 @@ const ReturnPickups = () => {
                                   </span>
                                 </td>
                                 <td>
-                                  {sr.returnInvoiceNumber ? (
-                                    <span className="rp-inv-badge" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
-                                      {sr.returnInvoiceNumber}
-                                    </span>
-                                  ) : <span className="rp-muted">—</span>}
-                                </td>
-                                <td>
                                   <button className="rp-items-btn" onClick={() => setDetailItem(sr)}>
                                     {(sr.returnItems || []).length} item(s)
                                   </button>
                                 </td>
                                 <td className="rp-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
                                 <td className="rp-muted">
-                                  {sr.completedAt
-                                    ? new Date(sr.completedAt).toLocaleString("en-GB")
+                                  {sr.pickedUpAt
+                                    ? new Date(sr.pickedUpAt).toLocaleString("en-GB")
                                     : "—"}
                                 </td>
-                                <td><span className="rp-badge-green">✅ Completed</span></td>
+                                <td>
+                                  <span className="rp-badge-cyan">Bring to Store</span>
+                                </td>
                                 <td>
                                   {sr.returnInvoiceNumber ? (
                                     <button
@@ -388,6 +327,117 @@ const ReturnPickups = () => {
                           </tbody>
                         </table>
                       </div>
+
+                      <Pagination
+                        page={pickedUpPagination.page}
+                        totalPages={pickedUpPagination.totalPages}
+                        totalRecords={pickedUpPagination.totalRecords}
+                        showingFrom={pickedUpPagination.showingFrom}
+                        showingTo={pickedUpPagination.showingTo}
+                        canPrev={pickedUpPagination.canPrev}
+                        canNext={pickedUpPagination.canNext}
+                        onPrev={pickedUpPagination.goPrev}
+                        onNext={pickedUpPagination.goNext}
+                      />
+                    </>
+                  </div>
+                </div>
+              )}
+              </>
+              ))}
+
+              {/* History Tab */}
+              {activeTab === "history" && (
+                completed.length === 0 ? (
+                  <div className="rp-empty-card">
+                    <div className="rp-empty-icon">📋</div>
+                    <p>No completed return pickups yet.</p>
+                  </div>
+                ) : (
+                  <div className="rp-section">
+                    <div className="rp-card">
+                      <>
+                        <div className="rp-table-wrap">
+                          <table className="rp-table">
+                            <thead>
+                              <tr>
+                                <th>#</th>
+                                <th>Customer</th>
+                                <th>Original Order</th>
+                                <th>Return Invoice</th>
+                                <th>Items</th>
+                                <th>Return Amount</th>
+                                <th>Completed At</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {completedPagination.pageData.map((sr, idx) => (
+                                <tr key={sr._id}>
+                                  <td>{completedPagination.showingFrom + idx}</td>
+                                  <td>
+                                    <div className="rp-name">{sr.customer?.name || "—"}</div>
+                                    <div className="rp-phone">{sr.customer?.phoneNumber || ""}</div>
+                                  </td>
+                                  <td>
+                                    <span className="rp-inv-badge">
+                                      {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {sr.returnInvoiceNumber ? (
+                                      <span className="rp-inv-badge" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
+                                        {sr.returnInvoiceNumber}
+                                      </span>
+                                    ) : <span className="rp-muted">—</span>}
+                                  </td>
+                                  <td>
+                                    <button className="rp-items-btn" onClick={() => setDetailItem(sr)}>
+                                      {(sr.returnItems || []).length} item(s)
+                                    </button>
+                                  </td>
+                                  <td className="rp-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
+                                  <td className="rp-muted">
+                                    {sr.completedAt
+                                      ? new Date(sr.completedAt).toLocaleString("en-GB")
+                                      : "—"}
+                                  </td>
+                                  <td><span className="rp-badge-green">✅ Completed</span></td>
+                                  <td>
+                                    {sr.returnInvoiceNumber ? (
+                                      <button
+                                        className="rp-btn-download"
+                                        onClick={() => {
+                                          setPendingInvoiceData({ id: sr._id, invoiceNumber: sr.returnInvoiceNumber });
+                                          setShowInvoiceModal(true);
+                                        }}
+                                        title="Download invoice"
+                                      >
+                                        📥 Invoice
+                                      </button>
+                                    ) : (
+                                      <span className="rp-muted">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <Pagination
+                          page={completedPagination.page}
+                          totalPages={completedPagination.totalPages}
+                          totalRecords={completedPagination.totalRecords}
+                          showingFrom={completedPagination.showingFrom}
+                          showingTo={completedPagination.showingTo}
+                          canPrev={completedPagination.canPrev}
+                          canNext={completedPagination.canNext}
+                          onPrev={completedPagination.goPrev}
+                          onNext={completedPagination.goNext}
+                        />
+                      </>
                     </div>
                   </div>
                 )

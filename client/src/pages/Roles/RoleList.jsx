@@ -5,7 +5,7 @@ import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './RoleList.css';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from "../../utils/toast";
 
 const RoleList = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

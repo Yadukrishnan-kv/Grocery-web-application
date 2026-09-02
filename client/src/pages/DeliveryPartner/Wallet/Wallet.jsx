@@ -3,9 +3,12 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
 import axios from "axios";
 import "./Wallet.css";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 // Icons (unchanged)
 const CashIcon = () => (
@@ -143,6 +146,9 @@ const Wallet = () => {
         .reduce((sum, tx) => sum + tx.amount, 0),
     [walletData.transactions, selectedTxIds],
   );
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(filteredTransactions, entriesPerPage, `${searchCustomer}`);
 
   // Selection handlers
   const handleSelectAll = () => {
@@ -428,7 +434,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.map((tx, idx) => (
+                  {pagination.pageData.map((tx, idx) => (
                     <tr key={tx._id}>
                       <td>
                         <input
@@ -438,7 +444,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                           disabled={tx.status !== "received"}
                         />
                       </td>
-                      <td>{idx + 1}</td>
+                      <td>{pagination.showingFrom + idx}</td>
                       <td>{tx.order?.customer?.name || "N/A"}</td>
                       <td>
   {/* ✅ Use displayInvoiceNumber from backend, fallback to order.invoiceNumber */}
@@ -469,6 +475,17 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                 </tbody>
               </table>
             )}
+            <Pagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              totalRecords={pagination.totalRecords}
+              showingFrom={pagination.showingFrom}
+              showingTo={pagination.showingTo}
+              canPrev={pagination.canPrev}
+              canNext={pagination.canNext}
+              onPrev={pagination.goPrev}
+              onNext={pagination.goNext}
+            />
           </div>
         </div>
       </main>

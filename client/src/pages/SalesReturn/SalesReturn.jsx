@@ -3,10 +3,13 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header/Header";
 import Sidebar from "../../components/layout/Sidebar/Sidebar";
-import toast from "react-hot-toast";
+import toast from "../../utils/toast";
 import axios from "axios";
 import "./SalesReturn.css";
 import InvoiceDownloadModal from "../../components/InvoiceDownloadModal/InvoiceDownloadModal";
+import { useAppSettings } from "../../context/AppSettingsContext";
+import { usePaginatedData } from "../../hooks/usePagination";
+import Pagination from "../../components/common/Pagination";
 
 const STATUS_LABELS = {
   pending_admin_approval: "Pending Approval",
@@ -134,6 +137,9 @@ const SalesReturn = () => {
 
   const totalReturnAmt = (sr) =>
     (sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(filtered, entriesPerPage, `${activeTab}|${searchTerm}`);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -323,107 +329,121 @@ const SalesReturn = () => {
             ) : filtered.length === 0 ? (
               <div className="sr-empty">No returns found.</div>
             ) : (
-              <div className="sr-table-wrap">
-                <table className="sr-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Customer</th>
-                      <th>Order</th>
-                      <th>Items</th>
-                      <th>Return Amount</th>
-                      <th>Status</th>
-                      <th>Assigned To</th>
-                      <th>Date</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((sr, idx) => (
-                      <tr key={sr._id}>
-                        <td>{idx + 1}</td>
-                        <td>
-                          <div className="sr-customer-name">{sr.customer?.name || "-"}</div>
-                          <div className="sr-customer-phone">{sr.customer?.phoneNumber || ""}</div>
-                        </td>
-                        <td>
-                          <span className="sr-invoice-badge">
-                            {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "-"}
-                          </span>
-                        </td>
-                        <td>{(sr.returnItems || []).length} item(s)</td>
-                        <td className="sr-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
-                        <td>
-                          <span className={`sr-status-badge ${STATUS_COLORS[sr.status] || ""}`}>
-                            {STATUS_LABELS[sr.status] || sr.status}
-                          </span>
-                        </td>
-                        <td>{sr.assignedTo?.username || <span className="sr-muted">—</span>}</td>
-                        <td className="sr-muted">
-                          {new Date(sr.createdAt).toLocaleDateString("en-GB")}
-                        </td>
-                        <td>
-                          <div className="sr-actions">
-                            <button
-                              className="sr-btn-sm sr-btn-view"
-                              onClick={() => setDetailReturn(sr)}
-                            >
-                              View
-                            </button>
-                            {sr.status === "pending_admin_approval" && ["Admin", "Manager"].includes(user?.role) && (
-                              <>
-                                <button
-                                  className="sr-btn-sm sr-btn-approve"
-                                  onClick={() => { setApproveModal(sr); setApproveForm({ adminRemarks: "", deliveryManId: "" }); }}
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  className="sr-btn-sm sr-btn-reject"
-                                  onClick={() => { setRejectModal(sr); setRejectForm({ adminRemarks: "" }); }}
-                                >
-                                  Reject
-                                </button>
-                              </>
-                            )}
-                            {sr.status === "approved" && ["Admin", "Manager"].includes(user?.role) && (
-                              <button
-                                className="sr-btn-sm sr-btn-assign"
-                                onClick={() => { setAssignModal(sr); setAssignDeliveryManId(""); }}
-                              >
-                                Assign Pickup
-                              </button>
-                            )}
-                            {["pending_admin_approval", "approved"].includes(sr.status) && (
-                              <button
-                                className="sr-btn-sm sr-btn-cancel"
-                                onClick={() => handleCancel(sr._id)}
-                              >
-                                Cancel
-                              </button>
-                            )}
-                            {sr.status === "completed" && sr.returnInvoiceNumber && (
-                              <button
-                                className="sr-btn-sm sr-btn-invoice"
-                                onClick={() => {
-                                  if (isCustomer) {
-                                    handleDownloadInvoice(sr);
-                                  } else {
-                                    setPendingInvoiceSr(sr);
-                                    setShowInvoiceModal(true);
-                                  }
-                                }}
-                              >
-                                Invoice
-                              </button>
-                            )}
-                          </div>
-                        </td>
+              <>
+                <div className="sr-table-wrap">
+                  <table className="sr-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Customer</th>
+                        <th>Order</th>
+                        <th>Items</th>
+                        <th>Return Amount</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Date</th>
+                        <th>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((sr, idx) => (
+                        <tr key={sr._id}>
+                          <td>{pagination.showingFrom + idx}</td>
+                          <td>
+                            <div className="sr-customer-name">{sr.customer?.name || "-"}</div>
+                            <div className="sr-customer-phone">{sr.customer?.phoneNumber || ""}</div>
+                          </td>
+                          <td>
+                            <span className="sr-invoice-badge">
+                              {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "-"}
+                            </span>
+                          </td>
+                          <td>{(sr.returnItems || []).length} item(s)</td>
+                          <td className="sr-amount">AED {totalReturnAmt(sr).toFixed(2)}</td>
+                          <td>
+                            <span className={`sr-status-badge ${STATUS_COLORS[sr.status] || ""}`}>
+                              {STATUS_LABELS[sr.status] || sr.status}
+                            </span>
+                          </td>
+                          <td>{sr.assignedTo?.username || <span className="sr-muted">—</span>}</td>
+                          <td className="sr-muted">
+                            {new Date(sr.createdAt).toLocaleDateString("en-GB")}
+                          </td>
+                          <td>
+                            <div className="sr-actions">
+                              <button
+                                className="sr-btn-sm sr-btn-view"
+                                onClick={() => setDetailReturn(sr)}
+                              >
+                                View
+                              </button>
+                              {sr.status === "pending_admin_approval" && ["Admin", "Manager"].includes(user?.role) && (
+                                <>
+                                  <button
+                                    className="sr-btn-sm sr-btn-approve"
+                                    onClick={() => { setApproveModal(sr); setApproveForm({ adminRemarks: "", deliveryManId: "" }); }}
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    className="sr-btn-sm sr-btn-reject"
+                                    onClick={() => { setRejectModal(sr); setRejectForm({ adminRemarks: "" }); }}
+                                  >
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+                              {sr.status === "approved" && ["Admin", "Manager"].includes(user?.role) && (
+                                <button
+                                  className="sr-btn-sm sr-btn-assign"
+                                  onClick={() => { setAssignModal(sr); setAssignDeliveryManId(""); }}
+                                >
+                                  Assign Pickup
+                                </button>
+                              )}
+                              {["pending_admin_approval", "approved"].includes(sr.status) && (
+                                <button
+                                  className="sr-btn-sm sr-btn-cancel"
+                                  onClick={() => handleCancel(sr._id)}
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                              {sr.status === "completed" && sr.returnInvoiceNumber && (
+                                <button
+                                  className="sr-btn-sm sr-btn-invoice"
+                                  onClick={() => {
+                                    if (isCustomer) {
+                                      handleDownloadInvoice(sr);
+                                    } else {
+                                      setPendingInvoiceSr(sr);
+                                      setShowInvoiceModal(true);
+                                    }
+                                  }}
+                                >
+                                  Invoice
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

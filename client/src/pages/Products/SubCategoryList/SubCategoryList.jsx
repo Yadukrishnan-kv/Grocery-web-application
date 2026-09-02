@@ -5,7 +5,10 @@ import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './SubCategoryList.css';
 import axios from 'axios';
-import toast from 'react-hot-toast';
+import toast from "../../../utils/toast";
+import { useAppSettings } from '../../../context/AppSettingsContext';
+import { usePaginatedData } from '../../../hooks/usePagination';
+import Pagination from '../../../components/common/Pagination';
 
 const SubCategoryList = () => {
   const [subCategories, setSubCategories] = useState([]);
@@ -123,6 +126,13 @@ const SubCategoryList = () => {
     setSearchQuery('');
   };
 
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(
+    filteredSubCategories,
+    entriesPerPage,
+    `${selectedCategory}|${searchQuery}`
+  );
+
   if (!user) {
     return <div className="subcategory-list-loading">Loading...</div>;
   }
@@ -202,46 +212,60 @@ const SubCategoryList = () => {
                 {searchQuery.trim() ? ` matching "${searchQuery}"` : ''}
               </div>
             ) : (
-              <div className="subcategory-list-table-wrapper">
-                <table className="subcategory-list-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Sub-Category Name</th>
-                      <th scope="col">Category</th>
-                      <th scope="col">Edit</th>
-                      <th scope="col">Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSubCategories.map((subCat, index) => (
-                      <tr key={subCat._id}>
-                        <td>{index + 1}</td>
-                        <td>{subCat.subCategoryName}</td>
-                        <td>{subCat.CategoryName}</td>
-                        <td>
-                          <Link
-                            to={`/subcategory/create?edit=${subCat._id}`}
-                            className="subcategory-list-icon-button subcategory-list-edit-button"
-                            aria-label={`Edit sub-category ${subCat.subCategoryName}`}
-                          >
-                            ✎
-                          </Link>
-                        </td>
-                        <td>
-                          <button
-                            className="subcategory-list-icon-button subcategory-list-delete-button"
-                            onClick={() => handleDeleteClick(subCat._id, subCat.subCategoryName)}
-                            aria-label={`Delete sub-category ${subCat.subCategoryName}`}
-                          >
-                            🗑️
-                          </button>
-                        </td>
+              <>
+                <div className="subcategory-list-table-wrapper">
+                  <table className="subcategory-list-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Sub-Category Name</th>
+                        <th scope="col">Category</th>
+                        <th scope="col">Edit</th>
+                        <th scope="col">Delete</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((subCat, index) => (
+                        <tr key={subCat._id}>
+                          <td>{pagination.showingFrom + index}</td>
+                          <td>{subCat.subCategoryName}</td>
+                          <td>{subCat.CategoryName}</td>
+                          <td>
+                            <Link
+                              to={`/subcategory/create?edit=${subCat._id}`}
+                              className="subcategory-list-icon-button subcategory-list-edit-button"
+                              aria-label={`Edit sub-category ${subCat.subCategoryName}`}
+                            >
+                              ✎
+                            </Link>
+                          </td>
+                          <td>
+                            <button
+                              className="subcategory-list-icon-button subcategory-list-delete-button"
+                              onClick={() => handleDeleteClick(subCat._id, subCat.subCategoryName)}
+                              aria-label={`Delete sub-category ${subCat.subCategoryName}`}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

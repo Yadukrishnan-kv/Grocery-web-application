@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../../components/layout/Header/Header";
 import Sidebar from "../../components/layout/Sidebar/Sidebar";
-import toast from "react-hot-toast";
+import toast from "../../utils/toast";
 import axios from "axios";
 import "./CreateSalesReturn.css";
 

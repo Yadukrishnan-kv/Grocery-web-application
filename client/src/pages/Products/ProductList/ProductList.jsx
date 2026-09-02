@@ -6,9 +6,14 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./ProductList.css";
 import axios from "axios";
-import toast from 'react-hot-toast';
+import toast from "../../../utils/toast";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const ProductList = () => {
+  // Full list — only fetched/used when a search or category filter is active,
+  // so client-side filtering can search the whole dataset (not just one page).
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -18,6 +23,15 @@ const ProductList = () => {
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+
+  const { entriesPerPage } = useAppSettings();
+  const isFiltering = selectedCategory !== "All" || searchQuery.trim() !== "";
+
+  // Server-side pagination state (used when no filter/search is active)
+  const [pageProducts, setPageProducts] = useState([]);
+  const [serverPage, setServerPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalRecords, setServerTotalRecords] = useState(0);
 
   // NEW: Confirmation modal for delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -44,7 +58,9 @@ const ProductList = () => {
     }
   }, [backendUrl]);
 
-  const fetchProducts = useCallback(async () => {
+  // Full unpaginated list — only needed while a search/category filter is active,
+  // so filtering can search across the entire dataset rather than one page.
+  const fetchAllProducts = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
@@ -60,6 +76,32 @@ const ProductList = () => {
       setLoading(false);
     }
   }, [backendUrl]);
+
+  // Server-side paginated fetch — used for the default (unfiltered) browse view
+  const fetchProductsPage = useCallback(
+    async (page) => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${backendUrl}/api/products/getallproducts`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { page, limit: entriesPerPage },
+          }
+        );
+        setPageProducts(response.data.data);
+        setServerTotalPages(response.data.totalPages);
+        setServerTotalRecords(response.data.totalRecords);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        toast.error("Failed to load products");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [backendUrl, entriesPerPage]
+  );
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -78,9 +120,24 @@ const ProductList = () => {
 
   useEffect(() => {
     fetchCurrentUser();
-    fetchProducts();
     fetchCategories();
-  }, [fetchCurrentUser, fetchProducts, fetchCategories]);
+  }, [fetchCurrentUser, fetchCategories]);
+
+  // Fetch the right dataset depending on whether a filter/search is active
+  useEffect(() => {
+    if (isFiltering) {
+      fetchAllProducts();
+    } else {
+      fetchProductsPage(serverPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFiltering, serverPage, entriesPerPage]);
+
+  // Reset to page 1 of the server view whenever filters are cleared
+  useEffect(() => {
+    if (!isFiltering) setServerPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFiltering]);
 
   useEffect(() => {
     let result = products;
@@ -100,6 +157,27 @@ const ProductList = () => {
 
     setFilteredProducts(result);
   }, [selectedCategory, searchQuery, products]);
+
+  const clientPagination = usePaginatedData(
+    filteredProducts,
+    entriesPerPage,
+    `${selectedCategory}|${searchQuery}`
+  );
+  const serverPagination = {
+    page: serverPage,
+    totalPages: serverTotalPages,
+    totalRecords: serverTotalRecords,
+    showingFrom: serverTotalRecords === 0 ? 0 : (serverPage - 1) * entriesPerPage + 1,
+    showingTo: Math.min(serverPage * entriesPerPage, serverTotalRecords),
+    canPrev: serverPage > 1,
+    canNext: serverPage < serverTotalPages,
+    goPrev: () => setServerPage((p) => Math.max(1, p - 1)),
+    goNext: () => setServerPage((p) => Math.min(serverTotalPages, p + 1)),
+  };
+  const visibleProducts = isFiltering ? clientPagination.pageData : pageProducts;
+  const activePagination = isFiltering ? clientPagination : serverPagination;
+  const refetchCurrent = () =>
+    isFiltering ? fetchAllProducts() : fetchProductsPage(serverPage);
 
   const handleDeleteClick = (id, productName) => {
     setProductToDelete({ id, productName });
@@ -123,7 +201,7 @@ const ProductList = () => {
       toast.success(
         `Product "${productToDelete.productName}" deleted successfully!`
       );
-      fetchProducts();
+      refetchCurrent();
     } catch (error) {
       console.error("Error deleting product:", error);
       toast.error("Failed to delete product. Please try again.");
@@ -216,7 +294,7 @@ const ProductList = () => {
 
             {loading ? (
               <div className="product-list-loading">Loading products...</div>
-            ) : filteredProducts.length === 0 ? (
+            ) : visibleProducts.length === 0 ? (
               <div className="product-list-no-data">
                 No products found
                 {selectedCategory !== "All" ? ` in "${selectedCategory}"` : ""}
@@ -239,9 +317,9 @@ const ProductList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredProducts.map((product, index) => (
+                    {visibleProducts.map((product, index) => (
                       <tr key={product._id}>
-                        <td>{index + 1}</td>
+                        <td>{activePagination.showingFrom + index}</td>
                         <td>{product.productName}</td>
                         <td>{product.CategoryName}</td>
                         <td>{product.subCategoryName}</td>
@@ -295,6 +373,18 @@ const ProductList = () => {
                 </table>
               </div>
             )}
+
+            <Pagination
+              page={activePagination.page}
+              totalPages={activePagination.totalPages}
+              totalRecords={activePagination.totalRecords}
+              showingFrom={activePagination.showingFrom}
+              showingTo={activePagination.showingTo}
+              canPrev={activePagination.canPrev}
+              canNext={activePagination.canNext}
+              onPrev={activePagination.goPrev}
+              onNext={activePagination.goNext}
+            />
           </div>
         </div>
       </main>

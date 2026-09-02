@@ -4,8 +4,11 @@ import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './Emirates.css';
 import axios from 'axios';
-import toast from 'react-hot-toast';
+import toast from "../../utils/toast";
 import { useNavigate } from 'react-router-dom';
+import { useAppSettings } from '../../context/AppSettingsContext';
+import { usePaginatedData } from '../../hooks/usePagination';
+import Pagination from '../../components/common/Pagination';
 
 const Emirates = () => {
   const navigate = useNavigate();
@@ -13,6 +16,9 @@ const Emirates = () => {
   const [user, setUser] = useState(null);
   const [emiratesList, setEmiratesList] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(emiratesList, entriesPerPage, '');
 
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -149,39 +155,53 @@ const Emirates = () => {
             ) : emiratesList.length === 0 ? (
               <div className="emirates-no-data">No emirates found. Click "Add Emirates" to create one.</div>
             ) : (
-              <div className="emirates-table-wrapper">
-                <table className="emirates-data-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Emirates Name</th>
-                      <th>Emirates Code</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {emiratesList.map((em, index) => (
-                      <tr key={em._id}>
-                        <td>{index + 1}</td>
-                        <td className="emirates-name-cell">{em.emiratesName}</td>
-                        <td>
-                          <span className="emirates-code-badge">{em.emiratesCode}</span>
-                        </td>
-                        <td>
-                          <div className="emirates-actions-cell">
-                            <button className="emirates-edit-btn" onClick={() => handleEditClick(em)}>
-                              Edit
-                            </button>
-                            <button className="emirates-delete-btn" onClick={() => handleDelete(em._id, em.emiratesName)}>
-                              Delete
-                            </button>
-                          </div>
-                        </td>
+              <>
+                <div className="emirates-table-wrapper">
+                  <table className="emirates-data-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Emirates Name</th>
+                        <th>Emirates Code</th>
+                        <th>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((em, index) => (
+                        <tr key={em._id}>
+                          <td>{pagination.showingFrom + index}</td>
+                          <td className="emirates-name-cell">{em.emiratesName}</td>
+                          <td>
+                            <span className="emirates-code-badge">{em.emiratesCode}</span>
+                          </td>
+                          <td>
+                            <div className="emirates-actions-cell">
+                              <button className="emirates-edit-btn" onClick={() => handleEditClick(em)}>
+                                Edit
+                              </button>
+                              <button className="emirates-delete-btn" onClick={() => handleDelete(em._id, em.emiratesName)}>
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

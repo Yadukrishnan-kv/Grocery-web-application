@@ -1,5 +1,6 @@
 // controllers/productController.js (no change needed)
 const Product = require("../models/Product");
+const { getPaginationParams, buildPaginatedResponse } = require("../utils/paginate");
 
 const createProduct = async (req, res) => {
   try {
@@ -22,9 +23,19 @@ const createProduct = async (req, res) => {
 
 const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find()
-      .sort({ CategoryName: 1, subCategoryName: 1, productName: 1 });
-    res.json(products);
+    const sort = { CategoryName: 1, subCategoryName: 1, productName: 1 };
+
+    if (!req.query.page) {
+      const products = await Product.find().sort(sort);
+      return res.json(products);
+    }
+
+    const { page, limit, skip } = getPaginationParams(req.query);
+    const [products, totalRecords] = await Promise.all([
+      Product.find().sort(sort).skip(skip).limit(limit),
+      Product.countDocuments(),
+    ]);
+    res.json(buildPaginatedResponse(products, totalRecords, page, limit));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }

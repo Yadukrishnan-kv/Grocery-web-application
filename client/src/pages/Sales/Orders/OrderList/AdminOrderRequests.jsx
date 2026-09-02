@@ -4,8 +4,11 @@ import Header from '../../../../components/layout/Header/Header';
 import Sidebar from '../../../../components/layout/Sidebar/Sidebar';
 import DirhamSymbol from '../../../../Assets/aed-symbol.png';
 import axios from 'axios';
-import toast from 'react-hot-toast';
+import toast from "../../../../utils/toast";
 import './AdminOrderRequests.css';
+import { useAppSettings } from '../../../../context/AppSettingsContext';
+import { usePaginatedData } from '../../../../hooks/usePagination';
+import Pagination from '../../../../components/common/Pagination';
 
 const AdminOrderRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -79,6 +82,9 @@ const AdminOrderRequests = () => {
     }
   };
 
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(requests, entriesPerPage, "pending-requests");
+
   if (loading) {
     return <div className="admin-requests-loading">Loading pending order requests...</div>;
   }
@@ -108,114 +114,128 @@ const AdminOrderRequests = () => {
               No pending order requests at the moment.
             </div>
           ) : (
-            <div className="admin-requests-table-wrapper">
-              <table className="admin-requests-table">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Customer</th>
-                    <th>Products</th>
-                    <th>Total Qty</th>
-                    {/* ✅ UPDATED: VAT Breakdown Columns */}
-                    <th className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
-                    <th className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
-                    <th className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
-                    <th>Payment</th>
-                    <th>Remarks</th>
-                    <th>Requested At</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((req, index) => {
-                    const totalQty = req.orderItems.reduce((sum, item) => sum + item.orderedQuantity, 0);
+            <>
+              <div className="admin-requests-table-wrapper">
+                <table className="admin-requests-table">
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Customer</th>
+                      <th>Products</th>
+                      <th>Total Qty</th>
+                      {/* ✅ UPDATED: VAT Breakdown Columns */}
+                      <th className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
+                      <th className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
+                      <th className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
+                      <th>Payment</th>
+                      <th>Remarks</th>
+                      <th>Requested At</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagination.pageData.map((req, index) => {
+                      const totalQty = req.orderItems.reduce((sum, item) => sum + item.orderedQuantity, 0);
                     
-                    // ✅ Calculate VAT breakdown for this request
-                    const { exclVat, vatAmount, grandTotal } = calculateRequestVAT(req.orderItems);
+                      // ✅ Calculate VAT breakdown for this request
+                      const { exclVat, vatAmount, grandTotal } = calculateRequestVAT(req.orderItems);
 
-                    return (
-                      <tr key={req._id}>
-                        <td>{index + 1}</td>
-                        <td>
-                          <div className="admin-requests-customer-info">
-                            <strong>{req.customer?.name || 'N/A'}</strong>
-                            <span>{req.customer?.phoneNumber || ''}</span>
-                          </div>
-                        </td>
-                        <td className="admin-requests-products-cell">
-                          {req.orderItems?.length > 0 ? (
-                            <div className="admin-requests-products-list">
-                              {req.orderItems.map((item, i) => (
-                                <div key={i} className="admin-requests-product-tag">
-                                  <span className="admin-requests-product-name">
-                                    {item.product?.productName || 'Unknown'}
-                                  </span>
-                                  <span className="admin-requests-product-qty">
-                                    × {item.orderedQuantity}
-                                  </span>
-                                  <span className="admin-requests-product-unit">
-                                    {item.unit || ''}
-                                  </span>
-                                </div>
-                              ))}
+                      return (
+                        <tr key={req._id}>
+                          <td>{pagination.showingFrom + index}</td>
+                          <td>
+                            <div className="admin-requests-customer-info">
+                              <strong>{req.customer?.name || 'N/A'}</strong>
+                              <span>{req.customer?.phoneNumber || ''}</span>
                             </div>
-                          ) : (
-                            <span className="admin-requests-no-products">No products</span>
-                          )}
-                        </td>
-                        <td>{totalQty}</td>
+                          </td>
+                          <td className="admin-requests-products-cell">
+                            {req.orderItems?.length > 0 ? (
+                              <div className="admin-requests-products-list">
+                                {req.orderItems.map((item, i) => (
+                                  <div key={i} className="admin-requests-product-tag">
+                                    <span className="admin-requests-product-name">
+                                      {item.product?.productName || 'Unknown'}
+                                    </span>
+                                    <span className="admin-requests-product-qty">
+                                      × {item.orderedQuantity}
+                                    </span>
+                                    <span className="admin-requests-product-unit">
+                                      {item.unit || ''}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="admin-requests-no-products">No products</span>
+                            )}
+                          </td>
+                          <td>{totalQty}</td>
                         
-                        {/* ✅ VAT Breakdown Display */}
-                        <td className="vat-cell">
-                          <div className="vat-amount">
-                            <img src={DirhamSymbol} alt="AED" width={12} />
-                            <span>{exclVat.toFixed(2)}</span>
-                          </div>
-                        </td>
-                        <td className="vat-cell">
-                          <div className="vat-amount vat-highlight">
-                            <img src={DirhamSymbol} alt="AED" width={12} />
-                            <span>{vatAmount.toFixed(2)}</span>
-                          </div>
-                        </td>
-                        <td className="vat-cell grand-total-cell">
-                          <div className="vat-amount grand-total-amount">
-                            <img src={DirhamSymbol} alt="AED" width={14} />
-                            <span>{grandTotal.toFixed(2)}</span>
-                          </div>
-                        </td>
+                          {/* ✅ VAT Breakdown Display */}
+                          <td className="vat-cell">
+                            <div className="vat-amount">
+                              <img src={DirhamSymbol} alt="AED" width={12} />
+                              <span>{exclVat.toFixed(2)}</span>
+                            </div>
+                          </td>
+                          <td className="vat-cell">
+                            <div className="vat-amount vat-highlight">
+                              <img src={DirhamSymbol} alt="AED" width={12} />
+                              <span>{vatAmount.toFixed(2)}</span>
+                            </div>
+                          </td>
+                          <td className="vat-cell grand-total-cell">
+                            <div className="vat-amount grand-total-amount">
+                              <img src={DirhamSymbol} alt="AED" width={14} />
+                              <span>{grandTotal.toFixed(2)}</span>
+                            </div>
+                          </td>
 
-                        <td className="admin-requests-payment">
-                          {req.payment?.charAt(0).toUpperCase() + req.payment?.slice(1) || 'N/A'}
-                        </td>
-                        <td title={req.remarks || ''}>
-                          {req.remarks
-                            ? req.remarks.substring(0, 40) + (req.remarks.length > 40 ? '...' : '')
-                            : '-'}
-                        </td>
-                        <td>{new Date(req.requestedAt).toLocaleString()}</td>
-                        <td>
-                          <div className="admin-requests-actions">
-                            <button
-                              className="admin-requests-approve-btn"
-                              onClick={() => handleApprove(req._id)}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              className="admin-requests-reject-btn"
-                              onClick={() => handleReject(req._id)}
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          <td className="admin-requests-payment">
+                            {req.payment?.charAt(0).toUpperCase() + req.payment?.slice(1) || 'N/A'}
+                          </td>
+                          <td title={req.remarks || ''}>
+                            {req.remarks
+                              ? req.remarks.substring(0, 40) + (req.remarks.length > 40 ? '...' : '')
+                              : '-'}
+                          </td>
+                          <td>{new Date(req.requestedAt).toLocaleString()}</td>
+                          <td>
+                            <div className="admin-requests-actions">
+                              <button
+                                className="admin-requests-approve-btn"
+                                onClick={() => handleApprove(req._id)}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                className="admin-requests-reject-btn"
+                                onClick={() => handleReject(req._id)}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                totalRecords={pagination.totalRecords}
+                showingFrom={pagination.showingFrom}
+                showingTo={pagination.showingTo}
+                canPrev={pagination.canPrev}
+                canNext={pagination.canNext}
+                onPrev={pagination.goPrev}
+                onNext={pagination.goNext}
+              />
+            </>
           )}
         </div>
       </main>

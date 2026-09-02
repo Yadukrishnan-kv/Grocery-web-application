@@ -5,13 +5,19 @@ import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './PendingCustomerRequests.css';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from "../../../utils/toast";
+import { useAppSettings } from '../../../context/AppSettingsContext';
+import { usePaginatedData } from '../../../hooks/usePagination';
+import Pagination from '../../../components/common/Pagination';
 
 const PendingCustomerRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(requests, entriesPerPage, '');
 
   // NEW: Rejection modal states
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -177,112 +183,126 @@ const PendingCustomerRequests = () => {
                 No pending customer requests
               </div>
             ) : (
-              <div className="pending-requests-table-wrapper">
-                <table className="pending-requests-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Phone</th>
-                      <th scope="col">Credit Limit</th>
-                      <th scope="col">Suggested Credit</th>
-                      <th scope="col">Suggestion</th>
-                      <th scope="col">Billing Type</th>
-                      <th scope="col">Statement Type</th>
-                      <th scope="col">Due Days</th>
-                      <th scope="col">Opening Balance</th>
-                      <th scope="col">Opening Due Days</th>
-                      <th scope="col">Salesman</th>
-                      <th scope="col">Created At</th>
-                      <th scope="col">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requests.map((request, index) => (
-                      <tr key={request._id}>
-                        <td>{index + 1}</td>
-                        <td>{request.name}</td>
-                        <td>{request.email}</td>
-                        <td>{request.phoneNumber}</td>
-                        <td>AED{request.creditLimit.toFixed(2)}</td>
-                        <td>
-                          {request.suggestedCreditLimit != null
-                            ? `AED ${request.suggestedCreditLimit.toFixed(2)}`
-                            : '-'}
-                          {request.suggestedBy?.username && request.suggestedCreditLimit != null && (
-                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
-                              by {request.suggestedBy.username}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          {request.suggestedCreditLimitStatus === 'pending' ? (
+              <>
+                <div className="pending-requests-table-wrapper">
+                  <table className="pending-requests-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Phone</th>
+                        <th scope="col">Credit Limit</th>
+                        <th scope="col">Suggested Credit</th>
+                        <th scope="col">Suggestion</th>
+                        <th scope="col">Billing Type</th>
+                        <th scope="col">Statement Type</th>
+                        <th scope="col">Due Days</th>
+                        <th scope="col">Opening Balance</th>
+                        <th scope="col">Opening Due Days</th>
+                        <th scope="col">Salesman</th>
+                        <th scope="col">Created At</th>
+                        <th scope="col">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((request, index) => (
+                        <tr key={request._id}>
+                          <td>{pagination.showingFrom + index}</td>
+                          <td>{request.name}</td>
+                          <td>{request.email}</td>
+                          <td>{request.phoneNumber}</td>
+                          <td>AED{request.creditLimit.toFixed(2)}</td>
+                          <td>
+                            {request.suggestedCreditLimit != null
+                              ? `AED ${request.suggestedCreditLimit.toFixed(2)}`
+                              : '-'}
+                            {request.suggestedBy?.username && request.suggestedCreditLimit != null && (
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                                by {request.suggestedBy.username}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {request.suggestedCreditLimitStatus === 'pending' ? (
+                              <div className="action-buttons">
+                                <button
+                                  className="suggestion-approve-btn"
+                                  title="Accept suggested credit limit"
+                                  onClick={() => handleSuggestionAction(request._id, 'accepted')}
+                                >
+                                  ✔
+                                </button>
+                                <button
+                                  className="suggestion-reject-btn"
+                                  title="Reject suggested credit limit (use salesman's credit limit)"
+                                  onClick={() => handleSuggestionAction(request._id, 'rejected')}
+                                >
+                                  ✘
+                                </button>
+                              </div>
+                            ) : request.suggestedCreditLimitStatus === 'accepted' ? (
+                              <span style={{ color: '#16a34a', fontWeight: 600 }}>✅ Accepted</span>
+                            ) : request.suggestedCreditLimitStatus === 'rejected' ? (
+                              <span style={{ color: '#dc2626', fontWeight: 600 }}>❌ Rejected</span>
+                            ) : (
+                              <span style={{ color: '#94a3b8' }}>—</span>
+                            )}
+                          </td>
+                          <td>{request.billingType}</td>
+                          <td>
+                            {request.statementType
+                              ? request.statementType.charAt(0).toUpperCase() +
+                                request.statementType.slice(1)
+                              : "-"}
+                          </td>
+                          <td>{request.dueDays || "-"}</td>
+                          <td>
+                            {request.openingBalance > 0
+                              ? `AED${request.openingBalance.toFixed(2)}`
+                              : "-"}
+                          </td>
+                          <td>
+                            {request.openingBalanceDueDays
+                              ? `${request.openingBalanceDueDays} days`
+                              : "-"}
+                          </td>
+                          <td>{request.salesman?.username || 'Unknown'}</td>
+                          <td>{new Date(request.createdAt).toLocaleDateString()}</td>
+                          <td>
                             <div className="action-buttons">
                               <button
-                                className="suggestion-approve-btn"
-                                title="Accept suggested credit limit"
-                                onClick={() => handleSuggestionAction(request._id, 'accepted')}
+                                onClick={() => handleAccept(request._id)}
+                                className="accept-button"
                               >
-                                ✔
+                                Accept
                               </button>
                               <button
-                                className="suggestion-reject-btn"
-                                title="Reject suggested credit limit (use salesman's credit limit)"
-                                onClick={() => handleSuggestionAction(request._id, 'rejected')}
+                                onClick={() => handleReject(request._id)}
+                                className="reject-button"
                               >
-                                ✘
+                                Reject
                               </button>
                             </div>
-                          ) : request.suggestedCreditLimitStatus === 'accepted' ? (
-                            <span style={{ color: '#16a34a', fontWeight: 600 }}>✅ Accepted</span>
-                          ) : request.suggestedCreditLimitStatus === 'rejected' ? (
-                            <span style={{ color: '#dc2626', fontWeight: 600 }}>❌ Rejected</span>
-                          ) : (
-                            <span style={{ color: '#94a3b8' }}>—</span>
-                          )}
-                        </td>
-                        <td>{request.billingType}</td>
-                        <td>
-                          {request.statementType
-                            ? request.statementType.charAt(0).toUpperCase() +
-                              request.statementType.slice(1)
-                            : "-"}
-                        </td>
-                        <td>{request.dueDays || "-"}</td>
-                        <td>
-                          {request.openingBalance > 0
-                            ? `AED${request.openingBalance.toFixed(2)}`
-                            : "-"}
-                        </td>
-                        <td>
-                          {request.openingBalanceDueDays
-                            ? `${request.openingBalanceDueDays} days`
-                            : "-"}
-                        </td>
-                        <td>{request.salesman?.username || 'Unknown'}</td>
-                        <td>{new Date(request.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          <div className="action-buttons">
-                            <button
-                              onClick={() => handleAccept(request._id)}
-                              className="accept-button"
-                            >
-                              Accept
-                            </button>
-                            <button
-                              onClick={() => handleReject(request._id)}
-                              className="reject-button"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

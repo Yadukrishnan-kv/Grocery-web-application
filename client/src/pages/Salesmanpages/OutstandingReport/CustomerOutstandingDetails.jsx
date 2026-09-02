@@ -6,7 +6,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./CustomerOutstandingDetails.css";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
 
 const CustomerOutstandingDetails = () => {
   const { customerId } = useParams();

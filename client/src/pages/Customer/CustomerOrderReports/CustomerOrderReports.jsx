@@ -5,7 +5,10 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./CustomerOrderReports.css";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 
 const CustomerOrderReports = () => {
@@ -91,6 +94,13 @@ const CustomerOrderReports = () => {
       return matchesSearch && matchesDate;
     });
   }, [orders, searchTerm, fromDate, toDate]);
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(
+    filteredOrders,
+    entriesPerPage,
+    `${fromDate}|${toDate}|${searchTerm}`
+  );
 
   const downloadDeliveredInvoice = async (orderId, invoiceNumber, type = "normal") => {
     setDownloadingOrderId(orderId);
@@ -233,134 +243,148 @@ const CustomerOrderReports = () => {
                 {(fromDate || toDate || searchTerm) && " matching your filters"}
               </div>
             ) : (
-              <div className="customer-reports-table-wrapper">
-                <table className="customer-reports-data-table">
-                  <thead>
-                    <tr>
-                      <th>No</th>
-                      <th>Products</th>
-                      <th>Total Ordered Qty</th>
-                      <th>Total Delivered Qty</th>
-                      <th>Pending Qty</th>
-                      <th>Grand Total</th>
-                      <th>Status</th>
-                      <th>Order Date</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.map((order, index) => {
-                      const totalOrdered =
-                        order.orderItems?.reduce(
-                          (sum, item) => sum + item.orderedQuantity,
-                          0,
-                        ) || 0;
-                      const totalDelivered =
-                        order.orderItems?.reduce(
-                          (sum, item) => sum + item.deliveredQuantity,
-                          0,
-                        ) || 0;
-                      const pendingQty = totalOrdered - totalDelivered;
-                      const grandTotal =
-                        order.orderItems
-                          ?.reduce((sum, item) => sum + item.totalAmount, 0)
-                          ?.toFixed(2) || "0.00";
-                      const hasDelivered = totalDelivered > 0;
+              <>
+                <div className="customer-reports-table-wrapper">
+                  <table className="customer-reports-data-table">
+                    <thead>
+                      <tr>
+                        <th>No</th>
+                        <th>Products</th>
+                        <th>Total Ordered Qty</th>
+                        <th>Total Delivered Qty</th>
+                        <th>Pending Qty</th>
+                        <th>Grand Total</th>
+                        <th>Status</th>
+                        <th>Order Date</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((order, index) => {
+                        const totalOrdered =
+                          order.orderItems?.reduce(
+                            (sum, item) => sum + item.orderedQuantity,
+                            0,
+                          ) || 0;
+                        const totalDelivered =
+                          order.orderItems?.reduce(
+                            (sum, item) => sum + item.deliveredQuantity,
+                            0,
+                          ) || 0;
+                        const pendingQty = totalOrdered - totalDelivered;
+                        const grandTotal =
+                          order.orderItems
+                            ?.reduce((sum, item) => sum + item.totalAmount, 0)
+                            ?.toFixed(2) || "0.00";
+                        const hasDelivered = totalDelivered > 0;
 
-                      return (
-                        <tr key={order._id}>
-                          <td>{index + 1}</td>
+                        return (
+                          <tr key={order._id}>
+                            <td>{pagination.showingFrom + index}</td>
 
-                          {/* Multi-product column */}
-                          <td className="products-cell">
-                            {order.orderItems?.length > 0 ? (
-                              <div className="products-list">
-                                {order.orderItems.map((item, i) => (
-                                  <div key={i} className="product-tag">
-                                    <span className="product-name">
-                                      {item.product?.productName || "Unknown"}
-                                    </span>
-                                    <span className="product-qty">
-                                      × {item.orderedQuantity}
-                                    </span>
-                                    <span className="product-unit">
-                                      {item.unit || ""}
-                                    </span>
-                                  </div>
-                                ))}
+                            {/* Multi-product column */}
+                            <td className="products-cell">
+                              {order.orderItems?.length > 0 ? (
+                                <div className="products-list">
+                                  {order.orderItems.map((item, i) => (
+                                    <div key={i} className="product-tag">
+                                      <span className="product-name">
+                                        {item.product?.productName || "Unknown"}
+                                      </span>
+                                      <span className="product-qty">
+                                        × {item.orderedQuantity}
+                                      </span>
+                                      <span className="product-unit">
+                                        {item.unit || ""}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="no-products">No products</span>
+                              )}
+                            </td>
+
+                            <td>{totalOrdered}</td>
+                            <td>{totalDelivered}</td>
+                            <td>{pendingQty}</td>
+
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                }}
+                              >
+                                <img
+                                  src={DirhamSymbol}
+                                  alt="AED"
+                                  width={15}
+                                  height={15}
+                                />
+                                <span>{grandTotal}</span>
                               </div>
-                            ) : (
-                              <span className="no-products">No products</span>
-                            )}
-                          </td>
+                            </td>
 
-                          <td>{totalOrdered}</td>
-                          <td>{totalDelivered}</td>
-                          <td>{pendingQty}</td>
+                            <td>
+                              <span
+                                className={`customer-reports-status-badge customer-reports-status-${order.status?.toLowerCase() || "pending"}`}
+                              >
+                                {order.status?.charAt(0).toUpperCase() +
+                                  order.status?.slice(1) || "Pending"}
+                              </span>
+                            </td>
 
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="AED"
-                                width={15}
-                                height={15}
-                              />
-                              <span>{grandTotal}</span>
-                            </div>
-                          </td>
+                            <td>{formatDate(order.orderDate)}</td>
 
-                          <td>
-                            <span
-                              className={`customer-reports-status-badge customer-reports-status-${order.status?.toLowerCase() || "pending"}`}
-                            >
-                              {order.status?.charAt(0).toUpperCase() +
-                                order.status?.slice(1) || "Pending"}
-                            </span>
-                          </td>
-
-                          <td>{formatDate(order.orderDate)}</td>
-
-                          <td>
-                            <div className="customer-reports-action-buttons">
-                              {hasDelivered && order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
-                                order.deliveredInvoiceHistory.map((inv, i) => (
+                            <td>
+                              <div className="customer-reports-action-buttons">
+                                {hasDelivered && order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
+                                  order.deliveredInvoiceHistory.map((inv, i) => (
+                                    <button
+                                      key={i}
+                                      className="customer-reports-invoice-button delivered"
+                                      onClick={() => downloadDeliveredInvoice(order._id, inv.invoiceNumber)}
+                                      disabled={downloadingOrderId === order._id}
+                                    >
+                                      {downloadingOrderId === order._id
+                                        ? "Downloading..."
+                                        : `🧾 ${inv.invoiceNumber}`}
+                                    </button>
+                                  ))
+                                ) : hasDelivered ? (
                                   <button
-                                    key={i}
                                     className="customer-reports-invoice-button delivered"
-                                    onClick={() => downloadDeliveredInvoice(order._id, inv.invoiceNumber)}
+                                    onClick={() => downloadDeliveredInvoice(order._id)}
                                     disabled={downloadingOrderId === order._id}
                                   >
                                     {downloadingOrderId === order._id
                                       ? "Downloading..."
-                                      : `🧾 ${inv.invoiceNumber}`}
+                                      : "Delivered Invoice"}
                                   </button>
-                                ))
-                              ) : hasDelivered ? (
-                                <button
-                                  className="customer-reports-invoice-button delivered"
-                                  onClick={() => downloadDeliveredInvoice(order._id)}
-                                  disabled={downloadingOrderId === order._id}
-                                >
-                                  {downloadingOrderId === order._id
-                                    ? "Downloading..."
-                                    : "Delivered Invoice"}
-                                </button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

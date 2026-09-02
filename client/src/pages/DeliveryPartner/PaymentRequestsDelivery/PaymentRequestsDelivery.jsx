@@ -3,9 +3,12 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
 import axios from "axios";
 import "./PaymentRequests.css";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const PaymentRequestsDelivery = () => {
   // Helper: extract all relevant invoice numbers from a bill
@@ -380,6 +383,15 @@ const PaymentRequestsDelivery = () => {
       .filter((r) => selectedChequeRequests.includes(r._id))
       .reduce((sum, r) => sum + r.amount, 0);
   }, [chequeRequests, selectedChequeRequests]);
+
+  // ────────────────────────────────────────────────
+  // Pagination
+  // ────────────────────────────────────────────────
+  const { entriesPerPage } = useAppSettings();
+  const walletPagination = usePaginatedData(filteredWalletTx, entriesPerPage, `${walletSearch}`);
+  const pendingPagination = usePaginatedData(filteredPendingBills, entriesPerPage, `${pendingSearch}`);
+  const cashPagination = usePaginatedData(filteredCashRequests, entriesPerPage, `${cashSearch}`);
+  const chequePagination = usePaginatedData(filteredChequeRequests, entriesPerPage, `${chequeSearch}`);
 
   // Wallet Totals
   const calculateTotal = (list, statuses = ["received", "pending"]) =>
@@ -980,94 +992,108 @@ const PaymentRequestsDelivery = () => {
             ) : filteredWalletTx.length === 0 ? (
               <div className="no-data">No transactions yet</div>
             ) : (
-              <div className="table-responsive">
-                <table className="requests-table">
-                  <thead>
-                    <tr>
-                      <th className="checkbox-col">
-                        <input
-                          type="checkbox"
-                          checked={selectAllWallet}
-                          onChange={handleSelectAllWallet}
-                        />
-                      </th>
-                      <th>No</th>
-                      <th>Customer</th>
-                      <th>Invoice #</th>
-                      <th>Amount</th>
-                      <th>Method</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                      <th>Pay to Admin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredWalletTx.map((tx, idx) => {
-                      const isReady = tx.status === "received";
-                      const hasBill = !!tx.bill?._id;
-                      const invoiceNos = getInvoiceNumbers(tx.bill);
-                      return (
-                        <tr
-                          key={tx._id}
-                          className={selectedWalletTx.includes(tx._id) ? "selected-row" : ""}
-                        >
-                          <td className="checkbox-col">
-                            <input
-                              type="checkbox"
-                              checked={selectedWalletTx.includes(tx._id)}
-                              onChange={() => handleWalletTxSelect(tx._id)}
-                              disabled={!isReady}
-                            />
-                          </td>
-                          <td>{idx + 1}</td>
-                          <td>{tx.customer?.name || "—"}</td>
-                          <td>
-                            <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
-                          </td>
-                          <td>{tx.amount.toFixed(2)}</td>
-                          <td>
-                            {tx.method?.charAt(0).toUpperCase() + tx.method?.slice(1) || "—"}
-                          </td>
-                          <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`status-badge status-${tx.status}`}>
-                              {tx.status === "received"
-                                ? "Ready to Pay"
-                                : tx.status === "pending"
-                                ? "Sent to Admin"
-                                : tx.status === "paid_to_admin"
-                                ? "Paid to Admin"
-                                : tx.status}
-                            </span>
-                          </td>
-                          <td className="actions-col">
-                            {hasBill && (
-                              <button
-                                className="download-receipt-btn"
-                                onClick={() => downloadReceipt(tx.bill._id, invoiceNos[0], tx._id)}
-                                title="Download Receipt"
-                              >
-                                Receipt
-                              </button>
-                            )}
-                          </td>
-                          <td className="pay-admin-col">
-                            {isReady && (
-                              <button
-                                className="pay-admin-btn"
-                                onClick={() => handlePayToAdminClick(tx._id)}
-                              >
-                                Pay to Admin
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="table-responsive">
+                  <table className="requests-table">
+                    <thead>
+                      <tr>
+                        <th className="checkbox-col">
+                          <input
+                            type="checkbox"
+                            checked={selectAllWallet}
+                            onChange={handleSelectAllWallet}
+                          />
+                        </th>
+                        <th>No</th>
+                        <th>Customer</th>
+                        <th>Invoice #</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                        <th>Pay to Admin</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {walletPagination.pageData.map((tx, idx) => {
+                        const isReady = tx.status === "received";
+                        const hasBill = !!tx.bill?._id;
+                        const invoiceNos = getInvoiceNumbers(tx.bill);
+                        return (
+                          <tr
+                            key={tx._id}
+                            className={selectedWalletTx.includes(tx._id) ? "selected-row" : ""}
+                          >
+                            <td className="checkbox-col">
+                              <input
+                                type="checkbox"
+                                checked={selectedWalletTx.includes(tx._id)}
+                                onChange={() => handleWalletTxSelect(tx._id)}
+                                disabled={!isReady}
+                              />
+                            </td>
+                            <td>{walletPagination.showingFrom + idx}</td>
+                            <td>{tx.customer?.name || "—"}</td>
+                            <td>
+                              <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
+                            </td>
+                            <td>{tx.amount.toFixed(2)}</td>
+                            <td>
+                              {tx.method?.charAt(0).toUpperCase() + tx.method?.slice(1) || "—"}
+                            </td>
+                            <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
+                            <td>
+                              <span className={`status-badge status-${tx.status}`}>
+                                {tx.status === "received"
+                                  ? "Ready to Pay"
+                                  : tx.status === "pending"
+                                  ? "Sent to Admin"
+                                  : tx.status === "paid_to_admin"
+                                  ? "Paid to Admin"
+                                  : tx.status}
+                              </span>
+                            </td>
+                            <td className="actions-col">
+                              {hasBill && (
+                                <button
+                                  className="download-receipt-btn"
+                                  onClick={() => downloadReceipt(tx.bill._id, invoiceNos[0], tx._id)}
+                                  title="Download Receipt"
+                                >
+                                  Receipt
+                                </button>
+                              )}
+                            </td>
+                            <td className="pay-admin-col">
+                              {isReady && (
+                                <button
+                                  className="pay-admin-btn"
+                                  onClick={() => handlePayToAdminClick(tx._id)}
+                                >
+                                  Pay to Admin
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={walletPagination.page}
+                  totalPages={walletPagination.totalPages}
+                  totalRecords={walletPagination.totalRecords}
+                  showingFrom={walletPagination.showingFrom}
+                  showingTo={walletPagination.showingTo}
+                  canPrev={walletPagination.canPrev}
+                  canNext={walletPagination.canNext}
+                  onPrev={walletPagination.goPrev}
+                  onNext={walletPagination.goNext}
+                />
+              </>
             )}
           </div>
 
@@ -1140,81 +1166,95 @@ const PaymentRequestsDelivery = () => {
             ) : filteredPendingBills.length === 0 ? (
               <div className="no-data">No pending bills</div>
             ) : (
-              <div className="table-responsive">
-                <table className="requests-table">
-                  <thead>
-                    <tr>
-                      <th className="checkbox-col">
-                        <input
-                          type="checkbox"
-                          checked={selectAllPending}
-                          onChange={handleSelectAllPending}
-                        />
-                      </th>
-                      <th>No</th>
-                      <th>Customer</th>
-                      <th>Invoice #</th>
-                      <th>Amount Due</th>
-                      <th>Due Date</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredPendingBills.map((bill, idx) => {
-                      const invoiceNos = getInvoiceNumbers(bill);
-                      return (
-                        <tr
-                          key={bill._id}
-                          className={selectedPendingBills.includes(bill._id) ? "selected-row" : ""}
-                        >
-                          <td className="checkbox-col">
-                            <input
-                              type="checkbox"
-                              checked={selectedPendingBills.includes(bill._id)}
-                              onChange={() => handlePendingBillSelect(bill._id)}
-                              disabled={bill.status === "paid"}
-                            />
-                          </td>
-                          <td>{idx + 1}</td>
-                          <td>{bill.customer?.name || "—"}</td>
-                          <td>
-                            <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
-                          </td>
-                          <td>{bill.amountDue.toFixed(2)}</td>
-                          <td>{new Date(bill.dueDate).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`status-badge status-${bill.status}`}>
-                              {bill.status}
-                            </span>
-                          </td>
-                          <td className="actions-col">
-                            {(bill.status === "pending" || bill.status === "partial") && (
-                              <button
-                                className="mark-received-btn"
-                                onClick={() =>
-                                  handleMarkReceivedClick(bill._id, bill.amountDue, invoiceNos.join(", "), bill.grandTotal, bill.paidAmount)
-                                }
-                                disabled={processingId === bill._id}
-                              >
-                                Mark Received
-                              </button>
-                            )}
-                            {(bill.status === "paid" || bill.status === "partial") && (
-                              <button
-                                className="download-receipt-btn"
-                                onClick={() => downloadReceipt(bill._id, invoiceNos[0])}
-                              >
-                                Receipt
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="table-responsive">
+                  <table className="requests-table">
+                    <thead>
+                      <tr>
+                        <th className="checkbox-col">
+                          <input
+                            type="checkbox"
+                            checked={selectAllPending}
+                            onChange={handleSelectAllPending}
+                          />
+                        </th>
+                        <th>No</th>
+                        <th>Customer</th>
+                        <th>Invoice #</th>
+                        <th>Amount Due</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingPagination.pageData.map((bill, idx) => {
+                        const invoiceNos = getInvoiceNumbers(bill);
+                        return (
+                          <tr
+                            key={bill._id}
+                            className={selectedPendingBills.includes(bill._id) ? "selected-row" : ""}
+                          >
+                            <td className="checkbox-col">
+                              <input
+                                type="checkbox"
+                                checked={selectedPendingBills.includes(bill._id)}
+                                onChange={() => handlePendingBillSelect(bill._id)}
+                                disabled={bill.status === "paid"}
+                              />
+                            </td>
+                            <td>{pendingPagination.showingFrom + idx}</td>
+                            <td>{bill.customer?.name || "—"}</td>
+                            <td>
+                              <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
+                            </td>
+                            <td>{bill.amountDue.toFixed(2)}</td>
+                            <td>{new Date(bill.dueDate).toLocaleDateString()}</td>
+                            <td>
+                              <span className={`status-badge status-${bill.status}`}>
+                                {bill.status}
+                              </span>
+                            </td>
+                            <td className="actions-col">
+                              {(bill.status === "pending" || bill.status === "partial") && (
+                                <button
+                                  className="mark-received-btn"
+                                  onClick={() =>
+                                    handleMarkReceivedClick(bill._id, bill.amountDue, invoiceNos.join(", "), bill.grandTotal, bill.paidAmount)
+                                  }
+                                  disabled={processingId === bill._id}
+                                >
+                                  Mark Received
+                                </button>
+                              )}
+                              {(bill.status === "paid" || bill.status === "partial") && (
+                                <button
+                                  className="download-receipt-btn"
+                                  onClick={() => downloadReceipt(bill._id, invoiceNos[0])}
+                                >
+                                  Receipt
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pendingPagination.page}
+                  totalPages={pendingPagination.totalPages}
+                  totalRecords={pendingPagination.totalRecords}
+                  showingFrom={pendingPagination.showingFrom}
+                  showingTo={pendingPagination.showingTo}
+                  canPrev={pendingPagination.canPrev}
+                  canNext={pendingPagination.canNext}
+                  onPrev={pendingPagination.goPrev}
+                  onNext={pendingPagination.goNext}
+                />
+              </>
             )}
           </div>
 
@@ -1295,78 +1335,92 @@ const PaymentRequestsDelivery = () => {
             ) : filteredCashRequests.length === 0 ? (
               <div className="no-data">No cash requests</div>
             ) : (
-              <div className="table-responsive">
-                <table className="requests-table">
-                  <thead>
-                    <tr>
-                      <th className="checkbox-col">
-                        <input
-                          type="checkbox"
-                          checked={selectAllCashRequests}
-                          onChange={handleSelectAllCashRequests}
-                        />
-                      </th>
-                      <th>No</th>
-                      <th>Customer</th>
-                      <th>Invoice #</th>
-                      <th>Amount</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCashRequests.map((req, idx) => {
-                      const invoiceNos = getInvoiceNumbers(req.bill);
-                      return (
-                        <tr
-                          key={req._id}
-                          className={selectedCashRequests.includes(req._id) ? "selected-row" : ""}
-                        >
-                          <td className="checkbox-col">
-                            <input
-                              type="checkbox"
-                              checked={selectedCashRequests.includes(req._id)}
-                              onChange={() => handleCashRequestSelect(req._id)}
-                              disabled={req.status !== "pending"}
-                            />
-                          </td>
-                          <td>{idx + 1}</td>
-                          <td>{req.customer?.name || "—"}</td>
-                          <td>
-                            <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
-                          </td>
-                          <td>{req.amount.toFixed(2)}</td>
-                          <td>{new Date(req.createdAt).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`status-badge status-${req.status}`}>
-                              {req.status}
-                            </span>
-                          </td>
-                          <td>
-                            {req.status === "pending" && (
-                              <div className="action-buttons">
-                                <button
-                                  className="accept-btn"
-                                  onClick={() => handleAcceptClick(req._id)}
-                                >
-                                  Accept
-                                </button>
-                                <button
-                                  className="reject-btn"
-                                  onClick={() => handleRejectClick(req._id)}
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="table-responsive">
+                  <table className="requests-table">
+                    <thead>
+                      <tr>
+                        <th className="checkbox-col">
+                          <input
+                            type="checkbox"
+                            checked={selectAllCashRequests}
+                            onChange={handleSelectAllCashRequests}
+                          />
+                        </th>
+                        <th>No</th>
+                        <th>Customer</th>
+                        <th>Invoice #</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cashPagination.pageData.map((req, idx) => {
+                        const invoiceNos = getInvoiceNumbers(req.bill);
+                        return (
+                          <tr
+                            key={req._id}
+                            className={selectedCashRequests.includes(req._id) ? "selected-row" : ""}
+                          >
+                            <td className="checkbox-col">
+                              <input
+                                type="checkbox"
+                                checked={selectedCashRequests.includes(req._id)}
+                                onChange={() => handleCashRequestSelect(req._id)}
+                                disabled={req.status !== "pending"}
+                              />
+                            </td>
+                            <td>{cashPagination.showingFrom + idx}</td>
+                            <td>{req.customer?.name || "—"}</td>
+                            <td>
+                              <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
+                            </td>
+                            <td>{req.amount.toFixed(2)}</td>
+                            <td>{new Date(req.createdAt).toLocaleDateString()}</td>
+                            <td>
+                              <span className={`status-badge status-${req.status}`}>
+                                {req.status}
+                              </span>
+                            </td>
+                            <td>
+                              {req.status === "pending" && (
+                                <div className="action-buttons">
+                                  <button
+                                    className="accept-btn"
+                                    onClick={() => handleAcceptClick(req._id)}
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    className="reject-btn"
+                                    onClick={() => handleRejectClick(req._id)}
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={cashPagination.page}
+                  totalPages={cashPagination.totalPages}
+                  totalRecords={cashPagination.totalRecords}
+                  showingFrom={cashPagination.showingFrom}
+                  showingTo={cashPagination.showingTo}
+                  canPrev={cashPagination.canPrev}
+                  canNext={cashPagination.canNext}
+                  onPrev={cashPagination.goPrev}
+                  onNext={cashPagination.goNext}
+                />
+              </>
             )}
           </div>
 
@@ -1447,99 +1501,113 @@ const PaymentRequestsDelivery = () => {
             ) : filteredChequeRequests.length === 0 ? (
               <div className="no-data">No cheque requests</div>
             ) : (
-              <div className="table-responsive">
-                <table className="requests-table">
-                  <thead>
-                    <tr>
-                      <th className="checkbox-col">
-                        <input
-                          type="checkbox"
-                          checked={selectAllChequeRequests}
-                          onChange={handleSelectAllChequeRequests}
-                        />
-                      </th>
-                      <th>No</th>
-                      <th>Customer</th>
-                      <th>Invoice #</th>
-                      <th>Amount</th>
-                      <th>Cheque Details</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredChequeRequests.map((req, idx) => {
-                      const invoiceNos = getInvoiceNumbers(req.bill);
-                      return (
-                        <tr
-                          key={req._id}
-                          className={selectedChequeRequests.includes(req._id) ? "selected-row" : ""}
-                        >
-                          <td className="checkbox-col">
-                            <input
-                              type="checkbox"
-                              checked={selectedChequeRequests.includes(req._id)}
-                              onChange={() => handleChequeRequestSelect(req._id)}
-                              disabled={req.status !== "pending"}
-                            />
-                          </td>
-                          <td>{idx + 1}</td>
-                          <td>{req.customer?.name || "—"}</td>
-                          <td>
-                            <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
-                          </td>
-                          <td>{req.amount.toFixed(2)}</td>
-                          <td>
-                            {req.chequeDetails ? (
-                              <div className="cheque-info">
-                                <div>
-                                  <strong>No:</strong> {req.chequeDetails.number || "—"}
+              <>
+                <div className="table-responsive">
+                  <table className="requests-table">
+                    <thead>
+                      <tr>
+                        <th className="checkbox-col">
+                          <input
+                            type="checkbox"
+                            checked={selectAllChequeRequests}
+                            onChange={handleSelectAllChequeRequests}
+                          />
+                        </th>
+                        <th>No</th>
+                        <th>Customer</th>
+                        <th>Invoice #</th>
+                        <th>Amount</th>
+                        <th>Cheque Details</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chequePagination.pageData.map((req, idx) => {
+                        const invoiceNos = getInvoiceNumbers(req.bill);
+                        return (
+                          <tr
+                            key={req._id}
+                            className={selectedChequeRequests.includes(req._id) ? "selected-row" : ""}
+                          >
+                            <td className="checkbox-col">
+                              <input
+                                type="checkbox"
+                                checked={selectedChequeRequests.includes(req._id)}
+                                onChange={() => handleChequeRequestSelect(req._id)}
+                                disabled={req.status !== "pending"}
+                              />
+                            </td>
+                            <td>{chequePagination.showingFrom + idx}</td>
+                            <td>{req.customer?.name || "—"}</td>
+                            <td>
+                              <strong className="invoice-number-cell">{invoiceNos.join(", ")}</strong>
+                            </td>
+                            <td>{req.amount.toFixed(2)}</td>
+                            <td>
+                              {req.chequeDetails ? (
+                                <div className="cheque-info">
+                                  <div>
+                                    <strong>No:</strong> {req.chequeDetails.number || "—"}
+                                  </div>
+                                  <div>
+                                    <strong>Bank:</strong> {req.chequeDetails.bank || "—"}
+                                  </div>
+                                  <div>
+                                    <strong>Date:</strong>{" "}
+                                    {req.chequeDetails.date
+                                      ? new Date(req.chequeDetails.date).toLocaleDateString()
+                                      : "—"}
+                                  </div>
                                 </div>
-                                <div>
-                                  <strong>Bank:</strong> {req.chequeDetails.bank || "—"}
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td>{new Date(req.createdAt).toLocaleDateString()}</td>
+                            <td>
+                              <span className={`status-badge status-${req.status}`}>
+                                {req.status}
+                              </span>
+                            </td>
+                            <td>
+                              {req.status === "pending" && (
+                                <div className="action-buttons">
+                                  <button
+                                    className="accept-btn"
+                                    onClick={() => handleAcceptClick(req._id)}
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    className="reject-btn"
+                                    onClick={() => handleRejectClick(req._id)}
+                                  >
+                                    Reject
+                                  </button>
                                 </div>
-                                <div>
-                                  <strong>Date:</strong>{" "}
-                                  {req.chequeDetails.date
-                                    ? new Date(req.chequeDetails.date).toLocaleDateString()
-                                    : "—"}
-                                </div>
-                              </div>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td>{new Date(req.createdAt).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`status-badge status-${req.status}`}>
-                              {req.status}
-                            </span>
-                          </td>
-                          <td>
-                            {req.status === "pending" && (
-                              <div className="action-buttons">
-                                <button
-                                  className="accept-btn"
-                                  onClick={() => handleAcceptClick(req._id)}
-                                >
-                                  Accept
-                                </button>
-                                <button
-                                  className="reject-btn"
-                                  onClick={() => handleRejectClick(req._id)}
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={chequePagination.page}
+                  totalPages={chequePagination.totalPages}
+                  totalRecords={chequePagination.totalRecords}
+                  showingFrom={chequePagination.showingFrom}
+                  showingTo={chequePagination.showingTo}
+                  canPrev={chequePagination.canPrev}
+                  canNext={chequePagination.canNext}
+                  onPrev={chequePagination.goPrev}
+                  onNext={chequePagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

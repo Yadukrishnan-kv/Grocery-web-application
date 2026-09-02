@@ -5,7 +5,7 @@ import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './User.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from "../../utils/toast"; // ← NEW IMPORT
 
 const User = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

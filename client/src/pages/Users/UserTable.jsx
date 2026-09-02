@@ -5,7 +5,10 @@ import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './UserTable.css';
 import axios from 'axios';
-import toast from 'react-hot-toast'; // ← NEW IMPORT
+import toast from "../../utils/toast"; // ← NEW IMPORT
+import { useAppSettings } from '../../context/AppSettingsContext';
+import { usePaginatedData } from '../../hooks/usePagination';
+import Pagination from '../../components/common/Pagination';
 
 const UserTable = () => {
   const [users, setUsers] = useState([]);
@@ -80,16 +83,23 @@ const UserTable = () => {
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
-      const matchesSearch = !searchTerm.trim() || 
+      const matchesSearch = !searchTerm.trim() ||
         (user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
          user.email?.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesRole = roleFilter === 'all' || 
+
+      const matchesRole = roleFilter === 'all' ||
         (user.role && user.role.toLowerCase() === roleFilter.toLowerCase());
-      
+
       return matchesSearch && matchesRole;
     });
   }, [users, searchTerm, roleFilter]);
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(
+    filteredUsers,
+    entriesPerPage,
+    `${roleFilter}|${searchTerm}`
+  );
 
   const handleDeleteClick = (id, username, role) => {
     if (role === 'Admin' || role === 'superadmin') {
@@ -224,9 +234,9 @@ const UserTable = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map((user, index) => (
+                    {pagination.pageData.map((user, index) => (
                       <tr key={user._id}>
-                        <td>{index + 1}</td>
+                        <td>{pagination.showingFrom + index}</td>
                         <td>{user.username}</td>
                         <td>{user.email}</td>
                         <td>
@@ -265,6 +275,18 @@ const UserTable = () => {
                 </table>
               </div>
             )}
+
+            <Pagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              totalRecords={pagination.totalRecords}
+              showingFrom={pagination.showingFrom}
+              showingTo={pagination.showingTo}
+              canPrev={pagination.canPrev}
+              canNext={pagination.canNext}
+              onPrev={pagination.goPrev}
+              onNext={pagination.goNext}
+            />
           </div>
         </div>
       </main>

@@ -1,6 +1,6 @@
 // src/pages/Login/Login.jsx
 import React, { useState } from "react";
-import toast from "react-hot-toast"; // ← NEW IMPORT
+import toast from "../../utils/toast"; // ← NEW IMPORT
 import "./Login.css";
 
 const Login = () => {

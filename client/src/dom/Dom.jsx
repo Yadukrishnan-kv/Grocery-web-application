@@ -13,6 +13,7 @@ import ProductList from "../pages/Products/ProductList/ProductList";
 import RolePermissions from "../pages/Roles/RolePermissions";
 import RoleList from "../pages/Roles/RoleList";
 import { PermissionProvider } from "../context/PermissionContext";
+import { AppSettingsProvider } from "../context/AppSettingsContext";
 import CreateRole from "../pages/Roles/CreateRole";
 import CreateCustomer from "../pages/Customer/CreateCustomer/CreateCustomer";
 import CustomerList from "../pages/Customer/CustomerList/CustomerList";
@@ -63,6 +64,7 @@ function Dom() {
   return (
     <div>
       <PermissionProvider>
+       <AppSettingsProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Login />} />
@@ -208,6 +210,7 @@ function Dom() {
             <Route path="/storekeeper/return-received" element={<ReturnReceived />} />
           </Routes>
         </BrowserRouter>
+       </AppSettingsProvider>
       </PermissionProvider>
     </div>
   );

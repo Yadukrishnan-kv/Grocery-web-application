@@ -5,7 +5,10 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./SalesmanCustomers.css";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const SalesmanCustomers = () => {
   const [customers, setCustomers] = useState([]);
@@ -96,6 +99,9 @@ const SalesmanCustomers = () => {
     });
   }, [customers, searchTerm]); // ✅ Removed dueDaysFilter dependency
 
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(filteredCustomers, entriesPerPage, `${searchTerm}`);
+
   const hasContactData = useMemo(
     () => filteredCustomers.some(c => c.contactPersonName || c.contactPersonPhone || c.contactPersonAddress),
     [filteredCustomers]
@@ -161,112 +167,126 @@ const SalesmanCustomers = () => {
                 {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
               </div>
             ) : (
-              <div className="customer-list-table-wrapper">
-                <table className="customer-list-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Customer ID</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Phone</th>
-                      {hasContactData && <th scope="col">Contact Person</th>}
-                      {hasContactData && <th scope="col">Contact Phone</th>}
-                      {hasContactData && <th scope="col">Contact Address</th>}
-                      <th scope="col">Address</th>
-                      <th scope="col">TRN</th>
-                      <th scope="col">Emirates</th>
-                      <th scope="col">Emirates Code</th>
-                      <th scope="col">Credit Limit</th>
-                      <th scope="col">Balance</th>
-                      <th scope="col">Return Balance</th>
-                      <th scope="col">Used Credit</th>
-                      <th scope="col">Outstanding</th>
-                      <th scope="col">Billing Type</th>
-                      <th scope="col">Due Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCustomers.map((customer, index) => {
-                      const daysLeft = getDaysRemaining(customer);
-                      const dueStatusText = getDueStatusText(daysLeft);
-                      const dueClass = getDueClass(daysLeft);
-                      const usedCredit = (customer.creditLimit || 0) - (customer.balanceCreditLimit || 0);
+              <>
+                <div className="customer-list-table-wrapper">
+                  <table className="customer-list-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Customer ID</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Phone</th>
+                        {hasContactData && <th scope="col">Contact Person</th>}
+                        {hasContactData && <th scope="col">Contact Phone</th>}
+                        {hasContactData && <th scope="col">Contact Address</th>}
+                        <th scope="col">Address</th>
+                        <th scope="col">TRN</th>
+                        <th scope="col">Emirates</th>
+                        <th scope="col">Emirates Code</th>
+                        <th scope="col">Credit Limit</th>
+                        <th scope="col">Balance</th>
+                        <th scope="col">Return Balance</th>
+                        <th scope="col">Used Credit</th>
+                        <th scope="col">Outstanding</th>
+                        <th scope="col">Billing Type</th>
+                        <th scope="col">Due Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((customer, index) => {
+                        const daysLeft = getDaysRemaining(customer);
+                        const dueStatusText = getDueStatusText(daysLeft);
+                        const dueClass = getDueClass(daysLeft);
+                        const usedCredit = (customer.creditLimit || 0) - (customer.balanceCreditLimit || 0);
 
-                      return (
-                        <tr key={customer._id}>
-                          <td>{index + 1}</td>
-                          <td>
-                            <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
-                              {customer.customerId || "-"}
-                            </span>
-                          </td>
-                          <td>{customer.name || "-"}</td>
-                          <td>{customer.email || "-"}</td>
-                          <td>{customer.phoneNumber || "-"}</td>
-                          {hasContactData && <td>{customer.contactPersonName || "-"}</td>}
-                          {hasContactData && <td>{customer.contactPersonPhone || "-"}</td>}
-                          {hasContactData && <td>{customer.contactPersonAddress || "-"}</td>}
-                          <td>{customer.address || "-"}</td>
-                          <td>{customer.pincode || "-"}</td>
-                          <td>{customer.emiratesName || "-"}</td>
-                          <td>{customer.emiratesCode || "-"}</td>
+                        return (
+                          <tr key={customer._id}>
+                            <td>{pagination.showingFrom + index}</td>
+                            <td>
+                              <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
+                                {customer.customerId || "-"}
+                              </span>
+                            </td>
+                            <td>{customer.name || "-"}</td>
+                            <td>{customer.email || "-"}</td>
+                            <td>{customer.phoneNumber || "-"}</td>
+                            {hasContactData && <td>{customer.contactPersonName || "-"}</td>}
+                            {hasContactData && <td>{customer.contactPersonPhone || "-"}</td>}
+                            {hasContactData && <td>{customer.contactPersonAddress || "-"}</td>}
+                            <td>{customer.address || "-"}</td>
+                            <td>{customer.pincode || "-"}</td>
+                            <td>{customer.emiratesName || "-"}</td>
+                            <td>{customer.emiratesCode || "-"}</td>
 
-                          {/* Credit Limit */}
-                          <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
-                              <span>{(customer.creditLimit || 0).toFixed(2)}</span>
-                            </div>
-                          </td>
+                            {/* Credit Limit */}
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
+                                <span>{(customer.creditLimit || 0).toFixed(2)}</span>
+                              </div>
+                            </td>
 
-                          {/* Balance Credit Limit */}
-                          <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
-                              <span>{(customer.balanceCreditLimit || 0).toFixed(2)}</span>
-                            </div>
-                          </td>
+                            {/* Balance Credit Limit */}
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
+                                <span>{(customer.balanceCreditLimit || 0).toFixed(2)}</span>
+                              </div>
+                            </td>
 
-                          {/* Return Balance */}
-                          <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
-                              <span>{(customer.returnCreditBalance || 0).toFixed(2)}</span>
-                            </div>
-                          </td>
+                            {/* Return Balance */}
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
+                                <span>{(customer.returnCreditBalance || 0).toFixed(2)}</span>
+                              </div>
+                            </td>
 
-                          {/* Used Credit */}
-                          <td>
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
-                              <span>{usedCredit.toFixed(2)}</span>
-                            </div>
-                          </td>
+                            {/* Used Credit */}
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
+                                <span>{usedCredit.toFixed(2)}</span>
+                              </div>
+                            </td>
 
-                          {/* Outstanding Amount */}
-                          <td className={customer.totalOutstanding > 0 ? "due-red" : ""}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
-                              <span>{(customer.totalOutstanding || 0).toFixed(2)}</span>
-                            </div>
-                          </td>
+                            {/* Outstanding Amount */}
+                            <td className={customer.totalOutstanding > 0 ? "due-red" : ""}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                <img src={DirhamSymbol} alt="AED" width={15} height={15} style={{ paddingTop: "3px" }} />
+                                <span>{(customer.totalOutstanding || 0).toFixed(2)}</span>
+                              </div>
+                            </td>
 
-                          {/* Billing Type */}
-                          <td>
-                            <span className={`billing-badge ${customer.billingType === "Cash" ? "cash" : "credit"}`}>
-                              {customer.billingType || "-"}
-                            </span>
-                          </td>
+                            {/* Billing Type */}
+                            <td>
+                              <span className={`billing-badge ${customer.billingType === "Cash" ? "cash" : "credit"}`}>
+                                {customer.billingType || "-"}
+                              </span>
+                            </td>
 
-                          {/* Due Status */}
-                          <td className={dueClass}>{dueStatusText}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            {/* Due Status */}
+                            <td className={dueClass}>{dueStatusText}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

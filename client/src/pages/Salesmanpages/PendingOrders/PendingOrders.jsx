@@ -3,6 +3,9 @@ import axios from "axios";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import "./PendingOrders.css";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const PendingOrders = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -52,6 +55,9 @@ const PendingOrders = () => {
     fetchPending();
   }, []);
 
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(orders, entriesPerPage, "");
+
   if (!user) {
     return <div className="order-list-loading">Loading...</div>;
   }
@@ -69,38 +75,52 @@ const PendingOrders = () => {
               <p className="sub">Orders still being packed by storekeeper</p>
             </div>
 
-            <div className="order-list-table-wrapper">
-              <table className="order-list-data-table">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Order ID</th>
-                    <th>Customer</th>
-                    <th>Items</th>
-                    <th>Qty Pending</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.length === 0 ? (
+            <>
+              <div className="order-list-table-wrapper">
+                <table className="order-list-data-table">
+                  <thead>
                     <tr>
-                      <td colSpan={6} className="order-list-no-data">No pending orders</td>
+                      <th>No</th>
+                      <th>Order ID</th>
+                      <th>Customer</th>
+                      <th>Items</th>
+                      <th>Qty Pending</th>
+                      <th>Status</th>
                     </tr>
-                  ) : (
-                    orders.map((o, idx) => (
-                      <tr key={o._id}>
-                        <td>{idx + 1}</td>
-                        <td>{o.orderId || String(o._id).slice(-8)}</td>
-                        <td>{o.customer?.name || "N/A"}</td>
-                        <td>{o.orderItems?.length || 0}</td>
-                        <td>{(o.orderItems || []).reduce((s, it) => s + Math.max((it.orderedQuantity || 0) - (it.packedQuantity || 0), 0), 0)}</td>
-                        <td>{o.status}</td>
+                  </thead>
+                  <tbody>
+                    {orders.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="order-list-no-data">No pending orders</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      pagination.pageData.map((o, idx) => (
+                        <tr key={o._id}>
+                          <td>{pagination.showingFrom + idx}</td>
+                          <td>{o.orderId || String(o._id).slice(-8)}</td>
+                          <td>{o.customer?.name || "N/A"}</td>
+                          <td>{o.orderItems?.length || 0}</td>
+                          <td>{(o.orderItems || []).reduce((s, it) => s + Math.max((it.orderedQuantity || 0) - (it.packedQuantity || 0), 0), 0)}</td>
+                          <td>{o.status}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                totalRecords={pagination.totalRecords}
+                showingFrom={pagination.showingFrom}
+                showingTo={pagination.showingTo}
+                canPrev={pagination.canPrev}
+                canNext={pagination.canNext}
+                onPrev={pagination.goPrev}
+                onNext={pagination.goNext}
+              />
+            </>
           </div>
         </div>
       </main>

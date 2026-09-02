@@ -5,7 +5,10 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./AcceptedOrdersList.css";
 import axios from "axios";
-import toast from 'react-hot-toast';
+import toast from "../../../utils/toast";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const AcceptedOrdersList = () => {
   const [orders, setOrders] = useState([]);
@@ -70,6 +73,9 @@ const AcceptedOrdersList = () => {
       order.customer?.name?.toLowerCase().includes(query)
     );
   }, [orders, searchTerm]);
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(filteredOrders, entriesPerPage, `${searchTerm}`);
 
   const clearSearch = () => setSearchTerm("");
 
@@ -139,90 +145,104 @@ const AcceptedOrdersList = () => {
                 {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
               </div>
             ) : (
-              <div className="accepted-orders-table-wrapper">
-                <table className="accepted-orders-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Customer</th>
-                      <th scope="col">Products</th>           {/* Updated */}
-                      <th scope="col">Total Qty</th>         {/* Added */}
-                      <th scope="col">Grand Total</th>       {/* Updated */}
-                      <th scope="col">Remarks</th>
-                      <th scope="col">Order Date</th>
-                      <th scope="col">Accepted At</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.map((order, index) => (
-                      <tr key={order._id}>
-                        <td>{index + 1}</td>
-                        <td>{order.customer?.name || "N/A"}</td>
-
-                        {/* Multi-product attractive display */}
-                        <td className="products-cell">
-                          {order.orderItems?.length > 0 ? (
-                            <div className="products-list">
-                              {order.orderItems.map((item, i) => (
-                                <div key={i} className="product-tag">
-                                  <span className="product-name">
-                                    {item.product?.productName || "Unknown Product"}
-                                  </span>
-                                  <span className="product-qty">
-                                    × {item.orderedQuantity}
-                                  </span>
-                                  <span className="product-unit">
-                                    {item.unit || ""}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="no-products">No products</span>
-                          )}
-                        </td>
-
-                        {/* Total ordered quantity */}
-                        <td>
-                          {order.totalOrderedQuantity ||
-                            order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) ||
-                            0}
-                        </td>
-
-                        {/* Grand total with Dirham symbol */}
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                            }}
-                          >
-                            <img
-                              src={DirhamSymbol}
-                              alt="AED"
-                              width={15}
-                              height={15}
-                              style={{ paddingTop: "2px" }}
-                            />
-                            <span style={{ fontWeight: 500 }}>
-                              {order.grandTotal?.toFixed(2) ||
-                                order.orderItems
-                                  ?.reduce((sum, it) => sum + it.totalAmount, 0)
-                                  ?.toFixed(2) ||
-                                "0.00"}
-                            </span>
-                          </div>
-                        </td>
-
-                        <td>{order.remarks || "-"}</td>
-                        <td>{formatDate(order.orderDate)}</td>
-                        <td>{formatDate(order.acceptedAt)}</td>
+              <>
+                <div className="accepted-orders-table-wrapper">
+                  <table className="accepted-orders-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Customer</th>
+                        <th scope="col">Products</th>           {/* Updated */}
+                        <th scope="col">Total Qty</th>         {/* Added */}
+                        <th scope="col">Grand Total</th>       {/* Updated */}
+                        <th scope="col">Remarks</th>
+                        <th scope="col">Order Date</th>
+                        <th scope="col">Accepted At</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((order, index) => (
+                        <tr key={order._id}>
+                          <td>{pagination.showingFrom + index}</td>
+                          <td>{order.customer?.name || "N/A"}</td>
+
+                          {/* Multi-product attractive display */}
+                          <td className="products-cell">
+                            {order.orderItems?.length > 0 ? (
+                              <div className="products-list">
+                                {order.orderItems.map((item, i) => (
+                                  <div key={i} className="product-tag">
+                                    <span className="product-name">
+                                      {item.product?.productName || "Unknown Product"}
+                                    </span>
+                                    <span className="product-qty">
+                                      × {item.orderedQuantity}
+                                    </span>
+                                    <span className="product-unit">
+                                      {item.unit || ""}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="no-products">No products</span>
+                            )}
+                          </td>
+
+                          {/* Total ordered quantity */}
+                          <td>
+                            {order.totalOrderedQuantity ||
+                              order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) ||
+                              0}
+                          </td>
+
+                          {/* Grand total with Dirham symbol */}
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                              }}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="AED"
+                                width={15}
+                                height={15}
+                                style={{ paddingTop: "2px" }}
+                              />
+                              <span style={{ fontWeight: 500 }}>
+                                {order.grandTotal?.toFixed(2) ||
+                                  order.orderItems
+                                    ?.reduce((sum, it) => sum + it.totalAmount, 0)
+                                    ?.toFixed(2) ||
+                                  "0.00"}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td>{order.remarks || "-"}</td>
+                          <td>{formatDate(order.orderDate)}</td>
+                          <td>{formatDate(order.acceptedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
           </div>
         </div>

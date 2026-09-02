@@ -5,7 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import ProductSearchDropdown from "../../../components/common/ProductSearchDropdown";
 import "./CreateCustomerOrder.css";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
 
 const CreateCustomerOrder = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

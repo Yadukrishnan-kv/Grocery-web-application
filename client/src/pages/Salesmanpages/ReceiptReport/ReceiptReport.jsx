@@ -6,7 +6,10 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import "./ReceiptReport.css";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../utils/toast";
+import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePaginatedData } from "../../../hooks/usePagination";
+import Pagination from "../../../components/common/Pagination";
 
 const ReceiptReport = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -84,6 +87,13 @@ const ReceiptReport = () => {
       return matchesSearch;
     });
   }, [receipts, searchTerm, dateFilter]);
+
+  const { entriesPerPage } = useAppSettings();
+  const pagination = usePaginatedData(
+    filteredReceipts,
+    entriesPerPage,
+    `${dateFilter}|${searchTerm}`
+  );
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -182,65 +192,79 @@ const ReceiptReport = () => {
                 {dateFilter !== "all" ? ` with selected filter` : ""}
               </div>
             ) : (
-              <div className="order-list-table-wrapper">
-                <table className="order-list-data-table">
-                  <thead>
-                    <tr>
-                      <th>No</th>
-                      <th>Invoice #</th>
-                      <th>Customer</th>
-                      <th>Amount Paid</th>
-                      <th>Bill Period</th>
-                      <th>Paid Date</th>
-                      <th>Orders</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredReceipts.map((receipt, idx) => (
-                      <tr 
-                        key={receipt._id} 
-                        className="clickable-row"
-                        onClick={() => handleRowClick(receipt._id)}
-                        style={{ cursor: 'pointer' }}
-                        title="View receipt details"
-                      >
-                        <td>{idx + 1}</td>
-                        <td>
-                          <span className="invoice-badge">{receipt.invoiceNumber}</span>
-                          {receipt.isOpeningBalance && (
-                            <span className="opening-badge-small">OB</span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="customer-cell">
-                            <span className="customer-name">{receipt.customer?.name}</span>
-                            <small className="customer-email">{receipt.customer?.email}</small>
-                          </div>
-                        </td>
-                        <td className="amount-paid">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <img src={DirhamSymbol} alt="AED" width={14} height={14} />
-                            <span>{formatCurrency(receipt.paidAmount)}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <small>{formatDate(receipt.cycleStart)}</small>
-                          <br />
-                          <small>→ {formatDate(receipt.cycleEnd)}</small>
-                        </td>
-                        <td>{formatDate(receipt.paidDate)}</td>
-                        <td>
-                          <span className="orders-count">{receipt.orderCount} order(s)</span>
-                        </td>
-                        <td>
-                          <span className="status-badge status-paid">Paid</span>
-                        </td>
+              <>
+                <div className="order-list-table-wrapper">
+                  <table className="order-list-data-table">
+                    <thead>
+                      <tr>
+                        <th>No</th>
+                        <th>Invoice #</th>
+                        <th>Customer</th>
+                        <th>Amount Paid</th>
+                        <th>Bill Period</th>
+                        <th>Paid Date</th>
+                        <th>Orders</th>
+                        <th>Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((receipt, idx) => (
+                        <tr
+                          key={receipt._id}
+                          className="clickable-row"
+                          onClick={() => handleRowClick(receipt._id)}
+                          style={{ cursor: 'pointer' }}
+                          title="View receipt details"
+                        >
+                          <td>{pagination.showingFrom + idx}</td>
+                          <td>
+                            <span className="invoice-badge">{receipt.invoiceNumber}</span>
+                            {receipt.isOpeningBalance && (
+                              <span className="opening-badge-small">OB</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="customer-cell">
+                              <span className="customer-name">{receipt.customer?.name}</span>
+                              <small className="customer-email">{receipt.customer?.email}</small>
+                            </div>
+                          </td>
+                          <td className="amount-paid">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <img src={DirhamSymbol} alt="AED" width={14} height={14} />
+                              <span>{formatCurrency(receipt.paidAmount)}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <small>{formatDate(receipt.cycleStart)}</small>
+                            <br />
+                            <small>→ {formatDate(receipt.cycleEnd)}</small>
+                          </td>
+                          <td>{formatDate(receipt.paidDate)}</td>
+                          <td>
+                            <span className="orders-count">{receipt.orderCount} order(s)</span>
+                          </td>
+                          <td>
+                            <span className="status-badge status-paid">Paid</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  showingFrom={pagination.showingFrom}
+                  showingTo={pagination.showingTo}
+                  canPrev={pagination.canPrev}
+                  canNext={pagination.canNext}
+                  onPrev={pagination.goPrev}
+                  onNext={pagination.goNext}
+                />
+              </>
             )}
 
           </div>

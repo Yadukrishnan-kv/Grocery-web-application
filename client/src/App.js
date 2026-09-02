@@ -1,6 +1,6 @@
 import './App.css';
 import Dom from './dom/Dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from './utils/toast';
 
 function App() {
   return (
@@ -9,7 +9,7 @@ function App() {
 <Toaster 
   position="top-right"
   toastOptions={{
-    duration: 4000,
+    duration: 2000,
     style: {
       borderRadius: '10px',
       background: '#333',

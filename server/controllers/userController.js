@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const Customer = require("../models/Customer");
 const Role = require("../models/Role");
+const { getPaginationParams, buildPaginatedResponse } = require("../utils/paginate");
 
 // Helper function to filter salesman-specific fields based on role
 const filterUserData = (user) => {
@@ -19,9 +20,19 @@ const filterUserData = (user) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password");
+    if (!req.query.page) {
+      const users = await User.find().select("-password");
+      const filteredUsers = users.map(user => filterUserData(user));
+      return res.json(filteredUsers);
+    }
+
+    const { page, limit, skip } = getPaginationParams(req.query);
+    const [users, totalRecords] = await Promise.all([
+      User.find().select("-password").skip(skip).limit(limit),
+      User.countDocuments(),
+    ]);
     const filteredUsers = users.map(user => filterUserData(user));
-    res.json(filteredUsers);
+    res.json(buildPaginatedResponse(filteredUsers, totalRecords, page, limit));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }

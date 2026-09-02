@@ -6,7 +6,7 @@ import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
 import "./CreateOrder.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import toast from "react-hot-toast";
+import toast from "../../../../utils/toast";
 
 const CreateOrder = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

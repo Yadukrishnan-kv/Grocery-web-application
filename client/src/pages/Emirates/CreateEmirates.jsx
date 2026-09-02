@@ -4,7 +4,7 @@ import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './CreateEmirates.css';
 import axios from 'axios';
-import toast from 'react-hot-toast';
+import toast from "../../utils/toast";
 import { useNavigate } from 'react-router-dom';
 
 const CreateEmirates = () => {
