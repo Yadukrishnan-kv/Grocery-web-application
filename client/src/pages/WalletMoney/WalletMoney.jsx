@@ -5,6 +5,7 @@ import Sidebar from "../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../Assets/aed-symbol.png";
 import toast from "../../utils/toast";
 import axios from "axios";
+import TableScrollSync from "../../components/common/TableScrollSync";
 import "./WalletMoney.css";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import { usePaginatedData } from "../../hooks/usePagination";
@@ -483,95 +484,97 @@ const WalletMoney = () => {
               <div className="no-data">No cash transactions found</div>
             ) : (
               <>
-                <div className="table-responsive">
-                  <table className="requests-table">
-                    <thead>
-                      <tr>
-                        <th className="checkbox-col">
-                          <input 
-                            type="checkbox" 
-                            checked={selectAllCash} 
-                            onChange={toggleAllCash} 
-                          />
-                        </th>
-                        <th>No</th>
-                        <th>Delivery</th>
-                        <th>Customer</th>
-                        <th>Order ID</th>
-                        <th>Amount</th>
-                        <th>Return Credit Used</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cashPagination.pageData.map((tx, idx) => {
-                        const isProcessing = processingId === tx._id;
-                        const isReceivable = tx.status === "received" || tx.status === "pending";
-                        return (
-                          <tr key={tx._id} className={selectedCashTx.includes(tx._id) ? "selected-row" : ""}>
-                            <td className="checkbox-col">
-                              <input 
-                                type="checkbox" 
-                                checked={selectedCashTx.includes(tx._id)} 
-                                onChange={() => toggleCashSelect(tx._id)} 
-                                disabled={!isReceivable || bulkProcessing}
-                              />
-                            </td>
-                            <td>{cashPagination.showingFrom + idx}</td>
-                            <td>{tx.deliveryMan?.username || "—"}</td>
-                            <td>{tx.order?.customer?.name || "—"}</td>
-                            <td>{tx.order?.orderId || tx.order?._id?.slice(-8) || "N/A"}</td>
-                            <td>{tx.amount.toFixed(2)}</td>
-                            <td>
-                              {tx.returnCreditUsed > 0
-                                ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
-                                : <span style={{ color: "#9ca3af" }}>—</span>}
-                            </td>
-                            <td>
-                              <span className={`status-badge status-${tx.status}`}>
-                                {tx.status === "received" ? "Received (Not Sent)" :
-                                 tx.status === "pending" ? "Pending Approval" :
-                                 "Collected"}
-                              </span>
-                            </td>
-                            <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
-                            <td>
-                              {tx.status === "received" && (
-                                <button
-                                  className="mark-received-btn"
-                                  onClick={() => handleMarkReceived(tx._id)}
-                                  disabled={processingId || bulkProcessing}
-                                >
-                                  {isProcessing ? "Processing..." : "Mark Received"}
-                                </button>
-                              )}
-                              {tx.status === "pending" && (
-                                <div className="action-buttons">
-                                  <button 
-                                    className="accept-btn" 
-                                    onClick={() => handleAccept(tx._id)}
+                <TableScrollSync>
+                  <div className="table-responsive">
+                    <table className="requests-table">
+                      <thead>
+                        <tr>
+                          <th className="checkbox-col">
+                            <input 
+                              type="checkbox" 
+                              checked={selectAllCash} 
+                              onChange={toggleAllCash} 
+                            />
+                          </th>
+                          <th>No</th>
+                          <th>Delivery</th>
+                          <th>Customer</th>
+                          <th>Order ID</th>
+                          <th>Amount</th>
+                          <th>Return Credit Used</th>
+                          <th>Status</th>
+                          <th>Date</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cashPagination.pageData.map((tx, idx) => {
+                          const isProcessing = processingId === tx._id;
+                          const isReceivable = tx.status === "received" || tx.status === "pending";
+                          return (
+                            <tr key={tx._id} className={selectedCashTx.includes(tx._id) ? "selected-row" : ""}>
+                              <td className="checkbox-col">
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedCashTx.includes(tx._id)} 
+                                  onChange={() => toggleCashSelect(tx._id)} 
+                                  disabled={!isReceivable || bulkProcessing}
+                                />
+                              </td>
+                              <td>{cashPagination.showingFrom + idx}</td>
+                              <td>{tx.deliveryMan?.username || "—"}</td>
+                              <td>{tx.order?.customer?.name || "—"}</td>
+                              <td>{tx.order?.orderId || tx.order?._id?.slice(-8) || "N/A"}</td>
+                              <td>{tx.amount.toFixed(2)}</td>
+                              <td>
+                                {tx.returnCreditUsed > 0
+                                  ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
+                                  : <span style={{ color: "#9ca3af" }}>—</span>}
+                              </td>
+                              <td>
+                                <span className={`status-badge status-${tx.status}`}>
+                                  {tx.status === "received" ? "Received (Not Sent)" :
+                                   tx.status === "pending" ? "Pending Approval" :
+                                   "Collected"}
+                                </span>
+                              </td>
+                              <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
+                              <td>
+                                {tx.status === "received" && (
+                                  <button
+                                    className="mark-received-btn"
+                                    onClick={() => handleMarkReceived(tx._id)}
                                     disabled={processingId || bulkProcessing}
                                   >
-                                    Accept
+                                    {isProcessing ? "Processing..." : "Mark Received"}
                                   </button>
-                                  <button 
-                                    className="reject-btn" 
-                                    onClick={() => handleReject(tx._id)}
-                                    disabled={processingId || bulkProcessing}
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                )}
+                                {tx.status === "pending" && (
+                                  <div className="action-buttons">
+                                    <button 
+                                      className="accept-btn" 
+                                      onClick={() => handleAccept(tx._id)}
+                                      disabled={processingId || bulkProcessing}
+                                    >
+                                      Accept
+                                    </button>
+                                    <button 
+                                      className="reject-btn" 
+                                      onClick={() => handleReject(tx._id)}
+                                      disabled={processingId || bulkProcessing}
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={cashPagination.page}
@@ -663,97 +666,99 @@ const WalletMoney = () => {
               <div className="no-data">No cheque transactions found</div>
             ) : (
               <>
-                <div className="table-responsive">
-                  <table className="requests-table">
-                    <thead>
-                      <tr>
-                        <th className="checkbox-col">
-                          <input 
-                            type="checkbox" 
-                            checked={selectAllCheque} 
-                            onChange={toggleAllCheque} 
-                          />
-                        </th>
-                        <th>No</th>
-                        <th>Delivery</th>
-                        <th>Customer</th>
-                        <th>Order ID</th>
-                        <th>Amount</th>
-                        <th>Return Credit Used</th>
-                        <th>Cheque Details</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {chequePagination.pageData.map((tx, idx) => {
-                        const isProcessing = processingId === tx._id;
-                        const isReceivable = tx.status === "received" || tx.status === "pending";
-                        return (
-                          <tr key={tx._id} className={selectedChequeTx.includes(tx._id) ? "selected-row" : ""}>
-                            <td className="checkbox-col">
-                              <input 
-                                type="checkbox" 
-                                checked={selectedChequeTx.includes(tx._id)} 
-                                onChange={() => toggleChequeSelect(tx._id)} 
-                                disabled={!isReceivable || bulkProcessing}
-                              />
-                            </td>
-                            <td>{chequePagination.showingFrom + idx}</td>
-                            <td>{tx.deliveryMan?.username || "—"}</td>
-                            <td>{tx.order?.customer?.name || "—"}</td>
-                            <td>{tx.order?.orderId || tx.order?._id?.slice(-8) || "N/A"}</td>
-                            <td>{tx.amount.toFixed(2)}</td>
-                            <td>
-                              {tx.returnCreditUsed > 0
-                                ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
-                                : <span style={{ color: "#9ca3af" }}>—</span>}
-                            </td>
-                            <td>{renderCheque(tx.chequeDetails)}</td>
-                            <td>
-                              <span className={`status-badge status-${tx.status}`}>
-                                {tx.status === "received" ? "Received (Not Sent)" :
-                                 tx.status === "pending" ? "Pending Approval" :
-                                 "Collected"}
-                              </span>
-                            </td>
-                            <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
-                            <td>
-                              {tx.status === "received" && (
-                                <button 
-                                  className="mark-received-btn" 
-                                  onClick={() => handleMarkReceived(tx._id)}
-                                  disabled={processingId || bulkProcessing}
-                                >
-                                  {isProcessing ? "Processing..." : "Mark Received"}
-                                </button>
-                              )}
-                              {tx.status === "pending" && (
-                                <div className="action-buttons">
+                <TableScrollSync>
+                  <div className="table-responsive">
+                    <table className="requests-table">
+                      <thead>
+                        <tr>
+                          <th className="checkbox-col">
+                            <input 
+                              type="checkbox" 
+                              checked={selectAllCheque} 
+                              onChange={toggleAllCheque} 
+                            />
+                          </th>
+                          <th>No</th>
+                          <th>Delivery</th>
+                          <th>Customer</th>
+                          <th>Order ID</th>
+                          <th>Amount</th>
+                          <th>Return Credit Used</th>
+                          <th>Cheque Details</th>
+                          <th>Status</th>
+                          <th>Date</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chequePagination.pageData.map((tx, idx) => {
+                          const isProcessing = processingId === tx._id;
+                          const isReceivable = tx.status === "received" || tx.status === "pending";
+                          return (
+                            <tr key={tx._id} className={selectedChequeTx.includes(tx._id) ? "selected-row" : ""}>
+                              <td className="checkbox-col">
+                                <input 
+                                  type="checkbox" 
+                                  checked={selectedChequeTx.includes(tx._id)} 
+                                  onChange={() => toggleChequeSelect(tx._id)} 
+                                  disabled={!isReceivable || bulkProcessing}
+                                />
+                              </td>
+                              <td>{chequePagination.showingFrom + idx}</td>
+                              <td>{tx.deliveryMan?.username || "—"}</td>
+                              <td>{tx.order?.customer?.name || "—"}</td>
+                              <td>{tx.order?.orderId || tx.order?._id?.slice(-8) || "N/A"}</td>
+                              <td>{tx.amount.toFixed(2)}</td>
+                              <td>
+                                {tx.returnCreditUsed > 0
+                                  ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
+                                  : <span style={{ color: "#9ca3af" }}>—</span>}
+                              </td>
+                              <td>{renderCheque(tx.chequeDetails)}</td>
+                              <td>
+                                <span className={`status-badge status-${tx.status}`}>
+                                  {tx.status === "received" ? "Received (Not Sent)" :
+                                   tx.status === "pending" ? "Pending Approval" :
+                                   "Collected"}
+                                </span>
+                              </td>
+                              <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
+                              <td>
+                                {tx.status === "received" && (
                                   <button 
-                                    className="accept-btn" 
-                                    onClick={() => handleAccept(tx._id)}
+                                    className="mark-received-btn" 
+                                    onClick={() => handleMarkReceived(tx._id)}
                                     disabled={processingId || bulkProcessing}
                                   >
-                                    Accept
+                                    {isProcessing ? "Processing..." : "Mark Received"}
                                   </button>
-                                  <button 
-                                    className="reject-btn" 
-                                    onClick={() => handleReject(tx._id)}
-                                    disabled={processingId || bulkProcessing}
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                )}
+                                {tx.status === "pending" && (
+                                  <div className="action-buttons">
+                                    <button 
+                                      className="accept-btn" 
+                                      onClick={() => handleAccept(tx._id)}
+                                      disabled={processingId || bulkProcessing}
+                                    >
+                                      Accept
+                                    </button>
+                                    <button 
+                                      className="reject-btn" 
+                                      onClick={() => handleReject(tx._id)}
+                                      disabled={processingId || bulkProcessing}
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={chequePagination.page}

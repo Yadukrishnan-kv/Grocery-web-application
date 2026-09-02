@@ -4,6 +4,7 @@ import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "../../../utils/toast";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./Wallet.css";
 import axios from "axios";
 import { useAppSettings } from "../../../context/AppSettingsContext";
@@ -286,71 +287,73 @@ const ChequeWallet = () => {
               </div>
             ) : (
               <>
-                <div className="wallet-table-container">
-                  <table className="wallet-data-table">
-                    <thead>
-                      <tr>
-                        <th className="col-checkbox"><input type="checkbox" checked={selectedTxIds.length === filteredTransactions.length && filteredTransactions.length > 0} onChange={handleSelectAll} className="checkbox-custom" /></th>
-                        <th className="col-index">No</th>
-                        <th className="col-customer">Customer</th>
-                        <th className="col-order">Order ID</th>
-                        <th className="col-amount">Amount</th>
-                        <th className="col-return-credit">Return Credit Used</th>
-                        <th className="col-cheque">Cheque Details</th>
-                        <th className="col-date">Date</th>
-                        <th className="col-status">Status</th>
-                        <th className="col-actions">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((tx, index) => (
-                        <tr key={tx._id} className={`tx-row ${selectedTxIds.includes(tx._id) ? 'selected' : ''} ${tx.status}`}>
-                          <td className="col-checkbox"><input type="checkbox" checked={selectedTxIds.includes(tx._id)} onChange={() => handleSelectTx(tx._id)} className="checkbox-custom" disabled={tx.status !== 'received'} /></td>
-                          <td className="col-index">{pagination.showingFrom + index}</td>
-                          <td className="col-customer">
-                            <div className="customer-cell">
-                              <div className="customer-avatar">{tx.order?.customer?.name?.charAt(0)?.toUpperCase() || '?'}</div>
-                              <span className="customer-name">{tx.order?.customer?.name || "N/A"}</span>
-                            </div>
-                          </td>
-                          <td className="col-order"><code className="order-id">#{tx.order?.orderId || tx.order?._id?.slice(-8)}</code></td>
-                          <td className="col-amount">
-                            <div className="amount-cell">
-                              <img src={DirhamSymbol} alt="AED" className="dirham-icon-small" />
-                              <span className="amount-value">{tx.amount.toFixed(2)}</span>
-                            </div>
-                          </td>
-                          <td className="col-return-credit">
-                            {tx.returnCreditUsed > 0
-                              ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
-                              : <span style={{ color: "#9ca3af" }}>—</span>}
-                          </td>
-                          <td className="col-cheque">{renderChequeDetails(tx.chequeDetails)}</td>
-                          <td className="col-date">{new Date(tx.date).toLocaleDateString('en-GB')}</td>
-                          <td className="col-status">
-                            <span className={`status-badge status-${tx.status}`}>
-                              {tx.status === "received" && <span className="status-dot pulse" />}
-                              {tx.status === "received" ? "Ready to Send" : tx.status === "pending" ? "Pending Approval" : "Paid to Admin"}
-                            </span>
-                          </td>
-                          <td className="col-actions">
-                            <div className="action-buttons">
-                              {tx.status === "received" && (
-                                <button className="btn-action btn-send" onClick={() => handleRequestPayChequeToAdmin(tx._id)} disabled={payingTxId === tx._id} title="Request Pay to Admin">
-                                  {payingTxId === tx._id ? "⏳" : <SendIcon />}
-                                </button>
-                              )}
-                              {tx.status === "pending" && <span className="btn-action btn-disabled" title="Awaiting admin approval">⏳</span>}
-                              <button className="btn-action btn-print" onClick={() => handlePrintReceipt(tx._id)} disabled={printingTxId === tx._id} title="Print Receipt">
-                                {printingTxId === tx._id ? "⏳" : <PrintIcon />}
-                              </button>
-                            </div>
-                          </td>
+                <TableScrollSync>
+                  <div className="wallet-table-container">
+                    <table className="wallet-data-table">
+                      <thead>
+                        <tr>
+                          <th className="col-checkbox"><input type="checkbox" checked={selectedTxIds.length === filteredTransactions.length && filteredTransactions.length > 0} onChange={handleSelectAll} className="checkbox-custom" /></th>
+                          <th className="col-index">No</th>
+                          <th className="col-customer">Customer</th>
+                          <th className="col-order">Order ID</th>
+                          <th className="col-amount">Amount</th>
+                          <th className="col-return-credit">Return Credit Used</th>
+                          <th className="col-cheque">Cheque Details</th>
+                          <th className="col-date">Date</th>
+                          <th className="col-status">Status</th>
+                          <th className="col-actions">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((tx, index) => (
+                          <tr key={tx._id} className={`tx-row ${selectedTxIds.includes(tx._id) ? 'selected' : ''} ${tx.status}`}>
+                            <td className="col-checkbox"><input type="checkbox" checked={selectedTxIds.includes(tx._id)} onChange={() => handleSelectTx(tx._id)} className="checkbox-custom" disabled={tx.status !== 'received'} /></td>
+                            <td className="col-index">{pagination.showingFrom + index}</td>
+                            <td className="col-customer">
+                              <div className="customer-cell">
+                                <div className="customer-avatar">{tx.order?.customer?.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                                <span className="customer-name">{tx.order?.customer?.name || "N/A"}</span>
+                              </div>
+                            </td>
+                            <td className="col-order"><code className="order-id">#{tx.order?.orderId || tx.order?._id?.slice(-8)}</code></td>
+                            <td className="col-amount">
+                              <div className="amount-cell">
+                                <img src={DirhamSymbol} alt="AED" className="dirham-icon-small" />
+                                <span className="amount-value">{tx.amount.toFixed(2)}</span>
+                              </div>
+                            </td>
+                            <td className="col-return-credit">
+                              {tx.returnCreditUsed > 0
+                                ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
+                                : <span style={{ color: "#9ca3af" }}>—</span>}
+                            </td>
+                            <td className="col-cheque">{renderChequeDetails(tx.chequeDetails)}</td>
+                            <td className="col-date">{new Date(tx.date).toLocaleDateString('en-GB')}</td>
+                            <td className="col-status">
+                              <span className={`status-badge status-${tx.status}`}>
+                                {tx.status === "received" && <span className="status-dot pulse" />}
+                                {tx.status === "received" ? "Ready to Send" : tx.status === "pending" ? "Pending Approval" : "Paid to Admin"}
+                              </span>
+                            </td>
+                            <td className="col-actions">
+                              <div className="action-buttons">
+                                {tx.status === "received" && (
+                                  <button className="btn-action btn-send" onClick={() => handleRequestPayChequeToAdmin(tx._id)} disabled={payingTxId === tx._id} title="Request Pay to Admin">
+                                    {payingTxId === tx._id ? "⏳" : <SendIcon />}
+                                  </button>
+                                )}
+                                {tx.status === "pending" && <span className="btn-action btn-disabled" title="Awaiting admin approval">⏳</span>}
+                                <button className="btn-action btn-print" onClick={() => handlePrintReceipt(tx._id)} disabled={printingTxId === tx._id} title="Print Receipt">
+                                  {printingTxId === tx._id ? "⏳" : <PrintIcon />}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

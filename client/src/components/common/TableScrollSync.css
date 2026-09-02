@@ -1,0 +1,37 @@
+.table-scroll-sync-track {
+  position: fixed;
+  bottom: 0;
+  height: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: rgba(248, 250, 252, 0.97);
+  border-top: 1px solid #e2e8f0;
+  z-index: 40;
+}
+
+.table-scroll-sync-thumb {
+  height: 1px;
+}
+
+.table-scroll-sync-track::-webkit-scrollbar {
+  height: 10px;
+}
+
+.table-scroll-sync-track::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.table-scroll-sync-track::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.table-scroll-sync-track::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@media (max-width: 640px) {
+  .table-scroll-sync-track {
+    display: none !important;
+  }
+}

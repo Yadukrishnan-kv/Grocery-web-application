@@ -5,6 +5,7 @@ import Header from "../../components/layout/Header/Header";
 import Sidebar from "../../components/layout/Sidebar/Sidebar";
 import toast from "../../utils/toast";
 import axios from "axios";
+import TableScrollSync from "../../components/common/TableScrollSync";
 import "./CreateSalesReturn.css";
 
 const CreateSalesReturn = () => {
@@ -339,100 +340,102 @@ const CreateSalesReturn = () => {
                   <p className="csr-card-sub">Enter the quantity to return for each item (0 to skip).</p>
                 </div>
                 <div className="csr-card-body">
-                  <div className="csr-items-table-wrap">
-                    <table className="csr-items-table">
-                      <thead>
-                        <tr>
-                          <th>Product</th>
-                          <th>Unit</th>
-                          <th>Delivered Qty</th>
-                          <th>Already Returned</th>
-                          <th>Remaining</th>
-                          <th>Return Qty</th>
-                          <th>Price / Unit</th>
-                          <th>Return Amount</th>
-                          <th>Reason</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {deliveredItems.map((item) => {
-                          const productId = item.product._id;
-                          const deliveredQty = item.deliveredQuantity || 0;
-                          const alreadyReturned = (selectedOrder?.alreadyReturnedQty || {})[productId] || 0;
-                          const remainingQty = deliveredQty - alreadyReturned;
-                          const returnQty = parseInt(returnItems[productId]?.returnQty || 0);
-                          const exclVat = returnQty * item.price;
-                          const vat = (exclVat * (item.vatPercentage || 5)) / 100;
-                          const lineTotal = exclVat + vat;
+                  <TableScrollSync>
+                    <div className="csr-items-table-wrap">
+                      <table className="csr-items-table">
+                        <thead>
+                          <tr>
+                            <th>Product</th>
+                            <th>Unit</th>
+                            <th>Delivered Qty</th>
+                            <th>Already Returned</th>
+                            <th>Remaining</th>
+                            <th>Return Qty</th>
+                            <th>Price / Unit</th>
+                            <th>Return Amount</th>
+                            <th>Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {deliveredItems.map((item) => {
+                            const productId = item.product._id;
+                            const deliveredQty = item.deliveredQuantity || 0;
+                            const alreadyReturned = (selectedOrder?.alreadyReturnedQty || {})[productId] || 0;
+                            const remainingQty = deliveredQty - alreadyReturned;
+                            const returnQty = parseInt(returnItems[productId]?.returnQty || 0);
+                            const exclVat = returnQty * item.price;
+                            const vat = (exclVat * (item.vatPercentage || 5)) / 100;
+                            const lineTotal = exclVat + vat;
 
-                          return (
-                            <tr key={productId} className={returnQty > 0 ? "csr-row-selected" : ""}>
-                              <td>
-                                <div className="csr-product-name">
-                                  {item.product?.productName || "—"}
-                                </div>
-                              </td>
-                              <td>{item.unit || item.product?.unit || "—"}</td>
-                              <td>
-                                <span className="csr-delivered-badge">
-                                  {deliveredQty}
-                                </span>
-                              </td>
-                              <td>
-                                {alreadyReturned > 0 ? (
-                                  <span style={{ color: "#e67e22", fontWeight: 600 }}>{alreadyReturned}</span>
-                                ) : (
-                                  <span style={{ color: "#aaa" }}>—</span>
-                                )}
-                              </td>
-                              <td>
-                                <span style={{ color: "#27ae60", fontWeight: 600 }}>{remainingQty}</span>
-                              </td>
-                              <td>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={remainingQty}
-                                  value={returnItems[productId]?.returnQty ?? remainingQty}
-                                  onChange={(e) => {
-                                    const val = Math.min(
-                                      Math.max(0, parseInt(e.target.value) || 0),
-                                      remainingQty
-                                    );
-                                    handleItemChange(productId, "returnQty", val);
-                                  }}
-                                  className="csr-qty-input"
-                                />
-                              </td>
-                              <td>AED {(item.price || 0).toFixed(2)}</td>
-                              <td className="csr-line-total">
-                                AED {lineTotal.toFixed(2)}
-                              </td>
-                              <td>
-                                <input
-                                  type="text"
-                                  value={returnItems[productId]?.reason || ""}
-                                  onChange={(e) => handleItemChange(productId, "reason", e.target.value)}
-                                  className="csr-reason-input"
-                                  placeholder="Reason (optional)"
-                                />
+                            return (
+                              <tr key={productId} className={returnQty > 0 ? "csr-row-selected" : ""}>
+                                <td>
+                                  <div className="csr-product-name">
+                                    {item.product?.productName || "—"}
+                                  </div>
+                                </td>
+                                <td>{item.unit || item.product?.unit || "—"}</td>
+                                <td>
+                                  <span className="csr-delivered-badge">
+                                    {deliveredQty}
+                                  </span>
+                                </td>
+                                <td>
+                                  {alreadyReturned > 0 ? (
+                                    <span style={{ color: "#e67e22", fontWeight: 600 }}>{alreadyReturned}</span>
+                                  ) : (
+                                    <span style={{ color: "#aaa" }}>—</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <span style={{ color: "#27ae60", fontWeight: 600 }}>{remainingQty}</span>
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={remainingQty}
+                                    value={returnItems[productId]?.returnQty ?? remainingQty}
+                                    onChange={(e) => {
+                                      const val = Math.min(
+                                        Math.max(0, parseInt(e.target.value) || 0),
+                                        remainingQty
+                                      );
+                                      handleItemChange(productId, "returnQty", val);
+                                    }}
+                                    className="csr-qty-input"
+                                  />
+                                </td>
+                                <td>AED {(item.price || 0).toFixed(2)}</td>
+                                <td className="csr-line-total">
+                                  AED {lineTotal.toFixed(2)}
+                                </td>
+                                <td>
+                                  <input
+                                    type="text"
+                                    value={returnItems[productId]?.reason || ""}
+                                    onChange={(e) => handleItemChange(productId, "reason", e.target.value)}
+                                    className="csr-reason-input"
+                                    placeholder="Reason (optional)"
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        {calcTotal() > 0 && (
+                          <tfoot>
+                            <tr>
+                              <td colSpan="5" className="csr-total-label">Total Return Amount (incl. VAT)</td>
+                              <td colSpan="2" className="csr-total-val">
+                                AED {calcTotal().toFixed(2)}
                               </td>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                      {calcTotal() > 0 && (
-                        <tfoot>
-                          <tr>
-                            <td colSpan="5" className="csr-total-label">Total Return Amount (incl. VAT)</td>
-                            <td colSpan="2" className="csr-total-val">
-                              AED {calcTotal().toFixed(2)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      )}
-                    </table>
-                  </div>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </TableScrollSync>
                 </div>
               </div>
             )}

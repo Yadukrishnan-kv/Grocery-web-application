@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import './DeliveryManOrderReports.css';
 import axios from 'axios';
 import InvoiceDownloadModal from '../../../components/InvoiceDownloadModal/InvoiceDownloadModal';
@@ -172,112 +173,114 @@ const DeliveryManOrderReports = () => {
             <div className="loading">Loading orders...</div>
           ) : (
             <>
-              <div className="table-wrapper">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Customer</th>
-                      <th scope="col">Product</th>
-                      <th scope="col">Ordered Qty</th>
-                      <th scope="col">Delivered Qty</th>
-                      <th scope="col">Remaining Qty</th>
-                      <th scope="col">Delivery Status</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Total Amount</th>
-                      <th scope="col">Order Date</th>
-                      <th scope="col">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagination.pageData.length > 0 ? (
-                      pagination.pageData.map((order, index) => {
-                        const items = order.orderItems || [];
-                        const orderedQty = sumOrdered(order);
-                        const deliveredQty = sumDelivered(order);
-                        const pendingQty = orderedQty - deliveredQty;
-                        const grandTotal = items.reduce((s, it) => s + (it.totalAmount || 0), 0);
-                        const productNames = items
-                          .map((it) => it.product?.productName || 'N/A')
-                          .join(', ');
-                        const singlePrice = items.length === 1 ? items[0].price : null;
-                        const hasDeliveredQty = deliveredQty > 0;
-                        const hasPendingQty = pendingQty > 0;
+              <TableScrollSync>
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Customer</th>
+                        <th scope="col">Product</th>
+                        <th scope="col">Ordered Qty</th>
+                        <th scope="col">Delivered Qty</th>
+                        <th scope="col">Remaining Qty</th>
+                        <th scope="col">Delivery Status</th>
+                        <th scope="col">Price</th>
+                        <th scope="col">Total Amount</th>
+                        <th scope="col">Order Date</th>
+                        <th scope="col">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.length > 0 ? (
+                        pagination.pageData.map((order, index) => {
+                          const items = order.orderItems || [];
+                          const orderedQty = sumOrdered(order);
+                          const deliveredQty = sumDelivered(order);
+                          const pendingQty = orderedQty - deliveredQty;
+                          const grandTotal = items.reduce((s, it) => s + (it.totalAmount || 0), 0);
+                          const productNames = items
+                            .map((it) => it.product?.productName || 'N/A')
+                            .join(', ');
+                          const singlePrice = items.length === 1 ? items[0].price : null;
+                          const hasDeliveredQty = deliveredQty > 0;
+                          const hasPendingQty = pendingQty > 0;
 
-                        return (
-                          <tr key={order._id}>
-                            <td>{pagination.showingFrom + index}</td>
-                            <td>{order.customer?.name || 'N/A'}</td>
-                            <td>{productNames || 'N/A'}</td>
-                            <td>{orderedQty}</td>
-                            <td>{deliveredQty}</td>
-                            <td>{pendingQty}</td>
-                            <td>
-                              <span className={`status-badge status-${getDeliveryStatus(order).replace(' ', '-').toLowerCase()}`}>
-                                {getDeliveryStatus(order)}
-                              </span>
-                            </td>
-                            <td>{singlePrice != null ? `$${Number(singlePrice).toFixed(2)}` : '—'}</td>
-                            <td>${Number(grandTotal).toFixed(2)}</td>
-                            <td>{new Date(order.orderDate).toLocaleDateString()}</td>
-                            <td>
-                              <div className="action-buttons">
-                                {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
-                                  order.deliveredInvoiceHistory.map((inv, i) => (
+                          return (
+                            <tr key={order._id}>
+                              <td>{pagination.showingFrom + index}</td>
+                              <td>{order.customer?.name || 'N/A'}</td>
+                              <td>{productNames || 'N/A'}</td>
+                              <td>{orderedQty}</td>
+                              <td>{deliveredQty}</td>
+                              <td>{pendingQty}</td>
+                              <td>
+                                <span className={`status-badge status-${getDeliveryStatus(order).replace(' ', '-').toLowerCase()}`}>
+                                  {getDeliveryStatus(order)}
+                                </span>
+                              </td>
+                              <td>{singlePrice != null ? `$${Number(singlePrice).toFixed(2)}` : '—'}</td>
+                              <td>${Number(grandTotal).toFixed(2)}</td>
+                              <td>{new Date(order.orderDate).toLocaleDateString()}</td>
+                              <td>
+                                <div className="action-buttons">
+                                  {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
+                                    order.deliveredInvoiceHistory.map((inv, i) => (
+                                      <button
+                                        key={i}
+                                        className="invoice-button delivered"
+                                        onClick={() => {
+                                          setPendingInvoiceData({ type: "delivered", orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                          setShowInvoiceModal(true);
+                                        }}
+                                        disabled={downloadingOrderId === order._id}
+                                      >
+                                        {downloadingOrderId === order._id
+                                          ? 'Downloading...'
+                                          : `🧾 ${inv.invoiceNumber}`}
+                                      </button>
+                                    ))
+                                  ) : hasDeliveredQty ? (
                                     <button
-                                      key={i}
                                       className="invoice-button delivered"
                                       onClick={() => {
-                                        setPendingInvoiceData({ type: "delivered", orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                        setPendingInvoiceData({ type: "delivered", orderId: order._id, invoiceNumber: null });
                                         setShowInvoiceModal(true);
                                       }}
                                       disabled={downloadingOrderId === order._id}
                                     >
-                                      {downloadingOrderId === order._id
-                                        ? 'Downloading...'
-                                        : `🧾 ${inv.invoiceNumber}`}
+                                      {downloadingOrderId === order._id ? 'Downloading...' : 'Delivered Invoice'}
                                     </button>
-                                  ))
-                                ) : hasDeliveredQty ? (
-                                  <button
-                                    className="invoice-button delivered"
-                                    onClick={() => {
-                                      setPendingInvoiceData({ type: "delivered", orderId: order._id, invoiceNumber: null });
-                                      setShowInvoiceModal(true);
-                                    }}
-                                    disabled={downloadingOrderId === order._id}
-                                  >
-                                    {downloadingOrderId === order._id ? 'Downloading...' : 'Delivered Invoice'}
-                                  </button>
-                                ) : null}
+                                  ) : null}
                               
-                                {hasPendingQty && (
-                                  <button
-                                    className="invoice-button pending"
-                                    onClick={() => {
-                                      setPendingInvoiceData({ type: "pending", orderId: order._id });
-                                      setShowInvoiceModal(true);
-                                    }}
-                                    disabled={downloadingOrderId === order._id}
-                                  >
-                                    {downloadingOrderId === order._id ? 'Downloading...' : 'Pending Invoice'}
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="11" className="no-data">
-                          No accepted orders found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                                  {hasPendingQty && (
+                                    <button
+                                      className="invoice-button pending"
+                                      onClick={() => {
+                                        setPendingInvoiceData({ type: "pending", orderId: order._id });
+                                        setShowInvoiceModal(true);
+                                      }}
+                                      disabled={downloadingOrderId === order._id}
+                                    >
+                                      {downloadingOrderId === order._id ? 'Downloading...' : 'Pending Invoice'}
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="11" className="no-data">
+                            No accepted orders found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </TableScrollSync>
 
               <Pagination
                 page={pagination.page}

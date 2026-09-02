@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import './SubCategoryList.css';
 import axios from 'axios';
 import toast from "../../../utils/toast";
@@ -213,46 +214,48 @@ const SubCategoryList = () => {
               </div>
             ) : (
               <>
-                <div className="subcategory-list-table-wrapper">
-                  <table className="subcategory-list-data-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">No</th>
-                        <th scope="col">Sub-Category Name</th>
-                        <th scope="col">Category</th>
-                        <th scope="col">Edit</th>
-                        <th scope="col">Delete</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((subCat, index) => (
-                        <tr key={subCat._id}>
-                          <td>{pagination.showingFrom + index}</td>
-                          <td>{subCat.subCategoryName}</td>
-                          <td>{subCat.CategoryName}</td>
-                          <td>
-                            <Link
-                              to={`/subcategory/create?edit=${subCat._id}`}
-                              className="subcategory-list-icon-button subcategory-list-edit-button"
-                              aria-label={`Edit sub-category ${subCat.subCategoryName}`}
-                            >
-                              ✎
-                            </Link>
-                          </td>
-                          <td>
-                            <button
-                              className="subcategory-list-icon-button subcategory-list-delete-button"
-                              onClick={() => handleDeleteClick(subCat._id, subCat.subCategoryName)}
-                              aria-label={`Delete sub-category ${subCat.subCategoryName}`}
-                            >
-                              🗑️
-                            </button>
-                          </td>
+                <TableScrollSync>
+                  <div className="subcategory-list-table-wrapper">
+                    <table className="subcategory-list-data-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">No</th>
+                          <th scope="col">Sub-Category Name</th>
+                          <th scope="col">Category</th>
+                          <th scope="col">Edit</th>
+                          <th scope="col">Delete</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((subCat, index) => (
+                          <tr key={subCat._id}>
+                            <td>{pagination.showingFrom + index}</td>
+                            <td>{subCat.subCategoryName}</td>
+                            <td>{subCat.CategoryName}</td>
+                            <td>
+                              <Link
+                                to={`/subcategory/create?edit=${subCat._id}`}
+                                className="subcategory-list-icon-button subcategory-list-edit-button"
+                                aria-label={`Edit sub-category ${subCat.subCategoryName}`}
+                              >
+                                ✎
+                              </Link>
+                            </td>
+                            <td>
+                              <button
+                                className="subcategory-list-icon-button subcategory-list-delete-button"
+                                onClick={() => handleDeleteClick(subCat._id, subCat.subCategoryName)}
+                                aria-label={`Delete sub-category ${subCat.subCategoryName}`}
+                              >
+                                🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

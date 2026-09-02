@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import './CategoryList.css';
 import axios from 'axios';
 import toast from "../../../utils/toast"; // ← NEW IMPORT
@@ -174,44 +175,46 @@ const CategoryList = () => {
               </div>
             ) : (
               <>
-                <div className="category-list-table-wrapper">
-                  <table className="category-list-data-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">No</th>
-                        <th scope="col">Category Name</th>
-                        <th scope="col">Edit</th>
-                        <th scope="col">Delete</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((category, index) => (
-                        <tr key={category._id}>
-                          <td>{pagination.showingFrom + index}</td>
-                          <td>{category.CategoryName}</td>
-                          <td>
-                            <Link
-                              to={`/category/create?edit=${category._id}`}
-                              className="category-list-icon-button category-list-edit-button"
-                              aria-label={`Edit category ${category.CategoryName}`}
-                            >
-                              ✎
-                            </Link>
-                          </td>
-                          <td>
-                            <button
-                              className="category-list-icon-button category-list-delete-button"
-                              onClick={() => handleDeleteClick(category._id, category.CategoryName)}
-                              aria-label={`Delete category ${category.CategoryName}`}
-                            >
-                              🗑️
-                            </button>
-                          </td>
+                <TableScrollSync>
+                  <div className="category-list-table-wrapper">
+                    <table className="category-list-data-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">No</th>
+                          <th scope="col">Category Name</th>
+                          <th scope="col">Edit</th>
+                          <th scope="col">Delete</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((category, index) => (
+                          <tr key={category._id}>
+                            <td>{pagination.showingFrom + index}</td>
+                            <td>{category.CategoryName}</td>
+                            <td>
+                              <Link
+                                to={`/category/create?edit=${category._id}`}
+                                className="category-list-icon-button category-list-edit-button"
+                                aria-label={`Edit category ${category.CategoryName}`}
+                              >
+                                ✎
+                              </Link>
+                            </td>
+                            <td>
+                              <button
+                                className="category-list-icon-button category-list-delete-button"
+                                onClick={() => handleDeleteClick(category._id, category.CategoryName)}
+                                aria-label={`Delete category ${category.CategoryName}`}
+                              >
+                                🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

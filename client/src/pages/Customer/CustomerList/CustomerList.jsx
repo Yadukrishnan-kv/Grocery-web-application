@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./CustomerList.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -316,198 +317,200 @@ const CustomerList = () => {
                 {dueDaysFilter !== "all" ? ` with due filter` : ""}
               </div>
             ) : (
-              <div className="customer-list-table-wrapper">
-                <table className="customer-list-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Customer ID</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Phone</th>
-                      {hasContactData && <th scope="col">Contact Person</th>}
-                      {hasContactData && <th scope="col">Contact Phone</th>}
-                      {hasContactData && <th scope="col">Contact Address</th>}
-                      <th scope="col">Address</th>
-                      <th scope="col">TRN</th>
-                      <th scope="col">Emirates</th>
-                      <th scope="col">Emirates Code</th>
-                      <th scope="col">Latitude</th>
-                      <th scope="col">Longitude</th>
-                      <th scope="col">Credit Limit</th>
-                      <th scope="col">Balance</th>
-                      <th scope="col">Return Balance</th>
-                      <th scope="col">Opening Balance</th>
-                      <th scope="col">Opening Due Days</th>
-                      <th scope="col">Billing Type</th>
-                      <th scope="col">Statement Type</th>
-                      <th scope="col">Salesman</th>
-                      <th scope="col">Due Days</th>
-                      <th scope="col">Current Bill Due</th>
-                      <th scope="col">Edit</th>
-                      <th scope="col">Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleCustomers.map((customer, index) => {
-                      const daysLeft = getDaysRemaining(customer);
-                      const dueStatusText = getDueStatusText(daysLeft);
-                      const dueClass = getDueClass(daysLeft);
+              <TableScrollSync>
+                <div className="customer-list-table-wrapper">
+                  <table className="customer-list-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Customer ID</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Phone</th>
+                        {hasContactData && <th scope="col">Contact Person</th>}
+                        {hasContactData && <th scope="col">Contact Phone</th>}
+                        {hasContactData && <th scope="col">Contact Address</th>}
+                        <th scope="col">Address</th>
+                        <th scope="col">TRN</th>
+                        <th scope="col">Emirates</th>
+                        <th scope="col">Emirates Code</th>
+                        <th scope="col">Latitude</th>
+                        <th scope="col">Longitude</th>
+                        <th scope="col">Credit Limit</th>
+                        <th scope="col">Balance</th>
+                        <th scope="col">Return Balance</th>
+                        <th scope="col">Opening Balance</th>
+                        <th scope="col">Opening Due Days</th>
+                        <th scope="col">Billing Type</th>
+                        <th scope="col">Statement Type</th>
+                        <th scope="col">Salesman</th>
+                        <th scope="col">Due Days</th>
+                        <th scope="col">Current Bill Due</th>
+                        <th scope="col">Edit</th>
+                        <th scope="col">Delete</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleCustomers.map((customer, index) => {
+                        const daysLeft = getDaysRemaining(customer);
+                        const dueStatusText = getDueStatusText(daysLeft);
+                        const dueClass = getDueClass(daysLeft);
 
-                      // NEW: Show "-" when no opening balance/due days
-                      const openingBalanceDisplay =
-                        customer.openingBalance > 0
-                          ? customer.openingBalance.toFixed(2)
-                          : "-";
-                      const openingDueDaysDisplay =
-                        customer.openingBalanceDueDays
-                          ? `${customer.openingBalanceDueDays} days`
-                          : "-";
+                        // NEW: Show "-" when no opening balance/due days
+                        const openingBalanceDisplay =
+                          customer.openingBalance > 0
+                            ? customer.openingBalance.toFixed(2)
+                            : "-";
+                        const openingDueDaysDisplay =
+                          customer.openingBalanceDueDays
+                            ? `${customer.openingBalanceDueDays} days`
+                            : "-";
 
-                      return (
-                        <tr key={customer._id}>
-                          <td>{activePagination.showingFrom + index}</td>
-                          <td>
-                            <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
-                              {customer.customerId || "-"}
-                            </span>
-                          </td>
-                          <td>{customer.name || "-"}</td>
-                          <td>{customer.email || "-"}</td>
-                          <td>{customer.phoneNumber || "-"}</td>
-                          {hasContactData && <td>{customer.contactPersonName || "-"}</td>}
-                          {hasContactData && <td>{customer.contactPersonPhone || "-"}</td>}
-                          {hasContactData && <td>{customer.contactPersonAddress || "-"}</td>}
-                          <td>{customer.address || "-"}</td>
-                          <td>{customer.pincode || "-"}</td>
-                          <td>{customer.emiratesName || "-"}</td>
-                          <td>{customer.emiratesCode || "-"}</td>
-                          <td>{customer.latitude != null ? customer.latitude : "-"}</td>
-                          <td>{customer.longitude != null ? customer.longitude : "-"}</td>
-
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="AED"
-                                width={15}
-                                height={15}
-                                style={{ paddingTop: "3px" }}
-                              />
-                              <span>
-                                {customer.creditLimit?.toFixed(2) || "0.00"}
+                        return (
+                          <tr key={customer._id}>
+                            <td>{activePagination.showingFrom + index}</td>
+                            <td>
+                              <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
+                                {customer.customerId || "-"}
                               </span>
-                            </div>
-                          </td>
+                            </td>
+                            <td>{customer.name || "-"}</td>
+                            <td>{customer.email || "-"}</td>
+                            <td>{customer.phoneNumber || "-"}</td>
+                            {hasContactData && <td>{customer.contactPersonName || "-"}</td>}
+                            {hasContactData && <td>{customer.contactPersonPhone || "-"}</td>}
+                            {hasContactData && <td>{customer.contactPersonAddress || "-"}</td>}
+                            <td>{customer.address || "-"}</td>
+                            <td>{customer.pincode || "-"}</td>
+                            <td>{customer.emiratesName || "-"}</td>
+                            <td>{customer.emiratesCode || "-"}</td>
+                            <td>{customer.latitude != null ? customer.latitude : "-"}</td>
+                            <td>{customer.longitude != null ? customer.longitude : "-"}</td>
 
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="AED"
-                                width={15}
-                                height={15}
-                                style={{ paddingTop: "3px" }}
-                              />
-                              <span>
-                                {customer.balanceCreditLimit?.toFixed(2) ||
-                                  "0.00"}
-                              </span>
-                            </div>
-                          </td>
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                }}
+                              >
+                                <img
+                                  src={DirhamSymbol}
+                                  alt="AED"
+                                  width={15}
+                                  height={15}
+                                  style={{ paddingTop: "3px" }}
+                                />
+                                <span>
+                                  {customer.creditLimit?.toFixed(2) || "0.00"}
+                                </span>
+                              </div>
+                            </td>
 
-                          {/* Return Balance */}
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="AED"
-                                width={15}
-                                height={15}
-                                style={{ paddingTop: "3px" }}
-                              />
-                              <span>
-                                {(customer.returnCreditBalance || 0).toFixed(2)}
-                              </span>
-                            </div>
-                          </td>
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                }}
+                              >
+                                <img
+                                  src={DirhamSymbol}
+                                  alt="AED"
+                                  width={15}
+                                  height={15}
+                                  style={{ paddingTop: "3px" }}
+                                />
+                                <span>
+                                  {customer.balanceCreditLimit?.toFixed(2) ||
+                                    "0.00"}
+                                </span>
+                              </div>
+                            </td>
 
-                          {/* NEW COLUMNS */}
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="AED"
-                                width={15}
-                                height={15}
-                                style={{ paddingTop: "3px" }}
-                              />
-                              <span>{openingBalanceDisplay}</span>
-                            </div>
-                          </td>
+                            {/* Return Balance */}
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                }}
+                              >
+                                <img
+                                  src={DirhamSymbol}
+                                  alt="AED"
+                                  width={15}
+                                  height={15}
+                                  style={{ paddingTop: "3px" }}
+                                />
+                                <span>
+                                  {(customer.returnCreditBalance || 0).toFixed(2)}
+                                </span>
+                              </div>
+                            </td>
 
-                          <td>{openingDueDaysDisplay}</td>
+                            {/* NEW COLUMNS */}
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                }}
+                              >
+                                <img
+                                  src={DirhamSymbol}
+                                  alt="AED"
+                                  width={15}
+                                  height={15}
+                                  style={{ paddingTop: "3px" }}
+                                />
+                                <span>{openingBalanceDisplay}</span>
+                              </div>
+                            </td>
 
-                          <td>{customer.billingType || "-"}</td>
-                          <td>
-                            {customer.statementType
-                              ? customer.statementType.charAt(0).toUpperCase() +
-                                customer.statementType.slice(1)
-                              : "-"}
-                          </td>
-                          <td>{customer.salesman?.username || "-"}</td>
-                          <td>{customer.dueDays || "-"}</td>
+                            <td>{openingDueDaysDisplay}</td>
 
-                          <td className={dueClass}>{dueStatusText}</td>
+                            <td>{customer.billingType || "-"}</td>
+                            <td>
+                              {customer.statementType
+                                ? customer.statementType.charAt(0).toUpperCase() +
+                                  customer.statementType.slice(1)
+                                : "-"}
+                            </td>
+                            <td>{customer.salesman?.username || "-"}</td>
+                            <td>{customer.dueDays || "-"}</td>
 
-                          <td>
-                            <Link
-                              to={`/customer/create?edit=${customer._id}`}
-                              className="customer-list-icon-button customer-list-edit-button"
-                            >
-                              ✎
-                            </Link>
-                          </td>
-                          <td>
-                            <button
-                              className="customer-list-icon-button customer-list-delete-button"
-                              onClick={() =>
-                                handleDeleteClick(customer._id, customer.name)
-                              }
-                            >
-                              🗑️
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            <td className={dueClass}>{dueStatusText}</td>
+
+                            <td>
+                              <Link
+                                to={`/customer/create?edit=${customer._id}`}
+                                className="customer-list-icon-button customer-list-edit-button"
+                              >
+                                ✎
+                              </Link>
+                            </td>
+                            <td>
+                              <button
+                                className="customer-list-icon-button customer-list-delete-button"
+                                onClick={() =>
+                                  handleDeleteClick(customer._id, customer.name)
+                                }
+                              >
+                                🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </TableScrollSync>
             )}
 
             <Pagination

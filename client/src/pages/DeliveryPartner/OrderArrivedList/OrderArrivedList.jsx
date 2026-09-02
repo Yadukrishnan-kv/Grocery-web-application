@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./OrderArrivedList.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -303,152 +304,154 @@ const OrderArrivedList = () => {
               </div>
             ) : (
               <>
-                <div className="order-arrived-table-wrapper">
-                  <table className="order-arrived-data-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">No</th>
-                        <th scope="col">Customer</th>
-                        <th scope="col">Products</th>
-                        <th scope="col">Total Qty</th>
-                        <th scope="col">Grand Total</th>
-                        <th scope="col">Remarks</th>
-                        <th scope="col">Order Date</th>
-                        <th scope="col">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((order, index) => (
-                        <tr key={order._id}>
-                          <td>{pagination.showingFrom + index}</td>
-                          <td>{order.customer?.name || "N/A"}</td>
+                <TableScrollSync>
+                  <div className="order-arrived-table-wrapper">
+                    <table className="order-arrived-data-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">No</th>
+                          <th scope="col">Customer</th>
+                          <th scope="col">Products</th>
+                          <th scope="col">Total Qty</th>
+                          <th scope="col">Grand Total</th>
+                          <th scope="col">Remarks</th>
+                          <th scope="col">Order Date</th>
+                          <th scope="col">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((order, index) => (
+                          <tr key={order._id}>
+                            <td>{pagination.showingFrom + index}</td>
+                            <td>{order.customer?.name || "N/A"}</td>
 
-                          {/* Attractive multi-product display */}
-                          <td className="products-cell">
-                            {order.orderItems?.length > 0 ? (
-                              <div className="products-list">
-                                {order.orderItems.map((item, i) => (
-                                  <div key={i} className="product-tag">
-                                    <span className="product-name">
-                                      {item.product?.productName ||
-                                        "Unknown Product"}
-                                    </span>
-                                    <span className="product-qty">
-                                      × {item.orderedQuantity}
-                                    </span>
-                                    <span className="product-unit">
-                                      {item.unit || ""}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="no-products">No products</span>
-                            )}
-                          </td>
-
-                          {/* Total ordered quantity */}
-                          <td>
-                            {order.totalOrderedQuantity ||
-                              order.orderItems?.reduce(
-                                (sum, it) => sum + it.orderedQuantity,
-                                0,
-                              ) ||
-                              0}
-                          </td>
-
-                          {/* Grand total with Dirham symbol */}
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                              }}
-                            >
-                              <img
-                                src={DirhamSymbol}
-                                alt="AED"
-                                width={20}
-                                height={20}
-                                style={{ paddingTop: "2px" }}
-                              />
-                              <span style={{ fontWeight: 500 }}>
-                                {order.grandTotal?.toFixed(2) ||
-                                  order.orderItems
-                                    ?.reduce((sum, it) => sum + it.totalAmount, 0)
-                                    ?.toFixed(2) ||
-                                  "0.00"}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td>{order.remarks || "-"}</td>
-                          <td>{formatDate(order.orderDate)}</td>
-
-                          <td>
-                            <div className="order-arrived-action-buttons">
-                              {order.invoiceHistory && order.invoiceHistory.length > 0 ? (
-                                <div className="invoice-buttons-group">
-                                  {order.invoiceHistory.map((inv, i) => (
-                                    <button
-                                      key={i}
-                                      className="invoice-btn"
-                                      onClick={() => {
-                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                        setShowInvoiceModal(true);
-                                      }}
-                                      title={`Download ${inv.invoiceNumber}`}
-                                    >
-                                      📄 {inv.invoiceNumber}
-                                    </button>
+                            {/* Attractive multi-product display */}
+                            <td className="products-cell">
+                              {order.orderItems?.length > 0 ? (
+                                <div className="products-list">
+                                  {order.orderItems.map((item, i) => (
+                                    <div key={i} className="product-tag">
+                                      <span className="product-name">
+                                        {item.product?.productName ||
+                                          "Unknown Product"}
+                                      </span>
+                                      <span className="product-qty">
+                                        × {item.orderedQuantity}
+                                      </span>
+                                      <span className="product-unit">
+                                        {item.unit || ""}
+                                      </span>
+                                    </div>
                                   ))}
                                 </div>
-                              ) : order.invoiceNumber ? (
+                              ) : (
+                                <span className="no-products">No products</span>
+                              )}
+                            </td>
+
+                            {/* Total ordered quantity */}
+                            <td>
+                              {order.totalOrderedQuantity ||
+                                order.orderItems?.reduce(
+                                  (sum, it) => sum + it.orderedQuantity,
+                                  0,
+                                ) ||
+                                0}
+                            </td>
+
+                            {/* Grand total with Dirham symbol */}
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                }}
+                              >
+                                <img
+                                  src={DirhamSymbol}
+                                  alt="AED"
+                                  width={20}
+                                  height={20}
+                                  style={{ paddingTop: "2px" }}
+                                />
+                                <span style={{ fontWeight: 500 }}>
+                                  {order.grandTotal?.toFixed(2) ||
+                                    order.orderItems
+                                      ?.reduce((sum, it) => sum + it.totalAmount, 0)
+                                      ?.toFixed(2) ||
+                                    "0.00"}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td>{order.remarks || "-"}</td>
+                            <td>{formatDate(order.orderDate)}</td>
+
+                            <td>
+                              <div className="order-arrived-action-buttons">
+                                {order.invoiceHistory && order.invoiceHistory.length > 0 ? (
+                                  <div className="invoice-buttons-group">
+                                    {order.invoiceHistory.map((inv, i) => (
+                                      <button
+                                        key={i}
+                                        className="invoice-btn"
+                                        onClick={() => {
+                                          setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                          setShowInvoiceModal(true);
+                                        }}
+                                        title={`Download ${inv.invoiceNumber}`}
+                                      >
+                                        📄 {inv.invoiceNumber}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : order.invoiceNumber ? (
+                                  <button
+                                    className="invoice-btn"
+                                    onClick={() => {
+                                      setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                      setShowInvoiceModal(true);
+                                    }}
+                                    title={`Download Invoice ${order.invoiceNumber}`}
+                                  >
+                                    📄 Invoice
+                                  </button>
+                                ) : null}
+
                                 <button
-                                  className="invoice-btn"
-                                  onClick={() => {
-                                    setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
-                                    setShowInvoiceModal(true);
-                                  }}
-                                  title={`Download Invoice ${order.invoiceNumber}`}
+                                  className="order-arrived-accept-button"
+                                  onClick={() => handleAcceptOrder(order._id)}
+                                  disabled={
+                                    acceptingOrderId === order._id ||
+                                    rejectingOrderId === order._id
+                                  }
                                 >
-                                  📄 Invoice
+                                  {acceptingOrderId === order._id
+                                    ? "Accepting..."
+                                    : "Accept"}
                                 </button>
-                              ) : null}
 
-                              <button
-                                className="order-arrived-accept-button"
-                                onClick={() => handleAcceptOrder(order._id)}
-                                disabled={
-                                  acceptingOrderId === order._id ||
-                                  rejectingOrderId === order._id
-                                }
-                              >
-                                {acceptingOrderId === order._id
-                                  ? "Accepting..."
-                                  : "Accept"}
-                              </button>
-
-                              <button
-                                className="order-arrived-reject-button"
-                                onClick={() => handleRejectOrder(order._id)}
-                                disabled={
-                                  acceptingOrderId === order._id ||
-                                  rejectingOrderId === order._id
-                                }
-                              >
-                                {rejectingOrderId === order._id
-                                  ? "Rejecting..."
-                                  : "Reject"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                                <button
+                                  className="order-arrived-reject-button"
+                                  onClick={() => handleRejectOrder(order._id)}
+                                  disabled={
+                                    acceptingOrderId === order._id ||
+                                    rejectingOrderId === order._id
+                                  }
+                                >
+                                  {rejectingOrderId === order._id
+                                    ? "Rejecting..."
+                                    : "Reject"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

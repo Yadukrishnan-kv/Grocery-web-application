@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./ReceiptReport.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -193,65 +194,67 @@ const ReceiptReport = () => {
               </div>
             ) : (
               <>
-                <div className="order-list-table-wrapper">
-                  <table className="order-list-data-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Invoice #</th>
-                        <th>Customer</th>
-                        <th>Amount Paid</th>
-                        <th>Bill Period</th>
-                        <th>Paid Date</th>
-                        <th>Orders</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((receipt, idx) => (
-                        <tr
-                          key={receipt._id}
-                          className="clickable-row"
-                          onClick={() => handleRowClick(receipt._id)}
-                          style={{ cursor: 'pointer' }}
-                          title="View receipt details"
-                        >
-                          <td>{pagination.showingFrom + idx}</td>
-                          <td>
-                            <span className="invoice-badge">{receipt.invoiceNumber}</span>
-                            {receipt.isOpeningBalance && (
-                              <span className="opening-badge-small">OB</span>
-                            )}
-                          </td>
-                          <td>
-                            <div className="customer-cell">
-                              <span className="customer-name">{receipt.customer?.name}</span>
-                              <small className="customer-email">{receipt.customer?.email}</small>
-                            </div>
-                          </td>
-                          <td className="amount-paid">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <img src={DirhamSymbol} alt="AED" width={14} height={14} />
-                              <span>{formatCurrency(receipt.paidAmount)}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <small>{formatDate(receipt.cycleStart)}</small>
-                            <br />
-                            <small>→ {formatDate(receipt.cycleEnd)}</small>
-                          </td>
-                          <td>{formatDate(receipt.paidDate)}</td>
-                          <td>
-                            <span className="orders-count">{receipt.orderCount} order(s)</span>
-                          </td>
-                          <td>
-                            <span className="status-badge status-paid">Paid</span>
-                          </td>
+                <TableScrollSync>
+                  <div className="order-list-table-wrapper">
+                    <table className="order-list-data-table">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Invoice #</th>
+                          <th>Customer</th>
+                          <th>Amount Paid</th>
+                          <th>Bill Period</th>
+                          <th>Paid Date</th>
+                          <th>Orders</th>
+                          <th>Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((receipt, idx) => (
+                          <tr
+                            key={receipt._id}
+                            className="clickable-row"
+                            onClick={() => handleRowClick(receipt._id)}
+                            style={{ cursor: 'pointer' }}
+                            title="View receipt details"
+                          >
+                            <td>{pagination.showingFrom + idx}</td>
+                            <td>
+                              <span className="invoice-badge">{receipt.invoiceNumber}</span>
+                              {receipt.isOpeningBalance && (
+                                <span className="opening-badge-small">OB</span>
+                              )}
+                            </td>
+                            <td>
+                              <div className="customer-cell">
+                                <span className="customer-name">{receipt.customer?.name}</span>
+                                <small className="customer-email">{receipt.customer?.email}</small>
+                              </div>
+                            </td>
+                            <td className="amount-paid">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <img src={DirhamSymbol} alt="AED" width={14} height={14} />
+                                <span>{formatCurrency(receipt.paidAmount)}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <small>{formatDate(receipt.cycleStart)}</small>
+                              <br />
+                              <small>→ {formatDate(receipt.cycleEnd)}</small>
+                            </td>
+                            <td>{formatDate(receipt.paidDate)}</td>
+                            <td>
+                              <span className="orders-count">{receipt.orderCount} order(s)</span>
+                            </td>
+                            <td>
+                              <span className="status-badge status-paid">Paid</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

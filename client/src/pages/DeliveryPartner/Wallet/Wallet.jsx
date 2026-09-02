@@ -9,6 +9,7 @@ import "./Wallet.css";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 
 // Icons (unchanged)
 const CashIcon = () => (
@@ -413,7 +414,9 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
             ) : filteredTransactions.length === 0 ? (
               <div className="no-data">No cash transactions found</div>
             ) : (
-              <table className="wallet-data-table">
+              <TableScrollSync>
+                <div className="wallet-table-container">
+                <table className="wallet-data-table">
                 <thead>
                   <tr>
                     <th>
@@ -473,7 +476,9 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+                </div>
+              </TableScrollSync>
             )}
             <Pagination
               page={pagination.page}

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 
 import "./CancelledOrdersList.css";
 import axios from "axios";
@@ -102,94 +103,96 @@ const CancelledOrdersList = () => {
               <div className="cancelled-orders-loading">Loading orders...</div>
             ) : (
               <>
-                <div className="cancelled-orders-table-wrapper">
-                  <table className="cancelled-orders-data-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">No</th>
-                        <th scope="col">Customer</th>
-                        <th scope="col">Product</th>
-                        <th scope="col">Ordered Qty</th>
-                        <th scope="col">Delivered Qty</th>
-                        <th scope="col">Price</th>
-                        <th scope="col">Total Amount</th>
-                        <th scope="col">Order Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.length > 0 ? (
-                        pagination.pageData.map((order, index) => {
-                          const items = order.orderItems || [];
-                          const orderedQty = items.reduce((s, it) => s + (it.orderedQuantity || 0), 0);
-                          const deliveredQty = items.reduce((s, it) => s + (it.deliveredQuantity || 0), 0);
-                          const grandTotal = items.reduce((s, it) => s + (it.totalAmount || 0), 0);
-                          const productNames = items
-                            .map((it) => it.product?.productName || "N/A")
-                            .join(", ");
-                          const singlePrice = items.length === 1 ? items[0].price : null;
-                          return (
-                            <tr key={order._id}>
-                              <td>{pagination.showingFrom + index}</td>
-                              <td>{order.customer?.name || "N/A"}</td>
-                              <td>{productNames || "N/A"}</td>
-                              <td>{orderedQty}</td>
-                              <td>{deliveredQty}</td>
-                              <td>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
-                                >
-                                  {singlePrice != null ? (
-                                    <>
-                                      <img
-                                        src={DirhamSymbol}
-                                        alt="Dirham Symbol"
-                                        width={15}
-                                        height={15}
-                                        style={{ paddingTop: "3px" }}
-                                      />
-                                      <span>{Number(singlePrice).toFixed(2)}</span>
-                                    </>
-                                  ) : (
-                                    <span>—</span>
-                                  )}
-                                </div>
-                              </td>
-                              <td>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
-                                >
-                                  <img
-                                    src={DirhamSymbol}
-                                    alt="Dirham Symbol"
-                                    width={15}
-                                    height={15}
-                                    style={{ paddingTop: "3px" }}
-                                  />
-                                  <span>{Number(grandTotal).toFixed(2)}</span>
-                                </div>
-                              </td>
-                              <td>{formatDate(order.orderDate)}</td>
-                            </tr>
-                          );
-                        })
-                      ) : (
+                <TableScrollSync>
+                  <div className="cancelled-orders-table-wrapper">
+                    <table className="cancelled-orders-data-table">
+                      <thead>
                         <tr>
-                          <td colSpan="8" className="cancelled-orders-no-data">
-                            No orders available for cancellation
-                          </td>
+                          <th scope="col">No</th>
+                          <th scope="col">Customer</th>
+                          <th scope="col">Product</th>
+                          <th scope="col">Ordered Qty</th>
+                          <th scope="col">Delivered Qty</th>
+                          <th scope="col">Price</th>
+                          <th scope="col">Total Amount</th>
+                          <th scope="col">Order Date</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.length > 0 ? (
+                          pagination.pageData.map((order, index) => {
+                            const items = order.orderItems || [];
+                            const orderedQty = items.reduce((s, it) => s + (it.orderedQuantity || 0), 0);
+                            const deliveredQty = items.reduce((s, it) => s + (it.deliveredQuantity || 0), 0);
+                            const grandTotal = items.reduce((s, it) => s + (it.totalAmount || 0), 0);
+                            const productNames = items
+                              .map((it) => it.product?.productName || "N/A")
+                              .join(", ");
+                            const singlePrice = items.length === 1 ? items[0].price : null;
+                            return (
+                              <tr key={order._id}>
+                                <td>{pagination.showingFrom + index}</td>
+                                <td>{order.customer?.name || "N/A"}</td>
+                                <td>{productNames || "N/A"}</td>
+                                <td>{orderedQty}</td>
+                                <td>{deliveredQty}</td>
+                                <td>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    {singlePrice != null ? (
+                                      <>
+                                        <img
+                                          src={DirhamSymbol}
+                                          alt="Dirham Symbol"
+                                          width={15}
+                                          height={15}
+                                          style={{ paddingTop: "3px" }}
+                                        />
+                                        <span>{Number(singlePrice).toFixed(2)}</span>
+                                      </>
+                                    ) : (
+                                      <span>—</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    <img
+                                      src={DirhamSymbol}
+                                      alt="Dirham Symbol"
+                                      width={15}
+                                      height={15}
+                                      style={{ paddingTop: "3px" }}
+                                    />
+                                    <span>{Number(grandTotal).toFixed(2)}</span>
+                                  </div>
+                                </td>
+                                <td>{formatDate(order.orderDate)}</td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan="8" className="cancelled-orders-no-data">
+                              No orders available for cancellation
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

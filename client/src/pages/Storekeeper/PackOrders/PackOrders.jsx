@@ -11,6 +11,7 @@ import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 
 import jsPDF from "jspdf";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 
 
 const PackOrders = () => {
@@ -456,110 +457,112 @@ const PackOrders = () => {
               <div className="order-list-no-data">No orders found</div>
             ) : (
               <>
-                <div className="order-list-table-wrapper">
-                  <table className="order-list-data-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Customer</th>
-                        <th>Products</th>
-                        <th>Total Ordered</th>
-                        <th>Packed Qty</th>
-                        <th>Status</th>
-                        <th>Order Date</th>
-                        <th>Delivery After</th>
-                        <th>Actions</th>
-                        <th>Pack</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((order, index) => (
-                        <tr key={order._id}>
-                          <td>{pagination.showingFrom + index}</td>
-                          <td>{order.customer?.name || "N/A"}</td>
-
-                          <td className="products-cell">
-                            {order.orderItems?.length > 0 ? (
-                              <div className="products-list">
-                                {order.orderItems.map((item, i) => (
-                                  <div key={i} className="product-tag">
-                                    <span className="product-name">
-                                      {item.product?.productName || "Unknown"}
-                                    </span>
-                                    <span className="product-qty">× {item.orderedQuantity}</span>
-                                    <span className="product-unit">{item.unit || ""}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="no-products">No products</span>
-                            )}
-                          </td>
-
-                          <td>{order.totalOrderedQuantity || 0}</td>
-                          <td>
-                            {order.orderItems?.reduce(
-                              (sum, i) => sum + (i.packedQuantity || 0),
-                              0
-                            ) || 0}
-                          </td>
-
-                          <td>
-                            <span
-                              className={`order-list-status-badge order-list-status-${
-                                order.packedStatus?.toLowerCase() || "not_packed"
-                              }`}
-                            >
-                              {order.packedStatus === "fully_packed"
-                                ? "Fully Packed"
-                                : order.packedStatus === "partially_packed"
-                                ? "Partially Packed"
-                                : "Not Packed"}
-                            </span>
-                          </td>
-
-                          <td>{formatDate(order.orderDate)}</td>
-
-                          <td>
-                            {order.packableAfter
-                              ? formatDate(order.packableAfter)
-                              : <span className="no-invoice-text">Same Day</span>}
-                          </td>
-
-                          <td className="actions-cell">
-                            {/* Packing Slip button */}
-                            <button
-                              className="order-list-icon-button order-list-download-pdf"
-                              onClick={() => {
-                                orderDataRef.current[order._id] = order;
-                                setPendingSlipData({ orderId: order._id });
-                                setShowSlipModal(true);
-                              }}
-                              title="Download packing slip"
-                            >
-                              🖨️ Slip
-                            </button>
-                          </td>
-
-                          <td className="pack-cell">
-                            <button
-                              className="order-list-icon-button order-list-edit-button"
-                              onClick={() => openPackModal(order)}
-                              disabled={order.packedStatus === "fully_packed"}
-                              title={
-                                order.packedStatus === "fully_packed"
-                                  ? "Order already fully packed"
-                                  : "Pack / Add more quantity"
-                              }
-                            >
-                              {order.packedStatus === "fully_packed" ? "Packed ✓" : "Pack"}
-                            </button>
-                          </td>
+                <TableScrollSync>
+                  <div className="order-list-table-wrapper">
+                    <table className="order-list-data-table">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Customer</th>
+                          <th>Products</th>
+                          <th>Total Ordered</th>
+                          <th>Packed Qty</th>
+                          <th>Status</th>
+                          <th>Order Date</th>
+                          <th>Delivery After</th>
+                          <th>Actions</th>
+                          <th>Pack</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((order, index) => (
+                          <tr key={order._id}>
+                            <td>{pagination.showingFrom + index}</td>
+                            <td>{order.customer?.name || "N/A"}</td>
+
+                            <td className="products-cell">
+                              {order.orderItems?.length > 0 ? (
+                                <div className="products-list">
+                                  {order.orderItems.map((item, i) => (
+                                    <div key={i} className="product-tag">
+                                      <span className="product-name">
+                                        {item.product?.productName || "Unknown"}
+                                      </span>
+                                      <span className="product-qty">× {item.orderedQuantity}</span>
+                                      <span className="product-unit">{item.unit || ""}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="no-products">No products</span>
+                              )}
+                            </td>
+
+                            <td>{order.totalOrderedQuantity || 0}</td>
+                            <td>
+                              {order.orderItems?.reduce(
+                                (sum, i) => sum + (i.packedQuantity || 0),
+                                0
+                              ) || 0}
+                            </td>
+
+                            <td>
+                              <span
+                                className={`order-list-status-badge order-list-status-${
+                                  order.packedStatus?.toLowerCase() || "not_packed"
+                                }`}
+                              >
+                                {order.packedStatus === "fully_packed"
+                                  ? "Fully Packed"
+                                  : order.packedStatus === "partially_packed"
+                                  ? "Partially Packed"
+                                  : "Not Packed"}
+                              </span>
+                            </td>
+
+                            <td>{formatDate(order.orderDate)}</td>
+
+                            <td>
+                              {order.packableAfter
+                                ? formatDate(order.packableAfter)
+                                : <span className="no-invoice-text">Same Day</span>}
+                            </td>
+
+                            <td className="actions-cell">
+                              {/* Packing Slip button */}
+                              <button
+                                className="order-list-icon-button order-list-download-pdf"
+                                onClick={() => {
+                                  orderDataRef.current[order._id] = order;
+                                  setPendingSlipData({ orderId: order._id });
+                                  setShowSlipModal(true);
+                                }}
+                                title="Download packing slip"
+                              >
+                                🖨️ Slip
+                              </button>
+                            </td>
+
+                            <td className="pack-cell">
+                              <button
+                                className="order-list-icon-button order-list-edit-button"
+                                onClick={() => openPackModal(order)}
+                                disabled={order.packedStatus === "fully_packed"}
+                                title={
+                                  order.packedStatus === "fully_packed"
+                                    ? "Order already fully packed"
+                                    : "Pack / Add more quantity"
+                                }
+                              >
+                                {order.packedStatus === "fully_packed" ? "Packed ✓" : "Pack"}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

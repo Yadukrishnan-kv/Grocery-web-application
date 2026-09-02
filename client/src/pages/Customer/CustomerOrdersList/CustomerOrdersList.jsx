@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./CustomerOrdersList.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -274,153 +275,155 @@ const CustomerOrdersList = () => {
               </div>
             ) : (
               <>
-                <div className="customer-orders-table-wrapper">
-                  <table className="customer-orders-data-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">No</th>
-                        <th scope="col">Order ID</th>
-                        <th scope="col">Products</th>
-                        <th scope="col">Total Ordered Qty</th>
-                        <th scope="col">Total Delivered Qty</th>
-                        {/* ✅ UPDATED: VAT Breakdown Columns */}
-                        <th scope="col" className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
-                        <th scope="col" className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
-                        <th scope="col" className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
-                        <th scope="col">Remarks</th>
-                        <th scope="col">Payment</th>
-                        <th scope="col">Delivery Partner</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Order Date</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((item, index) => {
-                        const isRequest = item.type === "request";
+                <TableScrollSync>
+                  <div className="customer-orders-table-wrapper">
+                    <table className="customer-orders-data-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">No</th>
+                          <th scope="col">Order ID</th>
+                          <th scope="col">Products</th>
+                          <th scope="col">Total Ordered Qty</th>
+                          <th scope="col">Total Delivered Qty</th>
+                          {/* ✅ UPDATED: VAT Breakdown Columns */}
+                          <th scope="col" className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
+                          <th scope="col" className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
+                          <th scope="col" className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
+                          <th scope="col">Remarks</th>
+                          <th scope="col">Payment</th>
+                          <th scope="col">Delivery Partner</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Order Date</th>
+                          <th scope="col">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((item, index) => {
+                          const isRequest = item.type === "request";
 
-                        // For real orders
-                        const totalOrdered = isRequest
-                          ? item.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0
-                          : item.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0;
+                          // For real orders
+                          const totalOrdered = isRequest
+                            ? item.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0
+                            : item.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0;
 
-                        const totalDelivered = isRequest
-                          ? 0 // Requests have no delivered qty
-                          : item.orderItems?.reduce((sum, it) => sum + it.deliveredQuantity, 0) || 0;
+                          const totalDelivered = isRequest
+                            ? 0 // Requests have no delivered qty
+                            : item.orderItems?.reduce((sum, it) => sum + it.deliveredQuantity, 0) || 0;
 
-                        // ✅ Calculate VAT breakdown
-                        const { exclVat, vatAmount, grandTotal } = calculateOrderVAT(item.orderItems);
+                          // ✅ Calculate VAT breakdown
+                          const { exclVat, vatAmount, grandTotal } = calculateOrderVAT(item.orderItems);
 
-                        return (
-                          <tr key={item._id}>
-                            <td>{pagination.showingFrom + index}</td>
-                            <td>{item.type === "order" ? item.orderId || item._id : "-"}</td>
+                          return (
+                            <tr key={item._id}>
+                              <td>{pagination.showingFrom + index}</td>
+                              <td>{item.type === "order" ? item.orderId || item._id : "-"}</td>
 
-                            <td className="products-cell">
-                              {item.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {item.orderItems.map((oi, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">
-                                        {oi.product?.productName || "Unknown"}
-                                      </span>
-                                      <span className="product-qty">× {oi.orderedQuantity}</span>
-                                      <span className="product-unit">{oi.unit || ""}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
-                            </td>
-
-                            <td>{totalOrdered}</td>
-                            <td>{totalDelivered}</td>
-
-                            {/* ✅ UPDATED: VAT Breakdown Display */}
-                            <td className="vat-cell">
-                              <div className="vat-amount">
-                                <img src={DirhamSymbol} alt="AED" width={12} />
-                                <span>{exclVat.toFixed(2)}</span>
-                              </div>
-                            </td>
-                            <td className="vat-cell">
-                              <div className="vat-amount vat-highlight">
-                                <img src={DirhamSymbol} alt="AED" width={12} />
-                                <span>{vatAmount.toFixed(2)}</span>
-                              </div>
-                            </td>
-                            <td className="vat-cell grand-total-cell">
-                              <div className="vat-amount grand-total-amount">
-                                <img src={DirhamSymbol} alt="AED" width={14} />
-                                <span>{grandTotal.toFixed(2)}</span>
-                              </div>
-                            </td>
-
-                            <td>{item.remarks || "-"}</td>
-
-                            <td>
-                              {item.payment?.charAt(0).toUpperCase() +
-                                item.payment?.slice(1) || "N/A"}
-                            </td>
-
-                            <td>
-                              <span
-                                className={`customer-orders-assignment-badge customer-orders-assignment-${
-                                  isRequest ? "pending" : (item.assignmentStatus?.toLowerCase() || "pending")
-                                }`}
-                              >
-                                {isRequest ? "N/A" : getAssignmentStatusDisplay(item)}
-                              </span>
-                            </td>
-
-                            <td>
-                              <span
-                                className={`customer-orders-status-badge customer-orders-status-${getStatusClass(item)}`}
-                              >
-                                {getStatusDisplay(item)}
-                              </span>
-                            </td>
-
-                            <td>
-                              {isRequest
-                                ? formatDate(item.requestedAt)
-                                : formatDate(item.orderDate)}
-                            </td>
-
-                            <td>
-                              {item.salesReturn?.status === "completed" ? (
-                                <span className="co-return-na">Returned</span>
-                              ) : isReturnEligible(item) ? (
-                                hasActiveReturn(item) ? (
-                                  <button
-                                    className="co-btn-return"
-                                    disabled
-                                    title={`Return already submitted (${item.salesReturn.status})`}
-                                    style={{ opacity: 0.5, cursor: "not-allowed" }}
-                                  >
-                                    ↩ Returned
-                                  </button>
+                              <td className="products-cell">
+                                {item.orderItems?.length > 0 ? (
+                                  <div className="products-list">
+                                    {item.orderItems.map((oi, i) => (
+                                      <div key={i} className="product-tag">
+                                        <span className="product-name">
+                                          {oi.product?.productName || "Unknown"}
+                                        </span>
+                                        <span className="product-qty">× {oi.orderedQuantity}</span>
+                                        <span className="product-unit">{oi.unit || ""}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 ) : (
-                                  <button
-                                    className="co-btn-return"
-                                    onClick={() =>
-                                      navigate(`/sales-returns/create?orderId=${item._id}`)
-                                    }
-                                  >
-                                    ↩ Return
-                                  </button>
-                                )
-                              ) : (
-                                <span className="co-return-na">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                  <span className="no-products">No products</span>
+                                )}
+                              </td>
+
+                              <td>{totalOrdered}</td>
+                              <td>{totalDelivered}</td>
+
+                              {/* ✅ UPDATED: VAT Breakdown Display */}
+                              <td className="vat-cell">
+                                <div className="vat-amount">
+                                  <img src={DirhamSymbol} alt="AED" width={12} />
+                                  <span>{exclVat.toFixed(2)}</span>
+                                </div>
+                              </td>
+                              <td className="vat-cell">
+                                <div className="vat-amount vat-highlight">
+                                  <img src={DirhamSymbol} alt="AED" width={12} />
+                                  <span>{vatAmount.toFixed(2)}</span>
+                                </div>
+                              </td>
+                              <td className="vat-cell grand-total-cell">
+                                <div className="vat-amount grand-total-amount">
+                                  <img src={DirhamSymbol} alt="AED" width={14} />
+                                  <span>{grandTotal.toFixed(2)}</span>
+                                </div>
+                              </td>
+
+                              <td>{item.remarks || "-"}</td>
+
+                              <td>
+                                {item.payment?.charAt(0).toUpperCase() +
+                                  item.payment?.slice(1) || "N/A"}
+                              </td>
+
+                              <td>
+                                <span
+                                  className={`customer-orders-assignment-badge customer-orders-assignment-${
+                                    isRequest ? "pending" : (item.assignmentStatus?.toLowerCase() || "pending")
+                                  }`}
+                                >
+                                  {isRequest ? "N/A" : getAssignmentStatusDisplay(item)}
+                                </span>
+                              </td>
+
+                              <td>
+                                <span
+                                  className={`customer-orders-status-badge customer-orders-status-${getStatusClass(item)}`}
+                                >
+                                  {getStatusDisplay(item)}
+                                </span>
+                              </td>
+
+                              <td>
+                                {isRequest
+                                  ? formatDate(item.requestedAt)
+                                  : formatDate(item.orderDate)}
+                              </td>
+
+                              <td>
+                                {item.salesReturn?.status === "completed" ? (
+                                  <span className="co-return-na">Returned</span>
+                                ) : isReturnEligible(item) ? (
+                                  hasActiveReturn(item) ? (
+                                    <button
+                                      className="co-btn-return"
+                                      disabled
+                                      title={`Return already submitted (${item.salesReturn.status})`}
+                                      style={{ opacity: 0.5, cursor: "not-allowed" }}
+                                    >
+                                      ↩ Returned
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="co-btn-return"
+                                      onClick={() =>
+                                        navigate(`/sales-returns/create?orderId=${item._id}`)
+                                      }
+                                    >
+                                      ↩ Return
+                                    </button>
+                                  )
+                                ) : (
+                                  <span className="co-return-na">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

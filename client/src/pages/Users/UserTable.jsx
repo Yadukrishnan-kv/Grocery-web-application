@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
+import TableScrollSync from "../../components/common/TableScrollSync";
 import './UserTable.css';
 import axios from 'axios';
 import toast from "../../utils/toast"; // ← NEW IMPORT
@@ -221,59 +222,61 @@ const UserTable = () => {
                 {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
               </div>
             ) : (
-              <div className="user-table-wrapper">
-                <table className="user-table-data-table">
-                  <thead>
-                    <tr>
-                      <th>No</th>
-                      <th>Username</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Edit</th>
-                      <th>Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagination.pageData.map((user, index) => (
-                      <tr key={user._id}>
-                        <td>{pagination.showingFrom + index}</td>
-                        <td>{user.username}</td>
-                        <td>{user.email}</td>
-                        <td>
-                          <span className={`user-table-role-badge user-table-role-${user.role.toLowerCase().replace(/\s+/g, '-')}`}>
-                            {user.role}
-                          </span>
-                        </td>
-                        <td>
-                          <Link
-                            to={`/user/create?edit=${user._id}`}
-                            className="user-table-icon-button user-table-edit-button"
-                            aria-label={`Edit user ${user.username}`}
-                          >
-                            ✎
-                          </Link>
-                        </td>
-                        <td>
-                          <button
-                            className={`user-table-icon-button user-table-delete-button ${
-                              user.role === 'Admin' || user.role === 'superadmin' ? 'disabled' : ''
-                            }`}
-                            onClick={() => handleDeleteClick(user._id, user.username, user.role)}
-                            disabled={user.role === 'Admin' || user.role === 'superadmin'}
-                            aria-label={
-                              user.role === 'Admin' || user.role === 'superadmin'
-                                ? `Cannot delete protected user ${user.username}`
-                                : `Delete user ${user.username}`
-                            }
-                          >
-                            🗑️
-                          </button>
-                        </td>
+              <TableScrollSync>
+                <div className="user-table-wrapper">
+                  <table className="user-table-data-table">
+                    <thead>
+                      <tr>
+                        <th>No</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Edit</th>
+                        <th>Delete</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pagination.pageData.map((user, index) => (
+                        <tr key={user._id}>
+                          <td>{pagination.showingFrom + index}</td>
+                          <td>{user.username}</td>
+                          <td>{user.email}</td>
+                          <td>
+                            <span className={`user-table-role-badge user-table-role-${user.role.toLowerCase().replace(/\s+/g, '-')}`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td>
+                            <Link
+                              to={`/user/create?edit=${user._id}`}
+                              className="user-table-icon-button user-table-edit-button"
+                              aria-label={`Edit user ${user.username}`}
+                            >
+                              ✎
+                            </Link>
+                          </td>
+                          <td>
+                            <button
+                              className={`user-table-icon-button user-table-delete-button ${
+                                user.role === 'Admin' || user.role === 'superadmin' ? 'disabled' : ''
+                              }`}
+                              onClick={() => handleDeleteClick(user._id, user.username, user.role)}
+                              disabled={user.role === 'Admin' || user.role === 'superadmin'}
+                              aria-label={
+                                user.role === 'Admin' || user.role === 'superadmin'
+                                  ? `Cannot delete protected user ${user.username}`
+                                  : `Delete user ${user.username}`
+                              }
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </TableScrollSync>
             )}
 
             <Pagination

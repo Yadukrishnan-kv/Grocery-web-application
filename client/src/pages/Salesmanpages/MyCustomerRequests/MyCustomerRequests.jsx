@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 
 import './MyCustomerRequests.css'; // New CSS file (below)
 import axios from 'axios';
@@ -154,82 +155,84 @@ const MyCustomerRequests = () => {
               </div>
             ) : (
               <>
-                <div className="requests-table-wrapper">
-                  <table className="requests-data-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">No</th>
-                        <th scope="col">Name</th>
-                        <th scope="col">Email</th>
-                        <th scope="col">Phone</th>
-                        <th scope="col">Credit Limit</th>
-                        <th scope="col">Billing Type</th>
-                        <th scope="col">Statement Type</th>
-                        <th scope="col">Due Days</th>
-                        <th scope="col">Opening Balance</th>
-                        <th scope="col">Opening Due Days</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Created</th>
-                        {requests.some(r => r.status === 'rejected') && <th scope="col">Reason</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((request, index) => (
-                        <tr key={request._id}>
-                          <td>{pagination.showingFrom + index}</td>
-                          <td>{request.name}</td>
-                          <td>{request.email}</td>
-                          <td>{request.phoneNumber}</td>
-                          <td><div
-                                                      style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "4px",
-                                                      }}
-                                                    >
-                                                      <img
-                                                        src={DirhamSymbol}
-                                                        alt="Dirham Symbol"
-                                                        width={15}
-                                                        height={15}
-                                                         style={{
-                                                          paddingTop: "3px",
-                                                        }}
-                                                      />
-                                                      <span>{request.creditLimit.toFixed(2)}</span></div></td>
-                          <td>{request.billingType}</td>
-                          <td>
-                            {request.statementType
-                              ? request.statementType.charAt(0).toUpperCase() +
-                                request.statementType.slice(1)
-                              : "-"}
-                          </td>
-                          <td>{request.dueDays || "-"}</td>
-                          <td>
-                            {request.openingBalance > 0
-                              ? request.openingBalance.toFixed(2)
-                              : "-"}
-                          </td>
-                          <td>
-                            {request.openingBalanceDueDays
-                              ? `${request.openingBalanceDueDays} days`
-                              : "-"}
-                          </td>
-                          <td>
-                            <span className={`requests-status-badge requests-status-${request.status}`}>
-                              {request.status === 'pending' ? 'Pending' :
-                               request.status === 'accepted' ? 'Accepted' : 'Rejected'}
-                            </span>
-                          </td>
-                          <td>{new Date(request.createdAt).toLocaleDateString()}</td>
-                          {request.status === 'rejected' && (
-                            <td>{request.rejectionReason || 'No reason provided'}</td>
-                          )}
+                <TableScrollSync>
+                  <div className="requests-table-wrapper">
+                    <table className="requests-data-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">No</th>
+                          <th scope="col">Name</th>
+                          <th scope="col">Email</th>
+                          <th scope="col">Phone</th>
+                          <th scope="col">Credit Limit</th>
+                          <th scope="col">Billing Type</th>
+                          <th scope="col">Statement Type</th>
+                          <th scope="col">Due Days</th>
+                          <th scope="col">Opening Balance</th>
+                          <th scope="col">Opening Due Days</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Created</th>
+                          {requests.some(r => r.status === 'rejected') && <th scope="col">Reason</th>}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((request, index) => (
+                          <tr key={request._id}>
+                            <td>{pagination.showingFrom + index}</td>
+                            <td>{request.name}</td>
+                            <td>{request.email}</td>
+                            <td>{request.phoneNumber}</td>
+                            <td><div
+                                                        style={{
+                                                          display: "flex",
+                                                          alignItems: "center",
+                                                          gap: "4px",
+                                                        }}
+                                                      >
+                                                        <img
+                                                          src={DirhamSymbol}
+                                                          alt="Dirham Symbol"
+                                                          width={15}
+                                                          height={15}
+                                                           style={{
+                                                            paddingTop: "3px",
+                                                          }}
+                                                        />
+                                                        <span>{request.creditLimit.toFixed(2)}</span></div></td>
+                            <td>{request.billingType}</td>
+                            <td>
+                              {request.statementType
+                                ? request.statementType.charAt(0).toUpperCase() +
+                                  request.statementType.slice(1)
+                                : "-"}
+                            </td>
+                            <td>{request.dueDays || "-"}</td>
+                            <td>
+                              {request.openingBalance > 0
+                                ? request.openingBalance.toFixed(2)
+                                : "-"}
+                            </td>
+                            <td>
+                              {request.openingBalanceDueDays
+                                ? `${request.openingBalanceDueDays} days`
+                                : "-"}
+                            </td>
+                            <td>
+                              <span className={`requests-status-badge requests-status-${request.status}`}>
+                                {request.status === 'pending' ? 'Pending' :
+                                 request.status === 'accepted' ? 'Accepted' : 'Rejected'}
+                              </span>
+                            </td>
+                            <td>{new Date(request.createdAt).toLocaleDateString()}</td>
+                            {request.status === 'rejected' && (
+                              <td>{request.rejectionReason || 'No reason provided'}</td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

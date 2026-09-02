@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./ProductList.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -301,77 +302,79 @@ const ProductList = () => {
                 {searchQuery.trim() ? ` matching "${searchQuery}"` : ""}
               </div>
             ) : (
-              <div className="product-list-table-wrapper">
-                <table className="product-list-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Product Name</th>
-                      <th scope="col">Category</th>
-                      <th scope="col">Sub-Category</th>
-                      <th scope="col">Price (AED)</th>
-                      {/* Quantity column removed */}
-                      <th scope="col">Unit</th>
-                      <th scope="col">Edit</th>
-                      <th scope="col">Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleProducts.map((product, index) => (
-                      <tr key={product._id}>
-                        <td>{activePagination.showingFrom + index}</td>
-                        <td>{product.productName}</td>
-                        <td>{product.CategoryName}</td>
-                        <td>{product.subCategoryName}</td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            <img
-                              src={DirhamSymbol}
-                              alt="Dirham Symbol"
-                              width={15}
-                              height={15}
-                              style={{
-                                paddingTop: "3px",
-                              }}
-                            />
-                            <span>{product.price.toFixed(2)}</span>
-                          </div>
-                        </td>
-
-                        {/* Quantity cell removed */}
-
-                        <td>{product.unit || "N/A"}</td>
-                        <td>
-                          <Link
-                            to={`/product/create?edit=${product._id}`}
-                            className="product-list-icon-button product-list-edit-button"
-                            aria-label={`Edit product ${product.productName}`}
-                          >
-                            ✎
-                          </Link>
-                        </td>
-                        <td>
-                          <button
-                            className="product-list-icon-button product-list-delete-button"
-                            onClick={() =>
-                              handleDeleteClick(product._id, product.productName)
-                            }
-                            aria-label={`Delete product ${product.productName}`}
-                          >
-                            🗑️
-                          </button>
-                        </td>
+              <TableScrollSync>
+                <div className="product-list-table-wrapper">
+                  <table className="product-list-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">No</th>
+                        <th scope="col">Product Name</th>
+                        <th scope="col">Category</th>
+                        <th scope="col">Sub-Category</th>
+                        <th scope="col">Price (AED)</th>
+                        {/* Quantity column removed */}
+                        <th scope="col">Unit</th>
+                        <th scope="col">Edit</th>
+                        <th scope="col">Delete</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {visibleProducts.map((product, index) => (
+                        <tr key={product._id}>
+                          <td>{activePagination.showingFrom + index}</td>
+                          <td>{product.productName}</td>
+                          <td>{product.CategoryName}</td>
+                          <td>{product.subCategoryName}</td>
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="Dirham Symbol"
+                                width={15}
+                                height={15}
+                                style={{
+                                  paddingTop: "3px",
+                                }}
+                              />
+                              <span>{product.price.toFixed(2)}</span>
+                            </div>
+                          </td>
+
+                          {/* Quantity cell removed */}
+
+                          <td>{product.unit || "N/A"}</td>
+                          <td>
+                            <Link
+                              to={`/product/create?edit=${product._id}`}
+                              className="product-list-icon-button product-list-edit-button"
+                              aria-label={`Edit product ${product.productName}`}
+                            >
+                              ✎
+                            </Link>
+                          </td>
+                          <td>
+                            <button
+                              className="product-list-icon-button product-list-delete-button"
+                              onClick={() =>
+                                handleDeleteClick(product._id, product.productName)
+                              }
+                              aria-label={`Delete product ${product.productName}`}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </TableScrollSync>
             )}
 
             <Pagination

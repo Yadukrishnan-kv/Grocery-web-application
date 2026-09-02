@@ -5,6 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "../../../utils/toast";
 import axios from "axios";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./PendingOrders.css";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
@@ -175,91 +176,93 @@ const PendingOrders = () => {
               </div>
             ) : (
               <>
-                <div className="pending-orders-table-wrapper">
-                  <table className="pending-orders-data-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Customer</th>
-                        <th>Products</th>
-                        <th>Total Ordered</th>
-                        <th>Already Packed</th>
-                        <th>Remaining to Pack</th>
-                        <th>Grand Total</th>
-                        <th>Status</th>
-                        <th>Order Date</th>
-                        <th>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((order, index) => {
-                        const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
-                        const packedQty = order.orderItems?.reduce((s, i) => s + (i.packedQuantity || 0), 0) || 0;
-                        const remaining = totalOrdered - packedQty;
-                        const grandTotal = order.orderItems?.reduce((s, i) => s + i.totalAmount, 0)?.toFixed(2) || "0.00";
+                <TableScrollSync>
+                  <div className="pending-orders-table-wrapper">
+                    <table className="pending-orders-data-table">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Customer</th>
+                          <th>Products</th>
+                          <th>Total Ordered</th>
+                          <th>Already Packed</th>
+                          <th>Remaining to Pack</th>
+                          <th>Grand Total</th>
+                          <th>Status</th>
+                          <th>Order Date</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((order, index) => {
+                          const totalOrdered = order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
+                          const packedQty = order.orderItems?.reduce((s, i) => s + (i.packedQuantity || 0), 0) || 0;
+                          const remaining = totalOrdered - packedQty;
+                          const grandTotal = order.orderItems?.reduce((s, i) => s + i.totalAmount, 0)?.toFixed(2) || "0.00";
 
-                        return (
-                          <tr key={order._id} className="pending-order-row">
-                            <td>{pagination.showingFrom + index}</td>
-                            <td className="customer-cell">
-                              <div className="customer-info">
-                                <strong>{order.customer?.name || "N/A"}</strong>
-                                <small>{order.customer?.phoneNumber || "N/A"}</small>
-                              </div>
-                            </td>
-
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.map((item, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">{item.product?.productName || "—"}</span>
-                                      <span className="product-qty">× {item.orderedQuantity}</span>
-                                      <span className="product-unit">{item.unit || ""}</span>
-                                    </div>
-                                  ))}
+                          return (
+                            <tr key={order._id} className="pending-order-row">
+                              <td>{pagination.showingFrom + index}</td>
+                              <td className="customer-cell">
+                                <div className="customer-info">
+                                  <strong>{order.customer?.name || "N/A"}</strong>
+                                  <small>{order.customer?.phoneNumber || "N/A"}</small>
                                 </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
-                            </td>
+                              </td>
 
-                            <td className="text-center">{totalOrdered}</td>
-                            <td className="text-center">
-                              <span className="packed-badge">{packedQty}</span>
-                            </td>
-                            <td className="text-center">
-                              <span className="remaining-badge remaining">{remaining}</span>
-                            </td>
+                              <td className="products-cell">
+                                {order.orderItems?.length > 0 ? (
+                                  <div className="products-list">
+                                    {order.orderItems.map((item, i) => (
+                                      <div key={i} className="product-tag">
+                                        <span className="product-name">{item.product?.productName || "—"}</span>
+                                        <span className="product-qty">× {item.orderedQuantity}</span>
+                                        <span className="product-unit">{item.unit || ""}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="no-products">No products</span>
+                                )}
+                              </td>
 
-                            <td>
-                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <img src={DirhamSymbol} alt="AED" width={18} height={20} style={{ paddingTop: "2px" }} />
-                                <span>{grandTotal}</span>
-                              </div>
-                            </td>
+                              <td className="text-center">{totalOrdered}</td>
+                              <td className="text-center">
+                                <span className="packed-badge">{packedQty}</span>
+                              </td>
+                              <td className="text-center">
+                                <span className="remaining-badge remaining">{remaining}</span>
+                              </td>
 
-                            <td>
-                              <span className={`status-badge status-${getPendingStatus(order).toLowerCase().replace(/\s/g, "-")}`}>
-                                {getPendingStatus(order)}
-                              </span>
-                            </td>
+                              <td>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                  <img src={DirhamSymbol} alt="AED" width={18} height={20} style={{ paddingTop: "2px" }} />
+                                  <span>{grandTotal}</span>
+                                </div>
+                              </td>
 
-                            <td>{formatDate(order.orderDate)}</td>
+                              <td>
+                                <span className={`status-badge status-${getPendingStatus(order).toLowerCase().replace(/\s/g, "-")}`}>
+                                  {getPendingStatus(order)}
+                                </span>
+                              </td>
 
-                            <td className="notes-cell">
-                              {order.remarks ? (
-                                <span className="notes-text">{order.remarks}</span>
-                              ) : (
-                                <span className="no-notes">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              <td>{formatDate(order.orderDate)}</td>
+
+                              <td className="notes-cell">
+                                {order.remarks ? (
+                                  <span className="notes-text">{order.remarks}</span>
+                                ) : (
+                                  <span className="no-notes">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

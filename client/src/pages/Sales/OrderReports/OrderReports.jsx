@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./OrderReports.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -275,146 +276,148 @@ const OrderReports = () => {
               </div>
             ) : (
               <>
-                <div className="order-reports-table-wrapper">
-                  <table className="order-reports-data-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Products</th> {/* ✅ Changed from "Product" to "Products" */}
-                        <th>Total Ordered Qty</th> {/* ✅ Changed */}
-                        <th>Total Delivered Qty</th> {/* ✅ Changed */}
-                        <th>Pending Qty</th>
-                        <th>Grand Total</th> {/* ✅ Changed */}
-                        <th>Delivery Partner</th>
-                        <th>Order Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((order, index) => {
-                        // ✅ Calculate totals for the ENTIRE order (not per item)
-                        const totalOrdered =
-                          order.orderItems?.reduce(
-                            (sum, item) => sum + item.orderedQuantity,
-                            0,
-                          ) || 0;
-                        const totalDelivered =
-                          order.orderItems?.reduce(
-                            (sum, item) => sum + item.deliveredQuantity,
-                            0,
-                          ) || 0;
-                        const pendingQty = totalOrdered - totalDelivered;
-                        const grandTotal =
-                          order.orderItems
-                            ?.reduce((sum, item) => sum + item.totalAmount, 0)
-                            ?.toFixed(2) || "0.00";
-                        const hasDelivered = totalDelivered > 0;
+                <TableScrollSync>
+                  <div className="order-reports-table-wrapper">
+                    <table className="order-reports-data-table">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Products</th> {/* ✅ Changed from "Product" to "Products" */}
+                          <th>Total Ordered Qty</th> {/* ✅ Changed */}
+                          <th>Total Delivered Qty</th> {/* ✅ Changed */}
+                          <th>Pending Qty</th>
+                          <th>Grand Total</th> {/* ✅ Changed */}
+                          <th>Delivery Partner</th>
+                          <th>Order Date</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((order, index) => {
+                          // ✅ Calculate totals for the ENTIRE order (not per item)
+                          const totalOrdered =
+                            order.orderItems?.reduce(
+                              (sum, item) => sum + item.orderedQuantity,
+                              0,
+                            ) || 0;
+                          const totalDelivered =
+                            order.orderItems?.reduce(
+                              (sum, item) => sum + item.deliveredQuantity,
+                              0,
+                            ) || 0;
+                          const pendingQty = totalOrdered - totalDelivered;
+                          const grandTotal =
+                            order.orderItems
+                              ?.reduce((sum, item) => sum + item.totalAmount, 0)
+                              ?.toFixed(2) || "0.00";
+                          const hasDelivered = totalDelivered > 0;
 
-                        return (
-                          <tr key={order._id}>
-                            <td>{pagination.showingFrom + index}</td>
+                          return (
+                            <tr key={order._id}>
+                              <td>{pagination.showingFrom + index}</td>
 
-                            {/* ✅ Multi-product column - like Customer page */}
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.map((item, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">
-                                        {item.product?.productName || "Unknown"}
-                                      </span>
-                                      <span className="product-qty">
-                                        × {item.orderedQuantity}
-                                      </span>
-                                      <span className="product-unit">
-                                        {item.unit || ""}
-                                      </span>
-                                    </div>
-                                  ))}
+                              {/* ✅ Multi-product column - like Customer page */}
+                              <td className="products-cell">
+                                {order.orderItems?.length > 0 ? (
+                                  <div className="products-list">
+                                    {order.orderItems.map((item, i) => (
+                                      <div key={i} className="product-tag">
+                                        <span className="product-name">
+                                          {item.product?.productName || "Unknown"}
+                                        </span>
+                                        <span className="product-qty">
+                                          × {item.orderedQuantity}
+                                        </span>
+                                        <span className="product-unit">
+                                          {item.unit || ""}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="no-products">No products</span>
+                                )}
+                              </td>
+
+                              <td>{totalOrdered}</td>
+                              <td>{totalDelivered}</td>
+                              <td>{pendingQty}</td>
+
+                              <td>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                  }}
+                                >
+                                  <img
+                                    src={DirhamSymbol}
+                                    alt="AED"
+                                    width={15}
+                                    height={15}
+                                  />
+                                  <span>{grandTotal}</span>
                                 </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
-                            </td>
+                              </td>
 
-                            <td>{totalOrdered}</td>
-                            <td>{totalDelivered}</td>
-                            <td>{pendingQty}</td>
+                              <td>
+                                {order.assignedTo?.username || "Not assigned"}
+                              </td>
 
-                            <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "6px",
-                                }}
-                              >
-                                <img
-                                  src={DirhamSymbol}
-                                  alt="AED"
-                                  width={15}
-                                  height={15}
-                                />
-                                <span>{grandTotal}</span>
-                              </div>
-                            </td>
+                              <td>{formatDate(order.orderDate)}</td>
 
-                            <td>
-                              {order.assignedTo?.username || "Not assigned"}
-                            </td>
+                              <td>
+                                <span
+                                  className={`order-reports-status-badge order-reports-status-${order.status?.toLowerCase() || "pending"}`}
+                                >
+                                  {order.status?.charAt(0).toUpperCase() +
+                                    order.status?.slice(1) || "Pending"}
+                                </span>
+                              </td>
 
-                            <td>{formatDate(order.orderDate)}</td>
-
-                            <td>
-                              <span
-                                className={`order-reports-status-badge order-reports-status-${order.status?.toLowerCase() || "pending"}`}
-                              >
-                                {order.status?.charAt(0).toUpperCase() +
-                                  order.status?.slice(1) || "Pending"}
-                              </span>
-                            </td>
-
-                            <td>
-                              <div className="order-reports-action-buttons">
-                                {hasDelivered && order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
-                                  order.deliveredInvoiceHistory.map((inv, i) => (
+                              <td>
+                                <div className="order-reports-action-buttons">
+                                  {hasDelivered && order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
+                                    order.deliveredInvoiceHistory.map((inv, i) => (
+                                      <button
+                                        key={i}
+                                        className="order-reports-invoice-button delivered"
+                                        onClick={() => {
+                                          setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                          setShowInvoiceModal(true);
+                                        }}
+                                        disabled={downloadingOrderId === order._id}
+                                      >
+                                        {downloadingOrderId === order._id
+                                          ? "Downloading..."
+                                          : `🧾 ${inv.invoiceNumber}`}
+                                      </button>
+                                    ))
+                                  ) : hasDelivered ? (
                                     <button
-                                      key={i}
                                       className="order-reports-invoice-button delivered"
                                       onClick={() => {
-                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: null });
                                         setShowInvoiceModal(true);
                                       }}
                                       disabled={downloadingOrderId === order._id}
                                     >
                                       {downloadingOrderId === order._id
                                         ? "Downloading..."
-                                        : `🧾 ${inv.invoiceNumber}`}
+                                        : "Delivered Invoice"}
                                     </button>
-                                  ))
-                                ) : hasDelivered ? (
-                                  <button
-                                    className="order-reports-invoice-button delivered"
-                                    onClick={() => {
-                                      setPendingInvoiceData({ orderId: order._id, invoiceNumber: null });
-                                      setShowInvoiceModal(true);
-                                    }}
-                                    disabled={downloadingOrderId === order._id}
-                                  >
-                                    {downloadingOrderId === order._id
-                                      ? "Downloading..."
-                                      : "Delivered Invoice"}
-                                  </button>
-                                ) : null}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./OutstandingReport.css";
 import { useNavigate } from "react-router-dom";
 import { useAppSettings } from "../../../context/AppSettingsContext";
@@ -78,42 +79,44 @@ const OutstandingReport = () => {
             </div>
 
             <>
-              <div className="order-list-table-wrapper">
-                <table className="order-list-data-table">
-                  <thead>
-                    <tr>
-                      <th>No</th>
-                      <th>Customer</th>
-                      <th>Credit Limit</th>
-                      <th>Outstanding</th>
-                      <th>Balance</th>
-                      <th>Pending Days</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.length === 0 ? (
+              <TableScrollSync>
+                <div className="order-list-table-wrapper">
+                  <table className="order-list-data-table">
+                    <thead>
                       <tr>
-                        <td colSpan={6} className="order-list-no-data">{rows.length === 0 ? "No outstanding data" : ""}</td>
+                        <th>No</th>
+                        <th>Customer</th>
+                        <th>Credit Limit</th>
+                        <th>Outstanding</th>
+                        <th>Balance</th>
+                        <th>Pending Days</th>
                       </tr>
-                    ) : (
-                      pagination.pageData.map((r, idx) => (
-   <tr
-      key={r._id}
-      className="clickable-row"  // ← Add this class for hover effect
-      onClick={() => navigate(`/sales/outstanding/${r._id}`)}  // ← Add navigation
-      style={{ cursor: 'pointer' }}
-    >                        <td>{pagination.showingFrom + idx}</td>
-                          <td>{r.name}</td>
-                          <td>{(r.creditLimit || 0).toFixed(2)}</td>
-                          <td>{(r.usedCredit || (r.creditLimit - r.balanceCreditLimit) || 0).toFixed(2)}</td>
-                          <td>{(r.balanceCreditLimit || 0).toFixed(2)}</td>
-                          <td>{r.pendingBillDaysLeft ?? "-"}</td>
+                    </thead>
+                    <tbody>
+                      {rows.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="order-list-no-data">{rows.length === 0 ? "No outstanding data" : ""}</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      ) : (
+                        pagination.pageData.map((r, idx) => (
+     <tr
+        key={r._id}
+        className="clickable-row"  // ← Add this class for hover effect
+        onClick={() => navigate(`/sales/outstanding/${r._id}`)}  // ← Add navigation
+        style={{ cursor: 'pointer' }}
+      >                        <td>{pagination.showingFrom + idx}</td>
+                            <td>{r.name}</td>
+                            <td>{(r.creditLimit || 0).toFixed(2)}</td>
+                            <td>{(r.usedCredit || (r.creditLimit - r.balanceCreditLimit) || 0).toFixed(2)}</td>
+                            <td>{(r.balanceCreditLimit || 0).toFixed(2)}</td>
+                            <td>{r.pendingBillDaysLeft ?? "-"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </TableScrollSync>
 
               <Pagination
                 page={pagination.page}

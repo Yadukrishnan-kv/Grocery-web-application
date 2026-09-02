@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./CustomerOutstandingDetails.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -267,64 +268,66 @@ const CustomerOutstandingDetails = () => {
                           {/* Orders Table - Using original full-width table style */}
                           {bill.orders?.length > 0 && (
                             <div className="orders-list">
-                              <div className="orders-table-wrapper-full">
-                                <table className="orders-table-full">
-                                  <thead>
-                                    <tr>
-                                      <th style={{ minWidth: "130px" }}>Invoice #</th>
-                                      <th style={{ minWidth: "110px" }}>Date</th>
-                                      <th style={{ minWidth: "220px" }}>Items</th>
-                                      <th style={{ minWidth: "110px", textAlign: "right" }}>Amount</th>
-                                      <th style={{ minWidth: "120px" }}>Status</th>
-                                      <th style={{ minWidth: "100px" }}>Payment</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {bill.orders.map((order) => (
-                                      <tr key={order._id}>
-                                        <td>{order.invoiceNumber || "-"}</td>
-                                        <td>{formatDate(order.orderDate)}</td>
-                                        <td>
-                                          <div
-                                            className="order-items-preview-full"
-                                            title={order.items?.map((i) => `${i.product} × ${i.quantity}`).join(", ")}
-                                          >
-                                            {order.items?.slice(0, 3).map((item, idx) => (
-                                              <span key={idx} className="item-chip-full">
-                                                {item.product} × {item.quantity}
-                                              </span>
-                                            ))}
-                                            {order.items?.length > 3 && (
-                                              <span
-                                                className="item-more-full"
-                                                title={`${order.items.length - 3} more items`}
-                                              >
-                                                +{order.items.length - 3}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td className="order-amount-full" style={{ textAlign: "right" }}>
-                                          <img src={DirhamSymbol} alt="AED" width={12} height={12} />
-                                          {formatCurrency(order.totalAmount)}
-                                        </td>
-                                        <td>
-                                          <span
-                                            className={`order-status status-${order.status?.replace(/\s+/g, "_")}`}
-                                          >
-                                            {order.status?.replace("_", " ") || "Unknown"}
-                                          </span>
-                                        </td>
-                                        <td>
-                                          <span className={`payment-badge ${order.payment}`}>
-                                            {order.payment}
-                                          </span>
-                                        </td>
+                              <TableScrollSync>
+                                <div className="orders-table-wrapper-full">
+                                  <table className="orders-table-full">
+                                    <thead>
+                                      <tr>
+                                        <th style={{ minWidth: "130px" }}>Invoice #</th>
+                                        <th style={{ minWidth: "110px" }}>Date</th>
+                                        <th style={{ minWidth: "220px" }}>Items</th>
+                                        <th style={{ minWidth: "110px", textAlign: "right" }}>Amount</th>
+                                        <th style={{ minWidth: "120px" }}>Status</th>
+                                        <th style={{ minWidth: "100px" }}>Payment</th>
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                                    </thead>
+                                    <tbody>
+                                      {bill.orders.map((order) => (
+                                        <tr key={order._id}>
+                                          <td>{order.invoiceNumber || "-"}</td>
+                                          <td>{formatDate(order.orderDate)}</td>
+                                          <td>
+                                            <div
+                                              className="order-items-preview-full"
+                                              title={order.items?.map((i) => `${i.product} × ${i.quantity}`).join(", ")}
+                                            >
+                                              {order.items?.slice(0, 3).map((item, idx) => (
+                                                <span key={idx} className="item-chip-full">
+                                                  {item.product} × {item.quantity}
+                                                </span>
+                                              ))}
+                                              {order.items?.length > 3 && (
+                                                <span
+                                                  className="item-more-full"
+                                                  title={`${order.items.length - 3} more items`}
+                                                >
+                                                  +{order.items.length - 3}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </td>
+                                          <td className="order-amount-full" style={{ textAlign: "right" }}>
+                                            <img src={DirhamSymbol} alt="AED" width={12} height={12} />
+                                            {formatCurrency(order.totalAmount)}
+                                          </td>
+                                          <td>
+                                            <span
+                                              className={`order-status status-${order.status?.replace(/\s+/g, "_")}`}
+                                            >
+                                              {order.status?.replace("_", " ") || "Unknown"}
+                                            </span>
+                                          </td>
+                                          <td>
+                                            <span className={`payment-badge ${order.payment}`}>
+                                              {order.payment}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </TableScrollSync>
                             </div>
                           )}
                         </div>

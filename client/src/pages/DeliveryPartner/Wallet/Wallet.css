@@ -452,7 +452,8 @@
    ─────────────────────────────────────────────────────── */
 .wallet-table-container {
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: var(--shadow-md);
   background: white;
 }

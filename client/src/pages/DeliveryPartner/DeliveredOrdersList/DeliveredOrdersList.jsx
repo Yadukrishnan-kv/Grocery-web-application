@@ -5,6 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "../../../utils/toast";
 import axios from "axios";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./DeliveredOrdersList.css";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 import { useAppSettings } from "../../../context/AppSettingsContext";
@@ -366,191 +367,193 @@ const DeliveredOrdersList = () => {
               </div>
             ) : (
               <>
-                <div className="delivered-orders-table-wrapper">
-                  <table className="delivered-orders-data-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Customer</th>
-                        <th>Products</th>
-                        <th>Total Ordered</th>
-                        <th>Packed Qty</th> {/* NEW */}
-                        <th>Total Delivered</th>
-                        <th>Remaining</th>
-                        <th>Grand Total</th>
-                        <th>Remarks</th>
-                        <th>Status</th>
-                        <th>Order Date</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((order, index) => {
-                        const totalOrdered =
-                          order.orderItems?.reduce(
-                            (s, i) => s + i.orderedQuantity,
-                            0,
-                          ) || 0;
-                        const packedQty =
-                          order.orderItems?.reduce(
-                            (s, i) => s + (i.packedQuantity || 0),
-                            0,
-                          ) || 0;
-                        const totalDelivered =
-                          order.orderItems?.reduce(
-                            (s, i) => s + i.deliveredQuantity,
-                            0,
-                          ) || 0;
-                        const remaining = packedQty - totalDelivered;
-                        const grandTotal =
-                          order.orderItems
-                            ?.reduce((s, i) => s + i.totalAmount, 0)
-                            ?.toFixed(2) || "0.00";
-                        // ✅ Enable deliver button if partially_packed OR fully_packed
-                        const isPacked =
-                          order.packedStatus === "partially_packed" ||
-                          order.packedStatus === "fully_packed";
+                <TableScrollSync>
+                  <div className="delivered-orders-table-wrapper">
+                    <table className="delivered-orders-data-table">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Customer</th>
+                          <th>Products</th>
+                          <th>Total Ordered</th>
+                          <th>Packed Qty</th> {/* NEW */}
+                          <th>Total Delivered</th>
+                          <th>Remaining</th>
+                          <th>Grand Total</th>
+                          <th>Remarks</th>
+                          <th>Status</th>
+                          <th>Order Date</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((order, index) => {
+                          const totalOrdered =
+                            order.orderItems?.reduce(
+                              (s, i) => s + i.orderedQuantity,
+                              0,
+                            ) || 0;
+                          const packedQty =
+                            order.orderItems?.reduce(
+                              (s, i) => s + (i.packedQuantity || 0),
+                              0,
+                            ) || 0;
+                          const totalDelivered =
+                            order.orderItems?.reduce(
+                              (s, i) => s + i.deliveredQuantity,
+                              0,
+                            ) || 0;
+                          const remaining = packedQty - totalDelivered;
+                          const grandTotal =
+                            order.orderItems
+                              ?.reduce((s, i) => s + i.totalAmount, 0)
+                              ?.toFixed(2) || "0.00";
+                          // ✅ Enable deliver button if partially_packed OR fully_packed
+                          const isPacked =
+                            order.packedStatus === "partially_packed" ||
+                            order.packedStatus === "fully_packed";
 
-                        return (
-                          <tr key={order._id}>
-                            <td>{pagination.showingFrom + index}</td>
-                            <td>{order.customer?.name || "N/A"}</td>
+                          return (
+                            <tr key={order._id}>
+                              <td>{pagination.showingFrom + index}</td>
+                              <td>{order.customer?.name || "N/A"}</td>
 
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.map((item, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">
-                                        {item.product?.productName || "—"}
-                                      </span>
-                                      <span className="product-qty">
-                                        × {item.orderedQuantity}
-                                      </span>
-                                      <span className="product-unit">
-                                        {item.unit || ""}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
-                            </td>
-
-                            <td>{totalOrdered}</td>
-                            <td>{packedQty} (packed)</td>
-                            <td>{totalDelivered}</td>
-                            <td>{remaining}</td>
-
-                            <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "6px",
-                                }}
-                              >
-                                <img
-                                  src={DirhamSymbol}
-                                  alt="AED"
-                                  width={18}
-                                  height={20}
-                                  style={{ paddingTop: "2px" }}
-                                />
-                                <span>{grandTotal}</span>
-                              </div>
-                            </td>
-
-                            <td>{order.remarks || "—"}</td>
-
-                            <td>
-                              <span
-                                className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(/\s/g, "-")}`}
-                              >
-                                {getDeliveryStatus(order)}
-                              </span>
-                            </td>
-
-                            <td>{formatDate(order.orderDate)}</td>
-
-                            <td>
-                              <div className="actions-cell-stack">
-                                {/* Packed Invoices */}
-                                {order.invoiceHistory && order.invoiceHistory.length > 0 && (
-                                  <div className="invoice-section">
-                                    <span className="invoice-section-label">Packed</span>
-                                    <div className="invoice-buttons-group">
-                                      {order.invoiceHistory.map((inv, i) => (
-                                        <button
-                                          key={i}
-                                          className="invoice-btn packed-invoice-btn"
-                                          onClick={() => {
-                                            setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                            setShowInvoiceModal(true);
-                                          }}
-                                        >
-                                          📄 {inv.invoiceNumber}
-                                        </button>
-                                      ))}
-                                    </div>
+                              <td className="products-cell">
+                                {order.orderItems?.length > 0 ? (
+                                  <div className="products-list">
+                                    {order.orderItems.map((item, i) => (
+                                      <div key={i} className="product-tag">
+                                        <span className="product-name">
+                                          {item.product?.productName || "—"}
+                                        </span>
+                                        <span className="product-qty">
+                                          × {item.orderedQuantity}
+                                        </span>
+                                        <span className="product-unit">
+                                          {item.unit || ""}
+                                        </span>
+                                      </div>
+                                    ))}
                                   </div>
-                                )}
-
-                                {/* Delivered Invoices */}
-                                {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 && (
-                                  <div className="invoice-section">
-                                    <span className="invoice-section-label delivered">Delivered</span>
-                                    <div className="invoice-buttons-group">
-                                      {order.deliveredInvoiceHistory.map((inv, i) => (
-                                        <button
-                                          key={i}
-                                          className="invoice-btn delivered-invoice-btn"
-                                          onClick={() => downloadDeliveredInvoice(order._id, inv.invoiceNumber)}
-                                        >
-                                          🧾 {inv.invoiceNumber}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Fallback: single packed invoice */}
-                                {(!order.invoiceHistory || order.invoiceHistory.length === 0) && order.invoiceNumber && (
-                                  <button
-                                    className="invoice-btn"
-                                    onClick={() => {
-                                      setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
-                                      setShowInvoiceModal(true);
-                                    }}
-                                  >
-                                    Download Invoice
-                                  </button>
-                                )}
-
-                                {isPacked ? (
-                                  <button
-                                    className="deliver-btn"
-                                    onClick={() => openDeliveryModal(order)}
-                                    disabled={deliveringOrderId === order._id}
-                                  >
-                                    {deliveringOrderId === order._id
-                                      ? "Delivering..."
-                                      : "Deliver"}
-                                  </button>
                                 ) : (
-                                  <span className="completed-text">
-                                    Awaiting Packing
-                                  </span>
+                                  <span className="no-products">No products</span>
                                 )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+
+                              <td>{totalOrdered}</td>
+                              <td>{packedQty} (packed)</td>
+                              <td>{totalDelivered}</td>
+                              <td>{remaining}</td>
+
+                              <td>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                  }}
+                                >
+                                  <img
+                                    src={DirhamSymbol}
+                                    alt="AED"
+                                    width={18}
+                                    height={20}
+                                    style={{ paddingTop: "2px" }}
+                                  />
+                                  <span>{grandTotal}</span>
+                                </div>
+                              </td>
+
+                              <td>{order.remarks || "—"}</td>
+
+                              <td>
+                                <span
+                                  className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(/\s/g, "-")}`}
+                                >
+                                  {getDeliveryStatus(order)}
+                                </span>
+                              </td>
+
+                              <td>{formatDate(order.orderDate)}</td>
+
+                              <td>
+                                <div className="actions-cell-stack">
+                                  {/* Packed Invoices */}
+                                  {order.invoiceHistory && order.invoiceHistory.length > 0 && (
+                                    <div className="invoice-section">
+                                      <span className="invoice-section-label">Packed</span>
+                                      <div className="invoice-buttons-group">
+                                        {order.invoiceHistory.map((inv, i) => (
+                                          <button
+                                            key={i}
+                                            className="invoice-btn packed-invoice-btn"
+                                            onClick={() => {
+                                              setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                              setShowInvoiceModal(true);
+                                            }}
+                                          >
+                                            📄 {inv.invoiceNumber}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Delivered Invoices */}
+                                  {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 && (
+                                    <div className="invoice-section">
+                                      <span className="invoice-section-label delivered">Delivered</span>
+                                      <div className="invoice-buttons-group">
+                                        {order.deliveredInvoiceHistory.map((inv, i) => (
+                                          <button
+                                            key={i}
+                                            className="invoice-btn delivered-invoice-btn"
+                                            onClick={() => downloadDeliveredInvoice(order._id, inv.invoiceNumber)}
+                                          >
+                                            🧾 {inv.invoiceNumber}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Fallback: single packed invoice */}
+                                  {(!order.invoiceHistory || order.invoiceHistory.length === 0) && order.invoiceNumber && (
+                                    <button
+                                      className="invoice-btn"
+                                      onClick={() => {
+                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                        setShowInvoiceModal(true);
+                                      }}
+                                    >
+                                      Download Invoice
+                                    </button>
+                                  )}
+
+                                  {isPacked ? (
+                                    <button
+                                      className="deliver-btn"
+                                      onClick={() => openDeliveryModal(order)}
+                                      disabled={deliveringOrderId === order._id}
+                                    >
+                                      {deliveringOrderId === order._id
+                                        ? "Delivering..."
+                                        : "Deliver"}
+                                    </button>
+                                  ) : (
+                                    <span className="completed-text">
+                                      Awaiting Packing
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

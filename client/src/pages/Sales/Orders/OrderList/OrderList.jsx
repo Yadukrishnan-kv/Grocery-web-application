@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Header from "../../../../components/layout/Header/Header";
 import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../../components/common/TableScrollSync";
 import "./OrderList.css";
 import axios from "axios";
 import toast from "../../../../utils/toast";
@@ -324,188 +325,190 @@ const OrderList = () => {
             {loading ? (
               <div className="order-list-loading">Loading orders...</div>
             ) : (
-              <div className="order-list-table-wrapper">
-                <table className="order-list-data-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">No</th>
-                      <th scope="col">Order ID</th>
-                      <th scope="col">Customer</th>
-                      <th scope="col">Products</th>
-                      <th scope="col">Total Qty</th>
-                      {/* ✅ UPDATED: VAT Breakdown Columns */}
-                      <th scope="col" className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
-                      <th scope="col" className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
-                      <th scope="col" className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
-                      <th scope="col">Payment</th>
-                      <th scope="col">Remarks</th>
-                      <th scope="col">Delivery Partner</th>
-                      <th scope="col">Assignment Status</th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Order Date</th>
-                      <th scope="col">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleOrders.length > 0 ? (
-                      visibleOrders.map((order, index) => {
-                        const { exclVat, vatAmount, grandTotal } = getVatBreakdown(order);
-                        return (
-                          <tr key={order._id}>
-                            <td>{activePagination.showingFrom + index}</td>
-                            <td>{order.orderId || order._id}</td>
-                            <td>{order.customer?.name || "N/A"}</td>
-
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.map((item, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">{item.product?.productName || "Unknown"}</span>
-                                      <span className="product-qty">× {item.orderedQuantity}</span>
-                                      <span className="product-unit">{item.unit || ""}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
-                            </td>
-
-                            <td>{order.totalOrderedQuantity || order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0}</td>
-
-                            {/* ✅ UPDATED: VAT Breakdown Display */}
-                            <td className="vat-cell">
-                              <div className="vat-amount">
-                                <img src={DirhamSymbol} alt="AED" width={12} />
-                                <span>{exclVat.toFixed(2)}</span>
-                              </div>
-                            </td>
-                            <td className="vat-cell">
-                              <div className="vat-amount vat-highlight">
-                                <img src={DirhamSymbol} alt="AED" width={12} />
-                                <span>{vatAmount.toFixed(2)}</span>
-                              </div>
-                            </td>
-                            <td className="vat-cell grand-total-cell">
-                              <div className="vat-amount grand-total-amount">
-                                <img src={DirhamSymbol} alt="AED" width={14} />
-                                <span>{grandTotal.toFixed(2)}</span>
-                              </div>
-                            </td>
-
-                            <td>{order.payment || "N/A"}</td>
-                            <td title={order.remarks || ""}>
-                              {order.remarks
-                                ? order.remarks.substring(0, 30) +
-                                  (order.remarks.length > 30 ? "..." : "")
-                                : "-"}
-                            </td>
-
-                            <td>
-                              {canAssignDelivery && (order.assignmentStatus === "pending_assignment" ||
-                              order.assignmentStatus === "rejected") ? (
-                                <select
-                                  className="order-list-delivery-partner-select"
-                                  onChange={(e) => {
-                                    const selectedId = e.target.value;
-                                    if (selectedId) {
-                                      handleAssignDeliveryPartner(
-                                        order._id,
-                                        selectedId
-                                      );
-                                    }
-                                  }}
-                                  defaultValue=""
-                                >
-                                  <option value="">
-                                    {order.assignmentStatus === "rejected"
-                                      ? "Reassign Partner"
-                                      : "Assign Delivery Partner"}
-                                  </option>
-                                  {deliveryPartners.map((partner) => (
-                                    <option key={partner._id} value={partner._id}>
-                                      {partner.username}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : order.assignedTo ? (
-                                <span className="order-list-assigned-partner">
-                                  {order.assignedTo.username || "Assigned"}
-                                </span>
-                              ) : (
-                                <span className="order-list-not-assigned">
-                                  Not Assigned
-                                </span>
-                              )}
-                            </td>
-                            <td>
-                              <span
-                                className={`order-list-assignment-badge order-list-assignment-${order.assignmentStatus?.toLowerCase() || "pending"}`}
-                              >
-                                {order.assignmentStatus === "accepted"
-                                  ? "Accepted"
-                                  : order.assignmentStatus === "rejected"
-                                  ? "Rejected"
-                                  : order.assignmentStatus === "assigned"
-                                  ? "Assigned"
-                                  : "Pending"}
-                              </span>
-                            </td>
-                            <td>
-                              <span
-                                className={`order-list-status-badge order-list-status-${order.status?.toLowerCase() || "pending"}`}
-                              >
-                                {order.status?.charAt(0).toUpperCase() +
-                                  order.status?.slice(1) || "Pending"}
-                              </span>
-                            </td>
-                            <td>{formatDate(order.orderDate)}</td>
-                            <td>
-                              <div className="order-list-action-buttons">
-                                <button
-                                  className="order-list-icon-button order-list-edit-button"
-                                  onClick={() => {
-                                    if (order.packedStatus && order.packedStatus !== "not_packed") {
-                                      toast.error("Cannot edit an order that has been packed");
-                                      return;
-                                    }
-                                    if (order.assignmentStatus === "accepted") {
-                                      toast.error("Cannot edit an order that has been accepted by delivery partner");
-                                      return;
-                                    }
-                                    navigate(`/order/create?edit=${order._id}`);
-                                  }}
-                                  aria-label={`Edit order ${order._id}`}
-                                >
-                                  ✎
-                                </button>
-                                <button
-                                  className="order-list-icon-button order-list-delete-button"
-                                  onClick={() =>
-                                    handleDeleteClick(order._id, order.orderId || order._id)
-                                  }
-                                  aria-label={`Delete order ${order.orderId || order._id}`}
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
+              <TableScrollSync>
+                <div className="order-list-table-wrapper">
+                  <table className="order-list-data-table">
+                    <thead>
                       <tr>
-                        <td colSpan="14" className="order-list-no-data">
-                          {activePagination.totalRecords === 0
-                            ? "No orders found"
-                            : "No orders match your filters"}
-                        </td>
+                        <th scope="col">No</th>
+                        <th scope="col">Order ID</th>
+                        <th scope="col">Customer</th>
+                        <th scope="col">Products</th>
+                        <th scope="col">Total Qty</th>
+                        {/* ✅ UPDATED: VAT Breakdown Columns */}
+                        <th scope="col" className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
+                        <th scope="col" className="vat-col">VAT 5%<br/><small>(Amount)</small></th>
+                        <th scope="col" className="vat-col grand-total-col">Grand Total<br/><small>(Incl. VAT)</small></th>
+                        <th scope="col">Payment</th>
+                        <th scope="col">Remarks</th>
+                        <th scope="col">Delivery Partner</th>
+                        <th scope="col">Assignment Status</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Order Date</th>
+                        <th scope="col">Actions</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {visibleOrders.length > 0 ? (
+                        visibleOrders.map((order, index) => {
+                          const { exclVat, vatAmount, grandTotal } = getVatBreakdown(order);
+                          return (
+                            <tr key={order._id}>
+                              <td>{activePagination.showingFrom + index}</td>
+                              <td>{order.orderId || order._id}</td>
+                              <td>{order.customer?.name || "N/A"}</td>
+
+                              <td className="products-cell">
+                                {order.orderItems?.length > 0 ? (
+                                  <div className="products-list">
+                                    {order.orderItems.map((item, i) => (
+                                      <div key={i} className="product-tag">
+                                        <span className="product-name">{item.product?.productName || "Unknown"}</span>
+                                        <span className="product-qty">× {item.orderedQuantity}</span>
+                                        <span className="product-unit">{item.unit || ""}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="no-products">No products</span>
+                                )}
+                              </td>
+
+                              <td>{order.totalOrderedQuantity || order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0}</td>
+
+                              {/* ✅ UPDATED: VAT Breakdown Display */}
+                              <td className="vat-cell">
+                                <div className="vat-amount">
+                                  <img src={DirhamSymbol} alt="AED" width={12} />
+                                  <span>{exclVat.toFixed(2)}</span>
+                                </div>
+                              </td>
+                              <td className="vat-cell">
+                                <div className="vat-amount vat-highlight">
+                                  <img src={DirhamSymbol} alt="AED" width={12} />
+                                  <span>{vatAmount.toFixed(2)}</span>
+                                </div>
+                              </td>
+                              <td className="vat-cell grand-total-cell">
+                                <div className="vat-amount grand-total-amount">
+                                  <img src={DirhamSymbol} alt="AED" width={14} />
+                                  <span>{grandTotal.toFixed(2)}</span>
+                                </div>
+                              </td>
+
+                              <td>{order.payment || "N/A"}</td>
+                              <td title={order.remarks || ""}>
+                                {order.remarks
+                                  ? order.remarks.substring(0, 30) +
+                                    (order.remarks.length > 30 ? "..." : "")
+                                  : "-"}
+                              </td>
+
+                              <td>
+                                {canAssignDelivery && (order.assignmentStatus === "pending_assignment" ||
+                                order.assignmentStatus === "rejected") ? (
+                                  <select
+                                    className="order-list-delivery-partner-select"
+                                    onChange={(e) => {
+                                      const selectedId = e.target.value;
+                                      if (selectedId) {
+                                        handleAssignDeliveryPartner(
+                                          order._id,
+                                          selectedId
+                                        );
+                                      }
+                                    }}
+                                    defaultValue=""
+                                  >
+                                    <option value="">
+                                      {order.assignmentStatus === "rejected"
+                                        ? "Reassign Partner"
+                                        : "Assign Delivery Partner"}
+                                    </option>
+                                    {deliveryPartners.map((partner) => (
+                                      <option key={partner._id} value={partner._id}>
+                                        {partner.username}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : order.assignedTo ? (
+                                  <span className="order-list-assigned-partner">
+                                    {order.assignedTo.username || "Assigned"}
+                                  </span>
+                                ) : (
+                                  <span className="order-list-not-assigned">
+                                    Not Assigned
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <span
+                                  className={`order-list-assignment-badge order-list-assignment-${order.assignmentStatus?.toLowerCase() || "pending"}`}
+                                >
+                                  {order.assignmentStatus === "accepted"
+                                    ? "Accepted"
+                                    : order.assignmentStatus === "rejected"
+                                    ? "Rejected"
+                                    : order.assignmentStatus === "assigned"
+                                    ? "Assigned"
+                                    : "Pending"}
+                                </span>
+                              </td>
+                              <td>
+                                <span
+                                  className={`order-list-status-badge order-list-status-${order.status?.toLowerCase() || "pending"}`}
+                                >
+                                  {order.status?.charAt(0).toUpperCase() +
+                                    order.status?.slice(1) || "Pending"}
+                                </span>
+                              </td>
+                              <td>{formatDate(order.orderDate)}</td>
+                              <td>
+                                <div className="order-list-action-buttons">
+                                  <button
+                                    className="order-list-icon-button order-list-edit-button"
+                                    onClick={() => {
+                                      if (order.packedStatus && order.packedStatus !== "not_packed") {
+                                        toast.error("Cannot edit an order that has been packed");
+                                        return;
+                                      }
+                                      if (order.assignmentStatus === "accepted") {
+                                        toast.error("Cannot edit an order that has been accepted by delivery partner");
+                                        return;
+                                      }
+                                      navigate(`/order/create?edit=${order._id}`);
+                                    }}
+                                    aria-label={`Edit order ${order._id}`}
+                                  >
+                                    ✎
+                                  </button>
+                                  <button
+                                    className="order-list-icon-button order-list-delete-button"
+                                    onClick={() =>
+                                      handleDeleteClick(order._id, order.orderId || order._id)
+                                    }
+                                    aria-label={`Delete order ${order.orderId || order._id}`}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="14" className="order-list-no-data">
+                            {activePagination.totalRecords === 0
+                              ? "No orders found"
+                              : "No orders match your filters"}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </TableScrollSync>
             )}
 
             <Pagination

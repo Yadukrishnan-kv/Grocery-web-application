@@ -4,6 +4,7 @@ import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
 import toast from "../../../utils/toast";
 import axios from "axios";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./StorekeeperOrders.css";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 import { useAppSettings } from "../../../context/AppSettingsContext";
@@ -238,175 +239,177 @@ const StorekeeperOrders = () => {
               <div className="order-list-no-data">No packed orders found</div>
             ) : (
               <>
-                <div className="order-list-table-wrapper">
-                  <table className="order-list-data-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Order ID</th>
-                        <th>Customer</th>
-                        <th>Products</th>
-                        <th>Packed Qty</th>{" "}
-                        {/* ✅ Show packed qty (not total ordered) */}
-                        <th>Delivered</th>
-                        <th>Amount</th> {/* ✅ Show amount for packed qty */}
-                        <th>Status</th>
-                        <th>Order Date</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((order, index) => {
-                        const totalPacked =
-                          order.orderItems?.reduce(
-                            (s, i) => s + (i.packedQuantity || 0),
-                            0,
-                          ) || 0;
-                        const totalDelivered =
-                          order.orderItems?.reduce(
-                            (s, i) => s + i.deliveredQuantity,
-                            0,
-                          ) || 0;
+                <TableScrollSync>
+                  <div className="order-list-table-wrapper">
+                    <table className="order-list-data-table">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Order ID</th>
+                          <th>Customer</th>
+                          <th>Products</th>
+                          <th>Packed Qty</th>{" "}
+                          {/* ✅ Show packed qty (not total ordered) */}
+                          <th>Delivered</th>
+                          <th>Amount</th> {/* ✅ Show amount for packed qty */}
+                          <th>Status</th>
+                          <th>Order Date</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((order, index) => {
+                          const totalPacked =
+                            order.orderItems?.reduce(
+                              (s, i) => s + (i.packedQuantity || 0),
+                              0,
+                            ) || 0;
+                          const totalDelivered =
+                            order.orderItems?.reduce(
+                              (s, i) => s + i.deliveredQuantity,
+                              0,
+                            ) || 0;
 
-                        // ✅ Calculate amount based on packed quantity (VAT-inclusive)
-                        const packedAmount =
-                          order.orderItems
-                            ?.reduce((sum, item) => {
-                              const packedQty = item.packedQuantity || 0;
-                              const previouslyInvoiced =
-                                item.invoicedQuantity || 0;
-                              const qtyForThisInvoice =
-                                packedQty - previouslyInvoiced;
-                              // Use totalAmount (incl. VAT) proportionally
-                              const ratio = item.orderedQuantity > 0
-                                ? qtyForThisInvoice / item.orderedQuantity
-                                : 0;
-                              const itemTotal = item.totalAmount
-                                ? item.totalAmount * ratio
-                                : qtyForThisInvoice * item.price * (1 + (item.vatPercentage || 5) / 100);
-                              return sum + itemTotal;
-                            }, 0)
-                            .toFixed(2) || "0.00";
+                          // ✅ Calculate amount based on packed quantity (VAT-inclusive)
+                          const packedAmount =
+                            order.orderItems
+                              ?.reduce((sum, item) => {
+                                const packedQty = item.packedQuantity || 0;
+                                const previouslyInvoiced =
+                                  item.invoicedQuantity || 0;
+                                const qtyForThisInvoice =
+                                  packedQty - previouslyInvoiced;
+                                // Use totalAmount (incl. VAT) proportionally
+                                const ratio = item.orderedQuantity > 0
+                                  ? qtyForThisInvoice / item.orderedQuantity
+                                  : 0;
+                                const itemTotal = item.totalAmount
+                                  ? item.totalAmount * ratio
+                                  : qtyForThisInvoice * item.price * (1 + (item.vatPercentage || 5) / 100);
+                                return sum + itemTotal;
+                              }, 0)
+                              .toFixed(2) || "0.00";
 
-                        const statusBadge = getPackedStatusBadge(order);
+                          const statusBadge = getPackedStatusBadge(order);
 
-                        return (
-                          <tr key={order._id}>
-                            <td>{pagination.showingFrom + index}</td>
-                            <td>{order.orderId || order._id}</td>
+                          return (
+                            <tr key={order._id}>
+                              <td>{pagination.showingFrom + index}</td>
+                              <td>{order.orderId || order._id}</td>
 
-                            <td>
-                              <div className="customer-cell">
-                                <span className="customer-name">
-                                  {order.customer?.name || "N/A"}
-                                </span>
-                                <small className="customer-phone">
-                                  {order.customer?.phoneNumber}
-                                </small>
-                              </div>
-                            </td>
-
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.slice(0, 2).map((item, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">
-                                        {item.product?.productName || "—"}
-                                      </span>
-                                      <span className="product-qty">
-                                        × {item.packedQuantity || 0}
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {order.orderItems.length > 2 && (
-                                    <span className="product-more">
-                                      +{order.orderItems.length - 2} more
-                                    </span>
-                                  )}
+                              <td>
+                                <div className="customer-cell">
+                                  <span className="customer-name">
+                                    {order.customer?.name || "N/A"}
+                                  </span>
+                                  <small className="customer-phone">
+                                    {order.customer?.phoneNumber}
+                                  </small>
                                 </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
-                            </td>
+                              </td>
 
-                            {/* ✅ Show PACKED quantity (not ordered) */}
-                            <td className="qty-cell packed">{totalPacked}</td>
-
-                            <td className="qty-cell delivered">
-                              {totalDelivered}
-                            </td>
-
-                            {/* ✅ Show amount for packed qty */}
-                            <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                }}
-                              >
-                                <img
-                                  src={DirhamSymbol}
-                                  alt="AED"
-                                  width={14}
-                                  height={14}
-                                />
-                                <span>{packedAmount}</span>
-                              </div>
-                            </td>
-
-                            <td>
-                              <span
-                                className={`status-badge ${statusBadge.class}`}
-                              >
-                                {statusBadge.label}
-                              </span>
-                            </td>
-
-                            <td>{formatDate(order.orderDate)}</td>
-
-                            <td>
-                              {order.packedStatus &&
-                                order.packedStatus !== "not_packed" &&
-                                order.invoiceHistory &&
-                                order.invoiceHistory.length > 0 ? (
-                                  <div className="invoice-buttons-group">
-                                    {order.invoiceHistory.map((inv, i) => (
-                                      <button
-                                        key={i}
-                                        className="order-list-icon-button order-list-view-button invoice-btn"
-                                        onClick={() => {
-                                          setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                          setShowInvoiceModal(true);
-                                        }}
-                                        title={`Download ${inv.invoiceNumber}`}
-                                      >
-                                        📄 {inv.invoiceNumber}
-                                      </button>
+                              <td className="products-cell">
+                                {order.orderItems?.length > 0 ? (
+                                  <div className="products-list">
+                                    {order.orderItems.slice(0, 2).map((item, i) => (
+                                      <div key={i} className="product-tag">
+                                        <span className="product-name">
+                                          {item.product?.productName || "—"}
+                                        </span>
+                                        <span className="product-qty">
+                                          × {item.packedQuantity || 0}
+                                        </span>
+                                      </div>
                                     ))}
+                                    {order.orderItems.length > 2 && (
+                                      <span className="product-more">
+                                        +{order.orderItems.length - 2} more
+                                      </span>
+                                    )}
                                   </div>
-                                ) : order.packedStatus &&
+                                ) : (
+                                  <span className="no-products">No products</span>
+                                )}
+                              </td>
+
+                              {/* ✅ Show PACKED quantity (not ordered) */}
+                              <td className="qty-cell packed">{totalPacked}</td>
+
+                              <td className="qty-cell delivered">
+                                {totalDelivered}
+                              </td>
+
+                              {/* ✅ Show amount for packed qty */}
+                              <td>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                  }}
+                                >
+                                  <img
+                                    src={DirhamSymbol}
+                                    alt="AED"
+                                    width={14}
+                                    height={14}
+                                  />
+                                  <span>{packedAmount}</span>
+                                </div>
+                              </td>
+
+                              <td>
+                                <span
+                                  className={`status-badge ${statusBadge.class}`}
+                                >
+                                  {statusBadge.label}
+                                </span>
+                              </td>
+
+                              <td>{formatDate(order.orderDate)}</td>
+
+                              <td>
+                                {order.packedStatus &&
                                   order.packedStatus !== "not_packed" &&
-                                  order.invoiceNumber ? (
-                                  <button
-                                    className="order-list-icon-button order-list-view-button"
-                                    onClick={() => {
-                                      setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
-                                      setShowInvoiceModal(true);
-                                    }}
-                                    title={`Download invoice ${order.invoiceNumber}`}
-                                  >
-                                    📄 Invoice
-                                  </button>
-                                ) : null}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                  order.invoiceHistory &&
+                                  order.invoiceHistory.length > 0 ? (
+                                    <div className="invoice-buttons-group">
+                                      {order.invoiceHistory.map((inv, i) => (
+                                        <button
+                                          key={i}
+                                          className="order-list-icon-button order-list-view-button invoice-btn"
+                                          onClick={() => {
+                                            setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                            setShowInvoiceModal(true);
+                                          }}
+                                          title={`Download ${inv.invoiceNumber}`}
+                                        >
+                                          📄 {inv.invoiceNumber}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : order.packedStatus &&
+                                    order.packedStatus !== "not_packed" &&
+                                    order.invoiceNumber ? (
+                                    <button
+                                      className="order-list-icon-button order-list-view-button"
+                                      onClick={() => {
+                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                        setShowInvoiceModal(true);
+                                      }}
+                                      title={`Download invoice ${order.invoiceNumber}`}
+                                    >
+                                      📄 Invoice
+                                    </button>
+                                  ) : null}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

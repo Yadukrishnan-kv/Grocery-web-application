@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
+import TableScrollSync from "../../components/common/TableScrollSync";
 import './Emirates.css';
 import axios from 'axios';
 import toast from "../../utils/toast";
@@ -156,39 +157,41 @@ const Emirates = () => {
               <div className="emirates-no-data">No emirates found. Click "Add Emirates" to create one.</div>
             ) : (
               <>
-                <div className="emirates-table-wrapper">
-                  <table className="emirates-data-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Emirates Name</th>
-                        <th>Emirates Code</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((em, index) => (
-                        <tr key={em._id}>
-                          <td>{pagination.showingFrom + index}</td>
-                          <td className="emirates-name-cell">{em.emiratesName}</td>
-                          <td>
-                            <span className="emirates-code-badge">{em.emiratesCode}</span>
-                          </td>
-                          <td>
-                            <div className="emirates-actions-cell">
-                              <button className="emirates-edit-btn" onClick={() => handleEditClick(em)}>
-                                Edit
-                              </button>
-                              <button className="emirates-delete-btn" onClick={() => handleDelete(em._id, em.emiratesName)}>
-                                Delete
-                              </button>
-                            </div>
-                          </td>
+                <TableScrollSync>
+                  <div className="emirates-table-wrapper">
+                    <table className="emirates-data-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Emirates Name</th>
+                          <th>Emirates Code</th>
+                          <th>Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((em, index) => (
+                          <tr key={em._id}>
+                            <td>{pagination.showingFrom + index}</td>
+                            <td className="emirates-name-cell">{em.emiratesName}</td>
+                            <td>
+                              <span className="emirates-code-badge">{em.emiratesCode}</span>
+                            </td>
+                            <td>
+                              <div className="emirates-actions-cell">
+                                <button className="emirates-edit-btn" onClick={() => handleEditClick(em)}>
+                                  Edit
+                                </button>
+                                <button className="emirates-delete-btn" onClick={() => handleDelete(em._id, em.emiratesName)}>
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

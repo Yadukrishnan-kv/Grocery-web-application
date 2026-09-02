@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./CustomerBillStatement.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -504,169 +505,171 @@ const getSalesManForCustomer = useCallback(async () => {
               </div>
             ) : (
               <>
-                <div className="customer-bills-table-wrapper">
-                  <table className="customer-bills-data-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">No</th>
-                        <th scope="col">Cycle Start</th>
-                        <th scope="col">Cycle End</th>
-                        <th scope="col">Invoice #</th>
-                        <th scope="col">Total Used</th>
-                        <th scope="col">Amount Due</th>
-                        <th scope="col">Due Date</th>
-                        <th scope="col">Days Remaining</th>
-                        <th scope="col">Paid Amount</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Download</th>
-                        <th scope="col">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bills.length > 0 ? (
-                        pagination.pageData.map((bill, index) => {
-                          const daysDisplay = getDaysRemainingDisplay(bill);
-                          const isPendingPayment = bill.status === "pending_payment";
-                          return (
-                            <tr key={bill._id}>
-                              <td>{pagination.showingFrom + index}</td>
-                              <td>{formatDate(bill.cycleStart)}</td>
-                              <td>{formatDate(bill.cycleEnd)}</td>
-                              <td>
-                                <span>
-                                  {getInvoiceNumbers(bill).join(", ")}
-                                  {bill.isOpeningBalance && (
-                                    <span style={{ 
-                                      marginLeft: "8px", 
-                                      backgroundColor: "#FFA500", 
-                                      color: "white", 
-                                      padding: "2px 6px", 
-                                      borderRadius: "3px", 
-                                      fontSize: "11px", 
-                                      fontWeight: "bold" 
-                                    }}>
-                                      OB
-                                    </span>
-                                  )}
-                                </span>
-                              </td>
-                              <td>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
-                                >
-                                  <img
-                                    src={DirhamSymbol}
-                                    alt="Dirham Symbol"
-                                    width={15}
-                                    height={15}
-                                    style={{ paddingTop: "3px" }}
-                                  />
-                                  <span>{bill.totalUsed?.toFixed(2) || "0.00"}</span>
-                                </div>
-                              </td>
-                              <td>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
-                                >
-                                  <img
-                                    src={DirhamSymbol}
-                                    alt="Dirham Symbol"
-                                    width={15}
-                                    height={15}
-                                    style={{ paddingTop: "3px" }}
-                                  />
-                                  <span>{bill.amountDue?.toFixed(2) || "0.00"}</span>
-                                </div>
-                              </td>
-                              <td>{formatDate(bill.dueDate)}</td>
-                              <td className={daysDisplay.className}>
-                                {daysDisplay.text}
-                              </td>
-                              <td>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
-                                >
-                                  <img
-                                    src={DirhamSymbol}
-                                    alt="Dirham Symbol"
-                                    width={15}
-                                    height={15}
-                                    style={{ paddingTop: "3px" }}
-                                  />
-                                  <span>{bill.paidAmount?.toFixed(2) || "0.00"}</span>
-                                </div>
-                              </td>
-                              <td>
-                                <span
-                                  className={`customer-bills-status-badge customer-bills-status-${
-                                    bill.status?.toLowerCase() || "pending"
-                                  }`}
-                                >
-                                  {bill.status?.charAt(0).toUpperCase() +
-                                    bill.status?.slice(1) || "Pending"}
-                                </span>
-                              </td>
-                              <td>
-                                {(bill.receiptTransactionId || bill.status === "paid") && (
-                                  <button
-                                    className="customer-bills-download-button"
-                                    onClick={() =>
-                                      handleDownloadReceipt(
-                                        bill._id,
-                                        bill.receiptTransactionId,
-                                        getInvoiceNumbers(bill).join("_") || bill._id.toString().slice(-8)
-                                      )
-                                    }
-                                  >
-                                    ⬇ Receipt
-                                  </button>
-                                )}
-                              </td>
-                              <td>
-                                {bill.status !== "paid" && bill.status !== "pending_payment" && (
-                                  <button
-                                    className="customer-bills-pay-button"
-                                    onClick={() =>
-                                      handlePayBill(bill._id, bill.amountDue)
-                                    }
-                                  >
-                                    Pay Bill
-                                  </button>
-                                )}
-                                {isPendingPayment && (
-                                  <button
-                                    className="customer-bills-pay-button pending"
-                                    disabled
-                                  >
-                                    Pending
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
+                <TableScrollSync>
+                  <div className="customer-bills-table-wrapper">
+                    <table className="customer-bills-data-table">
+                      <thead>
                         <tr>
-                          <td colSpan="12" className="customer-bills-no-data">
-                            No bills found
-                          </td>
+                          <th scope="col">No</th>
+                          <th scope="col">Cycle Start</th>
+                          <th scope="col">Cycle End</th>
+                          <th scope="col">Invoice #</th>
+                          <th scope="col">Total Used</th>
+                          <th scope="col">Amount Due</th>
+                          <th scope="col">Due Date</th>
+                          <th scope="col">Days Remaining</th>
+                          <th scope="col">Paid Amount</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Download</th>
+                          <th scope="col">Actions</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {bills.length > 0 ? (
+                          pagination.pageData.map((bill, index) => {
+                            const daysDisplay = getDaysRemainingDisplay(bill);
+                            const isPendingPayment = bill.status === "pending_payment";
+                            return (
+                              <tr key={bill._id}>
+                                <td>{pagination.showingFrom + index}</td>
+                                <td>{formatDate(bill.cycleStart)}</td>
+                                <td>{formatDate(bill.cycleEnd)}</td>
+                                <td>
+                                  <span>
+                                    {getInvoiceNumbers(bill).join(", ")}
+                                    {bill.isOpeningBalance && (
+                                      <span style={{ 
+                                        marginLeft: "8px", 
+                                        backgroundColor: "#FFA500", 
+                                        color: "white", 
+                                        padding: "2px 6px", 
+                                        borderRadius: "3px", 
+                                        fontSize: "11px", 
+                                        fontWeight: "bold" 
+                                      }}>
+                                        OB
+                                      </span>
+                                    )}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    <img
+                                      src={DirhamSymbol}
+                                      alt="Dirham Symbol"
+                                      width={15}
+                                      height={15}
+                                      style={{ paddingTop: "3px" }}
+                                    />
+                                    <span>{bill.totalUsed?.toFixed(2) || "0.00"}</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    <img
+                                      src={DirhamSymbol}
+                                      alt="Dirham Symbol"
+                                      width={15}
+                                      height={15}
+                                      style={{ paddingTop: "3px" }}
+                                    />
+                                    <span>{bill.amountDue?.toFixed(2) || "0.00"}</span>
+                                  </div>
+                                </td>
+                                <td>{formatDate(bill.dueDate)}</td>
+                                <td className={daysDisplay.className}>
+                                  {daysDisplay.text}
+                                </td>
+                                <td>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    <img
+                                      src={DirhamSymbol}
+                                      alt="Dirham Symbol"
+                                      width={15}
+                                      height={15}
+                                      style={{ paddingTop: "3px" }}
+                                    />
+                                    <span>{bill.paidAmount?.toFixed(2) || "0.00"}</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <span
+                                    className={`customer-bills-status-badge customer-bills-status-${
+                                      bill.status?.toLowerCase() || "pending"
+                                    }`}
+                                  >
+                                    {bill.status?.charAt(0).toUpperCase() +
+                                      bill.status?.slice(1) || "Pending"}
+                                  </span>
+                                </td>
+                                <td>
+                                  {(bill.receiptTransactionId || bill.status === "paid") && (
+                                    <button
+                                      className="customer-bills-download-button"
+                                      onClick={() =>
+                                        handleDownloadReceipt(
+                                          bill._id,
+                                          bill.receiptTransactionId,
+                                          getInvoiceNumbers(bill).join("_") || bill._id.toString().slice(-8)
+                                        )
+                                      }
+                                    >
+                                      ⬇ Receipt
+                                    </button>
+                                  )}
+                                </td>
+                                <td>
+                                  {bill.status !== "paid" && bill.status !== "pending_payment" && (
+                                    <button
+                                      className="customer-bills-pay-button"
+                                      onClick={() =>
+                                        handlePayBill(bill._id, bill.amountDue)
+                                      }
+                                    >
+                                      Pay Bill
+                                    </button>
+                                  )}
+                                  {isPendingPayment && (
+                                    <button
+                                      className="customer-bills-pay-button pending"
+                                      disabled
+                                    >
+                                      Pending
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan="12" className="customer-bills-no-data">
+                              No bills found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

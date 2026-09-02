@@ -3,6 +3,7 @@ import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import toast from "../../../utils/toast";
 import axios from "axios";
+import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./RemainingPackOrders.css";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 import { useAppSettings } from "../../../context/AppSettingsContext";
@@ -220,129 +221,131 @@ const RemainingPackOrders = () => {
               <div className="remaining-pack-no-data">No remaining orders to pack</div>
             ) : (
               <>
-                <div className="remaining-pack-table-wrapper">
-                  <table className="remaining-pack-data-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Customer</th>
-                        <th>Products</th>
-                        <th>Total Ordered</th>
-                        <th>Packed Qty</th>
-                        <th>Remaining Qty</th>
-                        <th>Status</th>
-                        <th>Order Date</th>
-                        <th>Delivery After</th>
-                        <th>Actions</th>
-                        <th>Remaining Pack</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagination.pageData.map((order, index) => {
-                        const totalPacked = order.orderItems?.reduce(
-                          (sum, i) => sum + (i.packedQuantity || 0),
-                          0
-                        ) || 0;
-                        const totalOrdered = order.totalOrderedQuantity || 0;
-                        const totalRemaining = totalOrdered - totalPacked;
+                <TableScrollSync>
+                  <div className="remaining-pack-table-wrapper">
+                    <table className="remaining-pack-data-table">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Customer</th>
+                          <th>Products</th>
+                          <th>Total Ordered</th>
+                          <th>Packed Qty</th>
+                          <th>Remaining Qty</th>
+                          <th>Status</th>
+                          <th>Order Date</th>
+                          <th>Delivery After</th>
+                          <th>Actions</th>
+                          <th>Remaining Pack</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagination.pageData.map((order, index) => {
+                          const totalPacked = order.orderItems?.reduce(
+                            (sum, i) => sum + (i.packedQuantity || 0),
+                            0
+                          ) || 0;
+                          const totalOrdered = order.totalOrderedQuantity || 0;
+                          const totalRemaining = totalOrdered - totalPacked;
 
-                        return (
-                          <tr key={order._id}>
-                            <td>{pagination.showingFrom + index}</td>
-                            <td>{order.customer?.name || "N/A"}</td>
+                          return (
+                            <tr key={order._id}>
+                              <td>{pagination.showingFrom + index}</td>
+                              <td>{order.customer?.name || "N/A"}</td>
 
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.map((item, i) => {
-                                    const remaining = item.orderedQuantity - (item.packedQuantity || 0);
-                                    return (
-                                      <div key={i} className="product-tag">
-                                        <span className="product-name">
-                                          {item.product?.productName || "Unknown"}
-                                        </span>
-                                        <span className="product-qty">× {item.orderedQuantity}</span>
-                                        <span className="product-unit">{item.unit || ""}</span>
-                                        {remaining > 0 && (
-                                          <span className="product-remaining">
-                                            ({remaining} remaining)
+                              <td className="products-cell">
+                                {order.orderItems?.length > 0 ? (
+                                  <div className="products-list">
+                                    {order.orderItems.map((item, i) => {
+                                      const remaining = item.orderedQuantity - (item.packedQuantity || 0);
+                                      return (
+                                        <div key={i} className="product-tag">
+                                          <span className="product-name">
+                                            {item.product?.productName || "Unknown"}
                                           </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
-                            </td>
+                                          <span className="product-qty">× {item.orderedQuantity}</span>
+                                          <span className="product-unit">{item.unit || ""}</span>
+                                          {remaining > 0 && (
+                                            <span className="product-remaining">
+                                              ({remaining} remaining)
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <span className="no-products">No products</span>
+                                )}
+                              </td>
 
-                            <td>{totalOrdered}</td>
-                            <td>{totalPacked}</td>
-                            <td className="remaining-qty-cell">
-                              <span className="remaining-badge">{totalRemaining}</span>
-                            </td>
+                              <td>{totalOrdered}</td>
+                              <td>{totalPacked}</td>
+                              <td className="remaining-qty-cell">
+                                <span className="remaining-badge">{totalRemaining}</span>
+                              </td>
 
-                            <td>
-                              <span className="order-list-status-badge order-list-status-partially_packed">
-                                Partially Packed
-                              </span>
-                            </td>
+                              <td>
+                                <span className="order-list-status-badge order-list-status-partially_packed">
+                                  Partially Packed
+                                </span>
+                              </td>
 
-                            <td>{formatDate(order.orderDate)}</td>
+                              <td>{formatDate(order.orderDate)}</td>
 
-                            <td>
-                              {order.packableAfter
-                                ? formatDate(order.packableAfter)
-                                : <span className="no-invoice-text">Same Day</span>}
-                            </td>
+                              <td>
+                                {order.packableAfter
+                                  ? formatDate(order.packableAfter)
+                                  : <span className="no-invoice-text">Same Day</span>}
+                              </td>
 
-                            <td className="actions-cell">
-                              {order.invoiceHistory && order.invoiceHistory.length > 0 ? (
-                                <div className="invoice-buttons-group">
-                                  {order.invoiceHistory.map((inv, i) => (
-                                    <button
-                                      key={i}
-                                      className="order-list-icon-button order-list-view-button invoice-btn"
-                                      onClick={() => {
-                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                        setShowInvoiceModal(true);
-                                      }}
-                                      title={`Download ${inv.invoiceNumber}`}
-                                    >
-                                      📄 {inv.invoiceNumber}
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : order.invoiceNumber ? (
+                              <td className="actions-cell">
+                                {order.invoiceHistory && order.invoiceHistory.length > 0 ? (
+                                  <div className="invoice-buttons-group">
+                                    {order.invoiceHistory.map((inv, i) => (
+                                      <button
+                                        key={i}
+                                        className="order-list-icon-button order-list-view-button invoice-btn"
+                                        onClick={() => {
+                                          setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                          setShowInvoiceModal(true);
+                                        }}
+                                        title={`Download ${inv.invoiceNumber}`}
+                                      >
+                                        📄 {inv.invoiceNumber}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : order.invoiceNumber ? (
+                                  <button
+                                    className="order-list-icon-button order-list-view-button"
+                                    onClick={() => {
+                                      setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                      setShowInvoiceModal(true);
+                                    }}
+                                    title={`Download Invoice ${order.invoiceNumber}`}
+                                  >
+                                    📄 Invoice ({order.invoiceNumber})
+                                  </button>
+                                ) : null}
+                              </td>
+
+                              <td className="pack-cell">
                                 <button
-                                  className="order-list-icon-button order-list-view-button"
-                                  onClick={() => {
-                                    setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
-                                    setShowInvoiceModal(true);
-                                  }}
-                                  title={`Download Invoice ${order.invoiceNumber}`}
+                                  className="order-list-icon-button order-list-edit-button"
+                                  onClick={() => openPackModal(order)}
+                                  title="Pack remaining quantity"
                                 >
-                                  📄 Invoice ({order.invoiceNumber})
+                                  Pack Remaining
                                 </button>
-                              ) : null}
-                            </td>
-
-                            <td className="pack-cell">
-                              <button
-                                className="order-list-icon-button order-list-edit-button"
-                                onClick={() => openPackModal(order)}
-                                title="Pack remaining quantity"
-                              >
-                                Pack Remaining
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={pagination.page}

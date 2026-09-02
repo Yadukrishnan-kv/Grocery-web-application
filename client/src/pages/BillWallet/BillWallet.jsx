@@ -5,6 +5,7 @@ import Sidebar from "../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../Assets/aed-symbol.png";
 import toast from "../../utils/toast";
 import axios from "axios";
+import TableScrollSync from "../../components/common/TableScrollSync";
 import "./BillWallet.css";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import { usePaginatedData } from "../../hooks/usePagination";
@@ -438,90 +439,92 @@ const BillWallet = () => {
               <div className="no-data">No received (not sent) transactions</div>
             ) : (
               <>
-                <div className="table-responsive">
-                  <table className="requests-table">
-                    <thead>
-                      <tr>
-                        <th className="checkbox-col">
-                          <input
-                            type="checkbox"
-                            checked={selectAllReceived}
-                            onChange={toggleAllReceived}
-                          />
-                        </th>
-                        <th>No</th>
-                        <th>Delivery/Sales</th>
-                        <th>Customer</th>
-                        <th>Invoice #</th>
-                        <th>Amount</th>
-                        <th>Method</th>
-                        <th>Cheque Details</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {receivedPagination.pageData.map((tx, idx) => {
-                        const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
-                          ? tx.bill.packingInvoiceNumbers
-                          : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
-                        const invoiceNoDisplay = invoiceNos.join(", ");
-                        const isProcessing = processingId === tx._id;
-                        return (
-                          <tr
-                            key={tx._id}
-                            className={
-                              selectedReceived.includes(tx._id)
-                                ? "selected-row"
-                                : ""
-                            }
-                          >
-                            <td className="checkbox-col">
-                              <input
-                                type="checkbox"
-                                checked={selectedReceived.includes(tx._id)}
-                                onChange={() => toggleSelectReceived(tx._id)}
-                                disabled={bulkProcessing || isProcessing}
-                              />
-                            </td>
-                            <td>{receivedPagination.showingFrom + idx}</td>
-                            <td>
-                              {tx.recipient?.username || "—"}{" "}
-                              <small>({tx.recipientType})</small>
-                            </td>
-                            <td>{tx.customer?.name || "—"}</td>
-                            <td>
-                              <strong>{invoiceNoDisplay}</strong>
-                            </td>
-                            <td>{tx.amount.toFixed(2)}</td>
-                            <td>{tx.method?.toUpperCase() || "—"}</td>
-                            <td>{tx.chequeDetails ? "Yes" : "—"}</td>
-                            <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
-                            <td>
-                              <span className="status-badge status-received">
-                                Received
-                              </span>
-                            </td>
-                            <td>
-                              <button
-                                className="mark-received-btn"
-                                onClick={() =>
-                                  openMethodModal("mark-received", tx._id)
-                                }
-                                disabled={
-                                  processingId || bulkProcessing || isProcessing
-                                }
-                              >
-                                {isProcessing ? "Processing..." : "Mark Received"}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <TableScrollSync>
+                  <div className="table-responsive">
+                    <table className="requests-table">
+                      <thead>
+                        <tr>
+                          <th className="checkbox-col">
+                            <input
+                              type="checkbox"
+                              checked={selectAllReceived}
+                              onChange={toggleAllReceived}
+                            />
+                          </th>
+                          <th>No</th>
+                          <th>Delivery/Sales</th>
+                          <th>Customer</th>
+                          <th>Invoice #</th>
+                          <th>Amount</th>
+                          <th>Method</th>
+                          <th>Cheque Details</th>
+                          <th>Date</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {receivedPagination.pageData.map((tx, idx) => {
+                          const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
+                            ? tx.bill.packingInvoiceNumbers
+                            : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
+                          const invoiceNoDisplay = invoiceNos.join(", ");
+                          const isProcessing = processingId === tx._id;
+                          return (
+                            <tr
+                              key={tx._id}
+                              className={
+                                selectedReceived.includes(tx._id)
+                                  ? "selected-row"
+                                  : ""
+                              }
+                            >
+                              <td className="checkbox-col">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedReceived.includes(tx._id)}
+                                  onChange={() => toggleSelectReceived(tx._id)}
+                                  disabled={bulkProcessing || isProcessing}
+                                />
+                              </td>
+                              <td>{receivedPagination.showingFrom + idx}</td>
+                              <td>
+                                {tx.recipient?.username || "—"}{" "}
+                                <small>({tx.recipientType})</small>
+                              </td>
+                              <td>{tx.customer?.name || "—"}</td>
+                              <td>
+                                <strong>{invoiceNoDisplay}</strong>
+                              </td>
+                              <td>{tx.amount.toFixed(2)}</td>
+                              <td>{tx.method?.toUpperCase() || "—"}</td>
+                              <td>{tx.chequeDetails ? "Yes" : "—"}</td>
+                              <td>{new Date(tx.createdAt).toLocaleDateString()}</td>
+                              <td>
+                                <span className="status-badge status-received">
+                                  Received
+                                </span>
+                              </td>
+                              <td>
+                                <button
+                                  className="mark-received-btn"
+                                  onClick={() =>
+                                    openMethodModal("mark-received", tx._id)
+                                  }
+                                  disabled={
+                                    processingId || bulkProcessing || isProcessing
+                                  }
+                                >
+                                  {isProcessing ? "Processing..." : "Mark Received"}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={receivedPagination.page}
@@ -584,97 +587,99 @@ const BillWallet = () => {
               <div className="no-data">No pending requests</div>
             ) : (
               <>
-                <div className="table-responsive">
-                  <table className="requests-table">
-                    <thead>
-                      <tr>
-                        <th className="checkbox-col">
-                          <input
-                            type="checkbox"
-                            checked={selectAllRequests}
-                            onChange={toggleAllRequests}
-                          />
-                        </th>
-                        <th>No</th>
-                        <th>Sent By</th>
-                        <th>Customer</th>
-                        <th>Invoice #</th>
-                        <th>Amount</th>
-                        <th>Method</th>
-                        <th>Cheque Details</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {requestsPagination.pageData.map((req, idx) => {
-                        const tx = req.transaction || {};
-                        const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
-                          ? tx.bill.packingInvoiceNumbers
-                          : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
-                        const invoiceNoDisplay = invoiceNos.join(", ");
-                        return (
-                          <tr
-                            key={req._id}
-                            className={
-                              selectedRequests.includes(req._id)
-                                ? "selected-row"
-                                : ""
-                            }
-                          >
-                            <td className="checkbox-col">
-                              <input
-                                type="checkbox"
-                                checked={selectedRequests.includes(req._id)}
-                                onChange={() => toggleSelectRequest(req._id)}
-                                disabled={bulkProcessing}
-                              />
-                            </td>
-                            <td>{requestsPagination.showingFrom + idx}</td>
-                            <td>
-                              {req.sender?.username || "—"}{" "}
-                              <small>({req.sender?.role?.toLowerCase()})</small>
-                            </td>
-                            <td>{tx.customer?.name || "—"}</td>
-                            <td>
-                              <strong>{invoiceNoDisplay}</strong>
-                            </td>
-                            <td>{req.amount?.toFixed(2)}</td>
-                            <td>{req.method?.toUpperCase() || "—"}</td>
-                            <td>{req.chequeDetails ? "Yes" : "—"}</td>
-                            <td>
-                              {new Date(req.createdAt).toLocaleDateString()}
-                            </td>
-                            <td>
-                              <span className="status-badge status-pending">
-                                Pending
-                              </span>
-                            </td>
-                            <td>
-                              <div className="action-buttons">
-                                <button
-                                  className="accept-btn"
-                                  onClick={() => handleAccept(tx._id)} // ✅ FIXED: Use tx._id (transaction ID)
-                                  disabled={processingId || bulkProcessing}
-                                >
-                                  Accept
-                                </button>
-                                <button
-                                  className="reject-btn"
-                                  onClick={() => handleReject(tx._id)} // ✅ FIXED: Use tx._id (transaction ID)
-                                  disabled={processingId || bulkProcessing}
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <TableScrollSync>
+                  <div className="table-responsive">
+                    <table className="requests-table">
+                      <thead>
+                        <tr>
+                          <th className="checkbox-col">
+                            <input
+                              type="checkbox"
+                              checked={selectAllRequests}
+                              onChange={toggleAllRequests}
+                            />
+                          </th>
+                          <th>No</th>
+                          <th>Sent By</th>
+                          <th>Customer</th>
+                          <th>Invoice #</th>
+                          <th>Amount</th>
+                          <th>Method</th>
+                          <th>Cheque Details</th>
+                          <th>Date</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {requestsPagination.pageData.map((req, idx) => {
+                          const tx = req.transaction || {};
+                          const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
+                            ? tx.bill.packingInvoiceNumbers
+                            : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
+                          const invoiceNoDisplay = invoiceNos.join(", ");
+                          return (
+                            <tr
+                              key={req._id}
+                              className={
+                                selectedRequests.includes(req._id)
+                                  ? "selected-row"
+                                  : ""
+                              }
+                            >
+                              <td className="checkbox-col">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedRequests.includes(req._id)}
+                                  onChange={() => toggleSelectRequest(req._id)}
+                                  disabled={bulkProcessing}
+                                />
+                              </td>
+                              <td>{requestsPagination.showingFrom + idx}</td>
+                              <td>
+                                {req.sender?.username || "—"}{" "}
+                                <small>({req.sender?.role?.toLowerCase()})</small>
+                              </td>
+                              <td>{tx.customer?.name || "—"}</td>
+                              <td>
+                                <strong>{invoiceNoDisplay}</strong>
+                              </td>
+                              <td>{req.amount?.toFixed(2)}</td>
+                              <td>{req.method?.toUpperCase() || "—"}</td>
+                              <td>{req.chequeDetails ? "Yes" : "—"}</td>
+                              <td>
+                                {new Date(req.createdAt).toLocaleDateString()}
+                              </td>
+                              <td>
+                                <span className="status-badge status-pending">
+                                  Pending
+                                </span>
+                              </td>
+                              <td>
+                                <div className="action-buttons">
+                                  <button
+                                    className="accept-btn"
+                                    onClick={() => handleAccept(tx._id)} // ✅ FIXED: Use tx._id (transaction ID)
+                                    disabled={processingId || bulkProcessing}
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    className="reject-btn"
+                                    onClick={() => handleReject(tx._id)} // ✅ FIXED: Use tx._id (transaction ID)
+                                    disabled={processingId || bulkProcessing}
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={requestsPagination.page}
@@ -699,57 +704,59 @@ const BillWallet = () => {
               <div className="no-data">No payments collected yet</div>
             ) : (
               <>
-                <div className="table-responsive">
-                  <table className="requests-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Sender</th>
-                        <th>Customer</th>
-                        <th>Invoice #</th>
-                        <th>Amount</th>
-                        <th>Method</th>
-                        <th>Cheque Details</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paidPagination.pageData.map((tx, idx) => {
-                        const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
-                          ? tx.bill.packingInvoiceNumbers
-                          : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
-                        const invoiceNoDisplay = invoiceNos.join(", ");
-                        return (
-                          <tr key={tx._id}>
-                            <td>{paidPagination.showingFrom + idx}</td>
-                            <td>
-                              {tx.recipient?.username || "—"}{" "}
-                              <small>({tx.recipientType})</small>
-                            </td>
-                            <td>{tx.customer?.name || "—"}</td>
-                            <td>
-                              <strong>{invoiceNoDisplay}</strong>
-                            </td>
-                            <td>{tx.amount.toFixed(2)}</td>
-                            <td>{tx.method?.toUpperCase() || "—"}</td>
-                            <td>{tx.chequeDetails ? "Yes" : "—"}</td>
-                            <td>
-                              {new Date(
-                                tx.updatedAt || tx.createdAt,
-                              ).toLocaleDateString()}
-                            </td>
-                            <td>
-                              <span className="status-badge status-paid">
-                                Paid to Admin
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <TableScrollSync>
+                  <div className="table-responsive">
+                    <table className="requests-table">
+                      <thead>
+                        <tr>
+                          <th>No</th>
+                          <th>Sender</th>
+                          <th>Customer</th>
+                          <th>Invoice #</th>
+                          <th>Amount</th>
+                          <th>Method</th>
+                          <th>Cheque Details</th>
+                          <th>Date</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paidPagination.pageData.map((tx, idx) => {
+                          const invoiceNos = tx.bill?.packingInvoiceNumbers?.length > 0
+                            ? tx.bill.packingInvoiceNumbers
+                            : [tx.invoiceNumber || tx.bill?.invoiceNumber || tx.order?.invoiceNumber || "N/A"];
+                          const invoiceNoDisplay = invoiceNos.join(", ");
+                          return (
+                            <tr key={tx._id}>
+                              <td>{paidPagination.showingFrom + idx}</td>
+                              <td>
+                                {tx.recipient?.username || "—"}{" "}
+                                <small>({tx.recipientType})</small>
+                              </td>
+                              <td>{tx.customer?.name || "—"}</td>
+                              <td>
+                                <strong>{invoiceNoDisplay}</strong>
+                              </td>
+                              <td>{tx.amount.toFixed(2)}</td>
+                              <td>{tx.method?.toUpperCase() || "—"}</td>
+                              <td>{tx.chequeDetails ? "Yes" : "—"}</td>
+                              <td>
+                                {new Date(
+                                  tx.updatedAt || tx.createdAt,
+                                ).toLocaleDateString()}
+                              </td>
+                              <td>
+                                <span className="status-badge status-paid">
+                                  Paid to Admin
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </TableScrollSync>
 
                 <Pagination
                   page={paidPagination.page}
