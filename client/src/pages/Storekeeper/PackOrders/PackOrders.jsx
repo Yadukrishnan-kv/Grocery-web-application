@@ -25,10 +25,18 @@ const PackOrders = () => {
       return;
     }
     try {
-      // 80mm thermal paper: ~226pt wide
-      const pageWidth = 226;
-      const margin = 8;
+      // 80mm thermal paper, 76mm printable area - matches receipt print style
+      const MM_TO_PT = 2.834645669;
+      const PX_TO_PT = 0.75;
+      const paperWidthMM = 80;
+      const printableWidthMM = 76;
+      const pageWidth = paperWidthMM * MM_TO_PT;
+      const margin = ((paperWidthMM - printableWidthMM) / 2) * MM_TO_PT;
       const contentWidth = pageWidth - margin * 2;
+      const labelW = 75;
+      const titleMarginTop = 15 * PX_TO_PT;
+      const orderIdMarginTop = 10 * PX_TO_PT;
+      const productsMarginTop = 10 * PX_TO_PT;
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -36,7 +44,7 @@ const PackOrders = () => {
         format: [pageWidth, 1200],
       });
 
-      let y = margin + 5;
+      let y = margin + titleMarginTop;
 
       const formatDate = (dateString) => {
         if (!dateString) return "N/A";
@@ -48,51 +56,73 @@ const PackOrders = () => {
         });
       };
 
-      // ===== TITLE =====
-      pdf.setFontSize(11).setFont(undefined, "bold");
-      pdf.text("Order Details", margin, y);
-      y += 10;
-
-      // ===== ORDER INFO =====
-      pdf.setFontSize(7).setFont(undefined, "normal");
-      
-      const printLine = (label, value) => {
-        pdf.setFont(undefined, "bold");
-        pdf.text(label, margin, y);
-        pdf.setFont(undefined, "normal");
-        const valueStr = String(value);
-        pdf.text(valueStr, margin + 60, y, { maxWidth: contentWidth - 60 });
-        y += 9;
+      const drawDashedLine = (yPos) => {
+        pdf.setLineDashPattern([1, 1], 0);
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, yPos, pageWidth - margin, yPos);
+        pdf.setLineDashPattern([], 0);
+        return yPos + 8;
       };
 
-      const displayedOrderId = order.orderId || order._id;
-      printLine("Order ID:", displayedOrderId);
-      printLine("Customer:", order.customer?.name || "N/A");
-      printLine("Order Date:", formatDate(order.orderDate));
+      const printRow = (label, value) => {
+        pdf.setFontSize(8).setFont(undefined, "bold");
+        pdf.text(label, margin, y, { maxWidth: labelW });
+        pdf.setFontSize(8).setFont(undefined, "normal");
+        pdf.text(String(value), pageWidth - margin, y, { align: "right" });
+        y += 13;
+      };
 
-      y += 3;
+      // ===== TITLE =====
+      pdf.setFontSize(13).setFont(undefined, "bold");
+      pdf.text("ORDER DETAILS", pageWidth / 2, y, { align: "center" });
+      y += 16;
+
+      y = drawDashedLine(y) + orderIdMarginTop;
+
+      // ===== ORDER INFO =====
+      const displayedOrderId = order.orderId || order._id;
+      printRow("Order ID:", displayedOrderId);
+      printRow("Customer:", order.customer?.name || "N/A");
+      if (order.customer?.address) {
+        pdf.setFontSize(7).setFont(undefined, "normal");
+        const addressLines = pdf.splitTextToSize(order.customer.address, contentWidth);
+        addressLines.forEach((line) => {
+          pdf.text(line, pageWidth - margin, y, { align: "right" });
+          y += 10;
+        });
+      }
+      printRow("Order Date:", formatDate(order.orderDate));
+
+      y = drawDashedLine(y + 2) + productsMarginTop;
 
       // ===== PRODUCTS =====
-      pdf.setFont(undefined, "bold");
-      pdf.text("Products:", margin, y);
-      y += 9;
+      pdf.setFontSize(9).setFont(undefined, "bold");
+      pdf.text("PRODUCTS", margin, y);
+      y += 14;
 
-      pdf.setFont(undefined, "normal");
-      (order.orderItems || []).forEach((item, index) => {
+      (order.orderItems || []).forEach((item) => {
         const productName = item.product?.productName || "Unknown";
         const qty = item.orderedQuantity || 0;
         const unit = item.unit || "";
-        const listItem = `• ${productName} - Qty: ${qty} ${unit}`;
-        
-        // Wrap long product names
-        const lines = pdf.splitTextToSize(listItem, contentWidth - 5);
-        lines.forEach((line) => {
-          pdf.text(line, margin + 5, y);
-          y += 8;
+        const qtyText = `Qty: ${qty}${unit ? ` ${unit}` : ""}`;
+
+        pdf.setFontSize(8).setFont(undefined, "normal");
+        const nameLines = pdf.splitTextToSize(`• ${productName}`, contentWidth - 65);
+
+        nameLines.forEach((line, idx) => {
+          pdf.setFont(undefined, "normal");
+          pdf.text(line, margin, y);
+          if (idx === 0) {
+            pdf.setFont(undefined, "bold");
+            pdf.text(qtyText, pageWidth - margin, y, { align: "right" });
+          }
+          y += 11;
         });
+        y += 2;
       });
 
-      y += 3;
+      y = drawDashedLine(y);
 
       // Open the print dialog directly (hidden iframe, no new tab)
       const blobUrl = pdf.output("bloburl");

@@ -2489,7 +2489,7 @@ const getPendingForPacking = async (req, res) => {
         { packableAfter: { $lte: now } }
       ]
     })
-      .populate("customer", "name email phoneNumber")
+      .populate("customer", "name email phoneNumber address")
       .populate("orderItems.product", "productName unit price")
       .populate("assignedTo", "username")
       .sort({ orderDate: -1 });
