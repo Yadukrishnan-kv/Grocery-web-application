@@ -1,5 +1,5 @@
 // src/pages/Admin/PendingCustomerRequests.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import TableScrollSync from "../../../components/common/TableScrollSync";
@@ -16,9 +16,24 @@ const PendingCustomerRequests = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { entriesPerPage } = useAppSettings();
-  const pagination = usePaginatedData(requests, entriesPerPage, '');
+
+  const clearSearch = () => setSearchTerm('');
+
+  const filteredRequests = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return requests;
+    return requests.filter((request) =>
+      request.name?.toLowerCase().includes(term) ||
+      request.email?.toLowerCase().includes(term) ||
+      request.phoneNumber?.toLowerCase().includes(term) ||
+      request.salesman?.username?.toLowerCase().includes(term)
+    );
+  }, [requests, searchTerm]);
+
+  const pagination = usePaginatedData(filteredRequests, entriesPerPage, searchTerm);
 
   // NEW: Rejection modal states
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -177,11 +192,32 @@ const PendingCustomerRequests = () => {
           <div className="pending-requests-container">
             <div className="pending-requests-header-section">
               <h2 className="pending-requests-page-title">Pending Customer Creation Requests</h2>
+
+              <div className="pending-requests-controls-group">
+                <div className="pending-requests-search-container">
+                  <input
+                    type="text"
+                    className="pending-requests-search-input"
+                    placeholder="Search by name, email, phone or salesman..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <button
+                      className="pending-requests-search-clear"
+                      onClick={clearSearch}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {requests.length === 0 ? (
+            {filteredRequests.length === 0 ? (
               <div className="pending-requests-no-data">
                 No pending customer requests
+                {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
               </div>
             ) : (
               <>

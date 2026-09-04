@@ -25,13 +25,15 @@ const PackOrders = () => {
       return;
     }
     try {
-      // 80mm thermal paper, 76mm printable area - matches receipt print style
+      // 80mm thermal paper - a generous safe margin keeps text away from the
+      // printer's real (hardware-clipped) printable edge, which is narrower
+      // than the paper width itself.
       const MM_TO_PT = 2.834645669;
       const PX_TO_PT = 0.75;
       const paperWidthMM = 80;
-      const printableWidthMM = 76;
+      const safeMarginMM = 7;
       const pageWidth = paperWidthMM * MM_TO_PT;
-      const margin = ((paperWidthMM - printableWidthMM) / 2) * MM_TO_PT;
+      const margin = safeMarginMM * MM_TO_PT;
       const contentWidth = pageWidth - margin * 2;
       const labelW = 75;
       const titleMarginTop = 15 * PX_TO_PT;
@@ -66,11 +68,11 @@ const PackOrders = () => {
       };
 
       const printRow = (label, value) => {
-        pdf.setFontSize(8).setFont(undefined, "bold");
+        pdf.setFontSize(9).setFont(undefined, "bold");
         pdf.text(label, margin, y, { maxWidth: labelW });
-        pdf.setFontSize(8).setFont(undefined, "normal");
+        pdf.setFontSize(9).setFont(undefined, "normal");
         pdf.text(String(value), pageWidth - margin, y, { align: "right" });
-        y += 13;
+        y += 14;
       };
 
       // ===== TITLE =====
@@ -85,21 +87,26 @@ const PackOrders = () => {
       printRow("Order ID:", displayedOrderId);
       printRow("Customer:", order.customer?.name || "N/A");
       if (order.customer?.address) {
-        pdf.setFontSize(7).setFont(undefined, "normal");
+        pdf.setFontSize(8).setFont(undefined, "normal");
         const addressLines = pdf.splitTextToSize(order.customer.address, contentWidth);
         addressLines.forEach((line) => {
           pdf.text(line, pageWidth - margin, y, { align: "right" });
-          y += 10;
+          y += 11;
         });
+      }
+      if (order.customer?.pincode) {
+        pdf.setFontSize(9).setFont(undefined, "normal");
+        pdf.text(String(order.customer.pincode), pageWidth - margin, y, { align: "right" });
+        y += 14;
       }
       printRow("Order Date:", formatDate(order.orderDate));
 
       y = drawDashedLine(y + 2) + productsMarginTop;
 
       // ===== PRODUCTS =====
-      pdf.setFontSize(9).setFont(undefined, "bold");
+      pdf.setFontSize(10).setFont(undefined, "bold");
       pdf.text("PRODUCTS", margin, y);
-      y += 14;
+      y += 15;
 
       (order.orderItems || []).forEach((item) => {
         const productName = item.product?.productName || "Unknown";
@@ -107,19 +114,19 @@ const PackOrders = () => {
         const unit = item.unit || "";
         const qtyText = `Qty: ${qty}${unit ? ` ${unit}` : ""}`;
 
-        pdf.setFontSize(8).setFont(undefined, "normal");
-        const nameLines = pdf.splitTextToSize(`• ${productName}`, contentWidth - 65);
+        pdf.setFontSize(13).setFont(undefined, "normal");
+        const nameLines = pdf.splitTextToSize(`• ${productName}`, contentWidth - 90);
 
         nameLines.forEach((line, idx) => {
           pdf.setFont(undefined, "normal");
           pdf.text(line, margin, y);
           if (idx === 0) {
-            pdf.setFont(undefined, "bold");
+            pdf.setFont(undefined, "normal");
             pdf.text(qtyText, pageWidth - margin, y, { align: "right" });
           }
-          y += 11;
+          y += 16;
         });
-        y += 2;
+        y += 8;
       });
 
       y = drawDashedLine(y);
@@ -180,23 +187,48 @@ const PackOrders = () => {
       pdf.setTextColor(0, 0, 0);
 
       // ── Order Info Box ──
-      pdf.setFillColor(248, 249, 250);
-      pdf.roundedRect(margin, y, contentWidth, 28, 3, 3, "F");
       pdf.setFontSize(10).setFont(undefined, "normal");
 
       const displayedOrderId = order.orderId || order._id;
       const orderDate = formatDate(order.orderDate);
       const customerName = order.customer?.name || "N/A";
+      const customerAddress = order.customer?.address || "";
+      const addressLines = customerAddress
+        ? pdf.splitTextToSize(customerAddress, contentWidth - 40)
+        : [];
+
+      const lineH = 8;
+      const numRows = 3 + addressLines.length; // Order ID, Customer, [address...], Order Date
+      const boxHeight = 12 + lineH * (numRows - 1);
+
+      pdf.setFillColor(248, 249, 250);
+      pdf.roundedRect(margin, y, contentWidth, boxHeight, 3, 3, "F");
+
+      let infoY = y + 6;
+      pdf.setFont(undefined, "bold");
+      pdf.text("Order ID:", margin + 5, infoY);
+      pdf.setFont(undefined, "normal");
+      pdf.text(String(displayedOrderId), margin + 35, infoY);
+      infoY += lineH;
 
       pdf.setFont(undefined, "bold");
-      pdf.text("Order ID:", margin + 5, y + 6);
-      pdf.text("Customer:", margin + 5, y + 14);
-      pdf.text("Order Date:", margin + 5, y + 22);
+      pdf.text("Customer:", margin + 5, infoY);
       pdf.setFont(undefined, "normal");
-      pdf.text(String(displayedOrderId), margin + 35, y + 6);
-      pdf.text(customerName, margin + 35, y + 14);
-      pdf.text(orderDate, margin + 35, y + 22);
-      y += 36;
+      pdf.text(customerName, margin + 35, infoY);
+      infoY += lineH;
+
+      addressLines.forEach((line) => {
+        pdf.setFont(undefined, "normal");
+        pdf.text(line, margin + 35, infoY);
+        infoY += lineH;
+      });
+
+      pdf.setFont(undefined, "bold");
+      pdf.text("Order Date:", margin + 5, infoY);
+      pdf.setFont(undefined, "normal");
+      pdf.text(orderDate, margin + 35, infoY);
+
+      y += boxHeight + 8;
 
       // ── Table ──
       const colProduct = margin + 5;
