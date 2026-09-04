@@ -85,7 +85,28 @@ const PackOrders = () => {
       // ===== ORDER INFO =====
       const displayedOrderId = order.orderId || order._id;
       printRow("Order ID:", displayedOrderId);
-      printRow("Customer:", order.customer?.name || "N/A");
+
+      // Customer name can be a long business name — if it doesn't fit next to
+      // the label without overlapping, drop it to the line(s) below instead.
+      const customerLabel = "Customer:";
+      const customerName = order.customer?.name || "N/A";
+      pdf.setFontSize(9).setFont(undefined, "bold");
+      const customerLabelWidth = pdf.getTextWidth(customerLabel);
+      pdf.text(customerLabel, margin, y, { maxWidth: labelW });
+      pdf.setFontSize(9).setFont(undefined, "normal");
+      const customerAvailableWidth = contentWidth - customerLabelWidth - 6;
+      if (pdf.getTextWidth(customerName) <= customerAvailableWidth) {
+        pdf.text(customerName, pageWidth - margin, y, { align: "right" });
+        y += 14;
+      } else {
+        y += 14;
+        const customerNameLines = pdf.splitTextToSize(customerName, contentWidth);
+        customerNameLines.forEach((line) => {
+          pdf.text(line, pageWidth - margin, y, { align: "right" });
+          y += 11;
+        });
+      }
+
       if (order.customer?.address) {
         pdf.setFontSize(8).setFont(undefined, "normal");
         const addressLines = pdf.splitTextToSize(order.customer.address, contentWidth);
