@@ -9,6 +9,11 @@ const invoiceCounterSchema = new Schema({
     type: Number,
     default: 0
   },
+  // Calendar year the current deliveredInvoiceCount sequence belongs to.
+  // When the year changes, the sequence restarts at 1 (DDFT/101001/YY).
+  deliveredInvoiceYear: {
+    type: Number
+  },
   returnCount: {
     type: Number,
     default: 0

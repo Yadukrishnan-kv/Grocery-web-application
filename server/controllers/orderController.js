@@ -48,6 +48,87 @@ const getNextOrderId = async () => {
   const year = new Date().getFullYear();
   return `SO/${sequence}/${year}`;
 };
+
+// Delivery/packing invoice number: DDFT/101001/26, DDFT/101002/26, ...
+// Sequence starts at 101001 and increments per invoice. The trailing number is
+// the last 2 digits of the current calendar year. When the year changes, the
+// sequence resets so the first invoice of the new year is DDFT/101001/27.
+//
+// Given the counter's saved state and "now", decide what the next
+// deliveredInvoiceCount should be. Pulled out as a pure function so the
+// year-rollover decision can be unit tested without touching the DB.
+const computeDeliveryInvoiceRolloverCount = (savedYear, savedCount, currentYear) => {
+  if (savedYear == null) {
+    // Legacy record (deployed before year tracking existed) or brand new
+    // counter: keep the existing sequence going, just start tracking the year.
+    return (savedCount || 0) + 1;
+  }
+  if (savedYear !== currentYear) {
+    // Calendar year rolled over: restart the sequence.
+    return 1;
+  }
+  return (savedCount || 0) + 1;
+};
+
+const getNextDeliveryInvoiceNumber = async () => {
+  const currentYear = new Date().getFullYear();
+  const yearSuffix = String(currentYear).slice(-2);
+
+  // Fast, atomic path used for every invoice except the first one of a new year.
+  let counter = await InvoiceCounter.findOneAndUpdate(
+    { deliveredInvoiceYear: currentYear },
+    { $inc: { deliveredInvoiceCount: 1 } },
+    { new: true }
+  );
+
+  if (!counter) {
+    // No document tracking the current year yet: first invoice ever, a
+    // legacy document with no deliveredInvoiceYear, or the year just changed.
+    const existing = await InvoiceCounter.findOne({});
+    const nextCount = computeDeliveryInvoiceRolloverCount(
+      existing?.deliveredInvoiceYear,
+      existing?.deliveredInvoiceCount,
+      currentYear
+    );
+    counter = await InvoiceCounter.findOneAndUpdate(
+      {},
+      { $set: { deliveredInvoiceYear: currentYear, deliveredInvoiceCount: nextCount } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+  }
+
+  const sequence = 101000 + counter.deliveredInvoiceCount;
+  return `DDFT/${sequence}/${yearSuffix}`;
+};
+
+// GET /api/orders/delivery-invoice-status
+// Read-only preview of the delivery-invoice counter: what year it's currently
+// tracking and what the next invoice number will be. Does NOT consume a
+// sequence number, so it's safe to call any time (e.g. to verify the Jan 1
+// rollover produced DDFT/101001/<new year>).
+const getDeliveryInvoiceStatus = async (req, res) => {
+  try {
+    const currentYear = new Date().getFullYear();
+    const yearSuffix = String(currentYear).slice(-2);
+    const counter = await InvoiceCounter.findOne({});
+
+    const nextCount = computeDeliveryInvoiceRolloverCount(
+      counter?.deliveredInvoiceYear,
+      counter?.deliveredInvoiceCount,
+      currentYear
+    );
+
+    res.json({
+      currentYear,
+      trackedYear: counter?.deliveredInvoiceYear ?? null,
+      lastIssuedCount: counter?.deliveredInvoiceCount ?? 0,
+      nextInvoiceNumber: `DDFT/${101000 + nextCount}/${yearSuffix}`,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 const OrderRequest = require("../models/OrderRequest");
 const mongoose = require("mongoose");
 
@@ -566,7 +647,7 @@ const deliverOrder = async (req, res) => {
     } else {
       // Fallback: If no packing invoice was matched, keep the packing time format (DEL-xx)
       if (grandDeliveryAmount > 0) {
-        const invNo = order.invoiceNumber || "DEL-fallback";
+        const invNo = order.invoiceNumber || "DDFT-fallback";
         order.deliveredInvoiceHistory.push({
           invoiceNumber: invNo,
           quantity: deliveredItems.reduce((sum, item) => sum + Number(item.quantity), 0),
@@ -1486,7 +1567,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   let grandTotalExclVat = 0;
   let grandTotalVat = 0;
   let grandTotalInclVat = 0;
-  let totalWeight = 0;
+  let totalPacks = 0;
   let serialNumber = 1;
 
   for (const item of order.orderItems) {
@@ -1510,7 +1591,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     grandTotalExclVat += exclVatAmount;
     grandTotalVat += vatAmount;
     grandTotalInclVat += itemTotal;
-    totalWeight += qty;
+    totalPacks += qty;
 
     const unit = item.unit || item.product?.unit || "Nos";
 
@@ -1557,17 +1638,18 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
 
   // ===== TOTALS BLOCK =====
   doc.lineWidth(1).strokeColor(navyColor);
-  // Row 1: Total Weight and Total Dhs.
-  doc.rect(margin, totalsY, 265.28, 20).stroke();
-  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Total Weight", margin + 10, totalsY + 6);
-  doc.fillColor("#333333").font("Helvetica").fontSize(8).text(totalWeight.toString(), margin + 150, totalsY + 6, { width: 105, align: "right" });
-     
-  doc.rect(margin + 265.28, totalsY, 290, 20).stroke();
-  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Total Dhs.", margin + 265.28 + 10, totalsY + 6);
-  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(grandTotalExclVat.toFixed(2), margin + 265.28 + 150, totalsY + 6, { width: 130, align: "right" });
+  // Row 1: No. of Packs and Total Dhs.
+  const packsRowY = totalsY;
+  doc.rect(margin, packsRowY, 265.28, 20).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("No: of Packs", margin + 10, packsRowY + 6);
+  doc.fillColor("#333333").font("Helvetica").fontSize(8).text(totalPacks.toString(), margin + 150, packsRowY + 6, { width: 105, align: "right" });
+
+  doc.rect(margin + 265.28, packsRowY, 290, 20).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Total Dhs.", margin + 265.28 + 10, packsRowY + 6);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(grandTotalExclVat.toFixed(2), margin + 265.28 + 150, packsRowY + 6, { width: 130, align: "right" });
 
   // Row 2 & 3 Left: Merged Box (Total amount in words)
-  const row2Y = totalsY + 20;
+  const row2Y = packsRowY + 20;
   doc.rect(margin, row2Y, 265.28, 40).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5).text("Total amount in words", margin + 10, row2Y + 5);
   doc.fillColor("#333333").font("Helvetica").fontSize(7.5).text(amountToWords(grandTotalInclVat), margin + 10, row2Y + 16, { width: 245 });
@@ -1578,7 +1660,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(grandTotalVat.toFixed(2), margin + 265.28 + 150, row2Y + 6, { width: 130, align: "right" });
 
   // Row 3 Right: Grand Total
-  const row3Y = totalsY + 40;
+  const row3Y = packsRowY + 40;
   doc.rect(margin + 265.28, row3Y, 290, 20).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8.5).text("Grand Total", margin + 265.28 + 10, row3Y + 6);
   doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8.5).text(grandTotalInclVat.toFixed(2), margin + 265.28 + 150, row3Y + 6, { width: 130, align: "right" });
@@ -1626,7 +1708,8 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5);
   doc.text("Vehicle No. & Driver", box2X + 5, sigY + 8, { width: sigBoxW - 10, align: "center" });
   doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
-  if (order.assignedTo?.username) {
+  // Only show the driver's name once they have actually accepted the assigned delivery.
+  if (order.assignedTo?.username && order.assignmentStatus === "accepted") {
     doc.text(`Driver: ${order.assignedTo.username}`, box2X + 5, sigY + 30, { width: sigBoxW - 10, align: "center" });
     doc.text("Vehicle No: .................", box2X + 5, sigY + 45, { width: sigBoxW - 10, align: "center" });
   } else {
@@ -2419,12 +2502,7 @@ const packOrder = async (req, res) => {
     //    Invoice is generated regardless of payment source (return balance OR credit limit)
     let newInvoiceNumber = order.invoiceNumber;
     if (newlyPackedAmount > 0) {
-      const counter = await InvoiceCounter.findOneAndUpdate(
-        {},
-        { $inc: { invoiceCount: 1 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-      );
-      newInvoiceNumber = `DEL-${String(counter.invoiceCount).padStart(2, "0")}`;
+      newInvoiceNumber = await getNextDeliveryInvoiceNumber();
       if (!order.invoiceHistory) order.invoiceHistory = [];
       order.invoiceHistory.push({
         invoiceNumber: newInvoiceNumber,
@@ -2582,16 +2660,17 @@ const getPackedInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("orderItems.product", "productName price unit");
-    
+      .populate("orderItems.product", "productName price unit")
+      .populate("assignedTo", "username");
+
     if (!order) return res.status(404).json({ message: "Order not found" });
-    
+
     if (!order.packedAt || !order.packedStatus) {
       return res.status(400).json({ message: "Order not yet packed" });
     }
     
-    // ✅✅✅ USE EXISTING INVOICE NUMBER (DEL-XX) ✅✅✅
-    const invoiceNumber = order.invoiceNumber || `DEL-${order._id.toString().slice(-6).toUpperCase()}`;
+    // ✅✅✅ USE EXISTING INVOICE NUMBER (DDFT/xxxxxx/yy) ✅✅✅
+    const invoiceNumber = order.invoiceNumber || `DDFT/${order._id.toString().slice(-6).toUpperCase()}`;
     
     const designType = req.query.type === "preprinted" ? "preprinted" : "normal";
     const filename = `packed-invoice-${invoiceNumber}.pdf`;
@@ -2619,7 +2698,8 @@ const getUnifiedInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
-      .populate("orderItems.product", "productName price unit");
+      .populate("orderItems.product", "productName price unit")
+      .populate("assignedTo", "username");
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (!order.packedAt || !order.packedStatus) {
       return res.status(400).json({ message: "Order must be packed first to generate invoice" });
@@ -2681,9 +2761,12 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo, des
     });
   }
 
-  // Build a wrapper order so generateStyledInvoicePDF can process it
+  // Build a wrapper order so generateDaddysInvoicePDF can process it.
+  // NOTE: spread a plain object (order.toObject()), not the live Mongoose
+  // document directly — spreading a Mongoose doc only copies its internal
+  // $__/_doc keys, silently dropping assignedTo/assignmentStatus/etc.
   const wrapperOrder = {
-    ...order,
+    ...order.toObject(),
     _id: order._id,
     customer: order.customer,
     payment: order.payment,
@@ -2702,9 +2785,12 @@ const generateUnifiedInvoicePDF = async (doc, order, invoiceType, invoiceNo, des
 };
 // ✅ PACKED INVOICE PDF - New Tax Invoice Style (uses packed quantities)
 const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo, designType = "normal") => {
-  // Build wrapper with packed quantities so generateStyledInvoicePDF renders them
+  // Build wrapper with packed quantities so generateDaddysInvoicePDF renders them.
+  // NOTE: spread order.toObject(), not the live Mongoose document — spreading
+  // a Mongoose doc directly only copies its internal $__/_doc keys, silently
+  // dropping assignedTo/assignmentStatus/etc.
   const wrapperOrder = {
-    ...order,
+    ...order.toObject(),
     _id: order._id,
     customer: order.customer,
     payment: order.payment,
@@ -2780,5 +2866,6 @@ module.exports = {
   getUnifiedInvoice, // ✅ NEW unified invoice showing Ordered/Packed/Delivered
   generateUnifiedInvoicePDF, // ✅ NEW unified invoice PDF generator
   getAllOrdersForStorekeeper,
-  getPendingOrdersForAssignment
+  getPendingOrdersForAssignment,
+  getDeliveryInvoiceStatus
 };

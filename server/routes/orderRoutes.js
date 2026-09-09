@@ -20,7 +20,8 @@ const {
   rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,
   getMyOrders,getOrderInvoice,getlastorderdetails,checkFirstOrder,
   getPendingOrderRequests,approveOrderRequest,rejectOrderRequest,getCustomerOrderHistory,createOrderRequest,packOrder,getPendingForPacking,getRemainingForPacking,getMyPendingOrders,getPackedToday,
-  getReadyToDeliver,getPackedInvoice,getUnifiedInvoice,getAllOrdersForStorekeeper,getPendingOrdersForAssignment
+  getReadyToDeliver,getPackedInvoice,getUnifiedInvoice,getAllOrdersForStorekeeper,getPendingOrdersForAssignment,
+  getDeliveryInvoiceStatus
 } = require("../controllers/orderController");
 
 
@@ -70,4 +71,5 @@ router.get("/packed-invoice/:id", protect, getPackedInvoice);
 // ✅ NEW: Unified invoice showing Ordered/Packed/Delivered quantities
 router.get("/unified-invoice/:id", protect, getUnifiedInvoice);
 router.get('/all-orders', protect, getAllOrdersForStorekeeper);
+router.get("/delivery-invoice-status", protect, getDeliveryInvoiceStatus);
 module.exports = router;

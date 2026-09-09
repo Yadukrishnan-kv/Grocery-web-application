@@ -22,6 +22,7 @@ const StorekeeperOrders = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // "all" | "not_packed" | "partially_packed" | "fully_packed"
   const [invoiceFilter, setInvoiceFilter] = useState("");
+  const [nextInvoicePreview, setNextInvoicePreview] = useState(null);
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -57,10 +58,24 @@ const StorekeeperOrders = () => {
     }
   }, [backendUrl]);
 
+  const fetchNextInvoicePreview = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/orders/delivery-invoice-status`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setNextInvoicePreview(response.data);
+    } catch (error) {
+      console.error("Error fetching next invoice preview:", error);
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
     fetchCurrentUser();
     fetchAllOrders();
-  }, [fetchCurrentUser, fetchAllOrders]);
+    fetchNextInvoicePreview();
+  }, [fetchCurrentUser, fetchAllOrders, fetchNextInvoicePreview]);
 
   // ✅ Download invoice with correct filename
   const downloadUnifiedInvoice = async (orderId, invoiceNumber, type = "normal") => {
@@ -173,6 +188,11 @@ const StorekeeperOrders = () => {
               <p className="sub">
                 Complete order history with packing & delivery status
               </p>
+              {nextInvoicePreview && (
+                <p className="sub" style={{ marginTop: 4 }}>
+                  Next Invoice #: <strong>{nextInvoicePreview.nextInvoiceNumber}</strong>
+                </p>
+              )}
             </div>
 
             {/* Controls */}
@@ -199,7 +219,7 @@ const StorekeeperOrders = () => {
                 <input
                   type="text"
                   className="order-list-search-input"
-                  placeholder="Filter by Invoice # (DEL-XX)..."
+                  placeholder="Filter by Invoice # (DDFT/101001/26)..."
                   value={invoiceFilter}
                   onChange={(e) => setInvoiceFilter(e.target.value)}
                 />
