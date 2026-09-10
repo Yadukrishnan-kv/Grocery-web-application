@@ -796,7 +796,10 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
     doc.text("TRN: 100577923400003", rightColX, y + 72, { width: rightColWidth, align: "right" });
   }
 
-  y += 95;
+  // Preprinted paper already has the letterhead printed further down than the
+  // normal digital header, so it needs extra blank space here to avoid the
+  // "To."/invoice detail boxes overlapping the pre-printed letterhead.
+  y += designType === "preprinted" ? 105 : 95;
 
   // ===== CUSTOMER & INVOICE DETAILS ROW =====
   // Left: To. Box
@@ -873,15 +876,18 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
     return result;
   });
 
-  const headerRowHeight = 22;
-  const dataRowHeight = 18;
+  // Reduce the item table row heights for preprinted layout to offset the
+  // extra top blank space added above, keeping the invoice within one page.
+  const headerRowHeight = designType === "preprinted" ? 18 : 22;
+  const dataRowHeight = designType === "preprinted" ? 15 : 18;
+  const headerTextOffset = designType === "preprinted" ? 4 : 6;
 
   const drawTableHeader = (startY) => {
     doc.lineWidth(1).strokeColor(navyColor);
     doc.rect(margin, startY, contentWidth, headerRowHeight).stroke();
     cols.forEach((col) => {
       doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5)
-        .text(col.header, col.x + 2, startY + 6, { width: col.width - 4, align: col.align });
+        .text(col.header, col.x + 2, startY + headerTextOffset, { width: col.width - 4, align: col.align });
       doc.moveTo(col.x, startY).lineTo(col.x, startY + headerRowHeight).stroke();
     });
     doc.moveTo(margin + contentWidth, startY).lineTo(margin + contentWidth, startY + headerRowHeight).stroke();

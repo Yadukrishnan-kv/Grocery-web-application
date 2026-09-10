@@ -20,6 +20,7 @@ const DeliveredOrdersList = () => {
   const [user, setUser] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
+  const [pendingInvoiceKind, setPendingInvoiceKind] = useState("packed");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -489,6 +490,7 @@ const DeliveredOrdersList = () => {
                                             className="invoice-btn packed-invoice-btn"
                                             onClick={() => {
                                               setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                              setPendingInvoiceKind("packed");
                                               setShowInvoiceModal(true);
                                             }}
                                           >
@@ -508,7 +510,11 @@ const DeliveredOrdersList = () => {
                                           <button
                                             key={i}
                                             className="invoice-btn delivered-invoice-btn"
-                                            onClick={() => downloadDeliveredInvoice(order._id, inv.invoiceNumber)}
+                                            onClick={() => {
+                                              setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                              setPendingInvoiceKind("delivered");
+                                              setShowInvoiceModal(true);
+                                            }}
                                           >
                                             🧾 {inv.invoiceNumber}
                                           </button>
@@ -523,6 +529,7 @@ const DeliveredOrdersList = () => {
                                       className="invoice-btn"
                                       onClick={() => {
                                         setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
+                                        setPendingInvoiceKind("packed");
                                         setShowInvoiceModal(true);
                                       }}
                                     >
@@ -714,7 +721,11 @@ const DeliveredOrdersList = () => {
         onClose={() => setShowInvoiceModal(false)}
         onSelect={(type) => {
           setShowInvoiceModal(false);
-          downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+          if (pendingInvoiceKind === "delivered") {
+            downloadDeliveredInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+          } else {
+            downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+          }
         }}
       />
     </div>
