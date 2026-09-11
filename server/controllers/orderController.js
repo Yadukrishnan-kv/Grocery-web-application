@@ -1467,18 +1467,27 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // Preprinted paper already has the letterhead printed further down than the
   // normal digital header, so it needs extra blank space here to avoid the
   // "To."/invoice detail boxes overlapping the pre-printed letterhead.
-  y += designType === "preprinted" ? 115 : 95;
+  y += designType === "preprinted" ? 130 : 95;
 
   // ===== CUSTOMER & INVOICE DETAILS ROW =====
   // Left: To. Box
   doc.roundedRect(margin, y, 200, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 8, y + 5);
-  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(9.5).text(order.customer?.name || "N/A", margin + 8, y + 16, { width: 184 });
-  
-  let toY = y + 28;
+
+  // Measure the customer name first so the address (and every line below it)
+  // starts below however many lines the name actually wrapped to, instead of
+  // a fixed offset that overlapped the address when the name ran to 2 lines.
+  const customerName = order.customer?.name || "N/A";
+  doc.font("Helvetica-Bold").fontSize(9.5);
+  const nameHeight = doc.heightOfString(customerName, { width: 184 });
+  doc.fillColor("#333333").text(customerName, margin + 8, y + 16, { width: 184 });
+
+  let toY = y + 16 + nameHeight + 2;
   if (order.customer?.address) {
-    doc.font("Helvetica").fontSize(7.5).text(order.customer.address, margin + 8, toY, { width: 184, height: 20 });
-    toY += 18;
+    doc.font("Helvetica").fontSize(7.5);
+    const addressHeight = doc.heightOfString(order.customer.address, { width: 184 });
+    doc.text(order.customer.address, margin + 8, toY, { width: 184 });
+    toY += addressHeight + 2;
   }
   doc.font("Helvetica").fontSize(7.5).text(`Mob: ${order.customer?.phoneNumber || "N/A"}`, margin + 8, toY);
   toY += 10;
@@ -1549,9 +1558,10 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
 
   // Reduce the item table row heights for preprinted layout to offset the
   // extra top blank space added above, keeping the invoice within one page.
-  const headerRowHeight = designType === "preprinted" ? 16 : 22;
-  const dataRowHeight = designType === "preprinted" ? 13 : 18;
+  const headerRowHeight = designType === "preprinted" ? 14 : 22;
+  const dataRowHeight = designType === "preprinted" ? 12 : 18;
   const headerTextOffset = designType === "preprinted" ? 3 : 6;
+  const dataTextOffset = designType === "preprinted" ? 4 : 5;
 
   const drawTableHeader = (startY) => {
     doc.lineWidth(1).strokeColor(navyColor);
@@ -1620,7 +1630,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     cols.forEach((col, i) => {
       doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
       doc.moveTo(col.x, y).lineTo(col.x, y + dataRowHeight).stroke();
-      doc.text(rowData[i], col.x + 4, y + 5, { width: col.width - 8, align: i === 1 ? "left" : col.align });
+      doc.text(rowData[i], col.x + 4, y + dataTextOffset, { width: col.width - 8, align: i === 1 ? "left" : col.align });
     });
     doc.moveTo(margin + contentWidth, y).lineTo(margin + contentWidth, y + dataRowHeight).stroke();
 
