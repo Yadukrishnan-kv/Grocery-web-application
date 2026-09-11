@@ -1467,7 +1467,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // Preprinted paper already has the letterhead printed further down than the
   // normal digital header, so it needs extra blank space here to avoid the
   // "To."/invoice detail boxes overlapping the pre-printed letterhead.
-  y += designType === "preprinted" ? 105 : 95;
+  y += designType === "preprinted" ? 115 : 95;
 
   // ===== CUSTOMER & INVOICE DETAILS ROW =====
   // Left: To. Box
@@ -1549,9 +1549,9 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
 
   // Reduce the item table row heights for preprinted layout to offset the
   // extra top blank space added above, keeping the invoice within one page.
-  const headerRowHeight = designType === "preprinted" ? 18 : 22;
-  const dataRowHeight = designType === "preprinted" ? 15 : 18;
-  const headerTextOffset = designType === "preprinted" ? 4 : 6;
+  const headerRowHeight = designType === "preprinted" ? 16 : 22;
+  const dataRowHeight = designType === "preprinted" ? 13 : 18;
+  const headerTextOffset = designType === "preprinted" ? 3 : 6;
 
   const drawTableHeader = (startY) => {
     doc.lineWidth(1).strokeColor(navyColor);
