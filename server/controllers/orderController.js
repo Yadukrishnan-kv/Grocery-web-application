@@ -1345,6 +1345,9 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   const navyColor = "#002D62"; // Main brand navy blue
   const redColor = "#D21F3C";  // Brand red
 
+  // "فاتورة ضريبية" (tax invoice) in shaped/reversed Arabic sequence
+  const TAX_INVOICE_ARABIC = "ﺔﻲﺒﻱﺮﻟ ﺓﺭﻮﺳﺎﺱ";
+
   // Date formatting
   const date = new Date(order.orderDate || order.deliveredAt || Date.now());
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -1467,11 +1470,38 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // Preprinted paper already has the letterhead printed further down than the
   // normal digital header, so it needs extra blank space here to avoid the
   // "To."/invoice detail boxes overlapping the pre-printed letterhead.
-  y += designType === "preprinted" ? 130 : 95;
+  y += designType === "preprinted" ? 145 : 112;
+
+  // ===== TAX INVOICE TITLE (plain centered text, no filled box) =====
+  const titleEnglish = invoiceType.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  const titleEnglishWithSlash = `${titleEnglish} / `;
+  doc.font("Helvetica-Bold").fontSize(12);
+  const titleEnglishWidth = doc.widthOfString(titleEnglishWithSlash);
+  let titleArabicWidth = 0;
+  if (fontRegistered) {
+    doc.font("ArabicFont").fontSize(12);
+    titleArabicWidth = doc.widthOfString(TAX_INVOICE_ARABIC);
+  }
+  const titleStartX = margin + (contentWidth - (titleEnglishWidth + titleArabicWidth)) / 2;
+  doc.font("Helvetica-Bold").fontSize(12).fillColor(navyColor)
+     .text(titleEnglishWithSlash, titleStartX, y, { lineBreak: false });
+  if (fontRegistered) {
+    try {
+      doc.font("ArabicFont").fontSize(12).fillColor(navyColor)
+         .text(TAX_INVOICE_ARABIC, titleStartX + titleEnglishWidth, y, { lineBreak: false });
+    } catch (e) {
+      console.error("Failed to render Arabic tax invoice title:", e);
+    }
+  }
+  y += 22;
 
   // ===== CUSTOMER & INVOICE DETAILS ROW =====
-  // Left: To. Box
-  doc.roundedRect(margin, y, 200, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  // Left: To. Box — widened to reach the Details box now that the center
+  // Tax Invoice box no longer sits between them.
+  const toBoxGap = 15;
+  const toBoxWidth = (margin + contentWidth - 180) - margin - toBoxGap;
+  const toTextWidth = toBoxWidth - 16;
+  doc.roundedRect(margin, y, toBoxWidth, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 8, y + 5);
 
   // Measure the customer name first so the address (and every line below it)
@@ -1479,32 +1509,19 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // a fixed offset that overlapped the address when the name ran to 2 lines.
   const customerName = order.customer?.name || "N/A";
   doc.font("Helvetica-Bold").fontSize(9.5);
-  const nameHeight = doc.heightOfString(customerName, { width: 184 });
-  doc.fillColor("#333333").text(customerName, margin + 8, y + 16, { width: 184 });
+  const nameHeight = doc.heightOfString(customerName, { width: toTextWidth });
+  doc.fillColor("#333333").text(customerName, margin + 8, y + 16, { width: toTextWidth });
 
   let toY = y + 16 + nameHeight + 2;
   if (order.customer?.address) {
     doc.font("Helvetica").fontSize(7.5);
-    const addressHeight = doc.heightOfString(order.customer.address, { width: 184 });
-    doc.text(order.customer.address, margin + 8, toY, { width: 184 });
+    const addressHeight = doc.heightOfString(order.customer.address, { width: toTextWidth });
+    doc.text(order.customer.address, margin + 8, toY, { width: toTextWidth });
     toY += addressHeight + 2;
   }
   doc.font("Helvetica").fontSize(7.5).text(`Mob: ${order.customer?.phoneNumber || "N/A"}`, margin + 8, toY);
   toY += 10;
   doc.font("Helvetica-Bold").fontSize(8).text(`TRN: ${order.customer?.pincode || "N/A"}`, margin + 8, toY);
-
-  // Center: TAX INVOICE Box
-  doc.fillColor(navyColor).roundedRect(margin + 225, y + 15, 125, 45, 4).fill();
-  if (fontRegistered) {
-    try {
-      doc.font("ArabicFont").fontSize(11).fillColor("#FFFFFF");
-      // "فاتورة ضريبية" in shaped/reversed Arabic sequence
-      doc.text("\uFE94\uFEF2\uFE92\uFEF1\uFEAE\uFEDF \uFE93\uFEAD\uFEEE\uFEB3\uFE8E\uFEB1", margin + 225, y + 23, { width: 125, align: "center" });
-    } catch (e) {
-      console.error("Failed to render Arabic tax invoice title:", e);
-    }
-  }
-  doc.font("Helvetica-Bold").fontSize(11).fillColor("#FFFFFF").text(invoiceType, margin + 225, y + 38, { width: 125, align: "center" });
 
   // Right: Details Box
   const detailsBoxY = y;
@@ -1558,10 +1575,10 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
 
   // Reduce the item table row heights for preprinted layout to offset the
   // extra top blank space added above, keeping the invoice within one page.
-  const headerRowHeight = designType === "preprinted" ? 14 : 22;
-  const dataRowHeight = designType === "preprinted" ? 12 : 18;
-  const headerTextOffset = designType === "preprinted" ? 3 : 6;
-  const dataTextOffset = designType === "preprinted" ? 4 : 5;
+  const headerRowHeight = designType === "preprinted" ? 12 : 22;
+  const dataRowHeight = designType === "preprinted" ? 10 : 18;
+  const headerTextOffset = designType === "preprinted" ? 2 : 6;
+  const dataTextOffset = designType === "preprinted" ? 2.5 : 5;
 
   const drawTableHeader = (startY) => {
     doc.lineWidth(1).strokeColor(navyColor);
