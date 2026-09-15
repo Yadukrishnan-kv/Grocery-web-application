@@ -1,3 +1,4 @@
+const path = require("path");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Customer = require("../models/Customer");
@@ -14,9 +15,32 @@ const formatArabicForPdf = (text) => {
   if (!text) return "";
   try {
     const reshaped = arabicReshaper.convertArabic(text);
-    return reshaped.split("").reverse().join("");
+    return Array.from(reshaped).reverse().join("");
   } catch {
-    return text;
+    return Array.from(text).reverse().join("");
+  }
+};
+
+// PDFKit (0.17+) already joins/shapes RTL Arabic glyphs correctly within
+// each word on its own, so admin-entered dynamic labels only need glyph
+// reshaping, NOT the old manual whole-string reverse() above (that scrambles
+// each word's letters, since it was written for older PDFKit versions
+// without any RTL support). However, PDFKit's own handling still reverses
+// the ORDER of space-separated words without reordering the space itself
+// (e.g. "فاتورة ضريبية" comes out as "ضريبيةفاتورة", word order swapped and
+// the space swallowed) — so a single word ("هاي") renders correctly as-is,
+// but a multi-word phrase needs its word order pre-swapped here to cancel
+// that out and land back in correct reading order.
+// Kept separate from formatArabicForPdf so existing hardcoded strings
+// (company name, condition/signature lines) keep their long-standing look,
+// which already accounts for the old reversal behavior.
+const formatDynamicArabicForPdf = (text) => {
+  if (!text) return "";
+  try {
+    const reshaped = arabicReshaper.convertArabic(text);
+    return reshaped.split(" ").reverse().join(" ");
+  } catch {
+    return text.split(" ").reverse().join(" ");
   }
 };
 
@@ -1331,6 +1355,17 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   const margin = 20;
   const contentWidth = pageWidth - margin * 2;
 
+  // Footer block position — computed from page constants only (not from any
+  // loop/content state), so it's the same on every page. Used both to place
+  // the totals/signature footer on the last page, and to close off the item
+  // table's border on earlier pages down to that same line (see the item
+  // loop below), instead of leaving those pages' tables looking cut short.
+  const sigBoxW = 131.32;
+  const sigBoxH = 75;
+  const sigY = pageHeight - margin - sigBoxH - 10;
+  const chequeY = sigY - 18 - 5;
+  const totalsY = chequeY - 60 - 5;
+
   // Fetch dynamic Company Settings
   const company = await CompanySettings.findOne() || {};
   const companyName = company.companyName || "DADDYS FOODSTUFF TR. L.L.C.";
@@ -1340,37 +1375,56 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   const companyTel = company.companyTel || "";
   const companyEmail = company.companyEmail || "daddyskitchenmasala@gmail.com";
   const companyWebsite = company.companyWebsite || "www.daddyskitchenmasala.com";
+  const taxInvoiceArabicLabel = company.taxInvoiceArabicLabel || "فاتورة ضريبية";
 
   // Colors
   const navyColor = "#002D62"; // Main brand navy blue
   const redColor = "#D21F3C";  // Brand red
 
-  // "فاتورة ضريبية" (tax invoice) in shaped/reversed Arabic sequence
-  const TAX_INVOICE_ARABIC = "ﺔﻲﺒﻱﺮﻟ ﺓﺭﻮﺳﺎﺱ";
+  // Sourced from Company Settings (taxInvoiceArabicLabel) so admins can edit
+  // it without a code change; falls back to the standard phrase above.
+  const TAX_INVOICE_ARABIC = formatDynamicArabicForPdf(taxInvoiceArabicLabel);
+  const CONDITION_TEXT_ARABIC = formatArabicForPdf("استلمنا البضاعة المذكورة في حالة جيدة");
+  const RECEIVER_SIGNATURE_ARABIC = formatArabicForPdf("توقيع المستلم");
 
   // Date formatting
   const date = new Date(order.orderDate || order.deliveredAt || Date.now());
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const formattedDate = `${date.getDate()}-${monthNames[date.getMonth()]}-${String(date.getFullYear()).slice(-2)}`;
 
-  // Font registration (RTL Arabic support)
+  // The bundled NotoSansArabic font has no glyph for U+2003 (em space) and
+  // renders a visible ".notdef" box for it, so a plain regular space is
+  // repeated instead to widen the gap between words while staying inside
+  // codepoints guaranteed to exist in the font.
+  const WORD_GAP = "   ";
+  const TAX_INVOICE_ARABIC_SPACED = TAX_INVOICE_ARABIC.split(" ").join(WORD_GAP);
+  const CONDITION_TEXT_ARABIC_SPACED = CONDITION_TEXT_ARABIC.split(" ").join(WORD_GAP);
+  const RECEIVER_SIGNATURE_ARABIC_SPACED = RECEIVER_SIGNATURE_ARABIC.split(" ").join(WORD_GAP);
+
+  // Font registration (RTL Arabic support).
+  // Prefer Noto Sans Arabic for proper Arabic Presentation Forms rendering,
+  // fall back to Arial on Windows, then Linux alternatives.
   let fontRegistered = false;
   try {
-    let fontPath = "C:/Windows/Fonts/arial.ttf";
-    if (process.platform !== "win32") {
-      const linuxPaths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",
-        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf"
-      ];
-      for (const p of linuxPaths) {
-        if (fs.existsSync(p)) {
-          fontPath = p;
-          break;
-        }
+    const fontPaths = [
+      // Windows system fonts. Arial's Arabic Presentation Forms glyph
+      // coverage renders arabic-reshaper's pre-shaped/reversed output
+      // correctly; NotoSansArabic (tried previously) lacks glyphs for
+      // those presentation-form codepoints and drops most letters.
+      "C:/Windows/Fonts/arial.ttf",
+      // Linux alternatives
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",
+      "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+    ];
+    let fontPath = null;
+    for (const p of fontPaths) {
+      if (fs.existsSync(p)) {
+        fontPath = p;
+        break;
       }
     }
-    if (fs.existsSync(fontPath)) {
+    if (fontPath) {
       doc.registerFont("ArabicFont", fontPath);
       fontRegistered = true;
     }
@@ -1428,6 +1482,11 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   drawOuterBorder();
   drawWatermark();
 
+  // Wrapped in a function (rather than inline) so it can be redrawn on each
+  // new page when a large order's items spill past one page — every split
+  // page repeats the same invoice number/date/customer details, so each
+  // page reads as a complete invoice on its own.
+  const drawHeaderSection = () => {
   let y = 10;
 
   // ===== HEADER =====
@@ -1470,36 +1529,42 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // Preprinted paper already has the letterhead printed further down than the
   // normal digital header, so it needs extra blank space here to avoid the
   // "To."/invoice detail boxes overlapping the pre-printed letterhead.
-  y += designType === "preprinted" ? 145 : 112;
+  y += designType === "preprinted" ? 145 : 95;
 
-  // ===== TAX INVOICE TITLE (plain centered text, no filled box) =====
-  const titleEnglish = invoiceType.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-  const titleEnglishWithSlash = `${titleEnglish} / `;
-  doc.font("Helvetica-Bold").fontSize(12);
-  const titleEnglishWidth = doc.widthOfString(titleEnglishWithSlash);
-  let titleArabicWidth = 0;
-  if (fontRegistered) {
-    doc.font("ArabicFont").fontSize(12);
-    titleArabicWidth = doc.widthOfString(TAX_INVOICE_ARABIC);
-  }
-  const titleStartX = margin + (contentWidth - (titleEnglishWidth + titleArabicWidth)) / 2;
-  doc.font("Helvetica-Bold").fontSize(12).fillColor(navyColor)
-     .text(titleEnglishWithSlash, titleStartX, y, { lineBreak: false });
-  if (fontRegistered) {
-    try {
-      doc.font("ArabicFont").fontSize(12).fillColor(navyColor)
-         .text(TAX_INVOICE_ARABIC, titleStartX + titleEnglishWidth, y, { lineBreak: false });
-    } catch (e) {
-      console.error("Failed to render Arabic tax invoice title:", e);
+  // ===== TAX INVOICE TITLE =====
+  // Preprinted: plain centered text above the row, with the To. box widened
+  // into the space the old center box used to occupy. Normal invoice is
+  // untouched — it keeps the original filled navy "TAX INVOICE" box between
+  // the To. box and the Details box (drawn further below), at its original
+  // width and position.
+  let toBoxWidth = 200;
+  if (designType === "preprinted") {
+    const titleEnglish = invoiceType.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+    const titleEnglishWithSlash = `${titleEnglish} / `;
+    doc.font("Helvetica-Bold").fontSize(12);
+    const titleEnglishWidth = doc.widthOfString(titleEnglishWithSlash);
+    let titleArabicWidth = 0;
+    if (fontRegistered) {
+      doc.font("ArabicFont").fontSize(12);
+      titleArabicWidth = doc.widthOfString(TAX_INVOICE_ARABIC_SPACED);
     }
+    const titleStartX = margin + (contentWidth - (titleEnglishWidth + titleArabicWidth)) / 2;
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(navyColor)
+       .text(titleEnglishWithSlash, titleStartX, y, { lineBreak: false });
+    if (fontRegistered) {
+      try {
+        doc.font("ArabicFont").fontSize(12).fillColor(navyColor)
+           .text(TAX_INVOICE_ARABIC_SPACED, titleStartX + titleEnglishWidth, y, { lineBreak: false });
+      } catch (e) {
+        console.error("Failed to render Arabic tax invoice title:", e);
+      }
+    }
+    y += 22;
+    toBoxWidth = (margin + contentWidth - 180) - margin - 15;
   }
-  y += 22;
 
   // ===== CUSTOMER & INVOICE DETAILS ROW =====
-  // Left: To. Box — widened to reach the Details box now that the center
-  // Tax Invoice box no longer sits between them.
-  const toBoxGap = 15;
-  const toBoxWidth = (margin + contentWidth - 180) - margin - toBoxGap;
+  // Left: To. Box
   const toTextWidth = toBoxWidth - 16;
   doc.roundedRect(margin, y, toBoxWidth, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 8, y + 5);
@@ -1522,6 +1587,36 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   doc.font("Helvetica").fontSize(7.5).text(`Mob: ${order.customer?.phoneNumber || "N/A"}`, margin + 8, toY);
   toY += 10;
   doc.font("Helvetica-Bold").fontSize(8).text(`TRN: ${order.customer?.pincode || "N/A"}`, margin + 8, toY);
+
+  if (designType !== "preprinted") {
+    // Center: TAX INVOICE Box (original filled navy box, normal invoice only)
+    doc.fillColor(navyColor).roundedRect(margin + 225, y + 15, 125, 45, 4).fill();
+    if (fontRegistered) {
+      try {
+        // Box width/height are fixed, but the label is now admin-editable
+        // (Company Settings) and can differ from the original hardcoded
+        // text. ArabicFont's own line-height metric is ~2.1x its font size
+        // (a Noto font metrics quirk), so even a short single-line label
+        // can be tall enough to collide with "TAX INVOICE" drawn 15pt below
+        // — shrink until both the width fits AND the line height leaves
+        // clearance for that line, instead of assuming a fixed size fits.
+        doc.font("ArabicFont");
+        let arabicBoxFontSize = 11;
+        while (
+          arabicBoxFontSize > 5 &&
+          (doc.fontSize(arabicBoxFontSize).widthOfString(TAX_INVOICE_ARABIC_SPACED) > 115 ||
+            doc.currentLineHeight() > 13)
+        ) {
+          arabicBoxFontSize -= 0.5;
+        }
+        doc.font("ArabicFont").fontSize(arabicBoxFontSize).fillColor("#FFFFFF");
+        doc.text(TAX_INVOICE_ARABIC_SPACED, margin + 225, y + 23, { width: 125, align: "center", lineBreak: false });
+      } catch (e) {
+        console.error("Failed to render Arabic tax invoice title:", e);
+      }
+    }
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#FFFFFF").text(invoiceType, margin + 225, y + 38, { width: 125, align: "center" });
+  }
 
   // Right: Details Box
   const detailsBoxY = y;
@@ -1551,11 +1646,18 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   }
 
   y += 85;
+  return y;
+  };
+
+  let y = drawHeaderSection();
 
   // ===== ITEMS TABLE =====
+  // "S. No." is widened by 5pt (borrowed from "Item Name", which has ample
+  // spare width) only for preprinted, whose larger 8.5pt header font would
+  // otherwise wrap "S. No." to 2 lines and touch the row below.
   const colDefs = [
-    { width: 25, header: "S. No.", align: "center" },
-    { width: 170.28, header: "Item Name", align: "left" },
+    { width: designType === "preprinted" ? 30 : 25, header: "S. No.", align: "center" },
+    { width: designType === "preprinted" ? 165.28 : 170.28, header: "Item Name", align: "left" },
     { width: 35, header: "Qty.", align: "center" },
     { width: 35, header: "Unit", align: "center" },
     { width: 45, header: "U. Price", align: "right" },
@@ -1573,19 +1675,26 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     return result;
   });
 
-  // Reduce the item table row heights for preprinted layout to offset the
-  // extra top blank space added above, keeping the invoice within one page.
-  const headerRowHeight = designType === "preprinted" ? 12 : 22;
-  const dataRowHeight = designType === "preprinted" ? 10 : 18;
-  const headerTextOffset = designType === "preprinted" ? 2 : 6;
-  const dataTextOffset = designType === "preprinted" ? 2.5 : 5;
+  // Row heights/offsets now match the normal invoice exactly (the footer
+  // block below is pinned to the bottom of the page regardless of how much
+  // vertical space the item rows use, and overflow already pushes to a new
+  // page via the check below, so taller preprinted rows are safe either way).
+  // Preprinted's column heading font is bumped from the base 7.5pt to the
+  // largest size ("S. No." doesn't grow past ~7.5pt in its 25pt column, so
+  // 8.5pt is bound by "VAT Amount" instead) that still fits every header on
+  // one line within the existing column widths — no wrapping/overlap.
+  const headerRowHeight = 22;
+  const dataRowHeight = 18;
+  const headerTextOffset = 6;
+  const dataTextOffset = 5;
+  const headerFontSize = designType === "preprinted" ? 8.5 : 7.5;
 
   const drawTableHeader = (startY) => {
     doc.lineWidth(1).strokeColor(navyColor);
     doc.rect(margin, startY, contentWidth, headerRowHeight).stroke();
 
     cols.forEach((col) => {
-      doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5)
+      doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(headerFontSize)
          .text(col.header, col.x + 2, startY + headerTextOffset, { width: col.width - 4, align: col.align });
       doc.moveTo(col.x, startY).lineTo(col.x, startY + headerRowHeight).stroke();
     });
@@ -1603,14 +1712,37 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   let totalPacks = 0;
   let serialNumber = 1;
 
-  for (const item of order.orderItems) {
-    const qty = item.deliveredQuantity || item.orderedQuantity;
-    if (qty <= 0) continue;
+  // Only the page that ends up holding the very last item also carries the
+  // totals footer below it, so only that page's items need to stop short at
+  // totalsY to leave room for it. Every other page has no footer on it at
+  // all — its items can fill all the way down to where the border closes
+  // (totalsY + 60) instead of leaving that same footer-sized gap blank for
+  // no reason. Filtering + indexing (instead of the previous for-of with an
+  // inline qty<=0 skip) is what makes "is this the last item" knowable.
+  const validItems = order.orderItems.filter((item) => (item.deliveredQuantity || item.orderedQuantity) > 0);
 
-    // Page overflow check (strictly trigger at y = 625 to prevent any footer overlap)
-    if (y + dataRowHeight > 625) {
+  validItems.forEach((item, itemIndex) => {
+    const qty = item.deliveredQuantity || item.orderedQuantity;
+    const isLastItem = itemIndex === validItems.length - 1;
+    const overflowLimit = isLastItem ? totalsY : totalsY + 60;
+
+    // Page overflow check — trigger right where a row would reach overflowLimit
+    // (footer's start line on the last item's page, or the border-closing
+    // line totalsY + 60 on every other page).
+    if (y + dataRowHeight > overflowLimit) {
+      // Close this page's table border right where its last item row
+      // actually ends (y hasn't advanced for the item that's overflowing
+      // yet) — a tight fit with no leftover blank space, since this page
+      // won't carry the totals footer anyway (that lands on whichever page
+      // the loop finally ends on).
+      doc.lineWidth(1).strokeColor(navyColor);
+      doc.rect(margin, tableStartY, contentWidth, y - tableStartY).stroke();
+
       createNewPage();
-      y = margin + 15;
+      // Redraw the full header (logo/company info, Tax Invoice title, To./
+      // Details boxes) so this continuation page reads as a complete invoice
+      // with the same invoice number and customer details, not a bare table.
+      y = drawHeaderSection();
       y = drawTableHeader(y);
       tableStartY = y - headerRowHeight;
     }
@@ -1653,21 +1785,22 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
 
     y += dataRowHeight;
     serialNumber++;
-  }
+  });
 
-  // Check if footer sections need a new page
-  if (y > 625) {
+  // Check if footer sections need a new page (kept as a safety net — the
+  // in-loop check above already keeps y at or under totalsY in practice)
+  if (y > totalsY) {
     createNewPage();
+    // Same reasoning as the item-table overflow above: this page only has
+    // the totals block on it, but it should still read as a complete
+    // invoice rather than a bare footer, so repeat the header here too.
+    drawHeaderSection();
   }
 
   // ===== FOOTER DESIGN POSITIONING (Aligned at the bottom) =====
-  const sigBoxW = 131.32;
-  const sigBoxH = 75;
+  // sigBoxW/sigBoxH/sigY/chequeY/totalsY are computed near the top of this
+  // function now (needed inside the item loop above too).
   const sigGap = 10;
-
-  const sigY = pageHeight - margin - sigBoxH - 10;
-  const chequeY = sigY - 18 - 5;
-  const totalsY = chequeY - 60 - 5;
 
   // ===== TOTALS BLOCK =====
   doc.lineWidth(1).strokeColor(navyColor);
@@ -1711,10 +1844,43 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // Box 1: Condition and Receiver's Sign
   const box1X = margin;
   doc.roundedRect(box1X, sigY, sigBoxW, sigBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
-  if (fontRegistered) {
-    try {
-      doc.font("ArabicFont").fontSize(6.5).fillColor(navyColor);
-      // Reversed shaped RTL Arabic for: "استلمنا البضاعة المذكورة في حالة جيدة"
+  if (designType === "preprinted") {
+    // Lines are stacked using measured heights (not fixed offsets) since the
+    // correctly-shaped Arabic condition phrase wraps to 2 lines at this box
+    // width and a fixed offset made it collide with the English line drawn
+    // right after it. Normal invoice (below, unchanged) keeps fixed offsets.
+    const box1TextWidth = sigBoxW - 10;
+    let box1Y = sigY + 4;
+    if (fontRegistered) {
+      try {
+        doc.font("ArabicFont").fontSize(6.5).fillColor(navyColor);
+        doc.text(CONDITION_TEXT_ARABIC_SPACED, box1X + 5, box1Y, { width: box1TextWidth, align: "center" });
+        box1Y += 16;
+      } catch (e) {
+        console.error("Failed to render Arabic condition line 1:", e);
+      }
+    }
+    doc.fillColor(navyColor).font("Helvetica").fontSize(6.5);
+    doc.text("Received above items in good condition.", box1X + 5, box1Y, { width: box1TextWidth, align: "center" });
+    box1Y += 20;
+    doc.text("....................................................", box1X + 5, box1Y, { width: box1TextWidth, align: "center" });
+    box1Y += 9;
+    doc.font("Helvetica-Bold").fontSize(6.5);
+    doc.text("Receiver's Name & Signature", box1X + 5, box1Y, { width: box1TextWidth, align: "center" });
+    box1Y += 9;
+    if (fontRegistered) {
+      try {
+        doc.font("ArabicFont").fontSize(6.5);
+        doc.text(RECEIVER_SIGNATURE_ARABIC_SPACED, box1X + 5, box1Y, { width: box1TextWidth, align: "center" });
+      } catch (e) {
+        console.error("Failed to render Arabic condition signature:", e);
+      }
+    }
+  } else {
+    if (fontRegistered) {
+      try {
+        doc.font("ArabicFont").fontSize(6.5).fillColor(navyColor);
+        // Reversed shaped RTL Arabic for: "استلمنا البضاعة المذكورة في حالة جيدة"
       doc.text("\uFE94\uFEAE\uFEF2\uFEDF \uFE93\uFEAE\uFE92\uFE8E\uFE91 \uFEF2\uFEDF \uFE94\uFEAE\uFE92\uFE8E\uFE91 \uFE94\uFEA4\uFE8D\uFE94\uFE92\uFE8E\uFE91 \uFE8D\uFEAE\uFE92\uFE8E\uFE91 \uFE8E\uFEEC\uFEAE\uFE92\uFE8E\uFE91", box1X + 5, sigY + 5, { width: sigBoxW - 10, align: "center" });
     } catch (e) {
       console.error("Failed to render Arabic condition line 1:", e);
@@ -1733,6 +1899,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     } catch (e) {
       console.error("Failed to render Arabic condition signature:", e);
     }
+  }
   }
 
   // Box 2: Vehicle No. & Driver
@@ -2746,7 +2913,7 @@ const getUnifiedInvoice = async (req, res) => {
     const filename = `unified-invoice-${targetInvoiceNo}.pdf`;
 
     const pdfBuffer = await buildPDFBuffer(async (doc) => {
-      await generateUnifiedInvoicePDF(doc, order, "INVOICE", targetInvoiceNo, designType);
+      await generateUnifiedInvoicePDF(doc, order, "TAX INVOICE", targetInvoiceNo, designType);
     });
 
     const suffix = designType === "preprinted" ? "-preprinted" : "";

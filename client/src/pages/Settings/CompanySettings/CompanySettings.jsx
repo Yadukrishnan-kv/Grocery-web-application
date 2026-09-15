@@ -15,6 +15,8 @@ const CompanySettings = () => {
     companyEmail: "",
     companyWebsite: "",
     companyNameArabic: "",
+    taxInvoiceArabicLabel: "",
+    creditNoteArabicLabel: "",
     bankName: "",
     bankAccountNumber: "",
     entriesPerPage: 10,
@@ -62,6 +64,10 @@ const CompanySettings = () => {
             companyEmail: settingsRes.data.companyEmail || "",
             companyWebsite: settingsRes.data.companyWebsite || "",
             companyNameArabic: settingsRes.data.companyNameArabic || "",
+            taxInvoiceArabicLabel:
+              settingsRes.data.taxInvoiceArabicLabel || "فاتورة ضريبية",
+            creditNoteArabicLabel:
+              settingsRes.data.creditNoteArabicLabel || "مردودات المبيعات",
             bankName: settingsRes.data.bankName || "",
             bankAccountNumber: settingsRes.data.bankAccountNumber || "",
             entriesPerPage: settingsRes.data.entriesPerPage || 10,
@@ -214,10 +220,49 @@ const CompanySettings = () => {
                 id="companyNameArabic"
                 name="companyNameArabic"
                 type="text"
+                dir="rtl"
                 value={formData.companyNameArabic}
                 onChange={handleChange}
                 placeholder="Enter company name in Arabic"
               />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="taxInvoiceArabicLabel">
+                Tax Invoice Arabic Label
+              </label>
+              <input
+                id="taxInvoiceArabicLabel"
+                name="taxInvoiceArabicLabel"
+                type="text"
+                dir="rtl"
+                value={formData.taxInvoiceArabicLabel}
+                onChange={handleChange}
+                placeholder="فاتورة ضريبية"
+              />
+              <small className="field-hint">
+                Shown next to "Tax Invoice" on the preprinted &amp; normal
+                invoice. Does not affect the Sales Return invoice.
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="creditNoteArabicLabel">
+                Credit Note Arabic Label
+              </label>
+              <input
+                id="creditNoteArabicLabel"
+                name="creditNoteArabicLabel"
+                type="text"
+                dir="rtl"
+                value={formData.creditNoteArabicLabel}
+                onChange={handleChange}
+                placeholder="مردودات المبيعات"
+              />
+              <small className="field-hint">
+                Shown next to "Credit Note" on the preprinted &amp; normal
+                Sales Return invoice. Does not affect the Tax Invoice.
+              </small>
             </div>
 
             <div className="form-row">
