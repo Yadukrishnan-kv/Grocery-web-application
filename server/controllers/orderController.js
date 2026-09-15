@@ -1672,20 +1672,23 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   let y = drawHeaderSection();
 
   // ===== ITEMS TABLE =====
-  // "S. No." is widened by 5pt (borrowed from "Item Name", which has ample
-  // spare width) only for preprinted, whose larger 8.5pt header font would
-  // otherwise wrap "S. No." to 2 lines and touch the row below.
+  // Column widths sized to fit every header at 11pt (headerFontSize below)
+  // with a small margin, computed from actual measured text width per
+  // column — not just "S. No." anymore, since every numeric column needed
+  // more room at this size. "Item Name" gets whatever's left over (555.28
+  // total content width minus the other 9), which comes out close to its
+  // original 165.28 either way, so real product names still have room.
   const colDefs = [
-    { width: designType === "preprinted" ? 30 : 25, header: "S. No.", align: "center" },
-    { width: designType === "preprinted" ? 165.28 : 170.28, header: "Item Name", align: "left" },
-    { width: 35, header: "Qty.", align: "center" },
-    { width: 35, header: "Unit", align: "center" },
-    { width: 45, header: "U. Price", align: "right" },
-    { width: 50, header: "Excl. VAT", align: "right" },
-    { width: 35, header: "Disc%", align: "center" },
-    { width: 35, header: "VAT%", align: "center" },
-    { width: 55, header: "VAT Amount", align: "right" },
-    { width: 70, header: "TOTAL", align: "right" },
+    { width: 36.5, header: "S. No.", align: "center" },
+    { width: 178.78, header: "Item Name", align: "left" },
+    { width: 26.5, header: "Qty.", align: "center" },
+    { width: 27.5, header: "Unit", align: "center" },
+    { width: 46.5, header: "U. Price", align: "right" },
+    { width: 53.5, header: "Excl. VAT", align: "right" },
+    { width: 39.5, header: "Disc%", align: "center" },
+    { width: 35.5, header: "VAT%", align: "center" },
+    { width: 70.5, header: "VAT Amount", align: "right" },
+    { width: 40.5, header: "TOTAL", align: "right" },
   ];
 
   let colX = margin;
@@ -1695,19 +1698,15 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     return result;
   });
 
-  // Row heights/offsets now match the normal invoice exactly (the footer
-  // block below is pinned to the bottom of the page regardless of how much
-  // vertical space the item rows use, and overflow already pushes to a new
-  // page via the check below, so taller preprinted rows are safe either way).
-  // Preprinted's column heading font is bumped from the base 7.5pt to the
-  // largest size ("S. No." doesn't grow past ~7.5pt in its 25pt column, so
-  // 8.5pt is bound by "VAT Amount" instead) that still fits every header on
-  // one line within the existing column widths — no wrapping/overlap.
+  // Row heights/offsets match for both design types (the footer block below
+  // is pinned to the bottom of the page regardless of how much vertical
+  // space the item rows use, and overflow already pushes to a new page via
+  // the check below, so taller preprinted rows are safe either way).
   const headerRowHeight = 22;
   const dataRowHeight = 18;
   const headerTextOffset = 6;
   const dataTextOffset = 5;
-  const headerFontSize = designType === "preprinted" ? 8.5 : 7.5;
+  const headerFontSize = 11;
 
   const drawTableHeader = (startY) => {
     doc.lineWidth(1).strokeColor(navyColor);
