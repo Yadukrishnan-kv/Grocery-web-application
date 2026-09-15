@@ -1566,22 +1566,38 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // ===== CUSTOMER & INVOICE DETAILS ROW =====
   // Left: To. Box
   const toTextWidth = toBoxWidth - 16;
-  doc.roundedRect(margin, y, toBoxWidth, 75, 4).lineWidth(1).strokeColor(navyColor).stroke();
-  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 8, y + 5);
-
-  // Measure the customer name first so the address (and every line below it)
-  // starts below however many lines the name actually wrapped to, instead of
-  // a fixed offset that overlapped the address when the name ran to 2 lines.
   const customerName = order.customer?.name || "N/A";
+  const customerAddress = order.customer?.address || "";
+
+  // Measure name/address height first so the box (normal invoice only — see
+  // designType check below) can grow to fit a long address instead of the
+  // text running past the box's bottom edge. Preprinted keeps the original
+  // fixed 75pt box untouched.
   doc.font("Helvetica-Bold").fontSize(9.5);
   const nameHeight = doc.heightOfString(customerName, { width: toTextWidth });
+  let addressHeight = 0;
+  if (customerAddress) {
+    doc.font("Helvetica").fontSize(7.5);
+    addressHeight = doc.heightOfString(customerAddress, { width: toTextWidth });
+  }
+  let toBoxH = 75;
+  if (designType !== "preprinted") {
+    // 16 (top offset to name) + name + 2 (gap) + address (+2 gap if present)
+    // + 10 (mobile line) + 8 (TRN line) + 8 (bottom padding)
+    const toContentHeight = 16 + nameHeight + 2 + (customerAddress ? addressHeight + 2 : 0) + 10 + 8 + 8;
+    toBoxH = Math.max(75, toContentHeight);
+  }
+
+  doc.roundedRect(margin, y, toBoxWidth, toBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(9).text("To.", margin + 8, y + 5);
+
+  doc.font("Helvetica-Bold").fontSize(9.5);
   doc.fillColor("#333333").text(customerName, margin + 8, y + 16, { width: toTextWidth });
 
   let toY = y + 16 + nameHeight + 2;
-  if (order.customer?.address) {
+  if (customerAddress) {
     doc.font("Helvetica").fontSize(7.5);
-    const addressHeight = doc.heightOfString(order.customer.address, { width: toTextWidth });
-    doc.text(order.customer.address, margin + 8, toY, { width: toTextWidth });
+    doc.text(customerAddress, margin + 8, toY, { width: toTextWidth });
     toY += addressHeight + 2;
   }
   doc.font("Helvetica").fontSize(7.5).text(`Mob: ${order.customer?.phoneNumber || "N/A"}`, margin + 8, toY);
@@ -1618,10 +1634,11 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     doc.font("Helvetica-Bold").fontSize(11).fillColor("#FFFFFF").text(invoiceType, margin + 225, y + 38, { width: 125, align: "center" });
   }
 
-  // Right: Details Box
+  // Right: Details Box — matches the To. box's height (grown or not) so the
+  // two boxes stay bottom-aligned, with rows scaled to still divide evenly.
   const detailsBoxY = y;
-  const detailsBoxH = 75;
-  const detailsRowH = 18.75;
+  const detailsBoxH = toBoxH;
+  const detailsRowH = detailsBoxH / 4;
   const detailsBoxX = margin + contentWidth - 180;
   doc.roundedRect(detailsBoxX, detailsBoxY, 180, detailsBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
   
@@ -1645,7 +1662,10 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     doc.fillColor("#333333").font("Helvetica").fontSize(7.5).text(detailsValues[i], detailsBoxX + 65, rY + 5, { width: 110 });
   }
 
-  y += 85;
+  // Was a fixed "y += 85" (75 box + 10 gap); now follows the box's actual
+  // (possibly grown) height so a longer address leaves the item table with
+  // correspondingly less room, instead of the table overlapping the box.
+  y += toBoxH + 10;
   return y;
   };
 
