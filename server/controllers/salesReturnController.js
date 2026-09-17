@@ -998,12 +998,12 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
     { width: 36.5, header: "S. No.", align: "center" },
     { width: 159.78, header: "Item Name", align: "left" },
     { width: 45.5, header: "Ret.Qty", align: "center" },
-    { width: 27.5, header: "Unit", align: "center" },
+    { width: 38, header: "Unit", align: "center" },
     { width: 46.5, header: "U. Price", align: "right" },
     { width: 53.5, header: "Excl. VAT", align: "right" },
     { width: 39.5, header: "Disc%", align: "center" },
     { width: 35.5, header: "VAT%", align: "center" },
-    { width: 70.5, header: "VAT Amount", align: "right" },
+    { width: 60, header: "VAT Amount", align: "right" },
     { width: 40.5, header: "TOTAL", align: "right" },
   ];
 
@@ -1017,11 +1017,30 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
   // Row heights/offsets match for both design types (the footer block below
   // is pinned to the bottom of the page regardless of how much vertical
   // space the item rows use, so taller preprinted rows are safe).
-  const headerRowHeight = 22;
-  const dataRowHeight = 18;
+  const minHeaderRowHeight = 22;
+  const minDataRowHeight = 18;
   const headerTextOffset = 6;
   const dataTextOffset = 5;
-  const headerFontSize = 11;
+  const headerFontSize = 9.5;
+  const dataFontSize = 10;
+
+  // Rows no longer use a fixed height — long item names/units wrap onto a
+  // second line, so the row height grows to fit whichever cell wraps most
+  // (floored at minDataRowHeight for the common single-line case).
+  const computeRowHeight = (rowData) => {
+    doc.font("Helvetica").fontSize(dataFontSize);
+    const heights = cols.map((col, i) => doc.heightOfString(rowData[i], { width: col.width - 8 }));
+    return Math.max(minDataRowHeight, ...heights.map((h) => h + dataTextOffset * 2));
+  };
+
+  // Header labels are static across the invoice, so the wrap check only
+  // needs to run once — a narrow column grows the header row instead of
+  // clipping/wrapping past it.
+  doc.font("Helvetica-Bold").fontSize(headerFontSize);
+  const headerRowHeight = Math.max(
+    minHeaderRowHeight,
+    ...cols.map((col) => doc.heightOfString(col.header, { width: col.width - 4 }) + headerTextOffset * 2)
+  );
 
   const drawTableHeader = (startY) => {
     doc.lineWidth(1).strokeColor(navyColor);
@@ -1057,27 +1076,6 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
     const isLastItem = itemIndex === validItems.length - 1;
     const overflowLimit = isLastItem ? totalsY : totalsY + 60;
 
-    // Page overflow check — trigger right where a row would reach overflowLimit
-    // (footer's start line on the last item's page, or the border-closing
-    // line totalsY + 60 on every other page).
-    if (y + dataRowHeight > overflowLimit) {
-      // Close this page's table border right where its last item row
-      // actually ends (y hasn't advanced for the item that's overflowing
-      // yet) — a tight fit with no leftover blank space, since this page
-      // won't carry the totals footer anyway (that lands on whichever page
-      // the loop finally ends on).
-      doc.lineWidth(1).strokeColor(navyColor);
-      doc.rect(margin, tableStartY, contentWidth, y - tableStartY).stroke();
-
-      createNewPage();
-      // Redraw the full header (logo/company info, Credit Note title, To./
-      // Details boxes) so this continuation page reads as a complete invoice
-      // with the same CRN number and customer details, not a bare table.
-      y = drawHeaderSection();
-      y = drawTableHeader(y);
-      tableStartY = y - headerRowHeight;
-    }
-
     const vatPercentage = item.vatPercentage || 5;
     const unitPrice = item.price || 0;
     const exclVatAmount = item.exclVatAmount || unitPrice * qty;
@@ -1103,16 +1101,39 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
       itemTotal.toFixed(2),
     ];
 
+    const rowHeight = computeRowHeight(rowData);
+
+    // Page overflow check — trigger right where a row would reach overflowLimit
+    // (footer's start line on the last item's page, or the border-closing
+    // line totalsY + 60 on every other page).
+    if (y + rowHeight > overflowLimit) {
+      // Close this page's table border right where its last item row
+      // actually ends (y hasn't advanced for the item that's overflowing
+      // yet) — a tight fit with no leftover blank space, since this page
+      // won't carry the totals footer anyway (that lands on whichever page
+      // the loop finally ends on).
+      doc.lineWidth(1).strokeColor(navyColor);
+      doc.rect(margin, tableStartY, contentWidth, y - tableStartY).stroke();
+
+      createNewPage();
+      // Redraw the full header (logo/company info, Credit Note title, To./
+      // Details boxes) so this continuation page reads as a complete invoice
+      // with the same CRN number and customer details, not a bare table.
+      y = drawHeaderSection();
+      y = drawTableHeader(y);
+      tableStartY = y - headerRowHeight;
+    }
+
     doc.lineWidth(0.5).strokeColor(navyColor);
-    doc.moveTo(margin, y + dataRowHeight).lineTo(margin + contentWidth, y + dataRowHeight).stroke();
+    doc.moveTo(margin, y + rowHeight).lineTo(margin + contentWidth, y + rowHeight).stroke();
     cols.forEach((col, i) => {
-      doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
-      doc.moveTo(col.x, y).lineTo(col.x, y + dataRowHeight).stroke();
+      doc.fillColor("#333333").font("Helvetica").fontSize(dataFontSize);
+      doc.moveTo(col.x, y).lineTo(col.x, y + rowHeight).stroke();
       doc.text(rowData[i], col.x + 4, y + dataTextOffset, { width: col.width - 8, align: i === 1 ? "left" : col.align });
     });
-    doc.moveTo(margin + contentWidth, y).lineTo(margin + contentWidth, y + dataRowHeight).stroke();
+    doc.moveTo(margin + contentWidth, y).lineTo(margin + contentWidth, y + rowHeight).stroke();
 
-    y += dataRowHeight;
+    y += rowHeight;
     serialNumber++;
   });
 
