@@ -741,12 +741,12 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
   const headerBg = "#d9d9d9";
 
   const creditNoteArabicLabel = company.creditNoteArabicLabel || "مردودات المبيعات";
-  // Dynamic label uses word-order-swap only (see formatDynamicArabicForPdf);
-  // WORD_GAP widens the inter-word gap the same way the delivery invoice's
-  // tax invoice label does, since a plain space renders too narrow here.
+  // Dynamic label uses word-order-swap only (see formatDynamicArabicForPdf)
+  // with normal single-space word spacing — the wide WORD_GAP treatment
+  // below is only for the condition/signature lines, which need the extra
+  // gap to read correctly in their boxes.
   const CREDIT_NOTE_ARABIC = formatDynamicArabicForPdf(creditNoteArabicLabel);
   const WORD_GAP = "   ";
-  const CREDIT_NOTE_ARABIC_SPACED = CREDIT_NOTE_ARABIC.split(" ").join(WORD_GAP);
   const CONDITION_TEXT_ARABIC = formatArabicForPdf("استلمنا البضاعة المذكورة في حالة جيدة");
   const RECEIVER_SIGNATURE_ARABIC = formatArabicForPdf("توقيع المستلم");
   const CONDITION_TEXT_ARABIC_SPACED = CONDITION_TEXT_ARABIC.split(" ").join(WORD_GAP);
@@ -852,33 +852,63 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
   y += designType === "preprinted" ? 130 : 95;
 
   // ===== CREDIT NOTE TITLE =====
-  // Preprinted: plain centered text above the row, with the To. box widened
-  // into the space the old center box used to occupy. Normal invoice is
-  // untouched — it keeps the original filled navy "CREDIT NOTE" box between
-  // the To. box and the Details box (drawn further below), at its original
-  // width and position.
+  // Preprinted: centered text above the row, on a filled navy background
+  // sized to fit the text (same navy fill the normal invoice's title box
+  // uses), with the To. box widened into the space the old plain-text title
+  // used to occupy. Normal invoice is untouched — it keeps the original
+  // filled navy "CREDIT NOTE" box between the To. box and the Details box
+  // (drawn further below), at its original width and position.
   let toBoxWidth = 200;
   if (designType === "preprinted") {
     const titleEnglishWithSlash = "Credit Note / ";
-    doc.font("Helvetica-Bold").fontSize(12);
+    const titleFontSize = 12;
+    doc.font("Helvetica-Bold").fontSize(titleFontSize);
     const titleEnglishWidth = doc.widthOfString(titleEnglishWithSlash);
+    const englishAscent = (doc._font.ascender / 1000) * titleFontSize;
+    const englishDescent = Math.abs(doc._font.descender / 1000) * titleFontSize;
+
     let titleArabicWidth = 0;
+    let arabicAscent = 0;
+    let arabicDescent = 0;
     if (fontRegistered) {
-      doc.font("ArabicFont").fontSize(12);
-      titleArabicWidth = doc.widthOfString(CREDIT_NOTE_ARABIC_SPACED);
+      doc.font("ArabicFont").fontSize(titleFontSize);
+      titleArabicWidth = doc.widthOfString(CREDIT_NOTE_ARABIC);
+      arabicAscent = (doc._font.ascender / 1000) * titleFontSize;
+      arabicDescent = Math.abs(doc._font.descender / 1000) * titleFontSize;
     }
-    const titleStartX = margin + (contentWidth - (titleEnglishWidth + titleArabicWidth)) / 2;
-    doc.font("Helvetica-Bold").fontSize(12).fillColor(navyColor)
-       .text(titleEnglishWithSlash, titleStartX, y, { lineBreak: false });
+
+    // ArabicFont's ascender/descender metrics both run taller than
+    // Helvetica-Bold's at the same size, so the combined visual line height
+    // is whichever font's extent is larger on each side of the baseline —
+    // centering the box around that combined extent (not just fontSize)
+    // is what actually centers both texts together, and sharing one
+    // baseline computed from it is what keeps them on the same line.
+    const maxAscent = Math.max(englishAscent, arabicAscent);
+    const maxDescent = Math.max(englishDescent, arabicDescent);
+    const combinedTextHeight = maxAscent + maxDescent;
+
+    const titlePaddingX = 10;
+    const titlePaddingY = 6;
+    const titleBoxWidth = titleEnglishWidth + titleArabicWidth + titlePaddingX * 2;
+    const titleBoxHeight = combinedTextHeight + titlePaddingY * 2;
+    const titleBoxX = margin + (contentWidth - titleBoxWidth) / 2;
+
+    doc.fillColor(navyColor).roundedRect(titleBoxX, y, titleBoxWidth, titleBoxHeight, 4).fill();
+
+    const baseline = y + titlePaddingY + maxAscent;
+    const englishTextY = baseline - englishAscent;
+    const arabicTextY = baseline - arabicAscent;
+    doc.font("Helvetica-Bold").fontSize(titleFontSize).fillColor("#FFFFFF")
+       .text(titleEnglishWithSlash, titleBoxX + titlePaddingX, englishTextY, { lineBreak: false });
     if (fontRegistered) {
       try {
-        doc.font("ArabicFont").fontSize(12).fillColor(navyColor)
-           .text(CREDIT_NOTE_ARABIC_SPACED, titleStartX + titleEnglishWidth, y, { lineBreak: false });
+        doc.font("ArabicFont").fontSize(titleFontSize).fillColor("#FFFFFF")
+           .text(CREDIT_NOTE_ARABIC, titleBoxX + titlePaddingX + titleEnglishWidth, arabicTextY, { lineBreak: false });
       } catch (e) {
         console.error("Failed to render Arabic credit note title:", e);
       }
     }
-    y += 22;
+    y += titleBoxHeight + 8;
     toBoxWidth = (margin + contentWidth - 180) - margin - 15;
   }
 
@@ -937,13 +967,13 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
         let arabicBoxFontSize = 8;
         while (
           arabicBoxFontSize > 4 &&
-          (doc.fontSize(arabicBoxFontSize).widthOfString(CREDIT_NOTE_ARABIC_SPACED) > 115 ||
+          (doc.fontSize(arabicBoxFontSize).widthOfString(CREDIT_NOTE_ARABIC) > 115 ||
             doc.currentLineHeight() > 10)
         ) {
           arabicBoxFontSize -= 0.5;
         }
         doc.font("ArabicFont").fontSize(arabicBoxFontSize).fillColor("#FFFFFF");
-        doc.text(CREDIT_NOTE_ARABIC_SPACED, margin + 225, y + 25, { width: 125, align: "center", lineBreak: false });
+        doc.text(CREDIT_NOTE_ARABIC, margin + 225, y + 25, { width: 125, align: "center", lineBreak: false });
       } catch (e) {
         console.error("Failed to render Arabic title:", e);
       }
