@@ -793,15 +793,36 @@ const getOrInitCounter = async () => {
   return counter;
 };
 
+// Adds a centered "<page> of <total>" footer to every page, only when the
+// invoice actually spans more than one page — single-page invoices don't
+// need it. Must run after all content is drawn (page count isn't known
+// until then) and before doc.end(), using PDFKit's buffered-pages feature
+// to go back and stamp each already-completed page.
+const addPageNumbers = (doc) => {
+  const range = doc.bufferedPageRange();
+  if (range.count <= 1) return;
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    const { width, height } = doc.page;
+    doc.fontSize(8).font("Helvetica").fillColor("#333333")
+       .text(`${i + 1} of ${range.count}`, 0, height - 20, { width, align: "center", lineBreak: false });
+  }
+};
+
 // Helper: Buffer PDF in memory before sending (prevents ERR_INCOMPLETE_CHUNKED_ENCODING)
 const buildPDFBuffer = (generateFn) => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 0 });
+    const doc = new PDFDocument({ size: "A4", margin: 0, bufferPages: true });
     const chunks = [];
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
-    generateFn(doc).then(() => doc.end()).catch(reject);
+    generateFn(doc)
+      .then(() => {
+        addPageNumbers(doc);
+        doc.end();
+      })
+      .catch(reject);
   });
 };
 
