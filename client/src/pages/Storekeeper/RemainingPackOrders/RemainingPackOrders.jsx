@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import toast from "../../../utils/toast";
@@ -6,11 +6,20 @@ import axios from "axios";
 import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./RemainingPackOrders.css";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
+import SlipDownloadModal from "../../../components/SlipDownloadModal/SlipDownloadModal";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import { downloadThermalSlip, downloadPDFSlip } from "../../../utils/packingSlip";
+
+// The slip for this page should reflect what's actually left to pack, not
+// the full ordered quantity — same rendering as the Pack Orders slip, just
+// fed the remaining quantity and skipping items that have nothing left.
+const remainingQty = (item) => item.orderedQuantity - (item.packedQuantity || 0);
+const hasRemaining = (item) => remainingQty(item) > 0;
 
 const RemainingPackOrders = () => {
+  const orderDataRef = useRef({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,11 +27,21 @@ const RemainingPackOrders = () => {
   const [user, setUser] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
+  const [showSlipModal, setShowSlipModal] = useState(false);
+  const [pendingSlipData, setPendingSlipData] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [packInputs, setPackInputs] = useState({});
   const [processing, setProcessing] = useState(false);
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
+
+  const handleDownloadThermalPDF = (orderId) => {
+    downloadThermalSlip(orderDataRef.current[orderId], { getQty: remainingQty, filterItem: hasRemaining });
+  };
+
+  const handleDownloadPDFSlip = (orderId) => {
+    downloadPDFSlip(orderDataRef.current[orderId], { getQty: remainingQty, filterItem: hasRemaining });
+  };
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -236,6 +255,7 @@ const RemainingPackOrders = () => {
                           <th>Order Date</th>
                           <th>Delivery After</th>
                           <th>Actions</th>
+                          <th>Slip</th>
                           <th>Remaining Pack</th>
                         </tr>
                       </thead>
@@ -330,6 +350,20 @@ const RemainingPackOrders = () => {
                                 ) : null}
                               </td>
 
+                              <td className="actions-cell">
+                                <button
+                                  className="order-list-icon-button order-list-download-pdf"
+                                  onClick={() => {
+                                    orderDataRef.current[order._id] = order;
+                                    setPendingSlipData({ orderId: order._id });
+                                    setShowSlipModal(true);
+                                  }}
+                                  title="Download packing slip for remaining quantity"
+                                >
+                                  🖨️ Slip
+                                </button>
+                              </td>
+
                               <td className="pack-cell">
                                 <button
                                   className="order-list-icon-button order-list-edit-button"
@@ -371,6 +405,21 @@ const RemainingPackOrders = () => {
           setShowInvoiceModal(false);
           if (pendingInvoiceData) {
             downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
+          }
+        }}
+      />
+
+      <SlipDownloadModal
+        isOpen={showSlipModal}
+        onClose={() => setShowSlipModal(false)}
+        onSelect={(type) => {
+          setShowSlipModal(false);
+          if (pendingSlipData) {
+            if (type === "thermal") {
+              handleDownloadThermalPDF(pendingSlipData.orderId);
+            } else {
+              handleDownloadPDFSlip(pendingSlipData.orderId);
+            }
           }
         }}
       />

@@ -334,17 +334,22 @@ const generateReceipt = async (req, res) => {
     printRow("Date:", new Date(transaction.createdAt).toLocaleDateString("en-IN"));
 
     y = drawDashedLine(y + 2);
+    // Name/phone/address advance y by their actual rendered height
+    // (doc.heightOfString) instead of a fixed single-line guess — a long
+    // name or multi-line address would otherwise run into the rows below.
     doc.fontSize(7).font("Helvetica-Bold").text("CUSTOMER:", centerX, y);
     y += 11;
-    doc.fontSize(7).font("Helvetica").text(customer?.name || "N/A", centerX, y);
-    y += 10;
+    doc.fontSize(7).font("Helvetica");
+    const txCustomerName = customer?.name || "N/A";
+    doc.text(txCustomerName, centerX, y, { width: contentWidth });
+    y += doc.heightOfString(txCustomerName, { width: contentWidth }) + 2;
     if (customer?.phoneNumber) {
-      doc.fontSize(7).font("Helvetica").text(customer.phoneNumber, centerX, y);
-      y += 10;
+      doc.text(customer.phoneNumber, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(customer.phoneNumber, { width: contentWidth }) + 2;
     }
     if (customer?.address) {
-      doc.fontSize(7).font("Helvetica").text(customer.address, centerX, y, { width: contentWidth });
-      y += 10;
+      doc.text(customer.address, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(customer.address, { width: contentWidth }) + 2;
     }
 
     y = drawDashedLine(y + 2);

@@ -412,17 +412,22 @@ const generatePaymentReceipt = async (req, res) => {
     y = drawDashedLine(y + 2);
 
     // ===== CUSTOMER INFO =====
+    // Name/phone/address advance y by their actual rendered height
+    // (doc.heightOfString) instead of a fixed single-line guess — a long
+    // name or multi-line address would otherwise run into the rows below.
     doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text('CUSTOMER:', centerX, y);
     y += 11;
-    doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer?.name || 'N/A', centerX, y);
-    y += 10;
+    doc.fontSize(7).font('Helvetica').fillColor('#000');
+    const walletCustomerName = order.customer?.name || 'N/A';
+    doc.text(walletCustomerName, centerX, y, { width: contentWidth });
+    y += doc.heightOfString(walletCustomerName, { width: contentWidth }) + 2;
     if (order.customer?.phoneNumber) {
-      doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer.phoneNumber, centerX, y);
-      y += 10;
+      doc.text(order.customer.phoneNumber, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(order.customer.phoneNumber, { width: contentWidth }) + 2;
     }
     if (order.customer?.address) {
-      doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer.address, centerX, y, { width: contentWidth });
-      y += 10;
+      doc.text(order.customer.address, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(order.customer.address, { width: contentWidth }) + 2;
     }
 
     y = drawDashedLine(y + 2);
@@ -627,17 +632,22 @@ const generateBulkPaymentReceipt = async (req, res) => {
 
       // ===== CUSTOMER INFO =====
       const order = tx.order || {};
+      // Name/phone/address advance y by their actual rendered height
+      // (doc.heightOfString) instead of a fixed single-line guess — a long
+      // name or multi-line address would otherwise run into the rows below.
       doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text('CUSTOMER:', centerX, y);
       y += 11;
-      doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer?.name || 'N/A', centerX, y);
-      y += 10;
+      doc.fontSize(7).font('Helvetica').fillColor('#000');
+      const cashCustomerName = order.customer?.name || 'N/A';
+      doc.text(cashCustomerName, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(cashCustomerName, { width: contentWidth }) + 2;
       if (order.customer?.phoneNumber) {
-        doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer.phoneNumber, centerX, y);
-        y += 10;
+        doc.text(order.customer.phoneNumber, centerX, y, { width: contentWidth });
+        y += doc.heightOfString(order.customer.phoneNumber, { width: contentWidth }) + 2;
       }
       if (order.customer?.address) {
-        doc.fontSize(7).font('Helvetica').fillColor('#000').text(order.customer.address, centerX, y, { width: contentWidth });
-        y += 10;
+        doc.text(order.customer.address, centerX, y, { width: contentWidth });
+        y += doc.heightOfString(order.customer.address, { width: contentWidth }) + 2;
       }
 
       y = drawDashedLine(y + 2);

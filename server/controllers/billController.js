@@ -621,17 +621,25 @@ const getBillReceipt = async (req, res) => {
     y = drawDashedLine(y + 2);
 
     // ===== CUSTOMER INFO =====
+    // Name/phone/address are all wrapped to contentWidth and advance y by
+    // their actual rendered height (doc.heightOfString) instead of a fixed
+    // single-line guess — a long name or multi-line address would otherwise
+    // run into the rows drawn right after it.
     doc.fontSize(7).font("Helvetica-Bold").text("CUSTOMER:", centerX, y);
     y += 11;
-    doc.fontSize(7).font("Helvetica").text(receiptCustomer?.name || bill.customer?.name || "N/A", centerX, y);
-    y += 10;
-    if (receiptCustomer?.phoneNumber || bill.customer?.phoneNumber) {
-      doc.text(receiptCustomer?.phoneNumber || bill.customer?.phoneNumber, centerX, y);
-      y += 10;
+    doc.fontSize(7).font("Helvetica");
+    const receiptCustomerName = receiptCustomer?.name || bill.customer?.name || "N/A";
+    doc.text(receiptCustomerName, centerX, y, { width: contentWidth });
+    y += doc.heightOfString(receiptCustomerName, { width: contentWidth }) + 2;
+    const receiptCustomerPhone = receiptCustomer?.phoneNumber || bill.customer?.phoneNumber;
+    if (receiptCustomerPhone) {
+      doc.text(receiptCustomerPhone, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(receiptCustomerPhone, { width: contentWidth }) + 2;
     }
-    if (receiptCustomer?.address || bill.customer?.address) {
-      doc.text(receiptCustomer?.address || bill.customer?.address, centerX, y, { width: contentWidth });
-      y += 10;
+    const receiptCustomerAddress = receiptCustomer?.address || bill.customer?.address;
+    if (receiptCustomerAddress) {
+      doc.text(receiptCustomerAddress, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(receiptCustomerAddress, { width: contentWidth }) + 2;
     }
 
     y = drawDashedLine(y + 2);
@@ -793,18 +801,22 @@ const downloadBillInvoice = async (req, res) => {
     y = drawDashedLine(y + 2);
 
     // ===== CUSTOMER INFO =====
+    // Name/phone/address advance y by their actual rendered height
+    // (doc.heightOfString) instead of a fixed single-line guess — a long
+    // name or multi-line address would otherwise run into the rows below.
     doc.fontSize(7).font("Helvetica-Bold").text("BILL TO:", centerX, y);
     y += 11;
-    doc.fontSize(7).font("Helvetica")
-      .text(bill.customer?.name || "N/A", centerX, y);
-    y += 10;
+    doc.fontSize(7).font("Helvetica");
+    const billToName = bill.customer?.name || "N/A";
+    doc.text(billToName, centerX, y, { width: contentWidth });
+    y += doc.heightOfString(billToName, { width: contentWidth }) + 2;
     if (bill.customer?.phoneNumber) {
-      doc.text(bill.customer.phoneNumber, centerX, y);
-      y += 10;
+      doc.text(bill.customer.phoneNumber, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(bill.customer.phoneNumber, { width: contentWidth }) + 2;
     }
     if (bill.customer?.address) {
       doc.text(bill.customer.address, centerX, y, { width: contentWidth });
-      y += 10;
+      y += doc.heightOfString(bill.customer.address, { width: contentWidth }) + 2;
     }
 
     y = drawDashedLine(y + 2);
