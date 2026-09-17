@@ -10,6 +10,7 @@ import "./DeliveredOrdersList.css";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
+import SearchableSelect from "../../../components/common/SearchableSelect";
 import Pagination from "../../../components/common/Pagination";
 
 const DeliveredOrdersList = () => {
@@ -654,17 +655,18 @@ const DeliveredOrdersList = () => {
               {/* Payment Section */}
               <div className="payment-section">
                 <label>Payment Method</label>
-                <select
+                <SearchableSelect
+                  options={[
+                    ...(currentOrder.customer?.billingType !== "Cash" && currentOrder.payment === "credit"
+                      ? [{ value: "credit", label: "Credit" }]
+                      : []),
+                    { value: "cash", label: "Cash" },
+                    { value: "cheque", label: "Cheque" },
+                  ]}
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                >
-                  {/* Credit option only for Credit limit customers with a credit order */}
-                  {currentOrder.customer?.billingType !== "Cash" && currentOrder.payment === "credit" && (
-                    <option value="credit">Credit</option>
-                  )}
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                </select>
+                  onChange={(val) => setPaymentMethod(val)}
+                  placeholder="Select payment method"
+                />
                 {(paymentMethod === "cash" || paymentMethod === "cheque") && returnCreditToApply > 0 && cashToCollect === 0 && (
                   <p className="rc-note">Return credit covers the full amount — no {paymentMethod} needed.</p>
                 )}

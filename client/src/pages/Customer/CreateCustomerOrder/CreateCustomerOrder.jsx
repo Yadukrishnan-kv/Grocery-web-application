@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import ProductSearchDropdown from "../../../components/common/ProductSearchDropdown";
+import SearchableSelect from "../../../components/common/SearchableSelect";
 import "./CreateCustomerOrder.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -343,13 +344,15 @@ const CreateCustomerOrder = () => {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <select
+              <SearchableSelect
+                options={[
+                  { value: "credit", label: "Credit" },
+                  { value: "cash", label: "Cash" },
+                ]}
                 value={formData.payment}
-                onChange={(e) => setFormData({ ...formData, payment: e.target.value })}
-              >
-                <option value="credit">Credit</option>
-                <option value="cash">Cash</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, payment: val })}
+                placeholder="Select Payment Method"
+              />
               {errors.payment && <p className="error-text">{errors.payment}</p>}
               <p className="helper-text">Pre-filled from your profile billing type — you can change it if needed</p>
             </div>

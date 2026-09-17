@@ -10,6 +10,7 @@ import "../../DeliveryPartner/PaymentRequestsDelivery/PaymentRequests.css";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import SearchableSelect from "../../../components/common/SearchableSelect";
 
 const PaymentRequestsSales = () => {
   // Helper: extract all relevant invoice numbers from a bill
@@ -1656,14 +1657,16 @@ const PaymentRequestsSales = () => {
             </div>
             <div className="pay-modal-input-group">
               <label>Payment Method</label>
-              <select
-                value={markMethod}
-                onChange={(e) => setMarkMethod(e.target.value)}
+              <SearchableSelect
                 className="pay-modal-select"
-              >
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-              </select>
+                options={[
+                  { value: "cash", label: "Cash" },
+                  { value: "cheque", label: "Cheque" },
+                ]}
+                value={markMethod}
+                onChange={(val) => setMarkMethod(val)}
+                placeholder="Select method"
+              />
             </div>
             {markMethod === "cheque" && (
               <div className="pay-modal-cheque-group">
@@ -1716,14 +1719,16 @@ const PaymentRequestsSales = () => {
             </div>
             <div className="pay-modal-input-group">
               <label>Payment Method (applied to all)</label>
-              <select
-                value={bulkMarkMethod}
-                onChange={(e) => setBulkMarkMethod(e.target.value)}
+              <SearchableSelect
                 className="pay-modal-select"
-              >
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-              </select>
+                options={[
+                  { value: "cash", label: "Cash" },
+                  { value: "cheque", label: "Cheque" },
+                ]}
+                value={bulkMarkMethod}
+                onChange={(val) => setBulkMarkMethod(val)}
+                placeholder="Select method"
+              />
             </div>
             {bulkMarkMethod === "cheque" && (
               <div className="pay-modal-cheque-group">
@@ -1846,14 +1851,16 @@ const PaymentRequestsSales = () => {
             </div>
             <div className="pay-modal-input-group">
               <label>Payment Method</label>
-              <select
-                value={payToAdminMethod}
-                onChange={(e) => setPayToAdminMethod(e.target.value)}
+              <SearchableSelect
                 className="pay-modal-select"
-              >
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-              </select>
+                options={[
+                  { value: "cash", label: "Cash" },
+                  { value: "cheque", label: "Cheque" },
+                ]}
+                value={payToAdminMethod}
+                onChange={(val) => setPayToAdminMethod(val)}
+                placeholder="Select method"
+              />
             </div>
             {payToAdminMethod === "cheque" && (
               <div className="pay-modal-cheque-group">
@@ -1921,14 +1928,16 @@ const PaymentRequestsSales = () => {
             </div>
             <div className="pay-modal-input-group">
               <label>Payment Method (applied to all)</label>
-              <select
-                value={bulkPayMethod}
-                onChange={(e) => setBulkPayMethod(e.target.value)}
+              <SearchableSelect
                 className="pay-modal-select"
-              >
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-              </select>
+                options={[
+                  { value: "cash", label: "Cash" },
+                  { value: "cheque", label: "Cheque" },
+                ]}
+                value={bulkPayMethod}
+                onChange={(val) => setBulkPayMethod(val)}
+                placeholder="Select method"
+              />
             </div>
             {bulkPayMethod === "cheque" && (
               <div className="pay-modal-cheque-group">

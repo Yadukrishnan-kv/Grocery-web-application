@@ -11,6 +11,7 @@ import toast from "../../../../utils/toast";
 import { useAppSettings } from "../../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../../hooks/usePagination";
 import Pagination from "../../../../components/common/Pagination";
+import SearchableSelect from "../../../../components/common/SearchableSelect";
 
 const OrderList = () => {
   const navigate = useNavigate();
@@ -407,10 +408,14 @@ const OrderList = () => {
                               <td>
                                 {canAssignDelivery && (order.assignmentStatus === "pending_assignment" ||
                                 order.assignmentStatus === "rejected") ? (
-                                  <select
+                                  <SearchableSelect
                                     className="order-list-delivery-partner-select"
-                                    onChange={(e) => {
-                                      const selectedId = e.target.value;
+                                    options={deliveryPartners.map((partner) => ({
+                                      value: partner._id,
+                                      label: partner.username,
+                                    }))}
+                                    value=""
+                                    onChange={(selectedId) => {
                                       if (selectedId) {
                                         handleAssignDeliveryPartner(
                                           order._id,
@@ -418,19 +423,12 @@ const OrderList = () => {
                                         );
                                       }
                                     }}
-                                    defaultValue=""
-                                  >
-                                    <option value="">
-                                      {order.assignmentStatus === "rejected"
+                                    placeholder={
+                                      order.assignmentStatus === "rejected"
                                         ? "Reassign Partner"
-                                        : "Assign Delivery Partner"}
-                                    </option>
-                                    {deliveryPartners.map((partner) => (
-                                      <option key={partner._id} value={partner._id}>
-                                        {partner.username}
-                                      </option>
-                                    ))}
-                                  </select>
+                                        : "Assign Delivery Partner"
+                                    }
+                                  />
                                 ) : order.assignedTo ? (
                                   <span className="order-list-assigned-partner">
                                     {order.assignedTo.username || "Assigned"}

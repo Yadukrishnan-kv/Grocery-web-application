@@ -6,6 +6,7 @@ import Sidebar from "../../components/layout/Sidebar/Sidebar";
 import toast from "../../utils/toast";
 import axios from "axios";
 import TableScrollSync from "../../components/common/TableScrollSync";
+import SearchableSelect from "../../components/common/SearchableSelect";
 import "./CreateSalesReturn.css";
 
 const CreateSalesReturn = () => {
@@ -272,32 +273,28 @@ const CreateSalesReturn = () => {
                     {user && !isCustomer && (
                       <div className="csr-form-group">
                         <label>Select Customer</label>
-                        <select
+                        <SearchableSelect
                           className="csr-select"
+                          options={uniqueCustomers.map((c) => ({ value: c._id, label: c.name }))}
                           value={selectedCustomerId}
-                          onChange={handleCustomerChange}
-                        >
-                          {uniqueCustomers.length === 0 && <option value="">No customers found</option>}
-                          {uniqueCustomers.map((c) => (
-                            <option key={c._id} value={c._id}>{c.name}</option>
-                          ))}
-                        </select>
+                          onChange={(val) => handleCustomerChange({ target: { value: val } })}
+                          placeholder={uniqueCustomers.length === 0 ? "No customers found" : "Select Customer"}
+                          disabled={uniqueCustomers.length === 0}
+                        />
                       </div>
                     )}
                     <div className="csr-form-group">
                       <label>Select Order</label>
-                      <select
+                      <SearchableSelect
                         className="csr-select"
+                        options={customerOrders.map((o) => ({
+                          value: o._id,
+                          label: `${o.invoiceNumber || o._id.slice(-8)} — ${new Date(o.updatedAt).toLocaleDateString("en-GB")}`,
+                        }))}
                         value={selectedOrderId}
-                        onChange={(e) => handleOrderSelect(e.target.value)}
-                      >
-                        <option value="">-- Select an order --</option>
-                        {customerOrders.map((o) => (
-                          <option key={o._id} value={o._id}>
-                            {o.invoiceNumber || o._id.slice(-8)} — {new Date(o.updatedAt).toLocaleDateString("en-GB")}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => handleOrderSelect(val)}
+                        placeholder="-- Select an order --"
+                      />
                     </div>
                     {customerOrders.length === 0 && (
                       <div className="csr-info-box">

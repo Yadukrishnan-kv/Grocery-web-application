@@ -10,6 +10,7 @@ import toast from "../../../utils/toast";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import SearchableSelect from "../../../components/common/SearchableSelect";
 
 // Helper: Format date to DD/MM/YYYY
 const formatDate = (dateString) => {
@@ -721,14 +722,16 @@ const getSalesManForCustomer = useCallback(async () => {
 
             <div className="pay-modal-input-group">
               <label>Payment Method</label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
+              <SearchableSelect
                 className="pay-modal-select"
-              >
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-              </select>
+                options={[
+                  { value: "cash", label: "Cash" },
+                  { value: "cheque", label: "Cheque" },
+                ]}
+                value={paymentMethod}
+                onChange={(val) => setPaymentMethod(val)}
+                placeholder="Select method"
+              />
             </div>
 
             {paymentMethod === "cheque" && (
@@ -756,46 +759,45 @@ const getSalesManForCustomer = useCallback(async () => {
 
             <div className="pay-modal-input-group">
               <label>Recipient Type</label>
-              <select
+              <SearchableSelect
+                className="pay-modal-select"
+                options={[
+                  { value: "delivery", label: "Delivery Man" },
+                  { value: "sales", label: "Sales Man" },
+                ]}
                 value={recipientType}
-                onChange={(e) => {
-                  setRecipientType(e.target.value);
+                onChange={(val) => {
+                  setRecipientType(val);
                   setRecipientId(""); // Reset selection when type changes
                 }}
-                className="pay-modal-select"
-              >
-                <option value="delivery">Delivery Man</option>
-                <option value="sales">Sales Man</option>
-              </select>
+                placeholder="Select recipient type"
+              />
             </div>
 
             <div className="pay-modal-input-group">
               <label>Select Recipient</label>
-             <select
-  value={recipientId}
-  onChange={(e) => setRecipientId(e.target.value)}
+             <SearchableSelect
   className="pay-modal-select"
+  options={(recipientType === "delivery" ? filteredDeliveryMen : filteredSalesMen).map(person => ({
+    value: person._id,
+    label: person.username,
+  }))}
+  value={recipientId}
+  onChange={(val) => setRecipientId(val)}
   disabled={
     (recipientType === "delivery" && filteredDeliveryMen.length === 0) ||
     (recipientType === "sales" && filteredSalesMen.length === 0)
   }
->
-  <option value="">
-    {recipientType === "delivery" 
-      ? (filteredDeliveryMen.length > 0 
-          ? "Select Delivery Man" 
+  placeholder={
+    recipientType === "delivery"
+      ? (filteredDeliveryMen.length > 0
+          ? "Select Delivery Man"
           : "No delivery men associated with this bill")
-      : (filteredSalesMen.length > 0 
-          ? "Select Sales Man" 
-          : "No sales man assigned to your account")}
-  </option>
-
-  {(recipientType === "delivery" ? filteredDeliveryMen : filteredSalesMen).map(person => (
-    <option key={person._id} value={person._id}>
-      {person.username} 
-    </option>
-  ))}
-</select>
+      : (filteredSalesMen.length > 0
+          ? "Select Sales Man"
+          : "No sales man assigned to your account")
+  }
+/>
 
 <small style={{ color: "#e74c3c", fontSize: "11px", marginTop: "4px", display: "block" }}>
   {recipientType === "sales" && filteredSalesMen.length === 0 && 

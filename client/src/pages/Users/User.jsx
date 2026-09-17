@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../components/layout/Header/Header';
 import Sidebar from '../../components/layout/Sidebar/Sidebar';
 import './User.css';
+import SearchableSelect from '../../components/common/SearchableSelect';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import toast from "../../utils/toast"; // ← NEW IMPORT
@@ -353,21 +354,13 @@ const User = () => {
 
             <div className="form-group">
               <label htmlFor="role">Role</label>
-              <select
+              <SearchableSelect
                 id="role"
-                name="role"
+                options={roles.map(role => ({ value: role.name, label: role.name }))}
                 value={formData.role}
-                onChange={handleChange}
-                aria-invalid={!!errors.role}
-                aria-describedby={errors.role ? "role-error" : undefined}
-              >
-                <option value="">Select a role</option>
-                {roles.map(role => (
-                  <option key={role._id} value={role.name}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => handleChange({ target: { name: "role", value: val } })}
+                placeholder="Select a role"
+              />
               {errors.role && (
                 <p id="role-error" className="error-text" role="alert">
                   {errors.role}
@@ -380,19 +373,13 @@ const User = () => {
                 <div className="form-row">
                   <div className="form-group">
                     <label htmlFor="emiratesName">Emirates</label>
-                    <select
+                    <SearchableSelect
                       id="emiratesName"
-                      name="emiratesName"
+                      options={emiratesList.map(em => ({ value: em.emiratesName, label: em.emiratesName }))}
                       value={formData.emiratesName}
-                      onChange={handleChange}
-                    >
-                      <option value="">Select Emirates</option>
-                      {emiratesList.map(em => (
-                        <option key={em._id} value={em.emiratesName}>
-                          {em.emiratesName}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => handleChange({ target: { name: "emiratesName", value: val } })}
+                      placeholder="Select Emirates"
+                    />
                   </div>
 
                   <div className="form-group">

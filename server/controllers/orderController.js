@@ -1376,6 +1376,12 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   const companyEmail = company.companyEmail || "daddyskitchenmasala@gmail.com";
   const companyWebsite = company.companyWebsite || "www.daddyskitchenmasala.com";
   const taxInvoiceArabicLabel = company.taxInvoiceArabicLabel || "فاتورة ضريبية";
+  // English counterpart to taxInvoiceArabicLabel — only overrides the standard
+  // "TAX INVOICE" invoiceType (the default, used for the main delivered
+  // invoice); the "PENDING INVOICE" / "ORDER INVOICE" variants passed in for
+  // other invoice states keep their own distinct text untouched.
+  const taxInvoiceLabel = company.taxInvoiceLabel || "TAX INVOICE";
+  const displayInvoiceType = invoiceType === "TAX INVOICE" ? taxInvoiceLabel : invoiceType;
 
   // Colors
   const navyColor = "#002D62"; // Main brand navy blue
@@ -1543,7 +1549,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   // (drawn further below), at its original width and position.
   let toBoxWidth = 200;
   if (designType === "preprinted") {
-    const titleEnglish = invoiceType.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+    const titleEnglish = displayInvoiceType.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
     const titleEnglishWithSlash = `${titleEnglish} / `;
     const titleFontSize = 12;
     doc.font("Helvetica-Bold").fontSize(titleFontSize);
@@ -1664,7 +1670,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
         console.error("Failed to render Arabic tax invoice title:", e);
       }
     }
-    doc.font("Helvetica-Bold").fontSize(11).fillColor("#FFFFFF").text(invoiceType, margin + 225, y + 38, { width: 125, align: "center" });
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#FFFFFF").text(displayInvoiceType, margin + 225, y + 38, { width: 125, align: "center" });
   }
 
   // Right: Details Box — matches the To. box's height (grown or not) so the

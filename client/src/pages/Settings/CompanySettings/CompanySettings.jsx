@@ -5,6 +5,7 @@ import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import toast from "../../../utils/toast"; // ← NEW IMPORT
 import "./CompanySettings.css";
+import SearchableSelect from "../../../components/common/SearchableSelect";
 
 const CompanySettings = () => {
   const [formData, setFormData] = useState({
@@ -15,7 +16,9 @@ const CompanySettings = () => {
     companyEmail: "",
     companyWebsite: "",
     companyNameArabic: "",
+    taxInvoiceLabel: "",
     taxInvoiceArabicLabel: "",
+    creditNoteLabel: "",
     creditNoteArabicLabel: "",
     bankName: "",
     bankAccountNumber: "",
@@ -64,8 +67,10 @@ const CompanySettings = () => {
             companyEmail: settingsRes.data.companyEmail || "",
             companyWebsite: settingsRes.data.companyWebsite || "",
             companyNameArabic: settingsRes.data.companyNameArabic || "",
+            taxInvoiceLabel: settingsRes.data.taxInvoiceLabel || "TAX INVOICE",
             taxInvoiceArabicLabel:
               settingsRes.data.taxInvoiceArabicLabel || "فاتورة ضريبية",
+            creditNoteLabel: settingsRes.data.creditNoteLabel || "CREDIT NOTE",
             creditNoteArabicLabel:
               settingsRes.data.creditNoteArabicLabel || "مردودات المبيعات",
             bankName: settingsRes.data.bankName || "",
@@ -228,6 +233,25 @@ const CompanySettings = () => {
             </div>
 
             <div className="form-group">
+              <label htmlFor="taxInvoiceLabel">
+                Tax Invoice Label
+              </label>
+              <input
+                id="taxInvoiceLabel"
+                name="taxInvoiceLabel"
+                type="text"
+                value={formData.taxInvoiceLabel}
+                onChange={handleChange}
+                placeholder="TAX INVOICE"
+              />
+              <small className="field-hint">
+                English title shown on the preprinted &amp; normal invoice,
+                next to the Arabic label below. Does not affect the Sales
+                Return invoice.
+              </small>
+            </div>
+
+            <div className="form-group">
               <label htmlFor="taxInvoiceArabicLabel">
                 Tax Invoice Arabic Label
               </label>
@@ -243,6 +267,25 @@ const CompanySettings = () => {
               <small className="field-hint">
                 Shown next to "Tax Invoice" on the preprinted &amp; normal
                 invoice. Does not affect the Sales Return invoice.
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="creditNoteLabel">
+                Credit Note Label
+              </label>
+              <input
+                id="creditNoteLabel"
+                name="creditNoteLabel"
+                type="text"
+                value={formData.creditNoteLabel}
+                onChange={handleChange}
+                placeholder="CREDIT NOTE"
+              />
+              <small className="field-hint">
+                English title shown on the preprinted &amp; normal Sales
+                Return invoice, next to the Arabic label below. Does not
+                affect the Tax Invoice.
               </small>
             </div>
 
@@ -352,17 +395,13 @@ const CompanySettings = () => {
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="entriesPerPage">Entries per page</label>
-                <select
+                <SearchableSelect
                   id="entriesPerPage"
-                  name="entriesPerPage"
+                  options={[10, 20, 50, 100].map((n) => ({ value: n, label: String(n) }))}
                   value={formData.entriesPerPage}
-                  onChange={handleChange}
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
+                  onChange={(val) => handleChange({ target: { name: "entriesPerPage", value: val } })}
+                  placeholder="Select entries per page"
+                />
                 <small className="field-hint">
                   Number of rows shown per page across all list tables.
                 </small>

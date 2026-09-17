@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import './CreateSubCategory.css';
+import SearchableSelect from '../../../components/common/SearchableSelect';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import toast from "../../../utils/toast"; // ← NEW
@@ -207,22 +208,17 @@ const CreateSubCategory = () => {
           <form onSubmit={handleSubmit} noValidate>
             <div className="subcategory-form-group">
               <label htmlFor="CategoryName">Category Name</label>
-              <select
+              <SearchableSelect
                 id="CategoryName"
-                name="CategoryName"
+                options={categories.map(category => ({
+                  value: category.CategoryName,
+                  label: category.CategoryName,
+                }))}
                 value={formData.CategoryName}
-                onChange={handleChange}
-                aria-invalid={!!errors.CategoryName}
-                aria-describedby={errors.CategoryName ? "categoryname-error" : undefined}
+                onChange={(val) => handleChange({ target: { name: "CategoryName", value: val } })}
+                placeholder="Select a category"
                 className="subcategory-select"
-              >
-                <option value="">Select a category</option>
-                {categories.map(category => (
-                  <option key={category._id} value={category.CategoryName}>
-                    {category.CategoryName}
-                  </option>
-                ))}
-              </select>
+              />
               {errors.CategoryName && (
                 <p id="categoryname-error" className="subcategory-error-text" role="alert">
                   {errors.CategoryName}

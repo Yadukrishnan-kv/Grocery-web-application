@@ -32,10 +32,20 @@ const companySettingsSchema = new Schema(
       type: String,
       trim: true,
     },
+    taxInvoiceLabel: {
+      type: String,
+      trim: true,
+      default: "TAX INVOICE",
+    },
     taxInvoiceArabicLabel: {
       type: String,
       trim: true,
       default: "فاتورة ضريبية",
+    },
+    creditNoteLabel: {
+      type: String,
+      trim: true,
+      default: "CREDIT NOTE",
     },
     creditNoteArabicLabel: {
       type: String,

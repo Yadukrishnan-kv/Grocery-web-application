@@ -11,6 +11,7 @@ import InvoiceDownloadModal from "../../components/InvoiceDownloadModal/InvoiceD
 import { useAppSettings } from "../../context/AppSettingsContext";
 import { usePaginatedData } from "../../hooks/usePagination";
 import Pagination from "../../components/common/Pagination";
+import SearchableSelect from "../../components/common/SearchableSelect";
 
 const STATUS_LABELS = {
   pending_admin_approval: "Pending Approval",
@@ -567,16 +568,13 @@ const SalesReturn = () => {
               </div>
               <div className="sr-form-group">
                 <label>Assign Delivery Man (optional — skip to approve without assigning)</label>
-                <select
-                  value={approveForm.deliveryManId}
-                  onChange={(e) => setApproveForm((p) => ({ ...p, deliveryManId: e.target.value }))}
+                <SearchableSelect
                   className="sr-select"
-                >
-                  <option value="">-- Assign later --</option>
-                  {deliveryMen.map((d) => (
-                    <option key={d._id} value={d._id}>{d.username}</option>
-                  ))}
-                </select>
+                  options={deliveryMen.map((d) => ({ value: d._id, label: d.username }))}
+                  value={approveForm.deliveryManId}
+                  onChange={(val) => setApproveForm((p) => ({ ...p, deliveryManId: val }))}
+                  placeholder="-- Assign later --"
+                />
               </div>
               <div className="sr-modal-actions">
                 <button className="sr-btn-outline" onClick={() => setApproveModal(null)}>Cancel</button>
@@ -634,16 +632,13 @@ const SalesReturn = () => {
               </p>
               <div className="sr-form-group">
                 <label>Delivery Man</label>
-                <select
-                  value={assignDeliveryManId}
-                  onChange={(e) => setAssignDeliveryManId(e.target.value)}
+                <SearchableSelect
                   className="sr-select"
-                >
-                  <option value="">-- Select --</option>
-                  {deliveryMen.map((d) => (
-                    <option key={d._id} value={d._id}>{d.username}</option>
-                  ))}
-                </select>
+                  options={deliveryMen.map((d) => ({ value: d._id, label: d.username }))}
+                  value={assignDeliveryManId}
+                  onChange={(val) => setAssignDeliveryManId(val)}
+                  placeholder="-- Select --"
+                />
               </div>
               <div className="sr-modal-actions">
                 <button className="sr-btn-outline" onClick={() => setAssignModal(null)}>Cancel</button>

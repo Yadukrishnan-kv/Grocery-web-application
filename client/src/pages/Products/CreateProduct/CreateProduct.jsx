@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import "./CreateProduct.css";
+import SearchableSelect from "../../../components/common/SearchableSelect";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import toast from "../../../utils/toast";
@@ -321,24 +322,19 @@ const CreateProduct = () => {
             {/* 2. Category */}
             <div className="product-form-group">
               <label htmlFor="CategoryName">Category</label>
-              <select
+              <SearchableSelect
                 id="CategoryName"
-                name="CategoryName"
+                options={categories.map((category) => ({
+                  value: category.CategoryName,
+                  label: category.CategoryName,
+                }))}
                 value={formData.CategoryName}
-                onChange={handleChange}
-                aria-invalid={!!errors.CategoryName}
-                aria-describedby={
-                  errors.CategoryName ? "categoryname-error" : undefined
+                onChange={(val) =>
+                  handleChange({ target: { name: "CategoryName", value: val } })
                 }
+                placeholder="Select a category"
                 className="product-select"
-              >
-                <option value="">Select a category</option>
-                {categories.map((category) => (
-                  <option key={category._id} value={category.CategoryName}>
-                    {category.CategoryName}
-                  </option>
-                ))}
-              </select>
+              />
               {errors.CategoryName && (
                 <p
                   id="categoryname-error"
@@ -353,28 +349,20 @@ const CreateProduct = () => {
             {/* 3. Sub-Category */}
             <div className="product-form-group">
               <label htmlFor="subCategoryName">Sub-Category</label>
-              <select
+              <SearchableSelect
                 id="subCategoryName"
-                name="subCategoryName"
+                options={subCategories.map((subCategory) => ({
+                  value: subCategory.subCategoryName,
+                  label: subCategory.subCategoryName,
+                }))}
                 value={formData.subCategoryName}
-                onChange={handleChange}
-                disabled={!formData.CategoryName}
-                aria-invalid={!!errors.subCategoryName}
-                aria-describedby={
-                  errors.subCategoryName ? "subcategoryname-error" : undefined
+                onChange={(val) =>
+                  handleChange({ target: { name: "subCategoryName", value: val } })
                 }
+                disabled={!formData.CategoryName}
+                placeholder="Select a sub-category"
                 className="product-select"
-              >
-                <option value="">Select a sub-category</option>
-                {subCategories.map((subCategory) => (
-                  <option
-                    key={subCategory._id}
-                    value={subCategory.subCategoryName}
-                  >
-                    {subCategory.subCategoryName}
-                  </option>
-                ))}
-              </select>
+              />
               {errors.subCategoryName && (
                 <p
                   id="subcategoryname-error"
@@ -389,36 +377,18 @@ const CreateProduct = () => {
             {/* 4. Unit */}
             <div className="product-form-group">
               <label htmlFor="unit">Unit</label>
-              <select
+              <SearchableSelect
                 id="unit"
-                name="unit"
+                options={[
+                  "kg", "gram", "liter", "ml", "piece", "box", "pack", "bottle",
+                  "can", "dozen", "set", "pair", "roll", "bag", "jar", "tin",
+                  "carton", "bundle", "Nos",
+                ].map((u) => ({ value: u, label: u }))}
                 value={formData.unit}
-                onChange={handleChange}
-                aria-invalid={!!errors.unit}
-                aria-describedby={errors.unit ? "unit-error" : undefined}
+                onChange={(val) => handleChange({ target: { name: "unit", value: val } })}
+                placeholder="Select unit"
                 className="product-select"
-              >
-                <option value="">Select unit</option>
-                <option value="kg">kg</option>
-                <option value="gram">gram</option>
-                <option value="liter">liter</option>
-                <option value="ml">ml</option>
-                <option value="piece">piece</option>
-                <option value="box">box</option>
-                <option value="pack">pack</option>
-                <option value="bottle">bottle</option>
-                <option value="can">can</option>
-                <option value="dozen">dozen</option>
-                <option value="set">set</option>
-                <option value="pair">pair</option>
-                <option value="roll">roll</option>
-                <option value="bag">bag</option>
-                <option value="jar">jar</option>
-                <option value="tin">tin</option>
-                <option value="carton">carton</option>
-                <option value="bundle">bundle</option>
-                <option value="Nos">Nos</option>
-              </select>
+              />
               {errors.unit && (
                 <p id="unit-error" className="product-error-text" role="alert">
                   {errors.unit}

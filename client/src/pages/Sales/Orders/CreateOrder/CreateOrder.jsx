@@ -1,6 +1,7 @@
 // src/pages/Orders/CreateOrder/CreateOrder.jsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import ProductSearchDropdown from "../../../../components/common/ProductSearchDropdown";
+import SearchableSelect from "../../../../components/common/SearchableSelect";
 import Header from "../../../../components/layout/Header/Header";
 import Sidebar from "../../../../components/layout/Sidebar/Sidebar";
 import "./CreateOrder.css";
@@ -563,14 +564,12 @@ const CreateOrder = () => {
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Customer</label>
-              <select value={formData.customerId} onChange={handleCustomerChange}>
-                <option value="">Select Customer</option>
-                {customers.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                options={customers.map((c) => ({ value: c._id, label: c.name }))}
+                value={formData.customerId}
+                onChange={(val) => handleCustomerChange({ target: { value: val } })}
+                placeholder="Select Customer"
+              />
               {errors.customerId && <p className="error-text">{errors.customerId}</p>}
             </div>
 
@@ -579,13 +578,15 @@ const CreateOrder = () => {
                 Payment Method
                 {formData.customerId && <span className="auto-fetch-badge"> (pre-filled from customer, can override)</span>}
               </label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: "credit", label: "Credit" },
+                  { value: "cash", label: "Cash" },
+                ]}
                 value={formData.payment}
-                onChange={(e) => setFormData({ ...formData, payment: e.target.value })}
-              >
-                <option value="credit">Credit</option>
-                <option value="cash">Cash</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, payment: val })}
+                placeholder="Select Payment Method"
+              />
               {errors.payment && <p className="error-text">{errors.payment}</p>}
             </div>
 

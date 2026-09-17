@@ -10,6 +10,7 @@ import "./BillWallet.css";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import { usePaginatedData } from "../../hooks/usePagination";
 import Pagination from "../../components/common/Pagination";
+import SearchableSelect from "../../components/common/SearchableSelect";
 const BillWallet = () => {
   const [transactions, setTransactions] = useState([]);
   const [adminRequests, setAdminRequests] = useState([]);
@@ -798,14 +799,16 @@ const BillWallet = () => {
             </div>
             <div className="pay-modal-input-group">
               <label>Payment Method</label>
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
+              <SearchableSelect
                 className="pay-modal-select"
-              >
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-              </select>
+                options={[
+                  { value: "cash", label: "Cash" },
+                  { value: "cheque", label: "Cheque" },
+                ]}
+                value={method}
+                onChange={(val) => setMethod(val)}
+                placeholder="Select method"
+              />
             </div>
             {method === "cheque" && (
               <div className="pay-modal-cheque-group">

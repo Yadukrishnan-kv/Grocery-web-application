@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Header from '../../../components/layout/Header/Header';
 import Sidebar from '../../../components/layout/Sidebar/Sidebar';
 import '../../Customer/CreateCustomer/CreateCustomer.css'; // Reuse same CSS
+import SearchableSelect from '../../../components/common/SearchableSelect';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from "../../../utils/toast";
@@ -351,16 +352,17 @@ const CreateCustomerRequest = () => {
 
               <div className="customer-form-group">
                 <label htmlFor="billingType">Billing Type</label>
-                <select
+                <SearchableSelect
                   id="billingType"
-                  name="billingType"
+                  options={[
+                    { value: "Credit limit", label: "Credit Limit" },
+                    { value: "Cash", label: "Cash" },
+                  ]}
                   value={formData.billingType}
-                  onChange={handleChange}
+                  onChange={(val) => handleChange({ target: { name: "billingType", value: val } })}
+                  placeholder="Select billing type"
                   className="customer-select"
-                >
-                  <option value="Credit limit">Credit Limit</option>
-                  <option value="Cash">Cash</option>
-                </select>
+                />
               </div>
             </div>
 
@@ -369,17 +371,17 @@ const CreateCustomerRequest = () => {
               <div className="customer-form-row">
                 <div className="customer-form-group">
                   <label htmlFor="statementType">Statement Type</label>
-                  <select
+                  <SearchableSelect
                     id="statementType"
-                    name="statementType"
+                    options={[
+                      { value: "invoice-based", label: "Invoice-based" },
+                      { value: "monthly", label: "Monthly Statement" },
+                    ]}
                     value={formData.statementType}
-                    onChange={handleChange}
+                    onChange={(val) => handleChange({ target: { name: "statementType", value: val } })}
+                    placeholder="Select statement type"
                     className="customer-select"
-                  >
-                    <option value="">Select statement type</option>
-                    <option value="invoice-based">Invoice-based</option>
-                    <option value="monthly">Monthly Statement</option>
-                  </select>
+                  />
                   {errors.statementType && <p className="customer-error-text">{errors.statementType}</p>}
                 </div>
 
@@ -456,20 +458,17 @@ const CreateCustomerRequest = () => {
             <div className="customer-form-row">
               <div className="customer-form-group">
                 <label htmlFor="emiratesName">Customer Emirates</label>
-                <select
+                <SearchableSelect
                   id="emiratesName"
-                  name="emiratesName"
+                  options={emiratesList.map((em) => ({
+                    value: em.emiratesName,
+                    label: em.emiratesName,
+                  }))}
                   value={formData.emiratesName}
-                  onChange={handleChange}
+                  onChange={(val) => handleChange({ target: { name: "emiratesName", value: val } })}
+                  placeholder="Select Emirates"
                   className="customer-select"
-                >
-                  <option value="">Select Emirates</option>
-                  {emiratesList.map((em) => (
-                    <option key={em._id} value={em.emiratesName}>
-                      {em.emiratesName}
-                    </option>
-                  ))}
-                </select>
+                />
                 {errors.emiratesName && (
                   <p className="customer-error-text">{errors.emiratesName}</p>
                 )}

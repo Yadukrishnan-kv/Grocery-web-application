@@ -741,6 +741,9 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
   const headerBg = "#d9d9d9";
 
   const creditNoteArabicLabel = company.creditNoteArabicLabel || "مردودات المبيعات";
+  // English counterpart to creditNoteArabicLabel, sourced from Company
+  // Settings the same way so admins can edit it without a code change.
+  const creditNoteLabel = company.creditNoteLabel || "CREDIT NOTE";
   // Dynamic label uses word-order-swap only (see formatDynamicArabicForPdf)
   // with normal single-space word spacing — the wide WORD_GAP treatment
   // below is only for the condition/signature lines, which need the extra
@@ -860,7 +863,8 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
   // (drawn further below), at its original width and position.
   let toBoxWidth = 200;
   if (designType === "preprinted") {
-    const titleEnglishWithSlash = "Credit Note / ";
+    const titleEnglish = creditNoteLabel.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+    const titleEnglishWithSlash = `${titleEnglish} / `;
     const titleFontSize = 12;
     doc.font("Helvetica-Bold").fontSize(titleFontSize);
     const titleEnglishWidth = doc.widthOfString(titleEnglishWithSlash);
@@ -978,7 +982,7 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
         console.error("Failed to render Arabic title:", e);
       }
     }
-    doc.font("Helvetica-Bold").fontSize(7).fillColor("#FFFFFF").text("CREDIT NOTE", margin + 225, y + 36, { width: 125, align: "center" });
+    doc.font("Helvetica-Bold").fontSize(7).fillColor("#FFFFFF").text(creditNoteLabel, margin + 225, y + 36, { width: 125, align: "center" });
   }
 
   // Right: Details Box

@@ -4,6 +4,21 @@
   width: 100%;
 }
 
+/* Callers pass in the legacy per-page class the old native <select> used
+   (e.g. .product-select, .customer-select, .order-list-status-filter) so
+   its width/margin rules still apply. But those classes also carry their
+   own border/padding/background-arrow meant for an actual <select> box —
+   left as-is, that paints a second box (and a second arrow icon) around
+   the .dropdown-control below. Reset just the box-chrome properties here,
+   scoped to this wrapper, so only .dropdown-control's box is visible. */
+.product-search-dropdown {
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
 .dropdown-control {
   display: flex;
   align-items: center;
@@ -84,4 +99,37 @@
 .dropdown-item.no-match {
   color: #9ca3af;
   cursor: default;
+}
+
+/* Responsive: shrink padding/font and cap menu height on smaller viewports
+   so the dropdown stays comfortable to use on tablets/phones. */
+@media (max-width: 768px) {
+  .dropdown-input {
+    padding: 0.65rem 0.65rem 0.65rem 0.85rem;
+    font-size: 0.95rem;
+  }
+  .dropdown-menu {
+    max-height: 200px;
+  }
+  .dropdown-item {
+    padding: 0.6rem 0.85rem;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dropdown-input {
+    padding: 0.6rem 0.5rem 0.6rem 0.7rem;
+    font-size: 0.9rem;
+  }
+  .dropdown-arrow-btn {
+    padding: 0 0.6rem 0 0.4rem;
+  }
+  .dropdown-menu {
+    max-height: 180px;
+  }
+  .dropdown-item {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.9rem;
+  }
 }
