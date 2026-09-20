@@ -10,6 +10,7 @@ import toast from "../../../utils/toast";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 
 const CustomerOrderReports = () => {
@@ -20,6 +21,7 @@ const CustomerOrderReports = () => {
   const [activeItem, setActiveItem] = useState("Order Reports");
   const [user, setUser] = useState(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState(null);
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -251,7 +253,7 @@ const CustomerOrderReports = () => {
                       <thead>
                         <tr>
                           <th>No</th>
-                          <th>Products</th>
+                          <th>Order ID</th>
                           <th>Total Ordered Qty</th>
                           <th>Total Delivered Qty</th>
                           <th>Pending Qty</th>
@@ -284,27 +286,15 @@ const CustomerOrderReports = () => {
                             <tr key={order._id}>
                               <td>{pagination.showingFrom + index}</td>
 
-                              {/* Multi-product column */}
-                              <td className="products-cell">
-                                {order.orderItems?.length > 0 ? (
-                                  <div className="products-list">
-                                    {order.orderItems.map((item, i) => (
-                                      <div key={i} className="product-tag">
-                                        <span className="product-name">
-                                          {item.product?.productName || "Unknown"}
-                                        </span>
-                                        <span className="product-qty">
-                                          × {item.orderedQuantity}
-                                        </span>
-                                        <span className="product-unit">
-                                          {item.unit || ""}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="no-products">No products</span>
-                                )}
+                              <td>
+                                <button
+                                  type="button"
+                                  className="customer-reports-orderid-link"
+                                  onClick={() => setViewProductsOrder(order)}
+                                  title="View ordered products"
+                                >
+                                  {order.orderId || order._id}
+                                </button>
                               </td>
 
                               <td>{totalOrdered}</td>
@@ -393,6 +383,12 @@ const CustomerOrderReports = () => {
         </div>
       </main>
 
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
+      )}
     </div>
   );
 };

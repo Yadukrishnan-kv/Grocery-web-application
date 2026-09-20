@@ -10,6 +10,7 @@ import "./PendingOrders.css";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 const PendingOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -19,6 +20,7 @@ const PendingOrders = () => {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -182,8 +184,8 @@ const PendingOrders = () => {
                       <thead>
                         <tr>
                           <th>No</th>
+                          <th>Order ID</th>
                           <th>Customer</th>
-                          <th>Products</th>
                           <th>Total Ordered</th>
                           <th>Already Packed</th>
                           <th>Remaining to Pack</th>
@@ -203,27 +205,21 @@ const PendingOrders = () => {
                           return (
                             <tr key={order._id} className="pending-order-row">
                               <td>{pagination.showingFrom + index}</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="pending-orders-orderid-link"
+                                  onClick={() => setViewProductsOrder(order)}
+                                  title="View ordered products"
+                                >
+                                  {order.orderId || order._id}
+                                </button>
+                              </td>
                               <td className="customer-cell">
                                 <div className="customer-info">
                                   <strong>{order.customer?.name || "N/A"}</strong>
                                   <small>{order.customer?.phoneNumber || "N/A"}</small>
                                 </div>
-                              </td>
-
-                              <td className="products-cell">
-                                {order.orderItems?.length > 0 ? (
-                                  <div className="products-list">
-                                    {order.orderItems.map((item, i) => (
-                                      <div key={i} className="product-tag">
-                                        <span className="product-name">{item.product?.productName || "—"}</span>
-                                        <span className="product-qty">× {item.orderedQuantity}</span>
-                                        <span className="product-unit">{item.unit || ""}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="no-products">No products</span>
-                                )}
                               </td>
 
                               <td className="text-center">{totalOrdered}</td>
@@ -280,6 +276,13 @@ const PendingOrders = () => {
           </div>
         </div>
       </main>
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
+      )}
     </div>
   );
 };

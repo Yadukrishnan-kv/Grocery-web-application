@@ -12,6 +12,7 @@ import { useAppSettings } from "../../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../../hooks/usePagination";
 import Pagination from "../../../../components/common/Pagination";
 import SearchableSelect from "../../../../components/common/SearchableSelect";
+import OrderProductsModal from "../../../../components/common/OrderProductsModal";
 
 const OrderList = () => {
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ const OrderList = () => {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -334,7 +336,6 @@ const OrderList = () => {
                         <th scope="col">No</th>
                         <th scope="col">Order ID</th>
                         <th scope="col">Customer</th>
-                        <th scope="col">Products</th>
                         <th scope="col">Total Qty</th>
                         {/* ✅ UPDATED: VAT Breakdown Columns */}
                         <th scope="col" className="vat-col">Total Dhs<br/><small>(Excl. VAT)</small></th>
@@ -356,24 +357,17 @@ const OrderList = () => {
                           return (
                             <tr key={order._id}>
                               <td>{activePagination.showingFrom + index}</td>
-                              <td>{order.orderId || order._id}</td>
-                              <td>{order.customer?.name || "N/A"}</td>
-
-                              <td className="products-cell">
-                                {order.orderItems?.length > 0 ? (
-                                  <div className="products-list">
-                                    {order.orderItems.map((item, i) => (
-                                      <div key={i} className="product-tag">
-                                        <span className="product-name">{item.product?.productName || "Unknown"}</span>
-                                        <span className="product-qty">× {item.orderedQuantity}</span>
-                                        <span className="product-unit">{item.unit || ""}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="no-products">No products</span>
-                                )}
+                              <td>
+                                <button
+                                  type="button"
+                                  className="order-list-orderid-link"
+                                  onClick={() => setViewProductsOrder(order)}
+                                  title="View ordered products"
+                                >
+                                  {order.orderId || order._id}
+                                </button>
                               </td>
+                              <td>{order.customer?.name || "N/A"}</td>
 
                               <td>{order.totalOrderedQuantity || order.orderItems?.reduce((sum, it) => sum + it.orderedQuantity, 0) || 0}</td>
 
@@ -496,7 +490,7 @@ const OrderList = () => {
                         })
                       ) : (
                         <tr>
-                          <td colSpan="14" className="order-list-no-data">
+                          <td colSpan="13" className="order-list-no-data">
                             {activePagination.totalRecords === 0
                               ? "No orders found"
                               : "No orders match your filters"}
@@ -550,6 +544,13 @@ const OrderList = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
       )}
     </div>
   );

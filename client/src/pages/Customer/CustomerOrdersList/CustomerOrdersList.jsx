@@ -11,6 +11,7 @@ import toast from "../../../utils/toast";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 const CustomerOrdersList = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const CustomerOrdersList = () => {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -282,7 +284,6 @@ const CustomerOrdersList = () => {
                         <tr>
                           <th scope="col">No</th>
                           <th scope="col">Order ID</th>
-                          <th scope="col">Products</th>
                           <th scope="col">Total Ordered Qty</th>
                           <th scope="col">Total Delivered Qty</th>
                           {/* ✅ UPDATED: VAT Breakdown Columns */}
@@ -316,23 +317,22 @@ const CustomerOrdersList = () => {
                           return (
                             <tr key={item._id}>
                               <td>{pagination.showingFrom + index}</td>
-                              <td>{item.type === "order" ? item.orderId || item._id : "-"}</td>
-
-                              <td className="products-cell">
+                              <td>
                                 {item.orderItems?.length > 0 ? (
-                                  <div className="products-list">
-                                    {item.orderItems.map((oi, i) => (
-                                      <div key={i} className="product-tag">
-                                        <span className="product-name">
-                                          {oi.product?.productName || "Unknown"}
-                                        </span>
-                                        <span className="product-qty">× {oi.orderedQuantity}</span>
-                                        <span className="product-unit">{oi.unit || ""}</span>
-                                      </div>
-                                    ))}
-                                  </div>
+                                  <button
+                                    type="button"
+                                    className="customer-orders-orderid-link"
+                                    onClick={() => setViewProductsOrder(item)}
+                                    title="View ordered products"
+                                  >
+                                    {item.type === "order"
+                                      ? item.orderId || item._id
+                                      : `REQ-${item._id.toString().slice(-6)}`}
+                                  </button>
+                                ) : item.type === "order" ? (
+                                  item.orderId || item._id
                                 ) : (
-                                  <span className="no-products">No products</span>
+                                  "-"
                                 )}
                               </td>
 
@@ -441,6 +441,13 @@ const CustomerOrdersList = () => {
           </div>
         </div>
       </main>
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
+      )}
     </div>
   );
 };

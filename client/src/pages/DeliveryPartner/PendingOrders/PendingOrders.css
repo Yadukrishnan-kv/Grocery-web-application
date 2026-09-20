@@ -295,6 +295,20 @@
   font-style: italic;
 }
 
+.pending-orders-orderid-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.pending-orders-orderid-link:hover {
+  color: #4f46e5;
+}
+
 .text-center {
   text-align: center;
 }

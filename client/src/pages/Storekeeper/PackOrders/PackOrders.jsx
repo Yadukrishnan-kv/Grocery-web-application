@@ -10,6 +10,7 @@ import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { downloadThermalSlip, downloadPDFSlip } from "../../../utils/packingSlip";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 import TableScrollSync from "../../../components/common/TableScrollSync";
 
@@ -41,6 +42,7 @@ const PackOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [packInputs, setPackInputs] = useState({});
   const [processing, setProcessing] = useState(false);
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -250,8 +252,8 @@ const PackOrders = () => {
                       <thead>
                         <tr>
                           <th>No</th>
+                          <th>Order ID</th>
                           <th>Customer</th>
-                          <th>Products</th>
                           <th>Total Ordered</th>
                           <th>Packed Qty</th>
                           <th>Status</th>
@@ -265,25 +267,17 @@ const PackOrders = () => {
                         {pagination.pageData.map((order, index) => (
                           <tr key={order._id}>
                             <td>{pagination.showingFrom + index}</td>
-                            <td>{order.customer?.name || "N/A"}</td>
-
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.map((item, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">
-                                        {item.product?.productName || "Unknown"}
-                                      </span>
-                                      <span className="product-qty">× {item.orderedQuantity}</span>
-                                      <span className="product-unit">{item.unit || ""}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
+                            <td>
+                              <button
+                                type="button"
+                                className="order-list-orderid-link"
+                                onClick={() => setViewProductsOrder(order)}
+                                title="View ordered products"
+                              >
+                                {order.orderId || order._id}
+                              </button>
                             </td>
+                            <td>{order.customer?.name || "N/A"}</td>
 
                             <td>{order.totalOrderedQuantity || 0}</td>
                             <td>
@@ -435,6 +429,13 @@ const PackOrders = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
       )}
     </div>
   );

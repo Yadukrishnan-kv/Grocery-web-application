@@ -110,10 +110,15 @@ export const downloadThermalSlip = (order, { getQty = defaultGetQty, filterItem 
       pdf.text(customerName, pageWidth - margin, y, { align: "right" });
       y += lineAdvance(9);
     } else {
+      // Once it wraps, this is a paragraph, not a single-line label/value
+      // row anymore — right-aligning each line individually made short
+      // trailing lines (e.g. "ANZ") float off to the right, disconnected
+      // from the rest of the name above it. Left-align the whole block
+      // instead so every line starts from the same left edge.
       y += lineAdvance(9);
       const customerNameLines = pdf.splitTextToSize(customerName, contentWidth);
       customerNameLines.forEach((line) => {
-        pdf.text(line, pageWidth - margin, y, { align: "right" });
+        pdf.text(line, margin, y);
         y += lineAdvance(9);
       });
     }
@@ -122,13 +127,13 @@ export const downloadThermalSlip = (order, { getQty = defaultGetQty, filterItem 
       pdf.setFontSize(8).setFont(undefined, "normal");
       const addressLines = pdf.splitTextToSize(order.customer.address, contentWidth);
       addressLines.forEach((line) => {
-        pdf.text(line, pageWidth - margin, y, { align: "right" });
+        pdf.text(line, margin, y);
         y += lineAdvance(8);
       });
     }
     if (order.customer?.pincode) {
       pdf.setFontSize(9).setFont(undefined, "normal");
-      pdf.text(String(order.customer.pincode), pageWidth - margin, y, { align: "right" });
+      pdf.text(String(order.customer.pincode), margin, y);
       y += lineAdvance(9);
     }
     printRow("Order Date:", formatDate(order.orderDate));

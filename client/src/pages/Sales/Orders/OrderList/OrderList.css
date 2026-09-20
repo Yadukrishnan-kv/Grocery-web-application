@@ -698,6 +698,20 @@
   font-style: italic;
 }
 
+.order-list-orderid-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.order-list-orderid-link:hover {
+  color: #4f46e5;
+}
+
 /* Make sure column doesn't break layout on small screens */
 @media (max-width: 1200px) {
   .order-list-data-table td:nth-child(3) {

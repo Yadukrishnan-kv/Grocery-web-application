@@ -8,12 +8,15 @@ import "./OrderReports.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 
 const OrderReports = () => {
-  const [orders, setOrders] = useState([]);
+  // All orders fetched from the server (any status) — the qty search total is
+  // computed against this, not just the delivered subset shown in the table.
+  const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("Order Reports");
@@ -26,6 +29,9 @@ const OrderReports = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [salesmanFilter, setSalesmanFilter] = useState("all");
+  const [salesmen, setSalesmen] = useState([]);
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -65,13 +71,8 @@ const OrderReports = () => {
       const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
-      // ✅ Filter for orders that have ANY delivered quantity
-      const deliveredOrders = response.data.filter(order => 
-        order.orderItems?.some(item => (item.deliveredQuantity || 0) > 0)
-      );
-      
-      setOrders(deliveredOrders);
+
+      setAllOrders(response.data);
     } catch (error) {
       console.error("Error fetching orders:", error);
       toast.error("Failed to load orders");
@@ -79,6 +80,18 @@ const OrderReports = () => {
       setLoading(false);
     }
   }, [backendUrl, user]);
+
+  const fetchSalesmen = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/api/users/getAllUsers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSalesmen(response.data.filter((u) => u.role === "Sales man"));
+    } catch (error) {
+      console.error("Error fetching salesmen:", error);
+    }
+  }, [backendUrl]);
 
   // ==================== FIXED INFINITE LOOP ====================
   useEffect(() => {
@@ -88,22 +101,36 @@ const OrderReports = () => {
   useEffect(() => {
     if (user) {
       fetchDeliveredOrders();
+      if (user.role !== "Sales man") {
+        fetchSalesmen();
+      }
     }
-  }, [user, fetchDeliveredOrders]);
+  }, [user, fetchDeliveredOrders, fetchSalesmen]);
   // ============================================================
 
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
+  // A product-side match: name, category, or sub-category text
+  const itemMatchesSearch = useCallback(
+    (item) => {
+      const term = searchTerm.toLowerCase().trim();
+      if (!term) return true;
+      return (
+        item.product?.productName?.toLowerCase().includes(term) ||
+        item.product?.CategoryName?.toLowerCase().includes(term) ||
+        item.product?.subCategoryName?.toLowerCase().includes(term)
+      );
+    },
+    [searchTerm]
+  );
+
+  // Search / date / salesman matching — shared by the table (delivered orders only)
+  // and the qty total (computed across ALL orders, regardless of delivery status).
+  const orderMatchesFilters = useCallback(
+    (order) => {
+      const term = searchTerm.toLowerCase().trim();
       const matchesSearch =
-        !searchTerm.trim() ||
-        order.customer?.name
-          ?.toLowerCase()
-          .includes(searchTerm.toLowerCase().trim()) ||
-        order.orderItems?.some((item) =>
-          item.product?.productName
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase().trim())
-        );
+        !term ||
+        order.customer?.name?.toLowerCase().includes(term) ||
+        order.orderItems?.some((item) => itemMatchesSearch(item));
 
       let matchesDate = true;
       const orderDate = new Date(order.orderDate);
@@ -121,9 +148,45 @@ const OrderReports = () => {
         matchesDate = matchesDate && orderDate <= end;
       }
 
-      return matchesSearch && matchesDate;
+      const matchesSalesman =
+        salesmanFilter === "all" ||
+        order.customer?.salesman?._id === salesmanFilter ||
+        order.customer?.salesman === salesmanFilter;
+
+      return matchesSearch && matchesDate && matchesSalesman;
+    },
+    [searchTerm, fromDate, toDate, salesmanFilter, itemMatchesSearch]
+  );
+
+  // Orders that have any delivered quantity — this is what the table displays
+  const deliveredOrders = useMemo(
+    () =>
+      allOrders.filter((order) =>
+        order.orderItems?.some((item) => (item.deliveredQuantity || 0) > 0)
+      ),
+    [allOrders]
+  );
+
+  const filteredOrders = useMemo(
+    () => deliveredOrders.filter(orderMatchesFilters),
+    [deliveredOrders, orderMatchesFilters]
+  );
+
+  // Sum of DELIVERED qty for items matching the search term (product/category/sub-category),
+  // computed only across the delivered orders shown in this report (not pending/undelivered qty).
+  const filteredQtyTotal = useMemo(() => {
+    if (!searchTerm.trim()) return null;
+
+    let sum = 0;
+    filteredOrders.forEach((order) => {
+      (order.orderItems || []).forEach((item) => {
+        if (itemMatchesSearch(item)) {
+          sum += item.deliveredQuantity || 0;
+        }
+      });
     });
-  }, [orders, searchTerm, fromDate, toDate]);
+    return sum;
+  }, [filteredOrders, searchTerm, itemMatchesSearch]);
 
   const downloadDeliveredInvoice = async (orderId, invoiceNumber, type = "normal") => {
     setDownloadingOrderId(orderId);
@@ -164,13 +227,14 @@ const OrderReports = () => {
     setSearchTerm("");
     setFromDate("");
     setToDate("");
+    setSalesmanFilter("all");
   };
 
   const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(
     filteredOrders,
     entriesPerPage,
-    `${searchTerm}|${fromDate}|${toDate}`
+    `${searchTerm}|${fromDate}|${toDate}|${salesmanFilter}`
   );
 
   const formatDate = (dateString) => {
@@ -229,11 +293,27 @@ const OrderReports = () => {
                   />
                 </div>
 
+                {user?.role !== "Sales man" && (
+                  <select
+                    className="order-reports-salesman-filter"
+                    value={salesmanFilter}
+                    onChange={(e) => setSalesmanFilter(e.target.value)}
+                    aria-label="Filter orders by salesman"
+                  >
+                    <option value="all">All Salesmen</option>
+                    {salesmen.map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.username}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
                 <div className="order-reports-search-container">
                   <input
                     type="text"
                     className="order-reports-search-input"
-                    placeholder="Search by customer or product..."
+                    placeholder="Search by customer, product, category or sub-category..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -270,19 +350,26 @@ const OrderReports = () => {
             ) : filteredOrders.length === 0 ? (
               <div className="order-reports-no-data">
                 No orders found
-                {fromDate || toDate || searchTerm
+                {fromDate || toDate || searchTerm || salesmanFilter !== "all"
                   ? " matching your filters"
                   : ""}
               </div>
             ) : (
               <>
+                {filteredQtyTotal !== null && (
+                  <div className="order-reports-qty-summary">
+                    Total Delivered Qty: <strong>{filteredQtyTotal}</strong>
+                  </div>
+                )}
+
                 <TableScrollSync>
                   <div className="order-reports-table-wrapper">
                     <table className="order-reports-data-table">
                       <thead>
                         <tr>
                           <th>No</th>
-                          <th>Products</th> {/* ✅ Changed from "Product" to "Products" */}
+                          <th>Order ID</th>
+                          <th>Customer</th>
                           <th>Total Ordered Qty</th> {/* ✅ Changed */}
                           <th>Total Delivered Qty</th> {/* ✅ Changed */}
                           <th>Pending Qty</th>
@@ -317,28 +404,18 @@ const OrderReports = () => {
                             <tr key={order._id}>
                               <td>{pagination.showingFrom + index}</td>
 
-                              {/* ✅ Multi-product column - like Customer page */}
-                              <td className="products-cell">
-                                {order.orderItems?.length > 0 ? (
-                                  <div className="products-list">
-                                    {order.orderItems.map((item, i) => (
-                                      <div key={i} className="product-tag">
-                                        <span className="product-name">
-                                          {item.product?.productName || "Unknown"}
-                                        </span>
-                                        <span className="product-qty">
-                                          × {item.orderedQuantity}
-                                        </span>
-                                        <span className="product-unit">
-                                          {item.unit || ""}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="no-products">No products</span>
-                                )}
+                              <td>
+                                <button
+                                  type="button"
+                                  className="order-reports-orderid-link"
+                                  onClick={() => setViewProductsOrder(order)}
+                                  title="View ordered products"
+                                >
+                                  {order.orderId || order._id}
+                                </button>
                               </td>
+
+                              <td>{order.customer?.name || "N/A"}</td>
 
                               <td>{totalOrdered}</td>
                               <td>{totalDelivered}</td>
@@ -446,6 +523,13 @@ const OrderReports = () => {
           }
         }}
       />
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
+      )}
     </div>
   );
 };

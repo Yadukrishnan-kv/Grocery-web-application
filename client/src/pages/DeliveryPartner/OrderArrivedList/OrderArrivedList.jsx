@@ -11,6 +11,7 @@ import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/Invoi
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 const OrderArrivedList = () => {
   const [orders, setOrders] = useState([]);
@@ -25,6 +26,7 @@ const OrderArrivedList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -310,8 +312,8 @@ const OrderArrivedList = () => {
                       <thead>
                         <tr>
                           <th scope="col">No</th>
+                          <th scope="col">Order ID</th>
                           <th scope="col">Customer</th>
-                          <th scope="col">Products</th>
                           <th scope="col">Total Qty</th>
                           <th scope="col">Grand Total</th>
                           <th scope="col">Remarks</th>
@@ -323,31 +325,17 @@ const OrderArrivedList = () => {
                         {pagination.pageData.map((order, index) => (
                           <tr key={order._id}>
                             <td>{pagination.showingFrom + index}</td>
-                            <td>{order.customer?.name || "N/A"}</td>
-
-                            {/* Attractive multi-product display */}
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.map((item, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">
-                                        {item.product?.productName ||
-                                          "Unknown Product"}
-                                      </span>
-                                      <span className="product-qty">
-                                        × {item.orderedQuantity}
-                                      </span>
-                                      <span className="product-unit">
-                                        {item.unit || ""}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
+                            <td>
+                              <button
+                                type="button"
+                                className="order-arrived-orderid-link"
+                                onClick={() => setViewProductsOrder(order)}
+                                title="View ordered products"
+                              >
+                                {order.orderId || order._id}
+                              </button>
                             </td>
+                            <td>{order.customer?.name || "N/A"}</td>
 
                             {/* Total ordered quantity */}
                             <td>
@@ -478,6 +466,13 @@ const OrderArrivedList = () => {
           downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
         }}
       />
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
+      )}
     </div>
   );
 };

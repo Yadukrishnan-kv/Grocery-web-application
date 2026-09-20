@@ -296,6 +296,20 @@
   font-style: italic;
 }
 
+.accepted-orders-orderid-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.accepted-orders-orderid-link:hover {
+  color: #4f46e5;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .products-cell {

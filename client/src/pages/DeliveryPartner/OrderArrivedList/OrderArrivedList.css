@@ -431,6 +431,20 @@
   font-style: italic;
 }
 
+.order-arrived-orderid-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.order-arrived-orderid-link:hover {
+  color: #4f46e5;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .products-cell {

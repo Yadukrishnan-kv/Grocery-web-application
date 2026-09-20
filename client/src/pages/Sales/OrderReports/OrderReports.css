@@ -304,6 +304,8 @@
   border-radius: 10px;
   font-size: 0.875rem;
   background: white;
+  box-sizing: border-box;
+  width: 100%;
   transition: all 0.2s ease;
 }
 
@@ -311,6 +313,59 @@
   outline: none;
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.order-reports-salesman-filter {
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #374151;
+  background: white;
+  min-width: 160px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.order-reports-salesman-filter:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.order-reports-qty-summary {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: rgba(79, 70, 229, 0.06);
+  border: 1px solid rgba(79, 70, 229, 0.2);
+  border-radius: 10px;
+  color: #334155;
+  font-size: 0.9rem;
+  margin-left: auto;
+  width: fit-content;
+}
+
+.order-reports-qty-summary strong {
+  color: #4f46e5;
+  font-size: 1rem;
+}
+
+.order-reports-orderid-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.order-reports-orderid-link:hover {
+  color: #4f46e5;
 }
 
 /* Search container */
@@ -399,14 +454,29 @@
 }
 
 @media (max-width: 767px) {
- 
-  
-  
-  .order-reports-search-input{
-    width: 90%;
- }
-  .order-reports-date-input
-  {
-    width: 175%;
+  .order-reports-controls-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .order-reports-date-group,
+  .order-reports-salesman-filter,
+  .order-reports-search-container,
+  .order-reports-reset-button,
+  .order-reports-refresh-button {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .order-reports-search-input {
+    width: 100%;
+  }
+
+  .order-reports-qty-summary {
+    width: 100%;
+    max-width: none;
+    justify-content: space-between;
   }
 }

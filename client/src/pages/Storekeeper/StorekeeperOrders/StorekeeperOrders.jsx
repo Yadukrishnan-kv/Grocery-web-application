@@ -10,6 +10,7 @@ import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/Invoi
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 const StorekeeperOrders = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -19,6 +20,7 @@ const StorekeeperOrders = () => {
   const [user, setUser] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // "all" | "not_packed" | "partially_packed" | "fully_packed"
   const [invoiceFilter, setInvoiceFilter] = useState("");
@@ -267,7 +269,6 @@ const StorekeeperOrders = () => {
                           <th>No</th>
                           <th>Order ID</th>
                           <th>Customer</th>
-                          <th>Products</th>
                           <th>Packed Qty</th>{" "}
                           {/* ✅ Show packed qty (not total ordered) */}
                           <th>Delivered</th>
@@ -315,7 +316,16 @@ const StorekeeperOrders = () => {
                           return (
                             <tr key={order._id}>
                               <td>{pagination.showingFrom + index}</td>
-                              <td>{order.orderId || order._id}</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="order-list-orderid-link"
+                                  onClick={() => setViewProductsOrder(order)}
+                                  title="View ordered products"
+                                >
+                                  {order.orderId || order._id}
+                                </button>
+                              </td>
 
                               <td>
                                 <div className="customer-cell">
@@ -326,30 +336,6 @@ const StorekeeperOrders = () => {
                                     {order.customer?.phoneNumber}
                                   </small>
                                 </div>
-                              </td>
-
-                              <td className="products-cell">
-                                {order.orderItems?.length > 0 ? (
-                                  <div className="products-list">
-                                    {order.orderItems.slice(0, 2).map((item, i) => (
-                                      <div key={i} className="product-tag">
-                                        <span className="product-name">
-                                          {item.product?.productName || "—"}
-                                        </span>
-                                        <span className="product-qty">
-                                          × {item.packedQuantity || 0}
-                                        </span>
-                                      </div>
-                                    ))}
-                                    {order.orderItems.length > 2 && (
-                                      <span className="product-more">
-                                        +{order.orderItems.length - 2} more
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="no-products">No products</span>
-                                )}
                               </td>
 
                               {/* ✅ Show PACKED quantity (not ordered) */}
@@ -458,6 +444,13 @@ const StorekeeperOrders = () => {
           }
         }}
       />
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
+      )}
     </div>
   );
 };

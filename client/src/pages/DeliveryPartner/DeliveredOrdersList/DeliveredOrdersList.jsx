@@ -12,6 +12,7 @@ import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import SearchableSelect from "../../../components/common/SearchableSelect";
 import Pagination from "../../../components/common/Pagination";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 const DeliveredOrdersList = () => {
   const [orders, setOrders] = useState([]);
@@ -22,6 +23,7 @@ const DeliveredOrdersList = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
   const [pendingInvoiceKind, setPendingInvoiceKind] = useState("packed");
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -375,8 +377,8 @@ const DeliveredOrdersList = () => {
                       <thead>
                         <tr>
                           <th>No</th>
+                          <th>Order ID</th>
                           <th>Customer</th>
-                          <th>Products</th>
                           <th>Total Ordered</th>
                           <th>Packed Qty</th> {/* NEW */}
                           <th>Total Delivered</th>
@@ -418,29 +420,17 @@ const DeliveredOrdersList = () => {
                           return (
                             <tr key={order._id}>
                               <td>{pagination.showingFrom + index}</td>
-                              <td>{order.customer?.name || "N/A"}</td>
-
-                              <td className="products-cell">
-                                {order.orderItems?.length > 0 ? (
-                                  <div className="products-list">
-                                    {order.orderItems.map((item, i) => (
-                                      <div key={i} className="product-tag">
-                                        <span className="product-name">
-                                          {item.product?.productName || "—"}
-                                        </span>
-                                        <span className="product-qty">
-                                          × {item.orderedQuantity}
-                                        </span>
-                                        <span className="product-unit">
-                                          {item.unit || ""}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="no-products">No products</span>
-                                )}
+                              <td>
+                                <button
+                                  type="button"
+                                  className="delivered-orders-orderid-link"
+                                  onClick={() => setViewProductsOrder(order)}
+                                  title="View ordered products"
+                                >
+                                  {order.orderId || order._id}
+                                </button>
                               </td>
+                              <td>{order.customer?.name || "N/A"}</td>
 
                               <td>{totalOrdered}</td>
                               <td>{packedQty} (packed)</td>
@@ -730,6 +720,13 @@ const DeliveredOrdersList = () => {
           }
         }}
       />
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
+      )}
     </div>
   );
 };

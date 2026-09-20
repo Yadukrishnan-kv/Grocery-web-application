@@ -239,8 +239,12 @@ const getAllOrders = async (req, res) => {
     const sort = { orderDate: -1 };
     const populateOrders = (query) =>
       query
-        .populate("customer", "name email phoneNumber address pincode")
-        .populate("orderItems.product", "productName price unit")
+        .populate({
+          path: "customer",
+          select: "name email phoneNumber address pincode salesman",
+          populate: { path: "salesman", select: "username" },
+        })
+        .populate("orderItems.product", "productName price unit CategoryName subCategoryName")
         .populate("assignedTo", "username");
 
     if (!req.query.page) {
@@ -288,7 +292,7 @@ const getSalesmanOrders = async (req, res) => {
     const populateOrders = (query) =>
       query
         .populate("customer", "name email phoneNumber address pincode")
-        .populate("orderItems.product", "productName price unit")
+        .populate("orderItems.product", "productName price unit CategoryName subCategoryName")
         .populate("assignedTo", "username");
 
     if (!req.query.page) {

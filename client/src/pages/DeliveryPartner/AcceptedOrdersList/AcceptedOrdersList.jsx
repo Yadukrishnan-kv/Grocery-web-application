@@ -10,6 +10,7 @@ import toast from "../../../utils/toast";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 const AcceptedOrdersList = () => {
   const [orders, setOrders] = useState([]);
@@ -18,6 +19,7 @@ const AcceptedOrdersList = () => {
   const [activeItem, setActiveItem] = useState("Accepted Orders");
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -153,8 +155,8 @@ const AcceptedOrdersList = () => {
                       <thead>
                         <tr>
                           <th scope="col">No</th>
+                          <th scope="col">Order ID</th>
                           <th scope="col">Customer</th>
-                          <th scope="col">Products</th>           {/* Updated */}
                           <th scope="col">Total Qty</th>         {/* Added */}
                           <th scope="col">Grand Total</th>       {/* Updated */}
                           <th scope="col">Remarks</th>
@@ -166,30 +168,17 @@ const AcceptedOrdersList = () => {
                         {pagination.pageData.map((order, index) => (
                           <tr key={order._id}>
                             <td>{pagination.showingFrom + index}</td>
-                            <td>{order.customer?.name || "N/A"}</td>
-
-                            {/* Multi-product attractive display */}
-                            <td className="products-cell">
-                              {order.orderItems?.length > 0 ? (
-                                <div className="products-list">
-                                  {order.orderItems.map((item, i) => (
-                                    <div key={i} className="product-tag">
-                                      <span className="product-name">
-                                        {item.product?.productName || "Unknown Product"}
-                                      </span>
-                                      <span className="product-qty">
-                                        × {item.orderedQuantity}
-                                      </span>
-                                      <span className="product-unit">
-                                        {item.unit || ""}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="no-products">No products</span>
-                              )}
+                            <td>
+                              <button
+                                type="button"
+                                className="accepted-orders-orderid-link"
+                                onClick={() => setViewProductsOrder(order)}
+                                title="View ordered products"
+                              >
+                                {order.orderId || order._id}
+                              </button>
                             </td>
+                            <td>{order.customer?.name || "N/A"}</td>
 
                             {/* Total ordered quantity */}
                             <td>
@@ -250,6 +239,13 @@ const AcceptedOrdersList = () => {
           </div>
         </div>
       </main>
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
+      )}
     </div>
   );
 };

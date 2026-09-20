@@ -11,6 +11,7 @@ import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { downloadThermalSlip, downloadPDFSlip } from "../../../utils/packingSlip";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
 // The slip for this page should reflect what's actually left to pack, not
 // the full ordered quantity — same rendering as the Pack Orders slip, just
@@ -33,6 +34,7 @@ const RemainingPackOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [packInputs, setPackInputs] = useState({});
   const [processing, setProcessing] = useState(false);
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const handleDownloadThermalPDF = (orderId) => {
@@ -246,8 +248,8 @@ const RemainingPackOrders = () => {
                       <thead>
                         <tr>
                           <th>No</th>
+                          <th>Order ID</th>
                           <th>Customer</th>
-                          <th>Products</th>
                           <th>Total Ordered</th>
                           <th>Packed Qty</th>
                           <th>Remaining Qty</th>
@@ -271,33 +273,17 @@ const RemainingPackOrders = () => {
                           return (
                             <tr key={order._id}>
                               <td>{pagination.showingFrom + index}</td>
-                              <td>{order.customer?.name || "N/A"}</td>
-
-                              <td className="products-cell">
-                                {order.orderItems?.length > 0 ? (
-                                  <div className="products-list">
-                                    {order.orderItems.map((item, i) => {
-                                      const remaining = item.orderedQuantity - (item.packedQuantity || 0);
-                                      return (
-                                        <div key={i} className="product-tag">
-                                          <span className="product-name">
-                                            {item.product?.productName || "Unknown"}
-                                          </span>
-                                          <span className="product-qty">× {item.orderedQuantity}</span>
-                                          <span className="product-unit">{item.unit || ""}</span>
-                                          {remaining > 0 && (
-                                            <span className="product-remaining">
-                                              ({remaining} remaining)
-                                            </span>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <span className="no-products">No products</span>
-                                )}
+                              <td>
+                                <button
+                                  type="button"
+                                  className="order-list-orderid-link"
+                                  onClick={() => setViewProductsOrder(order)}
+                                  title="View ordered products"
+                                >
+                                  {order.orderId || order._id}
+                                </button>
                               </td>
+                              <td>{order.customer?.name || "N/A"}</td>
 
                               <td>{totalOrdered}</td>
                               <td>{totalPacked}</td>
@@ -476,6 +462,13 @@ const RemainingPackOrders = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+        />
       )}
     </div>
   );
