@@ -154,12 +154,14 @@ const StorekeeperOrders = () => {
     return `${day}/${month}/${year}`;
   };
 
-  const getPackedStatusBadge = (order) => {
-    const status = order.packedStatus || "not_packed";
+  const getDeliveryStatusBadge = (order) => {
+    const status = order.status || "pending";
     const map = {
-      not_packed: { label: "Not Packed", class: "status-not-packed" },
-      partially_packed: { label: "Partially Packed", class: "status-partial" },
-      fully_packed: { label: "Fully Packed", class: "status-packed" },
+      pending: { label: "Pending", class: "status-not-packed" },
+      ready_to_deliver: { label: "Ready to Deliver", class: "status-ready" },
+      partial_delivered: { label: "Partially Delivered", class: "status-partial" },
+      delivered: { label: "Fully Delivered", class: "status-packed" },
+      cancelled: { label: "Cancelled", class: "status-cancelled" },
     };
     return map[status] || { label: status, class: "status-neutral" };
   };
@@ -311,7 +313,7 @@ const StorekeeperOrders = () => {
                               }, 0)
                               .toFixed(2) || "0.00";
 
-                          const statusBadge = getPackedStatusBadge(order);
+                          const statusBadge = getDeliveryStatusBadge(order);
 
                           return (
                             <tr key={order._id}>

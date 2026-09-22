@@ -317,7 +317,7 @@ const getSalesmanCustomers = async (req, res) => {
 
     // Get customers assigned to this salesman
     const customers = await Customer.find({ salesman: req.user._id })
-      .select("name email phoneNumber _id")
+      .select("name email phoneNumber address customerId _id")
       .sort({ name: 1 });
 
     res.json(customers);
@@ -360,6 +360,13 @@ const updateCustomer = async (req, res) => {
       }
     });
 
+    // Fetched once and reused below (both for the credit-limit recalculation
+    // and to keep the linked login User's username/email in sync).
+    const targetCustomer = await Customer.findById(req.params.id);
+    if (!targetCustomer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
     // Map salesmanId → salesman field
     if (updateData.salesmanId !== undefined) {
       updateData.salesman = updateData.salesmanId || null;
@@ -378,26 +385,38 @@ const updateCustomer = async (req, res) => {
       delete updateData.salesmanId;
     }
 
-    // Coerce latitude/longitude to numbers or null
+    // Coerce latitude/longitude to numbers or null — guard against NaN
+    // (e.g. an unparseable string, or `null` surviving the JSON round-trip)
+    // so it never reaches Mongoose, which throws a CastError on NaN for a
+    // Number field instead of treating it as "no value".
     if (updateData.latitude !== undefined) {
-      updateData.latitude = updateData.latitude !== '' ? parseFloat(updateData.latitude) : null;
+      const parsedLatitude = updateData.latitude !== '' && updateData.latitude !== null
+        ? parseFloat(updateData.latitude)
+        : null;
+      if (parsedLatitude !== null && isNaN(parsedLatitude)) {
+        return res.status(400).json({ message: "Invalid latitude value" });
+      }
+      updateData.latitude = parsedLatitude;
     }
     if (updateData.longitude !== undefined) {
-      updateData.longitude = updateData.longitude !== '' ? parseFloat(updateData.longitude) : null;
+      const parsedLongitude = updateData.longitude !== '' && updateData.longitude !== null
+        ? parseFloat(updateData.longitude)
+        : null;
+      if (parsedLongitude !== null && isNaN(parsedLongitude)) {
+        return res.status(400).json({ message: "Invalid longitude value" });
+      }
+      updateData.longitude = parsedLongitude;
     }
 
     // Special handling for creditLimit / openingBalance changes
     if (updateData.creditLimit !== undefined || updateData.openingBalance !== undefined) {
-      const customer = await Customer.findById(req.params.id);
-      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const newCreditLimit = updateData.creditLimit !== undefined
+        ? parseFloat(updateData.creditLimit)
+        : targetCustomer.creditLimit;
 
-      const newCreditLimit = updateData.creditLimit !== undefined 
-        ? parseFloat(updateData.creditLimit) 
-        : customer.creditLimit;
-
-      const newOpeningBalance = updateData.openingBalance !== undefined 
-        ? parseFloat(updateData.openingBalance) 
-        : customer.openingBalance;
+      const newOpeningBalance = updateData.openingBalance !== undefined
+        ? parseFloat(updateData.openingBalance)
+        : targetCustomer.openingBalance;
 
       // Validate
       if (isNaN(newCreditLimit) || newCreditLimit < 0) {
@@ -414,16 +433,28 @@ const updateCustomer = async (req, res) => {
       updateData.balanceCreditLimit = newCreditLimit - newOpeningBalance;
     }
 
-    // Email uniqueness check
+    // Email uniqueness check — against both Customer and the linked login
+    // User collections, since the email is about to be synced to both below.
     if (updateData.email) {
-      const existing = await Customer.findOne({
-        email: updateData.email.trim().toLowerCase(),
+      updateData.email = updateData.email.trim().toLowerCase();
+
+      const existingCustomer = await Customer.findOne({
+        email: updateData.email,
         _id: { $ne: req.params.id }
       });
-      if (existing) {
+      if (existingCustomer) {
         return res.status(400).json({ message: "Email already in use" });
       }
-      updateData.email = updateData.email.trim().toLowerCase();
+
+      if (targetCustomer.user) {
+        const existingUser = await User.findOne({
+          email: updateData.email,
+          _id: { $ne: targetCustomer.user }
+        });
+        if (existingUser) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+      }
     }
 
     // If changing billingType to "Cash", clear credit-related fields
@@ -441,6 +472,18 @@ const updateCustomer = async (req, res) => {
 
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
+    }
+
+    // Keep the linked login User account's username/email in sync. The
+    // customer's own Profile page (getMyProfile in userController.js) reads
+    // username/email from the User document, not Customer — without this,
+    // an admin renaming a customer or changing their email here would never
+    // show up on the customer's side, even after a fresh login.
+    if (customer.user && (updateData.name !== undefined || updateData.email !== undefined)) {
+      const userUpdate = {};
+      if (updateData.name !== undefined) userUpdate.username = updateData.name.trim();
+      if (updateData.email !== undefined) userUpdate.email = updateData.email;
+      await User.findByIdAndUpdate(customer.user, userUpdate, { runValidators: true });
     }
 
     // Optional: If openingBalance changed, you could create/update a bill here
@@ -1109,10 +1152,22 @@ const getCustomerOutstandingDetails = async (req, res) => {
       return acc;
     }, {});
 
-    const totalOutstanding = pendingBills.reduce(
+    const billBasedOutstanding = pendingBills.reduce(
       (sum, bill) => sum + (bill.amountDue - bill.paidAmount),
       0
     );
+
+    // Bill documents are only auto-created on delivery for customers with
+    // statementType "invoice-based" (see createInvoiceBasedBill call sites in
+    // orderController.js) — "monthly"/unset-statement customers never get a
+    // per-order Bill, and even invoice-based customers have a normal pack→
+    // deliver lag before one exists. balanceCreditLimit, on the other hand, is
+    // decremented as soon as an order is packed, so it already reflects real
+    // credit consumption regardless of whether a bill has been generated yet.
+    // Floor totalOutstanding at usedCredit so it never understates what the
+    // customer actually owes just because billing hasn't caught up.
+    const usedCredit = customer.creditLimit - customer.balanceCreditLimit;
+    const totalOutstanding = Math.max(billBasedOutstanding, usedCredit);
 
     const totalBills = pendingBills.length;
     const overdueBills = pendingBills.filter(

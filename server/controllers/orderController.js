@@ -10,6 +10,7 @@ const arabicReshaper = require("arabic-reshaper");
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Bill = require("../models/Bill");
 const { getPaginationParams, buildPaginatedResponse } = require("../utils/paginate");
+const { formatCustomerId } = require("../utils/formatCustomerId");
 
 const formatArabicForPdf = (text) => {
   if (!text) return "";
@@ -833,12 +834,12 @@ const buildPDFBuffer = (generateFn) => {
 const getDeliveredInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
+      .populate("customer", "name email phoneNumber address pincode customerId balanceCreditLimit")
       .populate("orderItems.product", "productName price unit")
       .populate("assignedTo", "username");
-    
+
     if (!order) return res.status(404).json({ message: "Order not found" });
-    
+
     if (order.totalDeliveredQuantity === 0) {
       return res.status(400).json({ message: "No delivered quantity" });
     }
@@ -901,7 +902,7 @@ const getPendingInvoice = async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate(
         "customer",
-        "name email phoneNumber address pincode balanceCreditLimit",
+        "name email phoneNumber address pincode customerId balanceCreditLimit",
       )
       .populate("orderItems.product", "productName price unit"); // ← FIXED HERE
 
@@ -1644,12 +1645,12 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     doc.font("Helvetica").fontSize(7.5);
     addressHeight = doc.heightOfString(customerAddress, { width: toTextWidth });
   }
-  let toBoxH = 75;
+  let toBoxH = 86;
   if (designType !== "preprinted") {
     // 16 (top offset to name) + name + 2 (gap) + address (+2 gap if present)
-    // + 10 (mobile line) + 8 (TRN line) + 8 (bottom padding)
-    const toContentHeight = 16 + nameHeight + 2 + (customerAddress ? addressHeight + 2 : 0) + 10 + 8 + 8;
-    toBoxH = Math.max(75, toContentHeight);
+    // + 10 (mobile line) + 8 (TRN line) + 11 (gap to Customer ID line) + 8 (bottom padding)
+    const toContentHeight = 16 + nameHeight + 2 + (customerAddress ? addressHeight + 2 : 0) + 10 + 8 + 11 + 8;
+    toBoxH = Math.max(86, toContentHeight);
   }
 
   doc.roundedRect(margin, y, toBoxWidth, toBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
@@ -1667,6 +1668,8 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   doc.font("Helvetica").fontSize(7.5).text(`Mob: ${order.customer?.phoneNumber || "N/A"}`, margin + 8, toY);
   toY += 10;
   doc.font("Helvetica-Bold").fontSize(8).text(`TRN: ${order.customer?.pincode || "N/A"}`, margin + 8, toY);
+  toY += 11;
+  doc.font("Helvetica-Bold").fontSize(8).text(`Customer ID: ${formatCustomerId(order.customer?.customerId) || "N/A"}`, margin + 8, toY);
 
   if (designType !== "preprinted") {
     // Center: TAX INVOICE Box (original filled navy box, normal invoice only)
@@ -2060,9 +2063,9 @@ const getPendingOrdersForAssignment = async (req, res) => {
 
 const assignOrderToDeliveryMan = async (req, res) => {
   try {
-    // Check if user has permission to assign orders (Admin or Sales Manager)
-    if (!req.user || !["Admin", "Sales Manager"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Only Admin or Sales Manager can assign orders" });
+    // Check if user has permission to assign orders (Admin, Sales Manager, or Store kepper)
+    if (!req.user || !["Admin", "Sales Manager", "Store kepper"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only Admin, Sales Manager, or Storekeeper can assign orders" });
     }
 
     const { deliveryManId } = req.body;
@@ -2136,7 +2139,7 @@ const getOrderInvoice = async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate(
         "customer",
-        "name email phoneNumber address pincode balanceCreditLimit",
+        "name email phoneNumber address pincode customerId balanceCreditLimit",
       )
       .populate("product", "productName price");
 
@@ -2963,7 +2966,7 @@ const getReadyToDeliver = async (req, res) => {
 const getPackedInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
+      .populate("customer", "name email phoneNumber address pincode customerId balanceCreditLimit")
       .populate("orderItems.product", "productName price unit")
       .populate("assignedTo", "username");
 
@@ -3001,7 +3004,7 @@ const getPackedInvoice = async (req, res) => {
 const getUnifiedInvoice = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("customer", "name email phoneNumber address pincode balanceCreditLimit")
+      .populate("customer", "name email phoneNumber address pincode customerId balanceCreditLimit")
       .populate("orderItems.product", "productName price unit")
       .populate("assignedTo", "username");
     if (!order) return res.status(404).json({ message: "Order not found" });

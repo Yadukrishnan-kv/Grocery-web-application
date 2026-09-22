@@ -49,37 +49,66 @@ const CreateCustomer = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) newErrors.name = "Customer name is required";
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    // "Field is required" checks only apply when creating a brand-new
+    // customer. While editing, an admin may only be touching one or two
+    // fields — leaving the rest exactly as they already are shouldn't block
+    // saving. Format/range checks below still run whenever a value is
+    // actually present, in both modes, so garbage input is never accepted.
+    const requireField = !isEdit;
+
+    if (requireField && !formData.name.trim()) {
+      newErrors.name = "Customer name is required";
+    }
+
+    if (requireField && !formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (
+      formData.email.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
+    ) {
       newErrors.email = "Invalid email format";
     }
-    if (!formData.phoneNumber.trim())
+
+    if (requireField && !formData.phoneNumber.trim()) {
       newErrors.phoneNumber = "Phone number is required";
-    if (!formData.address.trim()) newErrors.address = "Address is required";
-    if (!formData.pincode.trim()) newErrors.pincode = "TRN is required";
+    }
+    if (requireField && !formData.address.trim()) {
+      newErrors.address = "Address is required";
+    }
+    if (requireField && !formData.pincode.trim()) {
+      newErrors.pincode = "TRN is required";
+    }
+
+    if (formData.latitude !== "" && isNaN(parseFloat(formData.latitude))) {
+      newErrors.latitude = "Latitude must be a valid number";
+    }
+    if (formData.longitude !== "" && isNaN(parseFloat(formData.longitude))) {
+      newErrors.longitude = "Longitude must be a valid number";
+    }
 
     if (formData.billingType === "Credit limit") {
-      if (
-        formData.creditLimit === "" ||
-        isNaN(formData.creditLimit) ||
-        parseFloat(formData.creditLimit) < 0
-      ) {
+      if (formData.creditLimit !== "") {
+        if (isNaN(formData.creditLimit) || parseFloat(formData.creditLimit) < 0) {
+          newErrors.creditLimit = "Valid credit limit ≥ 0 required";
+        }
+      } else if (requireField) {
         newErrors.creditLimit = "Valid credit limit ≥ 0 required";
       }
 
-      if (!formData.statementType)
+      if (requireField && !formData.statementType) {
         newErrors.statementType = "Statement type required";
-      if (
-        !formData.dueDays ||
-        isNaN(formData.dueDays) ||
-        parseInt(formData.dueDays) < 0
-      ) {
+      }
+
+      if (formData.dueDays !== "") {
+        if (isNaN(formData.dueDays) || parseInt(formData.dueDays) < 0) {
+          newErrors.dueDays = "Valid due days ≥ 0 required";
+        }
+      } else if (requireField) {
         newErrors.dueDays = "Valid due days ≥ 0 required";
       }
     }
 
-    // Opening balance validation
+    // Opening balance validation — format/range only, applies in both modes.
     const openingBal = parseFloat(formData.openingBalance) || 0;
     if (openingBal < 0) {
       newErrors.openingBalance = "Opening balance cannot be negative";
@@ -88,13 +117,15 @@ const CreateCustomer = () => {
       newErrors.openingBalance = "Opening balance cannot exceed credit limit";
     }
     if (openingBal > 0) {
-      if (
-        !formData.openingBalanceDueDays ||
-        isNaN(formData.openingBalanceDueDays) ||
-        parseInt(formData.openingBalanceDueDays) < 0
-      ) {
-        newErrors.openingBalanceDueDays =
-          "Valid due days required when opening balance > 0";
+      if (formData.openingBalanceDueDays !== "") {
+        if (
+          isNaN(formData.openingBalanceDueDays) ||
+          parseInt(formData.openingBalanceDueDays) < 0
+        ) {
+          newErrors.openingBalanceDueDays = "Valid due days required when opening balance > 0";
+        }
+      } else if (requireField) {
+        newErrors.openingBalanceDueDays = "Valid due days required when opening balance > 0";
       }
     }
 
@@ -179,8 +210,14 @@ const CreateCustomer = () => {
         contactPersonName: formData.contactPersonName.trim() || null,
         contactPersonPhone: formData.contactPersonPhone.trim() || null,
         contactPersonAddress: formData.contactPersonAddress.trim() || null,
-        latitude: formData.latitude !== "" ? parseFloat(formData.latitude) : null,
-        longitude: formData.longitude !== "" ? parseFloat(formData.longitude) : null,
+        latitude:
+          formData.latitude !== "" && !isNaN(parseFloat(formData.latitude))
+            ? parseFloat(formData.latitude)
+            : null,
+        longitude:
+          formData.longitude !== "" && !isNaN(parseFloat(formData.longitude))
+            ? parseFloat(formData.longitude)
+            : null,
         emiratesName: formData.emiratesName || null,
         emiratesCode: formData.emiratesCode || null,
         salesmanEmiratesName: formData.salesmanEmiratesName || null,
@@ -745,8 +782,15 @@ const CreateCustomer = () => {
                   value={formData.latitude}
                   onChange={handleChange}
                   placeholder="e.g. 25.2048"
+                  aria-invalid={!!errors.latitude}
+                  aria-describedby={errors.latitude ? "latitude-error" : undefined}
                   className="customer-input"
                 />
+                {errors.latitude && (
+                  <p id="latitude-error" className="customer-error-text" role="alert">
+                    {errors.latitude}
+                  </p>
+                )}
               </div>
               <div className="customer-form-group">
                 <label htmlFor="longitude">Longitude</label>
@@ -758,8 +802,15 @@ const CreateCustomer = () => {
                   value={formData.longitude}
                   onChange={handleChange}
                   placeholder="e.g. 55.2708"
+                  aria-invalid={!!errors.longitude}
+                  aria-describedby={errors.longitude ? "longitude-error" : undefined}
                   className="customer-input"
                 />
+                {errors.longitude && (
+                  <p id="longitude-error" className="customer-error-text" role="alert">
+                    {errors.longitude}
+                  </p>
+                )}
               </div>
             </div>
 

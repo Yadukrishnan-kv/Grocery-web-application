@@ -58,6 +58,7 @@
   padding: 1.75rem;
   text-align: center;
   border: 1px solid #e2e8f0;
+  border-top: 4px solid transparent;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -66,6 +67,12 @@
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
+
+.customer-credit-card--total { border-top-color: #4f46e5; }
+.customer-credit-card--available { border-top-color: #10b981; }
+.customer-credit-card--used { border-top-color: #ef4444; }
+.customer-credit-card--return { border-top-color: #3b82f6; }
+.customer-credit-card--utilization { border-top-color: #f59e0b; }
 
 .customer-credit-card h3 {
   font-size: 0.95rem;
@@ -76,10 +83,25 @@
   letter-spacing: 0.05em;
 }
 
+.customer-credit-amount-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.customer-credit-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
 .customer-credit-amount {
   font-size: 1.875rem;
   font-weight: 700;
   color: #111827;
+  letter-spacing: -0.02em;
 }
 
 .customer-credit-available {

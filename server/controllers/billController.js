@@ -499,7 +499,7 @@ const getBillReceipt = async (req, res) => {
     let receiptTransaction = null;
     if (transactionId) {
       receiptTransaction = await BillTransaction.findById(transactionId)
-        .populate("customer", "name phoneNumber address")
+        .populate("customer", "name phoneNumber address pincode")
         .populate("recipient", "username")
         .populate("order", "invoiceNumber");
     }
@@ -507,7 +507,7 @@ const getBillReceipt = async (req, res) => {
     if (!receiptTransaction) {
       receiptTransaction = await BillTransaction.findOne({ bill: bill._id })
         .sort({ createdAt: -1 })
-        .populate("customer", "name phoneNumber address")
+        .populate("customer", "name phoneNumber address pincode")
         .populate("recipient", "username")
         .populate("order", "invoiceNumber");
     }
@@ -621,7 +621,7 @@ const getBillReceipt = async (req, res) => {
     y = drawDashedLine(y + 2);
 
     // ===== CUSTOMER INFO =====
-    // Name/phone/address are all wrapped to contentWidth and advance y by
+    // Name/address/phone/TRN are all wrapped to contentWidth and advance y by
     // their actual rendered height (doc.heightOfString) instead of a fixed
     // single-line guess — a long name or multi-line address would otherwise
     // run into the rows drawn right after it.
@@ -631,15 +631,21 @@ const getBillReceipt = async (req, res) => {
     const receiptCustomerName = receiptCustomer?.name || bill.customer?.name || "N/A";
     doc.text(receiptCustomerName, centerX, y, { width: contentWidth });
     y += doc.heightOfString(receiptCustomerName, { width: contentWidth }) + 2;
+    const receiptCustomerAddress = receiptCustomer?.address || bill.customer?.address;
+    if (receiptCustomerAddress) {
+      doc.text(receiptCustomerAddress, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(receiptCustomerAddress, { width: contentWidth }) + 2;
+    }
     const receiptCustomerPhone = receiptCustomer?.phoneNumber || bill.customer?.phoneNumber;
     if (receiptCustomerPhone) {
       doc.text(receiptCustomerPhone, centerX, y, { width: contentWidth });
       y += doc.heightOfString(receiptCustomerPhone, { width: contentWidth }) + 2;
     }
-    const receiptCustomerAddress = receiptCustomer?.address || bill.customer?.address;
-    if (receiptCustomerAddress) {
-      doc.text(receiptCustomerAddress, centerX, y, { width: contentWidth });
-      y += doc.heightOfString(receiptCustomerAddress, { width: contentWidth }) + 2;
+    const receiptCustomerTrn = receiptCustomer?.pincode || bill.customer?.pincode;
+    if (receiptCustomerTrn) {
+      const receiptCustomerTrnText = `TRN: ${receiptCustomerTrn}`;
+      doc.text(receiptCustomerTrnText, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(receiptCustomerTrnText, { width: contentWidth }) + 2;
     }
 
     y = drawDashedLine(y + 2);

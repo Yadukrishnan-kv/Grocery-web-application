@@ -11,6 +11,7 @@ import toast from "../../../utils/toast";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import { formatCustomerId } from "../../../utils/formatCustomerId";
 
 const CustomerList = () => {
   // Full list — only fetched/used when a search or due-days filter is active,
@@ -371,7 +372,7 @@ const CustomerList = () => {
                             <td>{activePagination.showingFrom + index}</td>
                             <td>
                               <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
-                                {customer.customerId || "-"}
+                                {formatCustomerId(customer.customerId) || "-"}
                               </span>
                             </td>
                             <td>{customer.name || "-"}</td>

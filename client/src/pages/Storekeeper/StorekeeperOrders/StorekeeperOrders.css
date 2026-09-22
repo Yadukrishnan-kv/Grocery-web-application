@@ -227,6 +227,16 @@
   color: #166534;
 }
 
+.status-cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-ready {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 /* Search & Filter Controls */
 .order-list-controls-group {
   display: flex;

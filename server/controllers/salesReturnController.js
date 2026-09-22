@@ -10,6 +10,7 @@ const InvoiceCounter = require("../models/InvoiceCounter");
 const CompanySettings = require("../models/CompanySettings");
 const arabicReshaper = require("arabic-reshaper");
 const PDFDocument = require("pdfkit");
+const { formatCustomerId } = require("../utils/formatCustomerId");
 
 const formatArabicForPdf = (text) => {
   if (!text) return "";
@@ -952,12 +953,12 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
     doc.font("Helvetica").fontSize(7.5);
     addressHeight = doc.heightOfString(customerAddress, { width: toTextWidth });
   }
-  let toBoxH = 75;
+  let toBoxH = 86;
   if (designType !== "preprinted") {
     // 16 (top offset to name) + name + 2 (gap) + address (+2 gap if present)
-    // + 10 (mobile line) + 8 (TRN line) + 8 (bottom padding)
-    const toContentHeight = 16 + nameHeight + 2 + (customerAddress ? addressHeight + 2 : 0) + 10 + 8 + 8;
-    toBoxH = Math.max(75, toContentHeight);
+    // + 10 (mobile line) + 8 (TRN line) + 11 (gap to Customer ID line) + 8 (bottom padding)
+    const toContentHeight = 16 + nameHeight + 2 + (customerAddress ? addressHeight + 2 : 0) + 10 + 8 + 11 + 8;
+    toBoxH = Math.max(86, toContentHeight);
   }
 
   doc.roundedRect(margin, y, toBoxWidth, toBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
@@ -975,6 +976,8 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
   doc.font("Helvetica").fontSize(7.5).text(`Mob: ${sr.customer?.phoneNumber || "N/A"}`, margin + 8, toY);
   toY += 10;
   doc.font("Helvetica-Bold").fontSize(8).text(`TRN: ${sr.customer?.pincode || "N/A"}`, margin + 8, toY);
+  toY += 11;
+  doc.font("Helvetica-Bold").fontSize(8).text(`Customer ID: ${formatCustomerId(sr.customer?.customerId) || "N/A"}`, margin + 8, toY);
 
   if (designType !== "preprinted") {
     // Center: CREDIT NOTE Box (original filled navy box, normal invoice only)
@@ -1711,7 +1714,7 @@ const getReturnInvoice = async (req, res) => {
   try {
     const sr = await SalesReturn.findById(req.params.id)
       .populate("order", "invoiceNumber orderDate payment")
-      .populate("customer", "name phoneNumber address pincode")
+      .populate("customer", "name phoneNumber address pincode customerId")
       .populate("returnItems.product", "productName unit")
       .populate("assignedTo", "username");
 

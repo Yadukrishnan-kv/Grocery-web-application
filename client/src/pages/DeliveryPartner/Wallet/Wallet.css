@@ -340,6 +340,22 @@
   font-weight: 500;
 }
 
+.filtered-info {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 16px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--primary);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.filtered-info strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
 /* ───────────────────────────────────────────────────────
    📦 Bulk Actions Bar - Floating Design
    ─────────────────────────────────────────────────────── */
@@ -498,6 +514,7 @@
 .col-customer { min-width: 180px; }
 .col-order { width: 120px; }
 .col-amount { width: 130px; text-align: right; }
+.col-return-credit { width: 150px; }
 .col-cheque { min-width: 200px; }
 .col-date { width: 110px; color: var(--text-secondary); }
 .col-status { width: 150px; }
@@ -718,6 +735,11 @@
   gap: 16px;
   padding: 16px 20px;
   align-items: center;
+}
+
+/* Cash Wallet has no Cheque Details column — 9 tracks instead of 10 */
+.wallet-skeleton.cash .skeleton-row {
+  grid-template-columns: 50px 60px 180px 120px 130px 150px 110px 150px 120px;
 }
 
 .skeleton-cell {

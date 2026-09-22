@@ -11,6 +11,7 @@ import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { downloadThermalSlip, downloadPDFSlip } from "../../../utils/packingSlip";
 import OrderProductsModal from "../../../components/common/OrderProductsModal";
+import SearchableSelect from "../../../components/common/SearchableSelect";
 
 import TableScrollSync from "../../../components/common/TableScrollSync";
 
@@ -43,6 +44,7 @@ const PackOrders = () => {
   const [packInputs, setPackInputs] = useState({});
   const [processing, setProcessing] = useState(false);
   const [viewProductsOrder, setViewProductsOrder] = useState(null);
+  const [deliveryPartners, setDeliveryPartners] = useState([]);
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const fetchCurrentUser = useCallback(async () => {
@@ -78,12 +80,42 @@ const PackOrders = () => {
     }
   }, [backendUrl]);
 
+  const fetchDeliveryPartners = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/api/users/getAllUsers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const partners = response.data.filter((u) => u.role === "Delivery Man");
+      setDeliveryPartners(partners);
+    } catch (error) {
+      console.error("Error fetching delivery partners:", error);
+    }
+  }, [backendUrl]);
+
+  const handleAssignDeliveryPartner = async (orderId, deliveryManId) => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${backendUrl}/api/orders/assign/${orderId}`,
+        { deliveryManId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success("Delivery partner assigned successfully!");
+      fetchPendingOrders();
+    } catch (error) {
+      console.error("Error assigning delivery partner:", error);
+      toast.error(error.response?.data?.message || "Failed to assign delivery partner. Please try again.");
+    }
+  };
+
   useEffect(() => {
     fetchCurrentUser();
     fetchPendingOrders();
+    fetchDeliveryPartners();
     const interval = setInterval(fetchPendingOrders, 60000); // refresh every minute
     return () => clearInterval(interval);
-  }, [fetchCurrentUser, fetchPendingOrders]);
+  }, [fetchCurrentUser, fetchPendingOrders, fetchDeliveryPartners]);
 
   const openPackModal = (order) => {
     const inputs = {};
@@ -259,6 +291,7 @@ const PackOrders = () => {
                           <th>Status</th>
                           <th>Order Date</th>
                           <th>Delivery After</th>
+                          <th>Delivery Partner</th>
                           <th>Actions</th>
                           <th>Pack</th>
                         </tr>
@@ -307,6 +340,36 @@ const PackOrders = () => {
                               {order.packableAfter
                                 ? formatDate(order.packableAfter)
                                 : <span className="no-invoice-text">Same Day</span>}
+                            </td>
+
+                            <td>
+                              {(order.assignmentStatus === "pending_assignment" ||
+                              order.assignmentStatus === "rejected") ? (
+                                <SearchableSelect
+                                  className="order-list-delivery-partner-select"
+                                  options={deliveryPartners.map((partner) => ({
+                                    value: partner._id,
+                                    label: partner.username,
+                                  }))}
+                                  value=""
+                                  onChange={(selectedId) => {
+                                    if (selectedId) {
+                                      handleAssignDeliveryPartner(order._id, selectedId);
+                                    }
+                                  }}
+                                  placeholder={
+                                    order.assignmentStatus === "rejected"
+                                      ? "Reassign Partner"
+                                      : "Assign Delivery Partner"
+                                  }
+                                />
+                              ) : order.assignedTo ? (
+                                <span className="order-list-assigned-partner">
+                                  {order.assignedTo.username || "Assigned"}
+                                </span>
+                              ) : (
+                                <span className="order-list-not-assigned">Not Assigned</span>
+                              )}
                             </td>
 
                             <td className="actions-cell">

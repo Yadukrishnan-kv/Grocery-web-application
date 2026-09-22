@@ -228,7 +228,6 @@ const ReceiptReport = () => {
                             <td>
                               <div className="customer-cell">
                                 <span className="customer-name">{receipt.customer?.name}</span>
-                                <small className="customer-email">{receipt.customer?.email}</small>
                               </div>
                             </td>
                             <td className="amount-paid">

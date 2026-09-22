@@ -8,6 +8,7 @@ import "./CreateOrder.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import toast from "../../../../utils/toast";
+import { formatCustomerId } from "../../../../utils/formatCustomerId";
 
 const CreateOrder = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -565,7 +566,10 @@ const CreateOrder = () => {
             <div className="form-group">
               <label>Customer</label>
               <SearchableSelect
-                options={customers.map((c) => ({ value: c._id, label: c.name }))}
+                options={customers.map((c) => ({
+                  value: c._id,
+                  label: `${c.name}${c.customerId ? ` (${formatCustomerId(c.customerId)})` : ""} — ${c.address || "No address"}`,
+                }))}
                 value={formData.customerId}
                 onChange={(val) => handleCustomerChange({ target: { value: val } })}
                 placeholder="Select Customer"

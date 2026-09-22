@@ -10,6 +10,7 @@ import toast from "../../../utils/toast";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import { formatCustomerId } from "../../../utils/formatCustomerId";
 
 const SalesmanCustomers = () => {
   const [customers, setCustomers] = useState([]);
@@ -207,7 +208,7 @@ const SalesmanCustomers = () => {
                               <td>{pagination.showingFrom + index}</td>
                               <td>
                                 <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "1px" }}>
-                                  {customer.customerId || "-"}
+                                  {formatCustomerId(customer.customerId) || "-"}
                                 </span>
                               </td>
                               <td>{customer.name || "-"}</td>

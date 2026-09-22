@@ -179,28 +179,6 @@ const CustomerOutstandingDetails = () => {
               </div>
             )}
 
-            {/* Credit Limit Progress */}
-            {customer.creditLimit > 0 && (
-              <div className="credit-progress-section">
-                <div className="progress-header">
-                  <span>Credit Utilization</span>
-                  <span>{formatCurrency(customer.usedCredit)} / {formatCurrency(customer.creditLimit)} used</span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className={`progress-fill ${
-                      customer.usedCredit / customer.creditLimit > 0.9
-                        ? "critical"
-                        : customer.usedCredit / customer.creditLimit > 0.7
-                        ? "warning"
-                        : ""
-                    }`}
-                    style={{ width: `${Math.min(100, (customer.usedCredit / customer.creditLimit) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
             {/* Bills List */}
             <div className="bills-section">
               <h3 className="section-title">Pending Bills ({bills.length})</h3>

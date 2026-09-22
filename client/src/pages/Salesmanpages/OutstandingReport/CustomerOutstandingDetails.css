@@ -143,45 +143,6 @@
 .card-credit .card-value { color: #16a34a; }
 .card-overdue .card-value { color: #dc2626; }
 
-/* Credit Progress */
-.credit-progress-section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  color: #475569;
-  margin-bottom: 0.5rem;
-}
-
-.progress-bar {
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #22c55e, #16a34a);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-.progress-fill.warning {
-  background: linear-gradient(90deg, #f59e0b, #d97706);
-}
-
-.progress-fill.critical {
-  background: linear-gradient(90deg, #ef4444, #dc2626);
-}
-
 /* Bills Section */
 .section-title {
   font-size: 1.25rem;

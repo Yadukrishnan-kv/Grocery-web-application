@@ -122,106 +122,64 @@ const CustomerCreditLimit = () => {
             <h2 className="customer-credit-page-title">My Credit Limit</h2>
 
             <div className="customer-credit-summary">
-              <div className="customer-credit-card">
+              <div className="customer-credit-card customer-credit-card--total">
                 <h3>Total Credit Limit</h3>
-                <p className="customer-credit-amount">
-                  {" "}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <img
-                      src={DirhamSymbol}
-                      alt="Dirham Symbol"
-                      width={55}
-                      height={55}
-                      style={{
-                        paddingTop: "3px",
-                      }}
-                    />
-                    <span> {customer.creditLimit.toFixed(2)}</span>
-                  </div>
-                </p>
+                <div className="customer-credit-amount-row">
+                  <img
+                    src={DirhamSymbol}
+                    alt="AED"
+                    className="customer-credit-icon"
+                  />
+                  <span className="customer-credit-amount">
+                    {customer.creditLimit.toFixed(2)}
+                  </span>
+                </div>
               </div>
 
-              <div className="customer-credit-card">
+              <div className="customer-credit-card customer-credit-card--available">
                 <h3>Available Credit</h3>
-                <p className="customer-credit-amount customer-credit-available">
-                  {" "}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <img
-                      src={DirhamSymbol}
-                      alt="Dirham Symbol"
-                      width={55}
-                      height={55}
-                      style={{
-                        paddingTop: "3px",
-                      }}
-                    />
-                    <span> {availableCredit.toFixed(2)}</span>
-                  </div>
-                </p>
+                <div className="customer-credit-amount-row">
+                  <img
+                    src={DirhamSymbol}
+                    alt="AED"
+                    className="customer-credit-icon"
+                  />
+                  <span className="customer-credit-amount customer-credit-available">
+                    {availableCredit.toFixed(2)}
+                  </span>
+                </div>
               </div>
 
-              <div className="customer-credit-card">
+              <div className="customer-credit-card customer-credit-card--used">
                 <h3>Used Credit</h3>
-                <p className="customer-credit-amount customer-credit-used">
-                  {" "}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <img
-                      src={DirhamSymbol}
-                      alt="Dirham Symbol"
-                      width={55}
-                      height={55}
-                      style={{
-                        paddingTop: "3px",
-                      }}
-                    />
-                    <span> {usedCredit.toFixed(2)}</span>
-                  </div>
-                </p>
+                <div className="customer-credit-amount-row">
+                  <img
+                    src={DirhamSymbol}
+                    alt="AED"
+                    className="customer-credit-icon"
+                  />
+                  <span className="customer-credit-amount customer-credit-used">
+                    {usedCredit.toFixed(2)}
+                  </span>
+                </div>
               </div>
 
-              <div className="customer-credit-card">                <h3>Return Balance</h3>
-                <p className="customer-credit-amount customer-credit-available">
-                  {" "}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <img
-                      src={DirhamSymbol}
-                      alt="Dirham Symbol"
-                      width={55}
-                      height={55}
-                      style={{
-                        paddingTop: "3px",
-                      }}
-                    />
-                    <span> {(customer.returnCreditBalance || 0).toFixed(2)}</span>
-                  </div>
-                </p>
+              <div className="customer-credit-card customer-credit-card--return">
+                <h3>Return Balance</h3>
+                <div className="customer-credit-amount-row">
+                  <img
+                    src={DirhamSymbol}
+                    alt="AED"
+                    className="customer-credit-icon"
+                  />
+                  <span className="customer-credit-amount customer-credit-available">
+                    {(customer.returnCreditBalance || 0).toFixed(2)}
+                  </span>
+                </div>
               </div>
 
-              <div className="customer-credit-card">                <h3>Credit Utilization</h3>
+              <div className="customer-credit-card customer-credit-card--utilization">
+                <h3>Credit Utilization</h3>
                 <p className="customer-credit-utilization">
                   {creditUtilization}%
                 </p>
