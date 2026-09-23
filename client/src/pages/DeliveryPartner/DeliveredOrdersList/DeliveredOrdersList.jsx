@@ -10,7 +10,6 @@ import "./DeliveredOrdersList.css";
 import InvoiceDownloadModal from "../../../components/InvoiceDownloadModal/InvoiceDownloadModal";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
-import SearchableSelect from "../../../components/common/SearchableSelect";
 import Pagination from "../../../components/common/Pagination";
 import OrderProductsModal from "../../../components/common/OrderProductsModal";
 
@@ -22,20 +21,9 @@ const DeliveredOrdersList = () => {
   const [user, setUser] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
-  const [pendingInvoiceKind, setPendingInvoiceKind] = useState("packed");
   const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
-  const [currentOrder, setCurrentOrder] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState("credit");
-  const [chequeNumber, setChequeNumber] = useState("");
-  const [chequeBank, setChequeBank] = useState("");
-  const [chequeDate, setChequeDate] = useState("");
-
-  const [deliveringOrderId, setDeliveringOrderId] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -53,7 +41,7 @@ const DeliveredOrdersList = () => {
     }
   }, [backendUrl]);
 
-  const fetchAcceptedOrders = useCallback(async () => {
+  const fetchDeliveredOrders = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
@@ -62,16 +50,10 @@ const DeliveredOrdersList = () => {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      // ✅ Show orders that are: accepted AND (partially_packed OR fully_packed)
-      // Do NOT wait for ready_to_deliver - show when packing starts
+      // Read-only history: only orders that have been fully delivered.
       setOrders(
         res.data.filter(
-          (o) =>
-            o.assignmentStatus === "accepted" &&
-            (o.packedStatus === "partially_packed" ||
-              o.packedStatus === "fully_packed") &&
-            o.status !== "delivered" &&
-            o.status !== "cancelled",
+          (o) => o.assignmentStatus === "accepted" && o.status === "delivered",
         ),
       );
     } catch (err) {
@@ -83,140 +65,8 @@ const DeliveredOrdersList = () => {
 
   useEffect(() => {
     fetchCurrentUser();
-    fetchAcceptedOrders();
-  }, [fetchCurrentUser, fetchAcceptedOrders]);
-
-  // Open modal only if packed (partial or full)
-  const openDeliveryModal = (order) => {
-    // ✅ Allow delivery for BOTH partially_packed AND fully_packed orders
-    if (
-      order.packedStatus !== "partially_packed" &&
-      order.packedStatus !== "fully_packed"
-    ) {
-      return toast.error("Order not packed yet. Awaiting storekeeper packing.");
-    }
-
-    setCurrentOrder(order);
-    // Cash billing type customers never use credit payment at delivery
-    const isCashCustomer = order.customer?.billingType === "Cash" || order.payment !== "credit";
-    setPaymentMethod(isCashCustomer ? "cash" : "credit");
-    setChequeNumber("");
-    setChequeBank("");
-    setChequeDate("");
-    setShowDeliveryModal(true);
-  };
-
-  const getProductToDeliver = (item) => {
-    // ✅ Auto-calculate: full remaining packed qty (no input needed)
-    return (item.packedQuantity || 0) - (item.deliveredQuantity || 0);
-  };
-
-  const validateDelivery = () => {
-    // ✅ No qty input - just validate if there's anything to deliver
-    const toDeliverItems = currentOrder.orderItems.filter(
-      (item) => getProductToDeliver(item) > 0,
-    );
-    if (toDeliverItems.length === 0) {
-      return "No packed quantity remaining to deliver";
-    }
-
-    if (paymentMethod === "cheque") {
-      if (!chequeNumber.trim() || !chequeBank.trim() || !chequeDate) {
-        return "Please fill all cheque details";
-      }
-    }
-
-    return null;
-  };
-
-  const proceedWithDelivery = async () => {
-    const error = validateDelivery();
-    if (error) return toast.error(error);
-
-    // ✅ Auto-generate deliveredItems with full remaining packed qty
-    const deliveredItems = currentOrder.orderItems
-      .map((item) => {
-        const qty = getProductToDeliver(item);
-        return qty > 0 ? { product: item._id, quantity: qty } : null;
-      })
-      .filter(Boolean);
-
-    if (deliveredItems.length === 0) {
-      return toast.error("No quantity to deliver");
-    }
-
-    let chequeDetails = null;
-    if (paymentMethod === "cheque") {
-      chequeDetails = {
-        number: chequeNumber.trim(),
-        bank: chequeBank.trim(),
-        date: chequeDate,
-      };
-    }
-
-    setShowDeliveryModal(false);
-    setDeliveringOrderId(currentOrder._id);
-
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.post(
-        `${backendUrl}/api/orders/deliverorder/${currentOrder._id}`,
-        {
-          deliveredItems,
-          deliveredAt: new Date().toISOString(),
-          paymentMethod,
-          chequeDetails,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      if (res.data.returnCreditUsed && res.data.returnCreditUsed > 0) {
-        toast.success(
-          `Return credit of AED ${res.data.returnCreditUsed.toFixed(2)} was applied. Remaining AED ${(res.data.amountCollected - res.data.returnCreditUsed).toFixed(2)} collected as ${paymentMethod}.`,
-          { duration: 6000 }
-        );
-      } else {
-        toast.success("Delivery recorded successfully!");
-      }
-      fetchAcceptedOrders();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to record delivery");
-    } finally {
-      setDeliveringOrderId(null);
-      setCurrentOrder(null);
-    }
-  };
-
-  // ✅ Download unified invoice showing Ordered/Packed/Delivered
-  const downloadUnifiedInvoice = async (orderId, invoiceNumber, type = "normal") => {
-    try {
-      const token = localStorage.getItem("token");
-      const baseName = invoiceNumber
-        ? `invoice-${invoiceNumber}`
-        : `invoice-${orderId.slice(-8)}`;
-      const filename = type === "preprinted" ? `${baseName}-preprinted.pdf` : `${baseName}.pdf`;
-
-      const res = await axios.get(
-        `${backendUrl}/api/orders/unified-invoice/${orderId}?invoiceNumber=${invoiceNumber}&type=${type}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        },
-      );
-
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Invoice downloaded");
-    } catch (err) {
-      toast.error("Failed to download invoice");
-    }
-  };
+    fetchDeliveredOrders();
+  }, [fetchCurrentUser, fetchDeliveredOrders]);
 
   // Download delivered invoice (specific batch from deliveredInvoiceHistory)
   const downloadDeliveredInvoice = async (orderId, invoiceNumber, type = "normal") => {
@@ -244,38 +94,14 @@ const DeliveredOrdersList = () => {
     }
   };
 
-  const getDeliveryStatus = (order) => {
-    const totalOrdered =
-      order.orderItems?.reduce((s, i) => s + i.orderedQuantity, 0) || 0;
-    const totalDelivered =
-      order.orderItems?.reduce((s, i) => s + i.deliveredQuantity, 0) || 0;
-    const totalPacked =
-      order.orderItems?.reduce((s, i) => s + (i.packedQuantity || 0), 0) || 0;
-
-    // ✅ If partially_packed or fully_packed, it's ready to deliver (or being delivered)
-    if (order.packedStatus === "partially_packed") {
-      if (totalDelivered === 0) return "Ready to Deliver (Partial Pack)";
-      if (totalDelivered < totalPacked) return "Partially Delivered";
-    }
-
-    if (order.packedStatus !== "fully_packed") return "Awaiting Packing";
-    if (totalDelivered === 0) return "Ready to Deliver (Full Pack)";
-    if (totalDelivered < totalOrdered) return "Partially Delivered";
-    return "Fully Delivered";
-  };
-
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      const matchesSearch =
+      return (
         !searchTerm.trim() ||
-        order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all" ||
-        getDeliveryStatus(order).toLowerCase().replace(" ", "-") ===
-          statusFilter;
-      return matchesSearch && matchesStatus;
+        order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     });
-  }, [orders, searchTerm, statusFilter]);
+  }, [orders, searchTerm]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -287,11 +113,7 @@ const DeliveredOrdersList = () => {
   };
 
   const { entriesPerPage } = useAppSettings();
-  const pagination = usePaginatedData(
-    filteredOrders,
-    entriesPerPage,
-    `${statusFilter}|${searchTerm}`
-  );
+  const pagination = usePaginatedData(filteredOrders, entriesPerPage, `${searchTerm}`);
 
   if (!user) return <div className="delivered-orders-loading">Loading...</div>;
 
@@ -314,33 +136,9 @@ const DeliveredOrdersList = () => {
       >
         <div className="delivered-orders-container-wrapper">
           <div className="delivered-orders-container">
-            <h2 className="delivered-orders-page-title">Deliver Orders</h2>
+            <h2 className="delivered-orders-page-title">Delivered Orders</h2>
 
             <div className="delivered-orders-controls-group">
-              <div className="delivered-orders-filter-group">
-                <label
-                  htmlFor="statusFilter"
-                  className="delivered-orders-filter-label"
-                >
-                  Filter by Status:
-                </label>
-                <select
-                  id="statusFilter"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="delivered-orders-status-filter"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="awaiting-packing">Awaiting Packing</option>
-                  <option value="ready-to-deliver">Ready to Deliver</option>
-                  <option value="not-delivered">Not Delivered</option>
-                  <option value="partially-delivered">
-                    Partially Delivered
-                  </option>
-                  <option value="fully-delivered">Fully Delivered</option>
-                </select>
-              </div>
-
               <div className="delivered-orders-search-container">
                 <input
                   type="text"
@@ -364,9 +162,7 @@ const DeliveredOrdersList = () => {
               <div className="delivered-orders-loading">Loading orders...</div>
             ) : filteredOrders.length === 0 ? (
               <div className="delivered-orders-no-data">
-                No orders found
-                {statusFilter !== "all" &&
-                  ` with status "${statusFilter.replace("-", " ")}"`}
+                No delivered orders found
                 {searchTerm.trim() && ` matching "${searchTerm}"`}
               </div>
             ) : (
@@ -380,12 +176,9 @@ const DeliveredOrdersList = () => {
                           <th>Order ID</th>
                           <th>Customer</th>
                           <th>Total Ordered</th>
-                          <th>Packed Qty</th> {/* NEW */}
                           <th>Total Delivered</th>
-                          <th>Remaining</th>
                           <th>Grand Total</th>
                           <th>Remarks</th>
-                          <th>Status</th>
                           <th>Order Date</th>
                           <th>Actions</th>
                         </tr>
@@ -397,25 +190,15 @@ const DeliveredOrdersList = () => {
                               (s, i) => s + i.orderedQuantity,
                               0,
                             ) || 0;
-                          const packedQty =
-                            order.orderItems?.reduce(
-                              (s, i) => s + (i.packedQuantity || 0),
-                              0,
-                            ) || 0;
                           const totalDelivered =
                             order.orderItems?.reduce(
                               (s, i) => s + i.deliveredQuantity,
                               0,
                             ) || 0;
-                          const remaining = packedQty - totalDelivered;
                           const grandTotal =
                             order.orderItems
                               ?.reduce((s, i) => s + i.totalAmount, 0)
                               ?.toFixed(2) || "0.00";
-                          // ✅ Enable deliver button if partially_packed OR fully_packed
-                          const isPacked =
-                            order.packedStatus === "partially_packed" ||
-                            order.packedStatus === "fully_packed";
 
                           return (
                             <tr key={order._id}>
@@ -433,9 +216,7 @@ const DeliveredOrdersList = () => {
                               <td>{order.customer?.name || "N/A"}</td>
 
                               <td>{totalOrdered}</td>
-                              <td>{packedQty} (packed)</td>
                               <td>{totalDelivered}</td>
-                              <td>{remaining}</td>
 
                               <td>
                                 <div
@@ -458,52 +239,19 @@ const DeliveredOrdersList = () => {
 
                               <td>{order.remarks || "—"}</td>
 
-                              <td>
-                                <span
-                                  className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(/\s/g, "-")}`}
-                                >
-                                  {getDeliveryStatus(order)}
-                                </span>
-                              </td>
-
                               <td>{formatDate(order.orderDate)}</td>
 
                               <td>
                                 <div className="actions-cell-stack">
-                                  {/* Packed Invoices */}
-                                  {order.invoiceHistory && order.invoiceHistory.length > 0 && (
+                                  {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
                                     <div className="invoice-section">
-                                      <span className="invoice-section-label">Packed</span>
-                                      <div className="invoice-buttons-group">
-                                        {order.invoiceHistory.map((inv, i) => (
-                                          <button
-                                            key={i}
-                                            className="invoice-btn packed-invoice-btn"
-                                            onClick={() => {
-                                              setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                              setPendingInvoiceKind("packed");
-                                              setShowInvoiceModal(true);
-                                            }}
-                                          >
-                                            📄 {inv.invoiceNumber}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Delivered Invoices */}
-                                  {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 && (
-                                    <div className="invoice-section">
-                                      <span className="invoice-section-label delivered">Delivered</span>
                                       <div className="invoice-buttons-group">
                                         {order.deliveredInvoiceHistory.map((inv, i) => (
                                           <button
                                             key={i}
-                                            className="invoice-btn delivered-invoice-btn"
+                                            className="invoice-btn"
                                             onClick={() => {
                                               setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                              setPendingInvoiceKind("delivered");
                                               setShowInvoiceModal(true);
                                             }}
                                           >
@@ -512,36 +260,18 @@ const DeliveredOrdersList = () => {
                                         ))}
                                       </div>
                                     </div>
-                                  )}
-
-                                  {/* Fallback: single packed invoice */}
-                                  {(!order.invoiceHistory || order.invoiceHistory.length === 0) && order.invoiceNumber && (
+                                  ) : order.deliveredInvoiceNumber ? (
                                     <button
-                                      className="invoice-btn"
+                                      className="invoice-btn delivered-invoice-btn"
                                       onClick={() => {
-                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.invoiceNumber });
-                                        setPendingInvoiceKind("packed");
+                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.deliveredInvoiceNumber });
                                         setShowInvoiceModal(true);
                                       }}
                                     >
-                                      Download Invoice
-                                    </button>
-                                  )}
-
-                                  {isPacked ? (
-                                    <button
-                                      className="deliver-btn"
-                                      onClick={() => openDeliveryModal(order)}
-                                      disabled={deliveringOrderId === order._id}
-                                    >
-                                      {deliveringOrderId === order._id
-                                        ? "Delivering..."
-                                        : "Deliver"}
+                                      🧾 Download Invoice
                                     </button>
                                   ) : (
-                                    <span className="completed-text">
-                                      Awaiting Packing
-                                    </span>
+                                    <span className="completed-text">No invoice</span>
                                   )}
                                 </div>
                               </td>
@@ -568,144 +298,6 @@ const DeliveredOrdersList = () => {
             )}
           </div>
         </div>
-
-        {/* Delivery Modal - Now Read-Only: Shows Details, Auto-Full Delivery */}
-        {showDeliveryModal && currentOrder && (() => {
-          // Compute delivery amount & return credit breakdown for display
-          const grandDeliveryAmount = currentOrder.orderItems.reduce((sum, item) => {
-            const qty = getProductToDeliver(item);
-            if (qty <= 0) return sum;
-            const ratio = item.orderedQuantity > 0 ? qty / item.orderedQuantity : 0;
-            const itemTotal = item.totalAmount
-              ? item.totalAmount * ratio
-              : qty * item.price * (1 + (item.vatPercentage || 5) / 100);
-            return sum + itemTotal;
-          }, 0);
-          const returnCreditAvailable = currentOrder.customer?.returnCreditBalance || 0;
-          const returnCreditToApply = parseFloat(Math.min(returnCreditAvailable, grandDeliveryAmount).toFixed(2));
-          const cashToCollect = parseFloat(Math.max(0, grandDeliveryAmount - returnCreditToApply).toFixed(2));
-
-          return (
-          <div className="delivery-modal-overlay">
-            <div className="delivery-modal">
-              <h3>Confirm Delivery</h3>
-
-              {/* Return Credit Breakdown Banner */}
-              {returnCreditToApply > 0 && (
-                <div className="return-credit-banner">
-                  <div className="rc-row">
-                    <span>Order Total (incl. VAT):</span>
-                    <span>AED {grandDeliveryAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="rc-row rc-highlight">
-                    <span>Return Credit Applied:</span>
-                    <span>− AED {returnCreditToApply.toFixed(2)}</span>
-                  </div>
-                  <div className="rc-row rc-total">
-                    <strong>{cashToCollect === 0 ? "✅ No cash collection needed" : `Cash / Cheque to collect:`}</strong>
-                    {cashToCollect > 0 && <strong>AED {cashToCollect.toFixed(2)}</strong>}
-                  </div>
-                </div>
-              )}
-
-              {/* Products List - Read-Only Display */}
-              <div className="products-delivery-list">
-                <h4>Packed Items to Deliver:</h4>
-                {currentOrder.orderItems.map((item) => {
-                  const toDeliver = getProductToDeliver(item);
-
-                  if (toDeliver <= 0) return null; // Skip if nothing to deliver
-
-                  return (
-                    <div key={item._id} className="product-delivery-row">
-                      <div className="product-info">
-                        <strong>
-                          {item.product?.productName || "Unknown Product"}
-                        </strong>
-                        <div>
-                          Ordered: {item.orderedQuantity} {item.unit || ""}
-                        </div>
-                       
-                        <div>
-                          Already Delivered: {item.deliveredQuantity || 0}{" "}
-                          {item.unit || ""}
-                        </div>
-                        <div className="to-deliver-highlight">
-                          <strong>
-                            To Deliver: {toDeliver} {item.unit || ""}
-                          </strong>
-                        </div>
-                      </div>
-                    
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Payment Section */}
-              <div className="payment-section">
-                <label>Payment Method</label>
-                <SearchableSelect
-                  options={[
-                    ...(currentOrder.customer?.billingType !== "Cash" && currentOrder.payment === "credit"
-                      ? [{ value: "credit", label: "Credit" }]
-                      : []),
-                    { value: "cash", label: "Cash" },
-                    { value: "cheque", label: "Cheque" },
-                  ]}
-                  value={paymentMethod}
-                  onChange={(val) => setPaymentMethod(val)}
-                  placeholder="Select payment method"
-                />
-                {(paymentMethod === "cash" || paymentMethod === "cheque") && returnCreditToApply > 0 && cashToCollect === 0 && (
-                  <p className="rc-note">Return credit covers the full amount — no {paymentMethod} needed.</p>
-                )}
-                {(paymentMethod === "cash" || paymentMethod === "cheque") && returnCreditToApply > 0 && cashToCollect > 0 && (
-                  <p className="rc-note">Collect AED {cashToCollect.toFixed(2)} as {paymentMethod} (return credit of AED {returnCreditToApply.toFixed(2)} already applied).</p>
-                )}
-              </div>
-
-              {paymentMethod === "cheque" && (
-                <div className="cheque-details">
-                  <input
-                    placeholder="Cheque Number"
-                    value={chequeNumber}
-                    onChange={(e) => setChequeNumber(e.target.value)}
-                  />
-                  <input
-                    placeholder="Bank Name"
-                    value={chequeBank}
-                    onChange={(e) => setChequeBank(e.target.value)}
-                  />
-                  <input
-                    type="date"
-                    value={chequeDate}
-                    onChange={(e) => setChequeDate(e.target.value)}
-                  />
-                </div>
-              )}
-
-              <div className="modal-actions">
-                <button
-                  className="cancel-btn"
-                  onClick={() => setShowDeliveryModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="submit-btn"
-                  onClick={proceedWithDelivery}
-                  disabled={deliveringOrderId === currentOrder._id}
-                >
-                  {deliveringOrderId === currentOrder._id
-                    ? "Submitting..."
-                    : "Confirm Delivery"}
-                </button>
-              </div>
-            </div>
-          </div>
-          );
-        })()}
       </main>
 
       <InvoiceDownloadModal
@@ -713,11 +305,7 @@ const DeliveredOrdersList = () => {
         onClose={() => setShowInvoiceModal(false)}
         onSelect={(type) => {
           setShowInvoiceModal(false);
-          if (pendingInvoiceKind === "delivered") {
-            downloadDeliveredInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
-          } else {
-            downloadUnifiedInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
-          }
+          downloadDeliveredInvoice(pendingInvoiceData.orderId, pendingInvoiceData.invoiceNumber, type);
         }}
       />
 

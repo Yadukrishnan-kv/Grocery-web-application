@@ -1390,7 +1390,9 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   const sigBoxH = 75;
   const sigY = pageHeight - margin - sigBoxH - 10;
   const chequeY = sigY - 18 - 5;
-  const totalsY = chequeY - 60 - 5;
+  // 5 stacked rows: Total Dhs., Vat 5%, Sub Total, Round Off, Grand Total.
+  const totalsBlockHeight = 100;
+  const totalsY = chequeY - totalsBlockHeight - 5;
 
   // Fetch dynamic Company Settings
   const company = await CompanySettings.findOne() || {};
@@ -1829,7 +1831,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   validItems.forEach((item, itemIndex) => {
     const qty = item.deliveredQuantity || item.orderedQuantity;
     const isLastItem = itemIndex === validItems.length - 1;
-    const overflowLimit = isLastItem ? totalsY : totalsY + 60;
+    const overflowLimit = isLastItem ? totalsY : totalsY + totalsBlockHeight;
 
     const vatPercentage = item.vatPercentage || 5;
     const unitPrice = item.price || 0;
@@ -1921,9 +1923,11 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Total Dhs.", margin + 265.28 + 10, packsRowY + 6);
   doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(grandTotalExclVat.toFixed(2), margin + 265.28 + 150, packsRowY + 6, { width: 130, align: "right" });
 
-  // Row 2 & 3 Left: Merged Box (Total amount in words)
+  // Rows 2-5 Left: Merged Box (Total amount in words) — spans the same
+  // height as the four rows stacked on the right (Vat / Sub Total / Round
+  // Off / Grand Total).
   const row2Y = packsRowY + 20;
-  doc.rect(margin, row2Y, 265.28, 40).stroke();
+  doc.rect(margin, row2Y, 265.28, 80).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5).text("Total amount in words", margin + 10, row2Y + 5);
   doc.fillColor("#333333").font("Helvetica").fontSize(7.5).text(amountToWords(grandTotalInclVat), margin + 10, row2Y + 16, { width: 245 });
 
@@ -1932,15 +1936,39 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Vat 5%", margin + 265.28 + 10, row2Y + 6);
   doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(grandTotalVat.toFixed(2), margin + 265.28 + 150, row2Y + 6, { width: 130, align: "right" });
 
-  // Row 3 Right: Grand Total
-  const row3Y = packsRowY + 40;
+  // Invoice round-off: the printed Grand Total is rounded to the nearest
+  // whole AED (31.50 -> 32, 31.49 -> 31). Sub Total shows the exact
+  // pre-rounding total and Round Off shows the adjustment applied, so the
+  // three rows reconcile: Sub Total + Round Off = Grand Total.
+  const roundedGrandTotal = Math.round(grandTotalInclVat);
+  const roundOffAmount = roundedGrandTotal - grandTotalInclVat;
+  // Guard against floating-point noise (e.g. an exact total producing a
+  // -0.0000000003 "difference") printing a stray "-0.00".
+  const roundOffDisplay = Math.abs(roundOffAmount) < 0.005
+    ? "0.00"
+    : `${roundOffAmount > 0 ? "+" : "-"}${Math.abs(roundOffAmount).toFixed(2)}`;
+
+  // Row 3 Right: Sub Total (exact, pre-rounding)
+  const subTotalY = row2Y + 20;
+  doc.rect(margin + 265.28, subTotalY, 290, 20).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Sub Total", margin + 265.28 + 10, subTotalY + 6);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(grandTotalInclVat.toFixed(2), margin + 265.28 + 150, subTotalY + 6, { width: 130, align: "right" });
+
+  // Row 4 Right: Round Off
+  const roundOffY = subTotalY + 20;
+  doc.rect(margin + 265.28, roundOffY, 290, 20).stroke();
+  doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8).text("Round Off", margin + 265.28 + 10, roundOffY + 6);
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8).text(roundOffDisplay, margin + 265.28 + 150, roundOffY + 6, { width: 130, align: "right" });
+
+  // Row 5 Right: Grand Total (rounded)
+  const row3Y = roundOffY + 20;
   doc.rect(margin + 265.28, row3Y, 290, 20).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(8.5).text("Grand Total", margin + 265.28 + 10, row3Y + 6);
-  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8.5).text(grandTotalInclVat.toFixed(2), margin + 265.28 + 150, row3Y + 6, { width: 130, align: "right" });
+  doc.fillColor("#333333").font("Helvetica-Bold").fontSize(8.5).text(roundedGrandTotal.toFixed(2), margin + 265.28 + 150, row3Y + 6, { width: 130, align: "right" });
 
   // Outer border around the entire table (from S. No. header to totals)
   doc.lineWidth(1).strokeColor(navyColor);
-  doc.rect(margin, tableStartY, contentWidth, (totalsY + 60) - tableStartY).stroke();
+  doc.rect(margin, tableStartY, contentWidth, (totalsY + totalsBlockHeight) - tableStartY).stroke();
 
   // ===== CHEQUE SECTION =====
   doc.rect(margin, chequeY, contentWidth, 18).stroke();

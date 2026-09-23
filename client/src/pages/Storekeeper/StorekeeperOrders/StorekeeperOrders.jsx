@@ -330,14 +330,9 @@ const StorekeeperOrders = () => {
                               </td>
 
                               <td>
-                                <div className="customer-cell">
-                                  <span className="customer-name">
-                                    {order.customer?.name || "N/A"}
-                                  </span>
-                                  <small className="customer-phone">
-                                    {order.customer?.phoneNumber}
-                                  </small>
-                                </div>
+                                <span className="customer-name">
+                                  {order.customer?.name || "N/A"}
+                                </span>
                               </td>
 
                               {/* ✅ Show PACKED quantity (not ordered) */}

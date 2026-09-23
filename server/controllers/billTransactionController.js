@@ -409,7 +409,7 @@ const generateBulkReceipt = async (req, res) => {
     if (!allOwned) {
       return res.status(403).json({ message: "Unauthorized" });
     }
-    
+
     // Calculate total due for all unique customers in these transactions
     const uniqueCustomerIds = [...new Set(transactions.map(tx => tx.customer?._id?.toString()).filter(Boolean))];
     let totalDueAllCustomers = 0;
@@ -422,23 +422,21 @@ const generateBulkReceipt = async (req, res) => {
       totalDueAllCustomers += customerDue;
     }
 
-    // Extract common batch ID if all share one
-    const commonBatch = transactions[0]?.bill?.batchReceiptNumber;
-    const allSameBatch = transactions.every(tx => tx.bill?.batchReceiptNumber === commonBatch);
-    const batchTitle = allSameBatch && commonBatch ? `BULK RECEIPT (Batch: ${commonBatch})` : "BULK RECEIPT";
-
-    // Generate PDF with PDFKit
-    const PDFDocument = require("pdfkit");
-    const doc = new PDFDocument({ margin: 40 });
+    const company = (await CompanySettings.findOne()) || { companyName: "Company" };
 
     // ✅ Improved filename: Use unique invoices or generic
-    const uniqueInvoices = [...new Set(transactions.map(tx => 
+    const uniqueInvoices = [...new Set(transactions.map(tx =>
       (tx.bill?.packingInvoiceNumbers && tx.bill.packingInvoiceNumbers.length > 0) ? tx.bill.packingInvoiceNumbers.join("_") :
       (tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "NA")
     ))];
-    let suggestedFilename = uniqueInvoices.length === 1 && uniqueInvoices[0] !== "NA" 
-      ? `bulk-receipt-${uniqueInvoices[0]}` 
+    let suggestedFilename = uniqueInvoices.length === 1 && uniqueInvoices[0] !== "NA"
+      ? `bulk-receipt-${uniqueInvoices[0]}`
       : `bulk-receipt-${uniqueInvoices.length}-invoices`;
+
+    // Generate PDF with PDFKit
+    const PDFDocument = require("pdfkit");
+    const margin = 40;
+    const doc = new PDFDocument({ margin, size: "A4", bufferPages: true });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${suggestedFilename}.pdf"`);
@@ -452,63 +450,118 @@ const generateBulkReceipt = async (req, res) => {
     });
     doc.pipe(res);
 
-    // Header
-    doc.fontSize(20).font("Helvetica-Bold").text(batchTitle, { align: "center" });
-    doc.fontSize(10).font("Helvetica").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
-    doc.moveDown();
+    const pageLeft = doc.page.margins.left;
+    const pageRight = doc.page.width - doc.page.margins.right;
+    const contentWidth = pageRight - pageLeft;
+    const bottomLimit = doc.page.height - doc.page.margins.bottom;
+    const innerWidth = contentWidth - 16; // row text width (8pt padding each side)
 
-    // Recipient info
-    doc.fontSize(12).font("Helvetica-Bold").text("Recipient:");
-    doc.fontSize(10).font("Helvetica").text(`Name: ${transactions[0].recipient.username}`);
-    doc.moveDown();
+    const drawHeader = () => {
+      let y = doc.y;
+      doc.fontSize(18).font("Helvetica-Bold").fillColor("#0f172a")
+        .text((company.companyName || "COMPANY").toUpperCase(), pageLeft, y, { width: contentWidth, align: "center" });
+      y = doc.y + 4;
+      doc.fontSize(13).font("Helvetica-Bold").fillColor("#059669")
+        .text("BULK RECEIPT", pageLeft, y, { width: contentWidth, align: "center" });
+      y = doc.y + 2;
+      doc.fontSize(8.5).font("Helvetica").fillColor("#64748b")
+        .text(`Generated: ${new Date().toLocaleString()}`, pageLeft, y, { width: contentWidth, align: "center" });
+      y = doc.y + 14;
 
-    // Table header
-    const tableX = doc.x;
-    const colWidth = 85;
-    const row1Y = doc.y;
-    doc.font("Helvetica-Bold").fontSize(9);
-    doc.text("Customer", tableX, row1Y, { width: colWidth });
-   
-    doc.text("Invoice #", tableX + colWidth * 2, row1Y, { width: colWidth });
-    doc.text("Amount", tableX + colWidth * 3, row1Y, { width: colWidth });
-    doc.text("Method", tableX + colWidth * 4, row1Y, { width: colWidth });
-    doc.moveTo(tableX, row1Y + 15).lineTo(tableX + colWidth * 5, row1Y + 15).stroke();
-    doc.moveDown(1.5);
+      // Recipient info card
+      doc.roundedRect(pageLeft, y, contentWidth, 24, 6).fill("#f1f5f9");
+      doc.fontSize(9).font("Helvetica-Bold").fillColor("#334155")
+        .text("RECEIVED BY", pageLeft + 12, y + 7, { width: 120 });
+      doc.fontSize(9).font("Helvetica").fillColor("#0f172a")
+        .text(transactions[0].recipient?.username || "N/A", pageLeft + 120, y + 7, { width: contentWidth - 260 });
+      doc.fontSize(9).font("Helvetica-Bold").fillColor("#334155")
+        .text("TRANSACTIONS", pageLeft + contentWidth - 140, y + 7, { width: 90, align: "right" });
+      doc.fontSize(9).font("Helvetica").fillColor("#0f172a")
+        .text(String(transactions.length), pageLeft + contentWidth - 40, y + 7, { width: 40, align: "right" });
+      doc.y = y + 24 + 16;
+    };
 
-    // Table rows - ✅ FIXED: Prioritize bill/transaction invoice over order (for partial deliveries)
+    const ensureSpace = (blockHeight) => {
+      if (doc.y + blockHeight > bottomLimit) {
+        doc.addPage();
+        doc.y = doc.page.margins.top;
+      }
+    };
+
+    drawHeader();
+
+    // Rows — ✅ Prioritize bill/transaction invoice over order (for partial deliveries)
+    // Each transaction is printed as two free-flowing lines (name, then details)
+    // spanning the FULL page width instead of fixed table columns. A customer
+    // name of any length just wraps within its own line — there is no
+    // neighbouring column for it to run into, and the row's height always
+    // grows to fit however many lines it wrapped to.
     let totalAmount = 0;
-    doc.font("Helvetica").fontSize(9);
+    const rowGap = 10;
+    const nameFontSize = 10;
+    const metaFontSize = 8.5;
+
     transactions.forEach((tx, idx) => {
-      const rowY = doc.y;
-      doc.text(tx.customer?.name || "N/A", tableX, rowY, { width: colWidth });
-
-     
-
-      // ✅ FIXED PRIORITY: bill.packingInvoiceNumbers > bill.invoiceNumber > tx.invoiceNumber > tx.order.invoiceNumber
-      // This ensures DEL-01 shows for its bill, even if order is shared/updated
+      const customerName = tx.customer?.name || "N/A";
       const invoiceNum = (tx.bill?.packingInvoiceNumbers && tx.bill.packingInvoiceNumbers.length > 0)
         ? tx.bill.packingInvoiceNumbers.join(", ")
         : (tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "N/A");
-      doc.text(invoiceNum, tableX + colWidth * 2, rowY, { width: colWidth });
+      const amountStr = (tx.amount || 0).toFixed(2);
+      const methodStr = tx.method ? tx.method.charAt(0).toUpperCase() + tx.method.slice(1) : "—";
 
-      doc.text((tx.amount || 0).toFixed(2), tableX + colWidth * 3, rowY, { width: colWidth, align: "right" });
-      doc.text(tx.method?.charAt(0).toUpperCase() + (tx.method?.slice(1) || ""), tableX + colWidth * 4, rowY, { width: colWidth });
+      const nameLine = `${idx + 1}. ${customerName}`;
+      const metaLine = `Invoice: ${invoiceNum}    •    Amount: AED ${amountStr}    •    Method: ${methodStr}`;
+
+      doc.font("Helvetica-Bold").fontSize(nameFontSize);
+      const nameHeight = doc.heightOfString(nameLine, { width: innerWidth });
+      doc.font("Helvetica").fontSize(metaFontSize);
+      const metaHeight = doc.heightOfString(metaLine, { width: innerWidth });
+      const rowHeight = 6 + nameHeight + 3 + metaHeight + rowGap;
+
+      // Free-flowing row height — page-break check happens per row, not per
+      // fixed table slot, so it always accounts for however tall this
+      // particular row ended up being.
+      ensureSpace(rowHeight);
+      const rowY = doc.y;
+
+      if (idx % 2 === 1) {
+        doc.rect(pageLeft, rowY, contentWidth, rowHeight).fill("#f8fafc");
+      }
+
+      doc.font("Helvetica-Bold").fontSize(nameFontSize).fillColor("#0f172a")
+        .text(nameLine, pageLeft + 8, rowY + 6, { width: innerWidth });
+      doc.font("Helvetica").fontSize(metaFontSize).fillColor("#475569")
+        .text(metaLine, pageLeft + 8, rowY + 6 + nameHeight + 3, { width: innerWidth });
+
+      doc.moveTo(pageLeft, rowY + rowHeight).lineTo(pageRight, rowY + rowHeight)
+        .strokeColor("#e2e8f0").lineWidth(0.5).stroke();
+
       totalAmount += tx.amount || 0;
-      doc.moveDown();
+      doc.y = rowY + rowHeight;
     });
 
-    doc.moveTo(tableX, doc.y).lineTo(tableX + colWidth * 5, doc.y).stroke();
-    doc.moveDown(0.5);
+    // Totals summary box
+    ensureSpace(60);
+    const summaryY = doc.y + 12;
+    doc.roundedRect(pageLeft, summaryY, contentWidth, 44, 8).fill("#ecfdf5").strokeColor("#a7f3d0").lineWidth(1).stroke();
+    doc.font("Helvetica-Bold").fontSize(9).fillColor("#166534")
+      .text("TOTAL COLLECTED (THIS RECEIPT)", pageLeft + 16, summaryY + 8, { width: contentWidth / 2 - 24 });
+    doc.fontSize(13).fillColor("#059669")
+      .text(`AED ${totalAmount.toFixed(2)}`, pageLeft + 16, summaryY + 22, { width: contentWidth / 2 - 24 });
 
-    // Total
-    doc.font("Helvetica-Bold").fontSize(11);
-    doc.text(`BALANCE DUE: AED ${totalDueAllCustomers.toFixed(2)}`, { align: "right" });
-    doc.moveDown();
+    doc.font("Helvetica-Bold").fontSize(9).fillColor("#166534")
+      .text("OUTSTANDING BALANCE (ALL BILLS)", pageLeft + contentWidth / 2, summaryY + 8, { width: contentWidth / 2 - 16, align: "right" });
+    doc.fontSize(13).fillColor("#059669")
+      .text(`AED ${totalDueAllCustomers.toFixed(2)}`, pageLeft + contentWidth / 2, summaryY + 22, { width: contentWidth / 2 - 16, align: "right" });
+
+    doc.y = summaryY + 44 + 18;
 
     // Footer
-    doc.fontSize(9).font("Helvetica");
-    doc.text("This is a bulk receipt covering all transactions listed above.", { align: "center" });
-    doc.text(`Total Transactions: ${transactions.length}`, { align: "center" });
+    ensureSpace(30);
+    doc.fontSize(8.5).font("Helvetica").fillColor("#94a3b8")
+      .text("This is a bulk receipt covering all transactions listed above.", pageLeft, doc.y, { width: contentWidth, align: "center" });
+    doc.text("This is a computer-generated document.", pageLeft, doc.y + 12, { width: contentWidth, align: "center" });
+
     doc.end();
   } catch (error) {
     console.error("Generate bulk receipt error:", error);

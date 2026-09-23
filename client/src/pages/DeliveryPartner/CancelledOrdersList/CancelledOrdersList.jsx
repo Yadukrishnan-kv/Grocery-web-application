@@ -44,8 +44,10 @@ const CancelledOrdersList = () => {
     const response = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    const cancellableOrders = response.data.filter(order => 
-      order.assignmentStatus === "accepted" || order.assignmentStatus === "rejected"
+    // Only orders the delivery man rejected belong here — accepted orders
+    // continue through Accepted/Delivered Orders instead.
+    const cancellableOrders = response.data.filter(
+      (order) => order.assignmentStatus === "rejected"
     );
     setOrders(cancellableOrders);
   } catch (error) {
