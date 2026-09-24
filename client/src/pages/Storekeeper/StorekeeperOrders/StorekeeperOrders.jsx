@@ -322,8 +322,8 @@ const StorekeeperOrders = () => {
                                 <button
                                   type="button"
                                   className="order-list-orderid-link"
-                                  onClick={() => setViewProductsOrder(order)}
-                                  title="View ordered products"
+                                   onClick={() => setViewProductsOrder(order)}
+                                   title="View packed products"
                                 >
                                   {order.orderId || order._id}
                                 </button>
@@ -446,6 +446,9 @@ const StorekeeperOrders = () => {
         <OrderProductsModal
           order={viewProductsOrder}
           onClose={() => setViewProductsOrder(null)}
+          filterItem={(item) => (item.packedQuantity || 0) > 0}
+          getQty={(item) => item.packedQuantity || 0}
+          emptyText="No packed products"
         />
       )}
     </div>

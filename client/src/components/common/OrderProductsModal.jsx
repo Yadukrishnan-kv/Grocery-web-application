@@ -1,9 +1,10 @@
 import React from "react";
 import "./OrderProductsModal.css";
 
-const OrderProductsModal = ({ order, onClose }) => {
+const OrderProductsModal = ({ order, onClose, filterItem, getQty, emptyText }) => {
   if (!order) return null;
-  const items = order.orderItems || [];
+  const allItems = order.orderItems || [];
+  const items = filterItem ? allItems.filter(filterItem) : allItems;
 
   return (
     <div className="order-products-modal-overlay" onClick={onClose}>
@@ -30,13 +31,15 @@ const OrderProductsModal = ({ order, onClose }) => {
                   <span className="product-name">
                     {item.product?.productName || "Unknown"}
                   </span>
-                  <span className="product-qty">× {item.orderedQuantity}</span>
+                  <span className="product-qty">
+                    × {getQty ? getQty(item) : item.orderedQuantity}
+                  </span>
                   <span className="product-unit">{item.unit || ""}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <span className="no-products">No products</span>
+            <span className="no-products">{emptyText || "No products"}</span>
           )}
         </div>
       </div>

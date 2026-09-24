@@ -277,8 +277,8 @@ const RemainingPackOrders = () => {
                                 <button
                                   type="button"
                                   className="order-list-orderid-link"
-                                  onClick={() => setViewProductsOrder(order)}
-                                  title="View ordered products"
+                                   onClick={() => setViewProductsOrder(order)}
+                                   title="View remaining products to pack"
                                 >
                                   {order.orderId || order._id}
                                 </button>
@@ -468,6 +468,9 @@ const RemainingPackOrders = () => {
         <OrderProductsModal
           order={viewProductsOrder}
           onClose={() => setViewProductsOrder(null)}
+          filterItem={hasRemaining}
+          getQty={remainingQty}
+          emptyText="No remaining products to pack"
         />
       )}
     </div>

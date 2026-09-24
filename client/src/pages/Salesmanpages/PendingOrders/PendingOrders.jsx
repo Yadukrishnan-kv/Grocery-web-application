@@ -7,11 +7,16 @@ import "./PendingOrders.css";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import OrderProductsModal from "../../../components/common/OrderProductsModal";
+
+const pendingQty = (item) =>
+  Math.max((item.orderedQuantity || 0) - (item.packedQuantity || 0), 0);
 
 const PendingOrders = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -99,7 +104,16 @@ const PendingOrders = () => {
                         pagination.pageData.map((o, idx) => (
                           <tr key={o._id}>
                             <td>{pagination.showingFrom + idx}</td>
-                            <td>{o.orderId || String(o._id).slice(-8)}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="order-list-orderid-link"
+                                onClick={() => setViewProductsOrder(o)}
+                                title="View pending products"
+                              >
+                                {o.orderId || String(o._id).slice(-8)}
+                              </button>
+                            </td>
                             <td>{o.customer?.name || "N/A"}</td>
                             <td>{o.orderItems?.length || 0}</td>
                             <td>{(o.orderItems || []).reduce((s, it) => s + Math.max((it.orderedQuantity || 0) - (it.packedQuantity || 0), 0), 0)}</td>
@@ -127,6 +141,16 @@ const PendingOrders = () => {
           </div>
         </div>
       </main>
+
+      {viewProductsOrder && (
+        <OrderProductsModal
+          order={viewProductsOrder}
+          onClose={() => setViewProductsOrder(null)}
+          filterItem={(item) => pendingQty(item) > 0}
+          getQty={pendingQty}
+          emptyText="No pending products"
+        />
+      )}
     </div>
   );
 };

@@ -209,8 +209,8 @@ const PendingOrders = () => {
                                 <button
                                   type="button"
                                   className="pending-orders-orderid-link"
-                                  onClick={() => setViewProductsOrder(order)}
-                                  title="View ordered products"
+                                   onClick={() => setViewProductsOrder(order)}
+                                   title="View pending products"
                                 >
                                   {order.orderId || order._id}
                                 </button>
@@ -281,6 +281,13 @@ const PendingOrders = () => {
         <OrderProductsModal
           order={viewProductsOrder}
           onClose={() => setViewProductsOrder(null)}
+          filterItem={(item) =>
+            Math.max((item.orderedQuantity || 0) - (item.packedQuantity || 0), 0) > 0
+          }
+          getQty={(item) =>
+            Math.max((item.orderedQuantity || 0) - (item.packedQuantity || 0), 0)
+          }
+          emptyText="No pending products"
         />
       )}
     </div>
