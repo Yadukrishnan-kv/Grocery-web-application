@@ -312,6 +312,13 @@
   margin: 1.5rem 0;
 }
 
+.pack-no-remaining {
+  color: #94a3b8;
+  font-style: italic;
+  text-align: center;
+  padding: 1rem;
+}
+
 .pack-item-row {
   display: flex;
   justify-content: space-between;

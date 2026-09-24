@@ -1061,8 +1061,8 @@ const generateDaddysReturnInvoicePDF = async (doc, sr, settings, designType = "n
     { width: 53.5, header: "Excl. VAT", align: "right" },
     { width: 39.5, header: "Disc%", align: "center" },
     { width: 35.5, header: "VAT%", align: "center" },
-    { width: 60, header: "VAT Amount", align: "right" },
-    { width: 40.5, header: "TOTAL", align: "right" },
+    { width: 50, header: "VAT AMT", align: "right" },
+    { width: 50.5, header: "TOTAL", align: "right" },
   ];
 
   let colX = margin;

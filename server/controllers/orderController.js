@@ -460,6 +460,21 @@ const deleteOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    // Packed orders with a generated invoice cannot be deleted by anyone.
+    const isPacked = order.packedStatus && order.packedStatus !== "not_packed";
+    const hasInvoice =
+      !!order.invoiceNumber ||
+      (order.invoiceHistory && order.invoiceHistory.length > 0) ||
+      !!order.deliveredInvoiceNumber ||
+      (order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0);
+
+    if (isPacked && hasInvoice) {
+      return res.status(400).json({
+        message:
+          "This order is packed and has a generated invoice, so it cannot be deleted. Cancel the invoice instead.",
+      });
+    }
+
     // Revert inventory and credit only if not fully delivered
     if (order.status !== "delivered") {
       for (const item of order.orderItems) {
@@ -1756,8 +1771,8 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
     { width: 53.5, header: "Excl. VAT", align: "right" },
     { width: 39.5, header: "Disc%", align: "center" },
     { width: 35.5, header: "VAT%", align: "center" },
-    { width: 60, header: "VAT Amount", align: "right" },
-    { width: 40.5, header: "TOTAL", align: "right" },
+    { width: 50, header: "VAT AMT", align: "right" },
+    { width: 50.5, header: "TOTAL", align: "right" },
   ];
 
   let colX = margin;
@@ -1788,7 +1803,7 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   };
 
   // Header labels are static across the invoice, so the wrap check only
-  // needs to run once — a narrow column (e.g. "VAT Amount" in a shrunk
+  // needs to run once — a narrow column (e.g. "VAT AMT" in a shrunk
   // column) grows the header row instead of clipping/wrapping past it.
   doc.font("Helvetica-Bold").fontSize(headerFontSize);
   const headerRowHeight = Math.max(

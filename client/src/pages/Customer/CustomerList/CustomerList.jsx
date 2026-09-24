@@ -177,7 +177,11 @@ const CustomerList = () => {
       const matchesSearch =
         !searchTerm.trim() ||
         customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.email?.toLowerCase().includes(searchTerm.toLowerCase());
+        customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(formatCustomerId(customer.customerId) || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        customer.customerId?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const daysLeft = getDaysRemaining(customer);
 
@@ -264,7 +268,7 @@ const CustomerList = () => {
                   <input
                     type="text"
                     className="customer-list-search-input"
-                    placeholder="Search by name or email..."
+                    placeholder="Search by name, email, or customer ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />

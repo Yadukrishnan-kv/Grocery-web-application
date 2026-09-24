@@ -185,6 +185,17 @@ const OrderList = () => {
     setShowDeleteModal(true);
   };
 
+  // Packed orders with a generated invoice cannot be deleted by anyone.
+  const isDeleteBlocked = (order) => {
+    const isPacked = order.packedStatus && order.packedStatus !== "not_packed";
+    const hasInvoice =
+      !!order.invoiceNumber ||
+      (order.invoiceHistory && order.invoiceHistory.length > 0) ||
+      !!order.deliveredInvoiceNumber ||
+      (order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0);
+    return isPacked && hasInvoice;
+  };
+
   const confirmDelete = async () => {
     if (!orderToDelete) return;
 
@@ -200,7 +211,9 @@ const OrderList = () => {
       refetchCurrent();
     } catch (error) {
       console.error("Error deleting order:", error);
-      toast.error("Failed to delete order. Please try again.");
+      toast.error(
+        error.response?.data?.message || "Failed to delete order. Please try again."
+      );
     } finally {
       setOrderToDelete(null);
     }
@@ -476,9 +489,15 @@ const OrderList = () => {
                                   </button>
                                   <button
                                     className="order-list-icon-button order-list-delete-button"
-                                    onClick={() =>
-                                      handleDeleteClick(order._id, order.orderId || order._id)
-                                    }
+                                    onClick={() => {
+                                      if (isDeleteBlocked(order)) {
+                                        toast.error(
+                                          "Cannot delete an order that is packed with a generated invoice"
+                                        );
+                                        return;
+                                      }
+                                      handleDeleteClick(order._id, order.orderId || order._id);
+                                    }}
                                     aria-label={`Delete order ${order.orderId || order._id}`}
                                   >
                                     🗑️

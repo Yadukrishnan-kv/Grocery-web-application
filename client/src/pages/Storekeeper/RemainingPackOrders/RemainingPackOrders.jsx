@@ -202,6 +202,11 @@ const RemainingPackOrders = () => {
     });
   };
 
+  // Only show items that still have quantity left to pack in the Pack Remaining modal
+  const packModalItems = selectedOrder
+    ? selectedOrder.orderItems.filter(hasRemaining)
+    : [];
+
   if (!user) return <div className="loading">Loading user data...</div>;
 
   return (
@@ -418,34 +423,38 @@ const RemainingPackOrders = () => {
             <p>Customer: {selectedOrder.customer?.name || "N/A"}</p>
 
             <div className="pack-items">
-              {selectedOrder.orderItems.map((item) => {
-                const max = getMaxPackable(item);
-                const already = item.packedQuantity || 0;
-                return (
-                  <div key={item._id} className="pack-item-row">
-                    <div className="item-details">
-                      <strong>{item.product?.productName || "Unknown"}</strong>
-                      <div>Ordered: {item.orderedQuantity} {item.unit}</div>
-                      <div>Already packed: {already} {item.unit}</div>
-                      <div className="remaining">Remaining to pack: {max} {item.unit}</div>
-                    </div>
+              {packModalItems.length === 0 ? (
+                <p className="pack-no-remaining">No remaining products to pack</p>
+              ) : (
+                packModalItems.map((item) => {
+                  const max = getMaxPackable(item);
+                  const already = item.packedQuantity || 0;
+                  return (
+                    <div key={item._id} className="pack-item-row">
+                      <div className="item-details">
+                        <strong>{item.product?.productName || "Unknown"}</strong>
+                        <div>Ordered: {item.orderedQuantity} {item.unit}</div>
+                        <div>Already packed: {already} {item.unit}</div>
+                        <div className="remaining">Remaining to pack: {max} {item.unit}</div>
+                      </div>
 
-                    <div className="pack-qty">
-                      <label>Pack Now:</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={max}
-                        step="any"
-                        value={packInputs[item._id] ?? ""}
-                        onChange={(e) => handlePackQtyChange(item._id, e.target.value)}
-                        disabled={max === 0}
-                      />
-                      <span className="max-text">/ {max}</span>
+                      <div className="pack-qty">
+                        <label>Pack Now:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={max}
+                          step="any"
+                          value={packInputs[item._id] ?? ""}
+                          onChange={(e) => handlePackQtyChange(item._id, e.target.value)}
+                          disabled={max === 0}
+                        />
+                        <span className="max-text">/ {max}</span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             <div className="modal-footer">

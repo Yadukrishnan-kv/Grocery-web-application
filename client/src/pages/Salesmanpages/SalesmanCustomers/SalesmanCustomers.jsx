@@ -127,7 +127,11 @@ const SalesmanCustomers = () => {
         !searchTerm.trim() ||
         customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.phoneNumber?.includes(searchTerm)
+        customer.phoneNumber?.includes(searchTerm) ||
+        String(formatCustomerId(customer.customerId) || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        customer.customerId?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
   }, [customers, searchTerm]); // ✅ Removed dueDaysFilter dependency
@@ -174,7 +178,7 @@ const SalesmanCustomers = () => {
                   <input
                     type="text"
                     className="customer-list-search-input"
-                    placeholder="Search by name, email, or phone..."
+                    placeholder="Search by name, email, phone, or customer ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
