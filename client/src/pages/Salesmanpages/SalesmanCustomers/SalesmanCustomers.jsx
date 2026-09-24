@@ -11,6 +11,7 @@ import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { formatCustomerId } from "../../../utils/formatCustomerId";
+import { exportToExcel } from "../../../utils/exportToExcel";
 
 const SalesmanCustomers = () => {
   const [customers, setCustomers] = useState([]);
@@ -89,6 +90,36 @@ const SalesmanCustomers = () => {
 
   const clearSearch = () => setSearchTerm("");
 
+  const handleExportToExcel = () => {
+    const exportData = filteredCustomers.map((customer, index) => {
+      const usedCredit = (customer.creditLimit || 0) - (customer.balanceCreditLimit || 0);
+      const daysLeft = getDaysRemaining(customer);
+      const dueStatusText = getDueStatusText(daysLeft);
+
+      return {
+        "No": index + 1,
+        "Customer ID": formatCustomerId(customer.customerId) || "-",
+        "Name": customer.name || "-",
+        "Email": customer.email || "-",
+        "Phone": customer.phoneNumber || "-",
+        "Address": customer.address || "-",
+        "TRN": customer.pincode || "-",
+        "Emirates": customer.emiratesName || "-",
+        "Emirates Code": customer.emiratesCode || "-",
+        "Credit Limit (AED)": (customer.creditLimit || 0).toFixed(2),
+        "Balance (AED)": (customer.balanceCreditLimit || 0).toFixed(2),
+        "Return Balance (AED)": (customer.returnCreditBalance || 0).toFixed(2),
+        "Used Credit (AED)": usedCredit.toFixed(2),
+        "Outstanding (AED)": (customer.totalOutstanding || 0).toFixed(2),
+        "Billing Type": customer.billingType || "-",
+        "Due Status": dueStatusText,
+      };
+    });
+
+    exportToExcel(exportData, "SalesmanCustomers", "My Customers");
+    toast.success("Excel file exported successfully");
+  };
+
   // Filter customers by search term ONLY
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
@@ -157,6 +188,15 @@ const SalesmanCustomers = () => {
                     </button>
                   )}
                 </div>
+
+                <button
+                  className="customer-list-refresh-button"
+                  onClick={handleExportToExcel}
+                  disabled={loading || filteredCustomers.length === 0}
+                  title="Export to Excel"
+                >
+                  Export Excel
+                </button>
               </div>
             </div>
 

@@ -12,6 +12,7 @@ import OrderProductsModal from "../../../components/common/OrderProductsModal";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import { exportToExcel, formatDateForExcel } from "../../../utils/exportToExcel";
 
 const OrderReports = () => {
   // All orders fetched from the server (any status) — the qty search total is
@@ -230,6 +231,34 @@ const OrderReports = () => {
     setSalesmanFilter("all");
   };
 
+  const handleExportToExcel = () => {
+    const exportData = filteredOrders.map((order, index) => {
+      const totalOrdered =
+        order.orderItems?.reduce((sum, item) => sum + item.orderedQuantity, 0) || 0;
+      const totalDelivered =
+        order.orderItems?.reduce((sum, item) => sum + item.deliveredQuantity, 0) || 0;
+      const pendingQty = totalOrdered - totalDelivered;
+      const grandTotal =
+        order.orderItems?.reduce((sum, item) => sum + item.totalAmount, 0)?.toFixed(2) || "0.00";
+
+      return {
+        "No": index + 1,
+        "Order ID": order.orderId || order._id,
+        "Customer": order.customer?.name || "N/A",
+        "Total Ordered Qty": totalOrdered,
+        "Total Delivered Qty": totalDelivered,
+        "Pending Qty": pendingQty,
+        "Grand Total (AED)": grandTotal,
+        "Delivery Partner": order.assignedTo?.username || "Not assigned",
+        "Order Date": formatDateForExcel(order.orderDate),
+        "Status": order.status?.charAt(0).toUpperCase() + order.status?.slice(1) || "Pending",
+      };
+    });
+
+    exportToExcel(exportData, "OrderReports", "Order Reports");
+    toast.success("Excel file exported successfully");
+  };
+
   const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(
     filteredOrders,
@@ -341,6 +370,15 @@ const OrderReports = () => {
                   disabled={loading}
                 >
                   {loading ? "Refreshing..." : "Refresh Data"}
+                </button>
+
+                <button
+                  className="order-reports-refresh-button"
+                  onClick={handleExportToExcel}
+                  disabled={loading || filteredOrders.length === 0}
+                  title="Export to Excel"
+                >
+                  Export Excel
                 </button>
               </div>
             </div>
