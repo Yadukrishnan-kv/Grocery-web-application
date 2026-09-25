@@ -65,14 +65,30 @@ const AcceptedOrdersList = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Accepted orders that are not yet fully delivered (or cancelled) still
-      // belong here. Once fully delivered they move to the Delivered Orders list.
-      const acceptedOrders = response.data.filter(
-        (order) =>
-          order.assignmentStatus === "accepted" &&
-          order.status !== "delivered" &&
-          order.status !== "cancelled"
-      );
+      // Accepted orders stay here as long as there's a packed-but-undelivered
+      // batch waiting on me (or nothing has been packed/delivered for this
+      // order yet). Once I deliver everything currently packed and nothing
+      // new has been packed for me since, it moves to the Delivered Orders
+      // list — even if the overall order isn't fully complete yet (the
+      // storekeeper may still pack + (re)assign a remaining batch later).
+      const acceptedOrders = response.data.filter((order) => {
+        if (
+          order.assignmentStatus !== "accepted" ||
+          order.status === "delivered" ||
+          order.status === "cancelled"
+        ) {
+          return false;
+        }
+        const totalDelivered = order.orderItems?.reduce(
+          (sum, i) => sum + (i.deliveredQuantity || 0),
+          0
+        ) || 0;
+        const packedNotDelivered = order.orderItems?.reduce(
+          (sum, i) => sum + ((i.packedQuantity || 0) - (i.deliveredQuantity || 0)),
+          0
+        ) || 0;
+        return !(totalDelivered > 0 && packedNotDelivered === 0);
+      });
       setOrders(acceptedOrders);
     } catch (error) {
       console.error("Error fetching accepted orders:", error);
@@ -380,39 +396,33 @@ const AcceptedOrdersList = () => {
                           <th scope="col">No</th>
                           <th scope="col">Order ID</th>
                           <th scope="col">Customer</th>
-                          <th scope="col">Total Qty</th>
                           <th scope="col">Packed Qty</th>
-                          <th scope="col">Delivered</th>
-                          <th scope="col">Remaining</th>
                           <th scope="col">Grand Total</th>
                           <th scope="col">Remarks</th>
-                          <th scope="col">Status</th>
                           <th scope="col">Order Date</th>
                           <th scope="col">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pagination.pageData.map((order, index) => {
-                          const totalOrdered =
-                            order.orderItems?.reduce(
-                              (s, i) => s + i.orderedQuantity,
-                              0,
-                            ) || 0;
+                          // Packed-but-not-yet-delivered quantity/amount — what's
+                          // actually arrived and awaiting delivery right now, not
+                          // the order's whole cumulative packed total (which could
+                          // include an earlier round already delivered by a
+                          // different delivery partner before a reassignment).
                           const packedQty =
                             order.orderItems?.reduce(
-                              (s, i) => s + (i.packedQuantity || 0),
+                              (s, i) => s + ((i.packedQuantity || 0) - (i.deliveredQuantity || 0)),
                               0,
                             ) || 0;
-                          const totalDelivered =
-                            order.orderItems?.reduce(
-                              (s, i) => s + i.deliveredQuantity,
-                              0,
-                            ) || 0;
-                          const remaining = packedQty - totalDelivered;
-                          const grandTotal =
-                            order.orderItems
-                              ?.reduce((s, i) => s + i.totalAmount, 0)
-                              ?.toFixed(2) || "0.00";
+                          const grandTotal = (order.invoiceHistory?.length > 0
+                            ? Math.max(
+                                0,
+                                order.invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0) -
+                                (order.deliveredInvoiceHistory?.reduce((sum, h) => sum + (h.amount || 0), 0) || 0)
+                              )
+                            : order.orderItems?.reduce((s, i) => s + i.totalAmount, 0) || 0
+                          ).toFixed(2);
                           const isPacked =
                             order.packedStatus === "partially_packed" ||
                             order.packedStatus === "fully_packed";
@@ -432,10 +442,7 @@ const AcceptedOrdersList = () => {
                               </td>
                               <td>{order.customer?.name || "N/A"}</td>
 
-                              <td>{totalOrdered}</td>
                               <td className="packed-qty-cell">{packedQty}</td>
-                              <td>{totalDelivered}</td>
-                              <td className="remaining-cell">{remaining}</td>
 
                               <td>
                                 <div
@@ -460,39 +467,40 @@ const AcceptedOrdersList = () => {
 
                               <td>{order.remarks || "-"}</td>
 
-                              <td>
-                                <span
-                                  className={`status-badge status-${getDeliveryStatus(order).toLowerCase().replace(/\s/g, "-")}`}
-                                >
-                                  {getDeliveryStatus(order)}
-                                </span>
-                              </td>
-
                               <td>{formatDate(order.orderDate)}</td>
 
                               <td>
                                 <div className="actions-cell-stack">
-                                  {/* Packed Invoices */}
-                                  {order.invoiceHistory && order.invoiceHistory.length > 0 && (
-                                    <div className="invoice-section">
-                                      <span className="invoice-section-label">Packed</span>
-                                      <div className="invoice-buttons-group">
-                                        {order.invoiceHistory.map((inv, i) => (
-                                          <button
-                                            key={i}
-                                            className="invoice-btn packed-invoice-btn"
-                                            onClick={() => {
-                                              setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                              setPendingInvoiceKind("packed");
-                                              setShowInvoiceModal(true);
-                                            }}
-                                          >
-                                            📄 {inv.invoiceNumber}
-                                          </button>
-                                        ))}
+                                  {/* Packed Invoices — only ones still owed
+                                      (an invoice already fully delivered in an
+                                      earlier round, possibly by a different
+                                      delivery partner before a reassignment,
+                                      isn't this delivery's concern). */}
+                                  {(() => {
+                                    const outstandingInvoices = order.invoiceHistory?.filter((inv) =>
+                                      inv.items?.some((it) => (it.quantity || 0) - (it.deliveredQuantity || 0) > 0)
+                                    ) || [];
+                                    return outstandingInvoices.length > 0 && (
+                                      <div className="invoice-section">
+                                        <span className="invoice-section-label">Packed</span>
+                                        <div className="invoice-buttons-group">
+                                          {outstandingInvoices.map((inv, i) => (
+                                            <button
+                                              key={i}
+                                              className="invoice-btn packed-invoice-btn"
+                                              onClick={() => {
+                                                setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                                setPendingInvoiceKind("packed");
+                                                setShowInvoiceModal(true);
+                                              }}
+                                            >
+                                              📄 {inv.invoiceNumber}
+                                            </button>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    );
+                                  })()}
 
                                   {/* Fallback: single packed invoice */}
                                   {(!order.invoiceHistory || order.invoiceHistory.length === 0) && order.invoiceNumber && (
@@ -715,6 +723,9 @@ const AcceptedOrdersList = () => {
         <OrderProductsModal
           order={viewProductsOrder}
           onClose={() => setViewProductsOrder(null)}
+          filterItem={(item) => ((item.packedQuantity || 0) - (item.deliveredQuantity || 0)) > 0}
+          getQty={(item) => (item.packedQuantity || 0) - (item.deliveredQuantity || 0)}
+          emptyText="No products packed yet"
         />
       )}
     </div>

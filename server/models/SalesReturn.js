@@ -16,6 +16,11 @@ const returnItemSchema = new Schema({
 const salesReturnSchema = new Schema(
   {
     order: { type: Schema.Types.ObjectId, ref: "Order", required: true },
+    // Which specific packing/delivery invoice this return was made against —
+    // an order can have several (partial deliveries over time), and
+    // order.invoiceNumber only ever reflects the latest one, so it can't be
+    // relied on to show which batch these items actually came from.
+    invoiceNumber: { type: String, default: null },
     customer: { type: Schema.Types.ObjectId, ref: "Customer", required: true },
     returnItems: {
       type: [returnItemSchema],

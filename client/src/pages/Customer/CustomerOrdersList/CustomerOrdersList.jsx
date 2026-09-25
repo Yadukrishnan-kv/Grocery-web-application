@@ -72,33 +72,40 @@ const CustomerOrdersList = () => {
   }, [fetchCurrentUser, fetchCustomerHistory]);
 
   // ✅ Helper: Calculate VAT breakdown for order items
-  const calculateOrderVAT = (orderItems) => {
+  const calculateOrderVAT = (orderItems, invoiceHistory) => {
     if (!orderItems || !Array.isArray(orderItems)) {
       return { exclVat: 0, vatAmount: 0, grandTotal: 0 };
     }
-    
+
     let totalExclVat = 0;
     let totalVatAmount = 0;
     let totalGrand = 0;
-    
+
     orderItems.forEach((item) => {
       const qty = item.orderedQuantity || 0;
       const price = item.price || 0;
       const vatPercent = item.vatPercentage || 5;
-      
+
       const exclVat = qty * price;
       const vatAmount = (exclVat * vatPercent) / 100;
       const total = exclVat + vatAmount;
-      
+
       totalExclVat += exclVat;
       totalVatAmount += vatAmount;
       totalGrand += total;
     });
-    
+
+    // Once packed, invoiceHistory holds the actual invoiced Grand Total(s),
+    // already rounded to the nearest whole AED (Sub Total + Round Off =
+    // Grand Total) — prefer that over the raw order-time estimate.
+    const grandTotal = invoiceHistory?.length > 0
+      ? invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0)
+      : totalGrand;
+
     return {
       exclVat: totalExclVat,
       vatAmount: totalVatAmount,
-      grandTotal: totalGrand,
+      grandTotal,
     };
   };
 
@@ -312,7 +319,7 @@ const CustomerOrdersList = () => {
                             : item.orderItems?.reduce((sum, it) => sum + it.deliveredQuantity, 0) || 0;
 
                           // ✅ Calculate VAT breakdown
-                          const { exclVat, vatAmount, grandTotal } = calculateOrderVAT(item.orderItems);
+                          const { exclVat, vatAmount, grandTotal } = calculateOrderVAT(item.orderItems, item.invoiceHistory);
 
                           return (
                             <tr key={item._id}>

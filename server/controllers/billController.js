@@ -28,13 +28,18 @@ const generateBill = async (req, res) => {
     }
 
     // ✅ FIXED: Use totalAmount (includes VAT) instead of recalculating
-    const totalUsed = orders.reduce((sum, order) => {
+    const rawTotalUsed = orders.reduce((sum, order) => {
       const orderTotal = order.orderItems.reduce((itemSum, item) => {
         // Use stored totalAmount which includes VAT
         return itemSum + (item.totalAmount || item.price * item.orderedQuantity);
       }, 0);
       return sum + orderTotal;
     }, 0);
+    // This bill IS the invoice for the cycle, so it rounds to the nearest
+    // whole AED the same way every printed invoice does (Sub Total + Round
+    // Off = Grand Total) — otherwise amountDue would understate what the
+    // customer actually owes.
+    const totalUsed = Math.round(rawTotalUsed);
 
     let dueDate;
     const cycleEndDate = moment(cycleEnd);
@@ -364,6 +369,10 @@ const createInvoiceBasedBill = async (order, specificAmount = null, specificInvo
           totalUsed += (item.totalAmount || 0) * ratio;
         }
       }
+      // This bill covers the order's full Grand Total in one shot, so it
+      // rounds to the nearest whole AED the same way a printed invoice does
+      // (Sub Total + Round Off = Grand Total).
+      totalUsed = Math.round(totalUsed);
     }
 
     if (totalUsed <= 0) {
@@ -411,7 +420,34 @@ const createInvoiceBasedBill = async (order, specificAmount = null, specificInvo
 
 const getAllPendingBills = async (req, res) => {
   try {
-    const bills = await Bill.find({ status: { $in: ["pending", "overdue", "partial"] } })
+    const query = { status: { $in: ["pending", "overdue", "partial"] } };
+
+    // A delivery partner should only see bills for the specific packing
+    // invoices THEY personally delivered — not every pending bill in the
+    // system (which could include batches another partner delivered on the
+    // same order after a reassignment, or entirely unrelated orders).
+    const deliveryRoles = ["Delivery partner", "delivery partner", "deliveryman", "Delivery Man"];
+    if (req.user && deliveryRoles.includes(req.user.role)) {
+      const myOrders = await Order.find(
+        { "deliveredInvoiceHistory.deliveredBy": req.user._id },
+        { deliveredInvoiceHistory: 1 }
+      );
+      const myInvoiceNumbers = new Set();
+      myOrders.forEach((o) => {
+        (o.deliveredInvoiceHistory || []).forEach((h) => {
+          if (h.deliveredBy && String(h.deliveredBy) === String(req.user._id) && h.invoiceNumber) {
+            myInvoiceNumbers.add(h.invoiceNumber);
+          }
+        });
+      });
+      const invoiceNumberList = [...myInvoiceNumbers];
+      query.$or = [
+        { packingInvoiceNumbers: { $in: invoiceNumberList } },
+        { invoiceNumber: { $in: invoiceNumberList } },
+      ];
+    }
+
+    const bills = await Bill.find(query)
       .populate("customer", "name")
       .populate("orders", "invoiceNumber totalAmount totalExclVat totalVatAmount grandTotal")
       .sort({ dueDate: 1 });

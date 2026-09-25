@@ -46,7 +46,6 @@ import PaymentRequestsSales from "../pages/Salesmanpages/PaymentRequestsSales/Pa
 import BillWallet from "../pages/BillWallet/BillWallet";
 import AdminOrderRequests from "../pages/Sales/Orders/OrderList/AdminOrderRequests";
 import PackOrders from "../pages/Storekeeper/PackOrders/PackOrders";
-import PendingOrders from "../pages/DeliveryPartner/PendingOrders/PendingOrders";
 import SalesmanCustomers from "../pages/Salesmanpages/SalesmanCustomers/SalesmanCustomers";
 import CustomerOutstandingDetails from "../pages/Salesmanpages/OutstandingReport/CustomerOutstandingDetails";
 import ReceiptReport from "../pages/Salesmanpages/ReceiptReport/ReceiptReport";
@@ -192,11 +191,7 @@ function Dom() {
             {/* Manage Orders page removed */}
             <Route path="/storekeeper/packed-orders" element={<PackOrders />} />
             <Route path="/storekeeper/remaining-pack-orders" element={<RemainingPackOrders />} />
-            <Route
-              path="/PendingOrdersForPacking"
-              element={<PendingOrders />}
-            />
-              <Route 
+              <Route
   path="/storekeeper/all-orders" 
   element={
       <StorekeeperOrders />

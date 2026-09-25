@@ -44,10 +44,15 @@ const CancelledOrdersList = () => {
     const response = await axios.get(`${backendUrl}/api/orders/my-assigned-orders`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    // Only orders the delivery man rejected belong here — accepted orders
-    // continue through Accepted/Delivered Orders instead.
+    // Two distinct things land here: orders the delivery man rejected
+    // (assignmentStatus === "rejected"), and orders that were actually
+    // cancelled by admin/salesman/manager before packing started (order.status
+    // === "cancelled" — this can happen whether the assignment was merely
+    // "assigned" or already "accepted", since cancelOrder doesn't touch
+    // assignmentStatus). Accepted-and-still-active orders continue through
+    // Accepted/Delivered Orders instead.
     const cancellableOrders = response.data.filter(
-      (order) => order.assignmentStatus === "rejected"
+      (order) => order.assignmentStatus === "rejected" || order.status === "cancelled"
     );
     setOrders(cancellableOrders);
   } catch (error) {
@@ -112,6 +117,7 @@ const CancelledOrdersList = () => {
                         <tr>
                           <th scope="col">No</th>
                           <th scope="col">Customer</th>
+                          <th scope="col">Reason</th>
                           <th scope="col">Product</th>
                           <th scope="col">Ordered Qty</th>
                           <th scope="col">Delivered Qty</th>
@@ -135,6 +141,15 @@ const CancelledOrdersList = () => {
                               <tr key={order._id}>
                                 <td>{pagination.showingFrom + index}</td>
                                 <td>{order.customer?.name || "N/A"}</td>
+                                <td>
+                                  <span
+                                    className={`cancelled-orders-reason-badge ${
+                                      order.status === "cancelled" ? "is-cancelled" : "is-rejected"
+                                    }`}
+                                  >
+                                    {order.status === "cancelled" ? "Cancelled by Admin" : "Rejected by you"}
+                                  </span>
+                                </td>
                                 <td>{productNames || "N/A"}</td>
                                 <td>{orderedQty}</td>
                                 <td>{deliveredQty}</td>
@@ -186,7 +201,7 @@ const CancelledOrdersList = () => {
                           })
                         ) : (
                           <tr>
-                            <td colSpan="8" className="cancelled-orders-no-data">
+                            <td colSpan="9" className="cancelled-orders-no-data">
                               No orders available for cancellation
                             </td>
                           </tr>

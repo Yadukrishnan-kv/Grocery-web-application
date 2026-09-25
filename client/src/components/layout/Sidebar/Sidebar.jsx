@@ -23,7 +23,6 @@ const MENU_PERMISSIONS = {
   OrderArrived: "menu.deliveries.arrived",
   AcceptedOrders: "menu.deliveries.accepted",
   DeliveredOrders: "menu.deliveries.delivered",
-  PendingOrdersForPacking: "menu.deliveries.PendingOrdersForPacking",
   CancelledOrders: "menu.deliveries.cancelled",
   CustomerOrders: "menu.customer.orders",
   CustomerOrderReports: "menu.customer.order.reports",
@@ -150,11 +149,6 @@ const navItems = [
         id: "DeliveredOrders",
         label: "Delivered Orders",
         path: "/DeliveredOrders/list",
-      },
-      {
-        id: "PendingOrdersForPacking",
-        label: "Pending Orders For Packing",
-        path: "/PendingOrdersForPacking",
       },
       {
         id: "CancelledOrders",

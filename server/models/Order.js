@@ -137,6 +137,11 @@ const orderSchema = new Schema(
         quantity: Number,
         amount: Number,
         createdAt: { type: Date, default: Date.now },
+        // Which delivery partner personally delivered this batch — kept
+        // per-entry (not just order.assignedTo) so a deliveryman's delivered
+        // history survives the order later being reassigned to someone else
+        // for a subsequent packing round.
+        deliveredBy: { type: Schema.Types.ObjectId, ref: "User" },
         items: [
           {
             product: { type: Schema.Types.ObjectId, ref: "Product" },

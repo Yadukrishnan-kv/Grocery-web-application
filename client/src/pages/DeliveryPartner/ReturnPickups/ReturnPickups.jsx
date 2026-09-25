@@ -102,8 +102,11 @@ const ReturnPickups = () => {
     }
   };
 
+  // Once completed, sr.refundAmount holds the actual (already rounded)
+  // amount credited back — otherwise round the raw item sum the same way
+  // the printed credit note does (Sub Total + Round Off = Grand Total).
   const totalReturnAmt = (sr) =>
-    (sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
+    sr.refundAmount || Math.round((sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0));
 
   const assigned = pickups.filter((p) => p.status === "pickup_assigned");
   const pickedUp = pickups.filter((p) => p.status === "picked_up");
@@ -215,7 +218,7 @@ const ReturnPickups = () => {
                                   <td className="rp-address">{sr.customer?.address || "—"}</td>
                                   <td>
                                     <span className="rp-inv-badge">
-                                      {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
+                                      {sr.invoiceNumber || sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
                                     </span>
                                   </td>
                                   <td>
@@ -293,7 +296,7 @@ const ReturnPickups = () => {
                                   </td>
                                   <td>
                                     <span className="rp-inv-badge">
-                                      {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
+                                      {sr.invoiceNumber || sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
                                     </span>
                                   </td>
                                   <td>
@@ -388,7 +391,7 @@ const ReturnPickups = () => {
                                     </td>
                                     <td>
                                       <span className="rp-inv-badge">
-                                        {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
+                                        {sr.invoiceNumber || sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
                                       </span>
                                     </td>
                                     <td>

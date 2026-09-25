@@ -16,6 +16,7 @@ const {
   getPendingInvoice,
   assignOrderToDeliveryMan,
   getMyAssignedOrders,
+  getMyDeliveredOrders,
   acceptAssignedOrder,
   rejectAssignedOrder,getDeliveredOrdersForAdmin,getCustomerOrders,getCustomerOrderById,
   getMyOrders,getOrderInvoice,getlastorderdetails,checkFirstOrder,
@@ -43,6 +44,7 @@ router.get("/getpendinginvoice/:id", getPendingInvoice);
 router.post("/assign/:id", assignOrderToDeliveryMan);
 router.get("/pending-assignment", protect, getPendingOrdersForAssignment);
 router.get("/my-assigned-orders", getMyAssignedOrders);
+router.get("/my-delivered-orders", getMyDeliveredOrders);
 router.post("/accept/:id", acceptAssignedOrder);
 router.post("/reject/:id", rejectAssignedOrder);
 router.get("/admin-delivered-orders", getDeliveredOrdersForAdmin);

@@ -63,9 +63,12 @@ const OrderArrivedList = () => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      // Only show orders that are assigned (not yet accepted/rejected)
+      // Only show orders that are assigned (not yet accepted/rejected) and
+      // still active — if admin/salesman cancels the order before it's
+      // packed, it must disappear from here even though it's still
+      // "assigned" (cancelOrder doesn't touch assignmentStatus).
       const assignedOrders = response.data.filter(
-        (order) => order.assignmentStatus === "assigned",
+        (order) => order.assignmentStatus === "assigned" && order.status !== "cancelled",
       );
       setOrders(assignedOrders);
     } catch (error) {
@@ -314,7 +317,7 @@ const OrderArrivedList = () => {
                           <th scope="col">No</th>
                           <th scope="col">Order ID</th>
                           <th scope="col">Customer</th>
-                          <th scope="col">Total Qty</th>
+                          <th scope="col">Packed Qty</th>
                           <th scope="col">Grand Total</th>
                           <th scope="col">Remarks</th>
                           <th scope="col">Order Date</th>
@@ -337,17 +340,27 @@ const OrderArrivedList = () => {
                             </td>
                             <td>{order.customer?.name || "N/A"}</td>
 
-                            {/* Total ordered quantity */}
+                            {/* Packed-but-not-yet-delivered quantity — what's
+                                actually arrived and awaiting delivery right now.
+                                Using the raw cumulative packedQuantity would
+                                also count an earlier round already delivered
+                                by a different delivery partner (before this
+                                order was reassigned), which isn't this
+                                delivery's job. */}
                             <td>
-                              {order.totalOrderedQuantity ||
-                                order.orderItems?.reduce(
-                                  (sum, it) => sum + it.orderedQuantity,
-                                  0,
-                                ) ||
-                                0}
+                              {order.orderItems?.reduce(
+                                (sum, it) => sum + ((it.packedQuantity || 0) - (it.deliveredQuantity || 0)),
+                                0,
+                              ) || 0}
                             </td>
 
-                            {/* Grand total with Dirham symbol */}
+                            {/* Grand total with Dirham symbol — the outstanding
+                                (not-yet-delivered) invoiced amount: total
+                                invoiced so far minus whatever's already been
+                                delivered (possibly by a different delivery
+                                partner in an earlier round), rounded per
+                                invoice the same way the printed invoice is
+                                (Sub Total + Round Off = Grand Total). */}
                             <td>
                               <div
                                 style={{
@@ -364,11 +377,14 @@ const OrderArrivedList = () => {
                                   style={{ paddingTop: "2px" }}
                                 />
                                 <span style={{ fontWeight: 500 }}>
-                                  {order.grandTotal?.toFixed(2) ||
-                                    order.orderItems
-                                      ?.reduce((sum, it) => sum + it.totalAmount, 0)
-                                      ?.toFixed(2) ||
-                                    "0.00"}
+                                  {(order.invoiceHistory?.length > 0
+                                    ? Math.max(
+                                        0,
+                                        order.invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0) -
+                                        (order.deliveredInvoiceHistory?.reduce((sum, h) => sum + (h.amount || 0), 0) || 0)
+                                      )
+                                    : order.orderItems?.reduce((sum, it) => sum + it.totalAmount, 0) || 0
+                                  ).toFixed(2)}
                                 </span>
                               </div>
                             </td>
@@ -378,23 +394,34 @@ const OrderArrivedList = () => {
 
                             <td>
                               <div className="order-arrived-action-buttons">
-                                {order.invoiceHistory && order.invoiceHistory.length > 0 ? (
-                                  <div className="invoice-buttons-group">
-                                    {order.invoiceHistory.map((inv, i) => (
-                                      <button
-                                        key={i}
-                                        className="invoice-btn"
-                                        onClick={() => {
-                                          setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                          setShowInvoiceModal(true);
-                                        }}
-                                        title={`Download ${inv.invoiceNumber}`}
-                                      >
-                                        📄 {inv.invoiceNumber}
-                                      </button>
-                                    ))}
-                                  </div>
-                                ) : order.invoiceNumber ? (
+                                {/* Only invoices that still have an undelivered
+                                    quantity — an invoice already fully delivered
+                                    in an earlier round (possibly by a different
+                                    delivery partner, before a reassignment)
+                                    isn't this delivery's concern. */}
+                                {(() => {
+                                  const outstandingInvoices = order.invoiceHistory?.filter((inv) =>
+                                    inv.items?.some((it) => (it.quantity || 0) - (it.deliveredQuantity || 0) > 0)
+                                  ) || [];
+                                  return outstandingInvoices.length > 0 ? (
+                                    <div className="invoice-buttons-group">
+                                      {outstandingInvoices.map((inv, i) => (
+                                        <button
+                                          key={i}
+                                          className="invoice-btn"
+                                          onClick={() => {
+                                            setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                            setShowInvoiceModal(true);
+                                          }}
+                                          title={`Download ${inv.invoiceNumber}`}
+                                        >
+                                          📄 {inv.invoiceNumber}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : null;
+                                })()}
+                                {(!order.invoiceHistory || order.invoiceHistory.length === 0) && order.invoiceNumber ? (
                                   <button
                                     className="invoice-btn"
                                     onClick={() => {
@@ -471,6 +498,9 @@ const OrderArrivedList = () => {
         <OrderProductsModal
           order={viewProductsOrder}
           onClose={() => setViewProductsOrder(null)}
+          filterItem={(item) => ((item.packedQuantity || 0) - (item.deliveredQuantity || 0)) > 0}
+          getQty={(item) => (item.packedQuantity || 0) - (item.deliveredQuantity || 0)}
+          emptyText="No products packed yet"
         />
       )}
     </div>

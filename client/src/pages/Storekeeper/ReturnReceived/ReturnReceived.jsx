@@ -105,8 +105,11 @@ const ReturnReceived = () => {
     }
   };
 
+  // Once completed, sr.refundAmount holds the actual (already rounded)
+  // amount credited back — otherwise round the raw item sum the same way
+  // the printed credit note does (Sub Total + Round Off = Grand Total).
   const totalReturnAmt = (sr) =>
-    (sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
+    sr.refundAmount || Math.round((sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0));
 
   const pendingReturns = returns.filter((r) => r.status === "picked_up");
   const completedReturns = returns.filter((r) => r.status === "completed");
@@ -200,7 +203,7 @@ const ReturnReceived = () => {
                             </td>
                             <td>
                               <span className="rr-inv-badge">
-                                {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
+                                {sr.invoiceNumber || sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "—"}
                               </span>
                             </td>
                             <td>
@@ -297,7 +300,7 @@ const ReturnReceived = () => {
             <div className="rr-modal-body">
               <div className="rr-confirm-info">
                 <div><span>Customer</span><strong>{confirmModal.customer?.name}</strong></div>
-                <div><span>Order</span><strong>{confirmModal.order?.invoiceNumber || "—"}</strong></div>
+                <div><span>Order</span><strong>{confirmModal.invoiceNumber || confirmModal.order?.invoiceNumber || "—"}</strong></div>
                 <div><span>Return Amount</span><strong>AED {totalReturnAmt(confirmModal).toFixed(2)}</strong></div>
                 <div><span>Items</span><strong>{(confirmModal.returnItems || []).length} product(s)</strong></div>
               </div>

@@ -45,17 +45,18 @@ const DeliveredOrdersList = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${backendUrl}/api/orders/my-assigned-orders`,
+        `${backendUrl}/api/orders/my-delivered-orders`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      // Read-only history: only orders that have been fully delivered.
-      setOrders(
-        res.data.filter(
-          (o) => o.assignmentStatus === "accepted" && o.status === "delivered",
-        ),
-      );
+      // Read-only history: every order where I personally delivered at
+      // least one batch (server-side, keyed off deliveredInvoiceHistory —
+      // see getMyDeliveredOrders). This is independent of the order's
+      // CURRENT assignment, so a delivery I made stays here even if the
+      // order is later reassigned to a different partner for a further
+      // packing round.
+      setOrders(res.data.filter((o) => o.status !== "cancelled"));
     } catch (err) {
       toast.error("Failed to load orders");
     } finally {
@@ -93,6 +94,26 @@ const DeliveredOrdersList = () => {
       toast.error("Failed to download delivered invoice");
     }
   };
+
+  // This history page is scoped to what I (the logged-in delivery partner)
+  // personally delivered — an order's deliveredInvoiceHistory can include
+  // entries from a different partner if it was reassigned for another round,
+  // so quantities are aggregated per-product from only MY entries, keyed by
+  // deliveredBy, rather than the order's whole cumulative deliveredQuantity.
+  const getMyDeliveredQtyMap = useCallback(
+    (order) => {
+      const map = {};
+      (order?.deliveredInvoiceHistory || []).forEach((entry) => {
+        if (!entry.deliveredBy || String(entry.deliveredBy) !== String(user?._id)) return;
+        (entry.items || []).forEach((it) => {
+          const pid = String(it.product?._id || it.product);
+          map[pid] = (map[pid] || 0) + (it.quantity || 0);
+        });
+      });
+      return map;
+    },
+    [user]
+  );
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -175,8 +196,7 @@ const DeliveredOrdersList = () => {
                           <th>No</th>
                           <th>Order ID</th>
                           <th>Customer</th>
-                          <th>Total Ordered</th>
-                          <th>Total Delivered</th>
+                          <th>Total Delivered Qty</th>
                           <th>Grand Total</th>
                           <th>Remarks</th>
                           <th>Order Date</th>
@@ -185,20 +205,22 @@ const DeliveredOrdersList = () => {
                       </thead>
                       <tbody>
                         {pagination.pageData.map((order, index) => {
-                          const totalOrdered =
-                            order.orderItems?.reduce(
-                              (s, i) => s + i.orderedQuantity,
-                              0,
-                            ) || 0;
-                          const totalDelivered =
-                            order.orderItems?.reduce(
-                              (s, i) => s + i.deliveredQuantity,
-                              0,
-                            ) || 0;
-                          const grandTotal =
-                            order.orderItems
-                              ?.reduce((s, i) => s + i.totalAmount, 0)
-                              ?.toFixed(2) || "0.00";
+                          const myDeliveredMap = getMyDeliveredQtyMap(order);
+                          const totalDeliveredQty = Object.values(myDeliveredMap).reduce(
+                            (s, q) => s + q,
+                            0
+                          );
+                          // Grand Total here is what I personally delivered —
+                          // the sum of MY deliveredInvoiceHistory entries'
+                          // amounts, each already the invoice's rounded Grand
+                          // Total (Sub Total + Round Off = Grand Total), not
+                          // the whole order's invoiceHistory (which can
+                          // include invoices delivered by a different partner
+                          // after a reassignment).
+                          const grandTotal = (order.deliveredInvoiceHistory || [])
+                            .filter((h) => h.deliveredBy && String(h.deliveredBy) === String(user?._id))
+                            .reduce((sum, h) => sum + (h.amount || 0), 0)
+                            .toFixed(2);
 
                           return (
                             <tr key={order._id}>
@@ -215,8 +237,7 @@ const DeliveredOrdersList = () => {
                               </td>
                               <td>{order.customer?.name || "N/A"}</td>
 
-                              <td>{totalOrdered}</td>
-                              <td>{totalDelivered}</td>
+                              <td>{totalDeliveredQty}</td>
 
                               <td>
                                 <div
@@ -243,36 +264,52 @@ const DeliveredOrdersList = () => {
 
                               <td>
                                 <div className="actions-cell-stack">
-                                  {order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0 ? (
-                                    <div className="invoice-section">
-                                      <div className="invoice-buttons-group">
-                                        {order.deliveredInvoiceHistory.map((inv, i) => (
-                                          <button
-                                            key={i}
-                                            className="invoice-btn"
-                                            onClick={() => {
-                                              setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
-                                              setShowInvoiceModal(true);
-                                            }}
-                                          >
-                                            🧾 {inv.invoiceNumber}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ) : order.deliveredInvoiceNumber ? (
-                                    <button
-                                      className="invoice-btn delivered-invoice-btn"
-                                      onClick={() => {
-                                        setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.deliveredInvoiceNumber });
-                                        setShowInvoiceModal(true);
-                                      }}
-                                    >
-                                      🧾 Download Invoice
-                                    </button>
-                                  ) : (
-                                    <span className="completed-text">No invoice</span>
-                                  )}
+                                  {(() => {
+                                    // Only the batches I personally delivered —
+                                    // an order reassigned after my delivery can
+                                    // carry further deliveredInvoiceHistory
+                                    // entries belonging to a different partner.
+                                    const myDeliveries = (order.deliveredInvoiceHistory || []).filter(
+                                      (h) => h.deliveredBy && String(h.deliveredBy) === String(user?._id)
+                                    );
+
+                                    if (myDeliveries.length > 0) {
+                                      return (
+                                        <div className="invoice-section">
+                                          <div className="invoice-buttons-group">
+                                            {myDeliveries.map((inv, i) => (
+                                              <button
+                                                key={i}
+                                                className="invoice-btn"
+                                                onClick={() => {
+                                                  setPendingInvoiceData({ orderId: order._id, invoiceNumber: inv.invoiceNumber });
+                                                  setShowInvoiceModal(true);
+                                                }}
+                                              >
+                                                🧾 {inv.invoiceNumber}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+
+                                    if (!order.deliveredInvoiceHistory?.length && order.deliveredInvoiceNumber) {
+                                      return (
+                                        <button
+                                          className="invoice-btn delivered-invoice-btn"
+                                          onClick={() => {
+                                            setPendingInvoiceData({ orderId: order._id, invoiceNumber: order.deliveredInvoiceNumber });
+                                            setShowInvoiceModal(true);
+                                          }}
+                                        >
+                                          🧾 Download Invoice
+                                        </button>
+                                      );
+                                    }
+
+                                    return <span className="completed-text">No invoice</span>;
+                                  })()}
                                 </div>
                               </td>
                             </tr>
@@ -313,6 +350,17 @@ const DeliveredOrdersList = () => {
         <OrderProductsModal
           order={viewProductsOrder}
           onClose={() => setViewProductsOrder(null)}
+          filterItem={(item) => {
+            const map = getMyDeliveredQtyMap(viewProductsOrder);
+            const pid = String(item.product?._id || item.product);
+            return (map[pid] || 0) > 0;
+          }}
+          getQty={(item) => {
+            const map = getMyDeliveredQtyMap(viewProductsOrder);
+            const pid = String(item.product?._id || item.product);
+            return map[pid] || 0;
+          }}
+          emptyText="No products delivered yet"
         />
       )}
     </div>

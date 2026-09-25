@@ -9,6 +9,83 @@ import TableScrollSync from "../../components/common/TableScrollSync";
 import SearchableSelect from "../../components/common/SearchableSelect";
 import "./CreateSalesReturn.css";
 
+// An order can have several packing/delivery invoices (partial deliveries
+// over time). Group deliveredInvoiceHistory entries by invoiceNumber (a
+// single invoice can itself span more than one delivery event) so each
+// physical invoice becomes one selectable unit, sorted chronologically —
+// needed below to allocate already-returned quantities FIFO across invoices.
+const buildInvoiceGroups = (order) => {
+  const history = order.deliveredInvoiceHistory || [];
+  if (history.length === 0) {
+    // Fallback for orders with no recorded deliveredInvoiceHistory (very old
+    // orders, or ones delivered via the admin "mark delivered" shortcut) —
+    // treat the whole order as a single invoice using cumulative quantities.
+    return [
+      {
+        invoiceNumber: order.invoiceNumber || order.deliveredInvoiceNumber || order._id.slice(-8),
+        date: order.deliveredAt || order.updatedAt,
+        items: (order.orderItems || [])
+          .filter((it) => (it.deliveredQuantity || 0) > 0)
+          .map((it) => ({ productId: String(it.product?._id || it.product), qty: it.deliveredQuantity })),
+      },
+    ];
+  }
+
+  const byInvoice = new Map();
+  history.forEach((h) => {
+    if (!byInvoice.has(h.invoiceNumber)) {
+      byInvoice.set(h.invoiceNumber, { invoiceNumber: h.invoiceNumber, date: h.createdAt, items: {} });
+    }
+    const group = byInvoice.get(h.invoiceNumber);
+    if (new Date(h.createdAt) < new Date(group.date)) group.date = h.createdAt;
+    (h.items || []).forEach((it) => {
+      const pid = String(it.product?._id || it.product);
+      group.items[pid] = (group.items[pid] || 0) + (it.quantity || 0);
+    });
+  });
+
+  return [...byInvoice.values()]
+    .map((g) => ({
+      invoiceNumber: g.invoiceNumber,
+      date: g.date,
+      items: Object.entries(g.items).map(([productId, qty]) => ({ productId, qty })),
+    }))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+};
+
+// "Already returned" is tracked per order+product (not per invoice), so when
+// the same product was invoiced across more than one batch we allocate past
+// returns FIFO — earliest invoice's quantity is consumed first — to work out
+// how much of THIS specific invoice is still returnable.
+const getInvoiceItemsWithRemaining = (order, invoiceNumber) => {
+  const groups = buildInvoiceGroups(order);
+  const alreadyReturned = order.alreadyReturnedQty || {};
+  const cumulativeBefore = {};
+  let targetGroup = null;
+  for (const g of groups) {
+    if (g.invoiceNumber === invoiceNumber) {
+      targetGroup = g;
+      break;
+    }
+    g.items.forEach((it) => {
+      cumulativeBefore[it.productId] = (cumulativeBefore[it.productId] || 0) + it.qty;
+    });
+  }
+  if (!targetGroup) return [];
+
+  return targetGroup.items.map((it) => {
+    const before = cumulativeBefore[it.productId] || 0;
+    const totalReturned = alreadyReturned[it.productId] || 0;
+    const consumedFromThisInvoice = Math.max(0, Math.min(it.qty, totalReturned - before));
+    return {
+      productId: it.productId,
+      invoicedQty: it.qty,
+      alreadyReturnedForThisInvoice: consumedFromThisInvoice,
+      remaining: it.qty - consumedFromThisInvoice,
+    };
+  });
+};
+
 const CreateSalesReturn = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -18,6 +95,7 @@ const CreateSalesReturn = () => {
   const [deliveredOrders, setDeliveredOrders] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [selectedInvoiceNumber, setSelectedInvoiceNumber] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [returnItems, setReturnItems] = useState({}); // { productId: { reason: '', returnQty: 0 } }
   const [returnReason, setReturnReason] = useState("");
@@ -51,20 +129,21 @@ const CreateSalesReturn = () => {
       });
       setDeliveredOrders(res.data);
 
-      // Auto-select if orderId was passed in URL
+      // Auto-select if orderId was passed in URL — default to whichever of
+      // that order's invoices still has something returnable, or its most
+      // recent invoice otherwise.
       if (preselectedOrderId) {
         const found = res.data.find((o) => o._id === preselectedOrderId);
         if (found) {
           setSelectedCustomerId(found.customer?._id || "");
-          setSelectedOrderId(preselectedOrderId);
-          setSelectedOrder(found);
-          const init = {};
-          (found.orderItems || []).forEach((item) => {
-            if ((item.deliveredQuantity || 0) > 0) {
-              init[item.product._id] = { reason: "", returnQty: item.deliveredQuantity };
-            }
-          });
-          setReturnItems(init);
+          const groups = buildInvoiceGroups(found);
+          const groupWithRemaining = groups.find((g) =>
+            getInvoiceItemsWithRemaining(found, g.invoiceNumber).some((it) => it.remaining > 0)
+          );
+          const targetGroup = groupWithRemaining || groups[groups.length - 1];
+          if (targetGroup) {
+            selectInvoice(found, targetGroup.invoiceNumber);
+          }
         }
       }
     } catch {
@@ -72,6 +151,7 @@ const CreateSalesReturn = () => {
     } finally {
       setLoadingOrders(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendUrl, preselectedOrderId]);
 
   useEffect(() => {
@@ -141,28 +221,89 @@ const CreateSalesReturn = () => {
     }
   };
 
-  const handleOrderSelect = (orderId) => {
-    setSelectedOrderId(orderId);
-    if (!orderId) {
-      setSelectedOrder(null);
-      setReturnItems({});
-      return;
-    }
-    const order = customerOrders.find((o) => o._id === orderId);
-    setSelectedOrder(order || null);
-    const alreadyReturned = order?.alreadyReturnedQty || {};
+  // Populate the return form scoped to ONE specific invoice — deliveredQty,
+  // "already returned", and remaining are all computed for just that
+  // invoice's own items, not the whole order's cumulative totals.
+  const selectInvoice = (order, invoiceNumber) => {
+    setSelectedOrderId(order._id);
+    setSelectedInvoiceNumber(invoiceNumber);
+
+    const invoiceItems = getInvoiceItemsWithRemaining(order, invoiceNumber);
+    const productInfoMap = {};
+    (order.orderItems || []).forEach((oi) => {
+      const pid = String(oi.product?._id || oi.product);
+      productInfoMap[pid] = oi;
+    });
+
+    const syntheticOrderItems = invoiceItems.map((ii) => {
+      const info = productInfoMap[ii.productId] || {};
+      return {
+        product: info.product || { _id: ii.productId },
+        unit: info.unit,
+        price: info.price,
+        vatPercentage: info.vatPercentage,
+        deliveredQuantity: ii.invoicedQty,
+      };
+    });
+    const syntheticAlreadyReturned = {};
+    invoiceItems.forEach((ii) => {
+      syntheticAlreadyReturned[ii.productId] = ii.alreadyReturnedForThisInvoice;
+    });
+
+    setSelectedOrder({
+      ...order,
+      invoiceNumber,
+      orderItems: syntheticOrderItems,
+      alreadyReturnedQty: syntheticAlreadyReturned,
+    });
+
     const init = {};
-    (order?.orderItems || []).forEach((item) => {
-      const deliveredQty = item.deliveredQuantity || 0;
-      const prodId = item.product._id;
-      const already = alreadyReturned[prodId] || 0;
-      const remaining = deliveredQty - already;
-      if (remaining > 0) {
-        init[prodId] = { reason: "", returnQty: remaining };
+    invoiceItems.forEach((ii) => {
+      if (ii.remaining > 0) {
+        init[ii.productId] = { reason: "", returnQty: ii.remaining };
       }
     });
     setReturnItems(init);
   };
+
+  // Dropdown onChange — value is a composite "orderId::invoiceNumber" key
+  // (see invoiceOptions below), since one order can list several invoices.
+  const handleInvoiceSelect = (compositeValue) => {
+    if (!compositeValue) {
+      setSelectedOrderId("");
+      setSelectedInvoiceNumber("");
+      setSelectedOrder(null);
+      setReturnItems({});
+      return;
+    }
+    const sepIdx = compositeValue.lastIndexOf("::");
+    const orderId = compositeValue.slice(0, sepIdx);
+    const invoiceNumber = compositeValue.slice(sepIdx + 2);
+    const order = customerOrders.find((o) => o._id === orderId);
+    if (!order) return;
+    selectInvoice(order, invoiceNumber);
+  };
+
+  // One dropdown option per invoice (not per order) — an order with multiple
+  // packing/delivery rounds shows each of its invoices separately. An invoice
+  // that's already been fully returned (nothing left with remaining > 0) is
+  // left out entirely — it's done, there's nothing more to return against it.
+  const invoiceOptions = useMemo(() => {
+    const options = [];
+    customerOrders.forEach((order) => {
+      buildInvoiceGroups(order).forEach((g) => {
+        const hasRemaining = getInvoiceItemsWithRemaining(order, g.invoiceNumber).some(
+          (it) => it.remaining > 0
+        );
+        if (!hasRemaining) return;
+        options.push({
+          value: `${order._id}::${g.invoiceNumber}`,
+          label: `${g.invoiceNumber} — ${new Date(g.date).toLocaleDateString("en-GB")}`,
+        });
+      });
+    });
+    return options;
+  }, [customerOrders]);
 
   const handleItemChange = (productId, field, value) => {
     setReturnItems((prev) => ({
@@ -181,15 +322,20 @@ const CreateSalesReturn = () => {
     });
   };
 
+  // Rounded to the nearest whole AED, same rule as the printed credit note
+  // (Sub Total + Round Off = Grand Total) — this is what actually gets
+  // credited back to the customer once the return is processed.
   const calcTotal = () =>
-    getDeliveredItems().reduce((sum, item) => {
-      const productId = item.product._id;
-      const returnQty = parseInt(returnItems[productId]?.returnQty || 0);
-      if (returnQty <= 0) return sum;
-      const exclVat = returnQty * item.price;
-      const vat = (exclVat * (item.vatPercentage || 5)) / 100;
-      return sum + exclVat + vat;
-    }, 0);
+    Math.round(
+      getDeliveredItems().reduce((sum, item) => {
+        const productId = item.product._id;
+        const returnQty = parseInt(returnItems[productId]?.returnQty || 0);
+        if (returnQty <= 0) return sum;
+        const exclVat = returnQty * item.price;
+        const vat = (exclVat * (item.vatPercentage || 5)) / 100;
+        return sum + exclVat + vat;
+      }, 0)
+    );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -216,10 +362,14 @@ const CreateSalesReturn = () => {
       const token = localStorage.getItem("token");
       await axios.post(
         `${backendUrl}/api/sales-returns/create`,
-        { orderId: selectedOrderId, returnItems: itemsToReturn, returnReason },
+        { orderId: selectedOrderId, invoiceNumber: selectedInvoiceNumber, returnItems: itemsToReturn, returnReason },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success("Return request submitted for admin approval");
+      toast.success(
+        user?.role === "Admin"
+          ? "Return created and approved"
+          : "Return request submitted for admin approval"
+      );
       navigate(preselectedOrderId ? "/customer/orders" : "/sales-returns");
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to create return");
@@ -287,13 +437,10 @@ const CreateSalesReturn = () => {
                       <label>Select Order</label>
                       <SearchableSelect
                         className="csr-select"
-                        options={customerOrders.map((o) => ({
-                          value: o._id,
-                          label: `${o.invoiceNumber || o._id.slice(-8)} — ${new Date(o.updatedAt).toLocaleDateString("en-GB")}`,
-                        }))}
-                        value={selectedOrderId}
-                        onChange={(val) => handleOrderSelect(val)}
-                        placeholder="-- Select an order --"
+                        options={invoiceOptions}
+                        value={selectedOrderId ? `${selectedOrderId}::${selectedInvoiceNumber}` : ""}
+                        onChange={(val) => handleInvoiceSelect(val)}
+                        placeholder="-- Select an invoice --"
                       />
                     </div>
                     {customerOrders.length === 0 && (

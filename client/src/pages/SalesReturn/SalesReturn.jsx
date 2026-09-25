@@ -129,6 +129,7 @@ const SalesReturn = () => {
       list = list.filter(
         (r) =>
           r.customer?.name?.toLowerCase().includes(q) ||
+          r.invoiceNumber?.toLowerCase().includes(q) ||
           r.order?.invoiceNumber?.toLowerCase().includes(q) ||
           r.returnInvoiceNumber?.toLowerCase().includes(q) ||
           r.returnReason?.toLowerCase().includes(q)
@@ -137,8 +138,11 @@ const SalesReturn = () => {
     return list;
   }, [returns, activeTab, searchTerm]);
 
+  // Once completed, sr.refundAmount holds the actual (already rounded)
+  // amount credited back — otherwise round the raw item sum the same way
+  // the printed credit note does (Sub Total + Round Off = Grand Total).
   const totalReturnAmt = (sr) =>
-    (sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
+    sr.refundAmount || Math.round((sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0));
 
   const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(filtered, entriesPerPage, `${activeTab}|${searchTerm}`);
@@ -358,7 +362,7 @@ const SalesReturn = () => {
                             </td>
                             <td>
                               <span className="sr-invoice-badge">
-                                {sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "-"}
+                                {sr.invoiceNumber || sr.order?.invoiceNumber || sr.order?._id?.toString().slice(-6) || "-"}
                               </span>
                             </td>
                             <td>{(sr.returnItems || []).length} item(s)</td>
@@ -478,7 +482,7 @@ const SalesReturn = () => {
               <div className="sr-detail-grid">
                 <div><span>Customer</span><strong>{detailReturn.customer?.name}</strong></div>
                 <div><span>Phone</span><strong>{detailReturn.customer?.phoneNumber || "—"}</strong></div>
-                <div><span>Original Order</span><strong>{detailReturn.order?.invoiceNumber || "—"}</strong></div>
+                <div><span>Original Order</span><strong>{detailReturn.invoiceNumber || detailReturn.order?.invoiceNumber || "—"}</strong></div>
                 <div><span>Status</span>
                   <span className={`sr-status-badge ${STATUS_COLORS[detailReturn.status]}`}>
                     {STATUS_LABELS[detailReturn.status]}

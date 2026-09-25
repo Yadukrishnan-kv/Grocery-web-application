@@ -238,8 +238,7 @@ const OrderReports = () => {
       const totalDelivered =
         order.orderItems?.reduce((sum, item) => sum + item.deliveredQuantity, 0) || 0;
       const pendingQty = totalOrdered - totalDelivered;
-      const grandTotal =
-        order.orderItems?.reduce((sum, item) => sum + item.totalAmount, 0)?.toFixed(2) || "0.00";
+      const grandTotal = getOrderGrandTotal(order).toFixed(2);
 
       return {
         "No": index + 1,
@@ -274,6 +273,16 @@ const OrderReports = () => {
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
+
+  // Once the order has been packed, invoiceHistory holds the actual invoiced
+  // Grand Total(s) — each already rounded to the nearest whole AED (Sub
+  // Total + Round Off = Grand Total). Prefer that sum over the raw
+  // order-time total so this report reflects what the customer is really
+  // being charged, not the pre-rounding estimate.
+  const getOrderGrandTotal = (order) =>
+    order.invoiceHistory?.length > 0
+      ? order.invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0)
+      : order.orderItems?.reduce((sum, item) => sum + (item.totalAmount || 0), 0) || 0;
 
   if (!user) {
     return <div className="order-reports-loading">Loading...</div>;
@@ -412,7 +421,6 @@ const OrderReports = () => {
                           <th>Total Delivered Qty</th> {/* ✅ Changed */}
                           <th>Pending Qty</th>
                           <th>Grand Total</th> {/* ✅ Changed */}
-                          <th>Delivery Partner</th>
                           <th>Order Date</th>
                           <th>Status</th>
                           <th>Actions</th>
@@ -432,10 +440,7 @@ const OrderReports = () => {
                               0,
                             ) || 0;
                           const pendingQty = totalOrdered - totalDelivered;
-                          const grandTotal =
-                            order.orderItems
-                              ?.reduce((sum, item) => sum + item.totalAmount, 0)
-                              ?.toFixed(2) || "0.00";
+                          const grandTotal = getOrderGrandTotal(order).toFixed(2);
                           const hasDelivered = totalDelivered > 0;
 
                           return (
@@ -475,10 +480,6 @@ const OrderReports = () => {
                                   />
                                   <span>{grandTotal}</span>
                                 </div>
-                              </td>
-
-                              <td>
-                                {order.assignedTo?.username || "Not assigned"}
                               </td>
 
                               <td>{formatDate(order.orderDate)}</td>

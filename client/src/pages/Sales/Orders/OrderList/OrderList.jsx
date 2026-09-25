@@ -23,7 +23,8 @@ const OrderList = () => {
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState("Orders");
   const [user, setUser] = useState(null);
-  const canAssignDelivery = user?.role === "Admin" || user?.role === "Sales Manager";
+  const canAssignDelivery =
+    user?.role === "Admin" || user?.role === "Sales Manager" || user?.role === "Sales man";
   const [deliveryPartners, setDeliveryPartners] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -39,6 +40,8 @@ const OrderList = () => {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState(null);
   const [viewProductsOrder, setViewProductsOrder] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
@@ -196,6 +199,44 @@ const OrderList = () => {
     return isPacked && hasInvoice;
   };
 
+  // Cancelling is only offered before the storekeeper has packed anything —
+  // once packing has started there's stock/invoicing already in motion, so
+  // it goes through the normal delivered/returns flow instead.
+  const isCancelBlocked = (order) =>
+    order.status === "cancelled" ||
+    order.status === "delivered" ||
+    (order.packedStatus && order.packedStatus !== "not_packed");
+
+  const handleCancelClick = (id, orderId) => {
+    setOrderToCancel({ id, orderId });
+    setShowCancelModal(true);
+  };
+
+  const confirmCancel = async () => {
+    if (!orderToCancel) return;
+
+    setShowCancelModal(false);
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${backendUrl}/api/orders/cancelorder/${orderToCancel.id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast.success("Order cancelled successfully!");
+      refetchCurrent();
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to cancel order. Please try again."
+      );
+    } finally {
+      setOrderToCancel(null);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!orderToDelete) return;
 
@@ -258,7 +299,14 @@ const OrderList = () => {
     }
     const exclVat = order.orderItems.reduce((sum, item) => sum + (item.exclVatAmount || 0), 0);
     const vatAmount = order.orderItems.reduce((sum, item) => sum + (item.vatAmount || 0), 0);
-    const grandTotal = order.orderItems.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
+    // Once the order has been packed, invoiceHistory holds the actual invoiced
+    // Grand Total(s) — each already rounded to the nearest whole AED (Sub
+    // Total + Round Off = Grand Total). Prefer that sum over the raw
+    // order-time total so this list reflects what the customer is really
+    // being charged, not the pre-rounding estimate.
+    const grandTotal = order.invoiceHistory?.length > 0
+      ? order.invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0)
+      : order.orderItems.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
     return { exclVat, vatAmount, grandTotal };
   };
 
@@ -413,38 +461,75 @@ const OrderList = () => {
                               </td>
 
                               <td>
-                                {canAssignDelivery && (order.assignmentStatus === "pending_assignment" ||
-                                order.assignmentStatus === "rejected") ? (
-                                  <SearchableSelect
-                                    className="order-list-delivery-partner-select"
-                                    options={deliveryPartners.map((partner) => ({
-                                      value: partner._id,
-                                      label: partner.username,
-                                    }))}
-                                    value=""
-                                    onChange={(selectedId) => {
-                                      if (selectedId) {
-                                        handleAssignDeliveryPartner(
-                                          order._id,
-                                          selectedId
-                                        );
-                                      }
-                                    }}
-                                    placeholder={
-                                      order.assignmentStatus === "rejected"
-                                        ? "Reassign Partner"
-                                        : "Assign Delivery Partner"
-                                    }
-                                  />
-                                ) : order.assignedTo ? (
-                                  <span className="order-list-assigned-partner">
-                                    {order.assignedTo.username || "Assigned"}
-                                  </span>
-                                ) : (
-                                  <span className="order-list-not-assigned">
-                                    Not Assigned
-                                  </span>
-                                )}
+                                {(() => {
+                                  // Once a partner is assigned, just show their
+                                  // name — no need to keep the dropdown open.
+                                  // It only reappears when there's actually a
+                                  // fresh assignment decision to make: nothing
+                                  // assigned yet, the previous partner rejected,
+                                  // or the order was partially delivered and the
+                                  // remaining batch needs a (re)assignment.
+                                  const canReassignNow =
+                                    canAssignDelivery &&
+                                    (order.assignmentStatus === "pending_assignment" ||
+                                      order.assignmentStatus === "rejected" ||
+                                      order.status === "partial_delivered");
+
+                                  // Show every delivery partner who's actually
+                                  // touched this order — whoever delivered
+                                  // each round (deliveredInvoiceHistory[].deliveredBy)
+                                  // plus whoever's currently assigned — not just
+                                  // the current assignment, since a partially
+                                  // delivered order can involve more than one
+                                  // partner across rounds.
+                                  const deliveredIds = [...new Set(
+                                    (order.deliveredInvoiceHistory || [])
+                                      .map((h) => h.deliveredBy)
+                                      .filter(Boolean)
+                                      .map(String)
+                                  )];
+                                  const deliveredNames = deliveredIds
+                                    .map((id) => deliveryPartners.find((p) => String(p._id) === id)?.username)
+                                    .filter(Boolean);
+                                  const names = [...new Set(
+                                    order.assignedTo?.username
+                                      ? [...deliveredNames, order.assignedTo.username]
+                                      : deliveredNames
+                                  )];
+
+                                  return (
+                                    <>
+                                      {names.length > 0 && (
+                                        <div className="order-list-assigned-partner" style={{ marginBottom: 4 }}>
+                                          {names.join(", ")}
+                                        </div>
+                                      )}
+                                      {canReassignNow ? (
+                                        <SearchableSelect
+                                          className="order-list-delivery-partner-select"
+                                          options={deliveryPartners.map((partner) => ({
+                                            value: partner._id,
+                                            label: partner.username,
+                                          }))}
+                                          value={order.assignedTo?._id || ""}
+                                          onChange={(selectedId) => {
+                                            if (selectedId) {
+                                              handleAssignDeliveryPartner(
+                                                order._id,
+                                                selectedId
+                                              );
+                                            }
+                                          }}
+                                          placeholder="Assign Delivery Partner"
+                                        />
+                                      ) : names.length === 0 ? (
+                                        <span className="order-list-not-assigned">
+                                          Not Assigned
+                                        </span>
+                                      ) : null}
+                                    </>
+                                  );
+                                })()}
                               </td>
                               <td>
                                 <span
@@ -502,6 +587,29 @@ const OrderList = () => {
                                   >
                                     🗑️
                                   </button>
+                                  {canAssignDelivery && (
+                                    <button
+                                      className="order-list-icon-button order-list-cancel-button"
+                                      onClick={() => {
+                                        if (isCancelBlocked(order)) {
+                                          toast.error(
+                                            "Cannot cancel an order that has already been packed"
+                                          );
+                                          return;
+                                        }
+                                        handleCancelClick(order._id, order.orderId || order._id);
+                                      }}
+                                      disabled={isCancelBlocked(order)}
+                                      title={
+                                        isCancelBlocked(order)
+                                          ? "Order has already been packed and cannot be cancelled"
+                                          : "Cancel order"
+                                      }
+                                      aria-label={`Cancel order ${order.orderId || order._id}`}
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -554,11 +662,62 @@ const OrderList = () => {
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="confirm-delete"
                 onClick={confirmDelete}
               >
                 Delete Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelModal && orderToCancel && (
+        <div className="co-modal-overlay" onClick={() => setShowCancelModal(false)}>
+          <div className="co-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="co-modal-close"
+              onClick={() => setShowCancelModal(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+
+            <div className="co-modal-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a1.5 1.5 0 0 0 1.3 2.25h17.76a1.5 1.5 0 0 0 1.3-2.25L13.71 3.86a1.5 1.5 0 0 0-2.42 0Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+
+            <h3 className="co-modal-title">Cancel this order?</h3>
+            <p className="co-modal-text">
+              Order <span className="co-modal-order-chip">#{orderToCancel.orderId}</span> will be
+              cancelled for the customer.
+            </p>
+            <p className="co-modal-note">This action cannot be undone.</p>
+
+            <div className="co-modal-actions">
+              <button
+                type="button"
+                className="co-modal-btn co-modal-btn-secondary"
+                onClick={() => setShowCancelModal(false)}
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                className="co-modal-btn co-modal-btn-danger"
+                onClick={confirmCancel}
+              >
+                Yes, Cancel Order
               </button>
             </div>
           </div>

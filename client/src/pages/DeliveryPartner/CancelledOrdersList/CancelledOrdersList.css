@@ -52,6 +52,25 @@
   font-weight: 500;
 }
 
+.cancelled-orders-reason-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cancelled-orders-reason-badge.is-cancelled {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.cancelled-orders-reason-badge.is-rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 .cancelled-orders-no-data {
   text-align: center;
   padding: 3rem 2rem;

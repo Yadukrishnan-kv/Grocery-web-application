@@ -261,6 +261,7 @@ const RemainingPackOrders = () => {
                           <th>Status</th>
                           <th>Order Date</th>
                           <th>Delivery After</th>
+                          <th>Delivery Partner</th>
                           <th>Actions</th>
                           <th>Slip</th>
                           <th>Remaining Pack</th>
@@ -308,6 +309,12 @@ const RemainingPackOrders = () => {
                                 {order.packableAfter
                                   ? formatDate(order.packableAfter)
                                   : <span className="no-invoice-text">Same Day</span>}
+                              </td>
+
+                              <td>
+                                <span className="order-list-assigned-partner">
+                                  {order.assignedTo?.username || "Not Assigned"}
+                                </span>
                               </td>
 
                               <td className="actions-cell">

@@ -122,7 +122,7 @@ const amountToWords = (amount) => {
 
 const createSalesReturn = async (req, res) => {
   try {
-    const { orderId, returnItems, returnReason } = req.body;
+    const { orderId, returnItems, returnReason, invoiceNumber } = req.body;
 
     if (!orderId || !returnItems || returnItems.length === 0) {
       return res.status(400).json({ message: "orderId and returnItems are required" });
@@ -213,13 +213,20 @@ const createSalesReturn = async (req, res) => {
       return res.status(400).json({ message: "No valid return quantities provided" });
     }
 
+    // An admin-created return doesn't need the admin to then approve/reject
+    // their own request — skip straight past pending_admin_approval into the
+    // same "approved" state approveSalesReturn would have set.
+    const isAdminCreated = req.user?.role === "Admin";
+
     const salesReturn = await SalesReturn.create({
       order: orderId,
+      invoiceNumber: invoiceNumber || null,
       customer: order.customer,
       returnItems: processedItems,
       returnReason: returnReason || "",
-      status: "pending_admin_approval",
+      status: isAdminCreated ? "approved" : "pending_admin_approval",
       createdBy: req.user._id,
+      ...(isAdminCreated ? { adminApprovedAt: new Date() } : {}),
     });
 
     const populated = await SalesReturn.findById(salesReturn._id)
@@ -408,7 +415,10 @@ const confirmPickup = async (req, res) => {
     }
 
     const order = await Order.findById(sr.order);
-    const totalReturnAmount = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
+    // Credit note rounds to the nearest whole AED just like a sales invoice
+    // (Sub Total + Round Off = Grand Total) — the amount actually credited
+    // back to the customer must match what's printed on the return invoice.
+    const totalReturnAmount = Math.round(sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0));
 
     // Determine how the order was actually settled at delivery:
     // If a cash/cheque PaymentTransaction exists → customer paid cash at delivery
@@ -505,7 +515,9 @@ const confirmReturnReceived = async (req, res) => {
     }
 
     const order = await Order.findById(sr.order);
-    const totalReturnAmount = sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0);
+    // Same rounding rule as confirmPickup / the printed credit note (Sub
+    // Total + Round Off = Grand Total).
+    const totalReturnAmount = Math.round(sr.returnItems.reduce((s, i) => s + (i.totalAmount || 0), 0));
 
     // sr.billAdjusted is always set to true by confirmPickup, so this block
     // only runs if somehow confirmReturnReceived is called without a prior confirmPickup

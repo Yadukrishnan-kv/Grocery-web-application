@@ -521,8 +521,15 @@ const deliverOrder = async (req, res) => {
       return res.status(400).json({ message: "Order cannot be delivered" });
     }
 
-    let grandDeliveryAmount = 0;
     let returnCreditUsed = 0;
+
+    // Pass 1: validate quantities, update deliveredQuantity, and capture each
+    // product's raw per-unit VAT-inclusive amount plus how much of it still
+    // needs to be attributed to a packing invoice (done below). rawUnitAmount
+    // is only a fallback for quantity that no invoice can be matched to.
+    const deliveryRemaining = {}; // productId -> qty still to attribute to an invoice
+    const rawUnitAmount = {};     // productId -> VAT-inclusive amount per unit delivered this event
+
     for (const inputItem of deliveredItems) {
       const orderItem = order.orderItems.id(inputItem.product);
       if (!orderItem) {
@@ -544,8 +551,100 @@ const deliverOrder = async (req, res) => {
       const itemTotalWithVat = orderItem.totalAmount
         ? orderItem.totalAmount * ratio
         : qtyToDeliver * orderItem.price * (1 + (orderItem.vatPercentage || 5) / 100);
-      grandDeliveryAmount += parseFloat(itemTotalWithVat.toFixed(2));
+
+      const pid = String(orderItem.product?._id || orderItem.product);
+      deliveryRemaining[pid] = (deliveryRemaining[pid] || 0) + qtyToDeliver;
+      rawUnitAmount[pid] = itemTotalWithVat / qtyToDeliver;
     }
+
+    // ── Match delivered items to packing invoices, attributing this event's
+    // share of each invoice's already-rounded Grand Total (Sub Total + Round
+    // Off = Grand Total — same rule packOrder applies) instead of recomputing
+    // a fresh unrounded total. This keeps cash collected / credit restored on
+    // delivery equal to what the invoice actually charged, even when a single
+    // packing invoice is delivered across several separate delivery events —
+    // the before/after cumulative-quantity ratios below mean the final chunk
+    // always picks up whatever remainder keeps the sum exact. ─────────────
+    const packingInvoiceMap = new Map(); // invoiceNumber → true (deduplicated)
+    const invoiceDeliveries = new Map(); // invoiceNumber → array of items delivered
+    const invoiceEventAmounts = new Map(); // invoiceNumber → this event's share of its Grand Total
+    let matchedInvoiceAmount = 0;
+
+    if (order.invoiceHistory && order.invoiceHistory.length > 0) {
+      // Process invoices oldest-first so earlier invoices are consumed first
+      const sortedHistory = [...order.invoiceHistory].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+      );
+      for (const histEntry of sortedHistory) {
+        if (!histEntry.items || histEntry.items.length === 0) continue;
+        let matched = false;
+        for (const hItem of histEntry.items) {
+          const pid = String(hItem.product);
+          const invRemaining = (hItem.quantity || 0) - (hItem.deliveredQuantity || 0);
+          if (invRemaining > 0 && deliveryRemaining[pid] > 0) {
+            matched = true;
+            break;
+          }
+        }
+        if (matched) {
+          packingInvoiceMap.set(histEntry.invoiceNumber, true);
+          const deliveredUnderThisInvoice = [];
+          const totalQtyOfInvoice = histEntry.items.reduce((s, i) => s + (i.quantity || 0), 0);
+          const qtyDeliveredBefore = histEntry.items.reduce((s, i) => s + (i.deliveredQuantity || 0), 0);
+
+          // Deduct delivered quantities from this invoice's items
+          for (const hItem of histEntry.items) {
+            const pid = String(hItem.product);
+            const invRemaining = (hItem.quantity || 0) - (hItem.deliveredQuantity || 0);
+            if (invRemaining > 0 && deliveryRemaining[pid] > 0) {
+              const consumed = Math.min(invRemaining, deliveryRemaining[pid]);
+              hItem.deliveredQuantity = (hItem.deliveredQuantity || 0) + consumed;
+              deliveryRemaining[pid] -= consumed;
+              if (deliveryRemaining[pid] <= 0) delete deliveryRemaining[pid];
+
+              const orderItem = order.orderItems.find(oi => String(oi.product) === pid);
+
+              deliveredUnderThisInvoice.push({
+                product: hItem.product,
+                quantity: consumed,
+                price: hItem.price || (orderItem ? orderItem.price : 0),
+              });
+            }
+          }
+
+          if (deliveredUnderThisInvoice.length > 0) {
+            invoiceDeliveries.set(histEntry.invoiceNumber, deliveredUnderThisInvoice);
+
+            const invoiceGrandTotal = histEntry.amount || 0;
+            const qtyDeliveredAfter = histEntry.items.reduce((s, i) => s + (i.deliveredQuantity || 0), 0);
+            const amountBefore = totalQtyOfInvoice > 0
+              ? parseFloat((invoiceGrandTotal * qtyDeliveredBefore / totalQtyOfInvoice).toFixed(2))
+              : 0;
+            const amountAfter = qtyDeliveredAfter >= totalQtyOfInvoice
+              ? invoiceGrandTotal
+              : parseFloat((invoiceGrandTotal * qtyDeliveredAfter / totalQtyOfInvoice).toFixed(2));
+            const thisEventInvoiceAmount = parseFloat((amountAfter - amountBefore).toFixed(2));
+
+            invoiceEventAmounts.set(histEntry.invoiceNumber, thisEventInvoiceAmount);
+            matchedInvoiceAmount += thisEventInvoiceAmount;
+          }
+        }
+        // Stop early if all delivery items have been matched
+        if (Object.keys(deliveryRemaining).length === 0) break;
+      }
+    }
+
+    // Any quantity left unmatched (no packing invoice recorded for it, e.g.
+    // legacy orders from before invoiceHistory existed) falls back to a
+    // fresh Math.round of its raw amount — the same rounding a real invoice
+    // for it would apply.
+    let unmatchedRawAmount = 0;
+    for (const pid of Object.keys(deliveryRemaining)) {
+      unmatchedRawAmount += rawUnitAmount[pid] * deliveryRemaining[pid];
+    }
+    const roundedUnmatchedAmount = unmatchedRawAmount > 0 ? Math.round(unmatchedRawAmount) : 0;
+
+    const grandDeliveryAmount = parseFloat((matchedInvoiceAmount + roundedUnmatchedAmount).toFixed(2));
 
     // --- Robust Delivery Logic: Store Credit First, Restore Credit Limit, Record Payments ---
     if (paymentMethod === "cash" || paymentMethod === "cheque") {
@@ -590,73 +689,6 @@ const deliverOrder = async (req, res) => {
     const totalOrdered = order.orderItems.reduce((s, i) => s + i.orderedQuantity, 0);
     const totalDelivered = order.orderItems.reduce((s, i) => s + i.deliveredQuantity, 0);
 
-    // ── Match delivered items to packing invoices ──────────────────────────
-    // For each delivered item, find which packing invoices (DEL-XX) still had
-    // remaining quantity for that product and deduct accordingly.
-    const packingInvoiceMap = new Map(); // invoiceNumber → true (deduplicated)
-    const invoiceDeliveries = new Map(); // invoiceNumber → array of items delivered
-
-    if (order.invoiceHistory && order.invoiceHistory.length > 0) {
-      // Build remaining-to-deliver per product from this delivery batch
-      const deliveryRemaining = {};
-      for (const dItem of deliveredItems) {
-        // Resolve orderItem._id to product ID
-        const orderItem = order.orderItems.id(dItem.product);
-        const pid = orderItem ? String(orderItem.product) : String(dItem.product);
-        deliveryRemaining[pid] = (deliveryRemaining[pid] || 0) + Number(dItem.quantity);
-      }
-
-      // Process invoices oldest-first so earlier invoices are consumed first
-      const sortedHistory = [...order.invoiceHistory].sort(
-        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-      );
-      for (const histEntry of sortedHistory) {
-        if (!histEntry.items || histEntry.items.length === 0) continue;
-        let matched = false;
-        for (const hItem of histEntry.items) {
-          const pid = String(hItem.product);
-          const invRemaining = (hItem.quantity || 0) - (hItem.deliveredQuantity || 0);
-          if (invRemaining > 0 && deliveryRemaining[pid] > 0) {
-            matched = true;
-            break;
-          }
-        }
-        if (matched) {
-          packingInvoiceMap.set(histEntry.invoiceNumber, true);
-          const deliveredUnderThisInvoice = [];
-
-          // Deduct delivered quantities from this invoice's items
-          for (const hItem of histEntry.items) {
-            const pid = String(hItem.product);
-            const invRemaining = (hItem.quantity || 0) - (hItem.deliveredQuantity || 0);
-            if (invRemaining > 0 && deliveryRemaining[pid] > 0) {
-              const consumed = Math.min(invRemaining, deliveryRemaining[pid]);
-              hItem.deliveredQuantity = (hItem.deliveredQuantity || 0) + consumed;
-              deliveryRemaining[pid] -= consumed;
-              if (deliveryRemaining[pid] <= 0) delete deliveryRemaining[pid];
-
-              const orderItem = order.orderItems.find(oi => String(oi.product) === pid);
-
-              deliveredUnderThisInvoice.push({
-                product: hItem.product,
-                quantity: consumed,
-                price: hItem.price || (orderItem ? orderItem.price : 0),
-                vatPercentage: orderItem ? (orderItem.vatPercentage || 5) : 5,
-                orderItemTotalAmount: orderItem ? orderItem.totalAmount : null,
-                orderItemOrderedQuantity: orderItem ? orderItem.orderedQuantity : null,
-              });
-            }
-          }
-
-          if (deliveredUnderThisInvoice.length > 0) {
-            invoiceDeliveries.set(histEntry.invoiceNumber, deliveredUnderThisInvoice);
-          }
-        }
-        // Stop early if all delivery items have been matched
-        if (Object.keys(deliveryRemaining).length === 0) break;
-      }
-    }
-
     // Now record the delivered invoices under deliveredInvoiceHistory
     let lastDeliveredInvoiceNo = order.deliveredInvoiceNumber;
     if (!order.deliveredInvoiceHistory) order.deliveredInvoiceHistory = [];
@@ -664,21 +696,14 @@ const deliverOrder = async (req, res) => {
     if (invoiceDeliveries.size > 0) {
       for (const [invNo, itemsList] of invoiceDeliveries.entries()) {
         const totalQty = itemsList.reduce((sum, item) => sum + item.quantity, 0);
-        let totalAmount = 0;
-        for (const item of itemsList) {
-          const qtyToDeliver = item.quantity;
-          const ratio = qtyToDeliver / (item.orderItemOrderedQuantity || qtyToDeliver);
-          const itemTotalWithVat = item.orderItemTotalAmount
-            ? item.orderItemTotalAmount * ratio
-            : qtyToDeliver * item.price * (1 + (item.vatPercentage || 5) / 100);
-          totalAmount += parseFloat(itemTotalWithVat.toFixed(2));
-        }
+        const totalAmount = invoiceEventAmounts.get(invNo) || 0;
 
         order.deliveredInvoiceHistory.push({
           invoiceNumber: invNo,
           quantity: totalQty,
-          amount: parseFloat(totalAmount.toFixed(2)),
+          amount: totalAmount,
           createdAt: new Date(),
+          deliveredBy: req.user._id,
           items: itemsList.map(item => ({
             product: item.product,
             quantity: item.quantity,
@@ -697,6 +722,7 @@ const deliverOrder = async (req, res) => {
           quantity: deliveredItems.reduce((sum, item) => sum + Number(item.quantity), 0),
           amount: parseFloat(grandDeliveryAmount.toFixed(2)),
           createdAt: new Date(),
+          deliveredBy: req.user._id,
           items: deliveredItems.map((item) => {
             const orderItem = order.orderItems.id(item.product);
             return {
@@ -758,11 +784,22 @@ const deliverOrder = async (req, res) => {
 
 const cancelOrder = async (req, res) => {
   try {
+    if (!req.user || !["Admin", "Sales Manager", "Sales man"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only Admin, Sales Manager, or Salesman can cancel orders" });
+    }
+
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
     if (order.status === "delivered" || order.status === "cancelled") {
       return res.status(400).json({ message: "Cannot cancel this order" });
+    }
+
+    // Once the storekeeper has packed anything, the order already has stock
+    // committed and possibly an invoice generated — cancellation is only
+    // offered before packing starts.
+    if (order.packedStatus && order.packedStatus !== "not_packed") {
+      return res.status(400).json({ message: "Cannot cancel an order that has already been packed" });
     }
 
     // Revert stock for undelivered items
@@ -2052,15 +2089,29 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   }
   }
 
-  // Box 2: Vehicle No. & Driver
+  // Box 2: Vehicle No. & Driver — the driver shown must be whoever actually
+  // delivered THIS specific invoice, not the order's current assignedTo:
+  // once a remaining batch is reassigned to a different delivery partner,
+  // assignedTo moves on to them, but an earlier invoice's printed driver
+  // should stay whoever delivered that batch (deliveredInvoiceHistory[].deliveredBy).
   const box2X = margin + sigBoxW + sigGap;
   doc.roundedRect(box2X, sigY, sigBoxW, sigBoxH, 4).lineWidth(1).strokeColor(navyColor).stroke();
   doc.fillColor(navyColor).font("Helvetica-Bold").fontSize(7.5);
   doc.text("Vehicle No. & Driver", box2X + 5, sigY + 8, { width: sigBoxW - 10, align: "center" });
   doc.fillColor("#333333").font("Helvetica").fontSize(7.5);
-  // Only show the driver's name once they have actually accepted the assigned delivery.
-  if (order.assignedTo?.username && order.assignmentStatus === "accepted") {
-    doc.text(`Driver: ${order.assignedTo.username}`, box2X + 5, sigY + 30, { width: sigBoxW - 10, align: "center" });
+
+  let driverName = null;
+  const deliveredEntry = order.deliveredInvoiceHistory?.find((h) => h.invoiceNumber === invoiceNo);
+  if (deliveredEntry?.deliveredBy) {
+    const deliveredByUser = await User.findById(deliveredEntry.deliveredBy).select("username");
+    driverName = deliveredByUser?.username || null;
+  } else if (order.assignedTo?.username && order.assignmentStatus === "accepted") {
+    // Not delivered yet — show whoever's currently assigned to it.
+    driverName = order.assignedTo.username;
+  }
+
+  if (driverName) {
+    doc.text(`Driver: ${driverName}`, box2X + 5, sigY + 30, { width: sigBoxW - 10, align: "center" });
     doc.text("Vehicle No: .................", box2X + 5, sigY + 45, { width: sigBoxW - 10, align: "center" });
   } else {
     doc.text("Driver: .........................", box2X + 5, sigY + 30, { width: sigBoxW - 10, align: "center" });
@@ -2106,19 +2157,23 @@ const getPendingOrdersForAssignment = async (req, res) => {
 
 const assignOrderToDeliveryMan = async (req, res) => {
   try {
-    // Check if user has permission to assign orders (Admin, Sales Manager, or Store kepper)
-    if (!req.user || !["Admin", "Sales Manager", "Store kepper"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Only Admin, Sales Manager, or Storekeeper can assign orders" });
+    // Check if user has permission to assign orders (Admin, Sales Manager, Sales man, or Store kepper)
+    if (!req.user || !["Admin", "Sales Manager", "Sales man", "Store kepper"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only Admin, Sales Manager, Salesman, or Storekeeper can assign orders" });
     }
 
     const { deliveryManId } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (
-      order.assignmentStatus !== "pending_assignment" &&
-      order.assignmentStatus !== "rejected"
-    ) {
+    // Reassignment is always allowed (whatever the current assignmentStatus
+    // — pending_assignment, rejected, assigned, or accepted) as long as the
+    // order still has something to deliver. This lets the storekeeper hand a
+    // remaining packed batch to a different (or the same) delivery partner
+    // at any time from the Remaining Pack Orders screen — the newly assigned
+    // partner has to accept it again via their Order Arrived list, same as a
+    // first-time assignment.
+    if (order.status === "delivered" || order.status === "cancelled") {
       return res
         .status(400)
         .json({ message: "Order is not available for assignment" });
@@ -2170,6 +2225,36 @@ const getMyAssignedOrders = async (req, res) => {
       .populate("orderItems.product", "productName price unit")
       .populate("assignedTo", "username email")
       .sort({ assignedAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Read-only delivery history for the logged-in delivery man: every order
+// where they personally delivered at least one batch, keyed off
+// deliveredInvoiceHistory[].deliveredBy rather than the order's CURRENT
+// assignedTo — so a delivery this person made stays in their history even if
+// the order is later reassigned to a different delivery partner for a
+// subsequent packing round.
+const getMyDeliveredOrders = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const deliveryRoles = ["Delivery partner", "delivery partner", "deliveryman", "Delivery Man"];
+    if (!deliveryRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Only delivery personnel can access this" });
+    }
+
+    const orders = await Order.find({
+      "deliveredInvoiceHistory.deliveredBy": req.user._id,
+    })
+      .populate("customer", "name phoneNumber address pincode returnCreditBalance billingType")
+      .populate("orderItems.product", "productName price unit")
+      .populate("assignedTo", "username email")
+      .sort({ deliveredAt: -1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -2819,13 +2904,22 @@ const packOrder = async (req, res) => {
       }
     }
 
+    // Invoice printing rounds the Sub Total (VAT-inclusive) to the nearest
+    // whole AED — Sub Total + Round Off = Grand Total (see the identical
+    // Math.round in generateDaddysInvoicePDF). That Grand Total, not the
+    // unrounded Sub Total, is what the customer actually owes for this
+    // packing invoice, so it — not newlyPackedAmount — is what must come out
+    // of the customer's credit. Deducting the unrounded Sub Total across
+    // several partial-pack invoices under-deducts by each invoice's round-off.
+    const newlyPackedGrandTotal = Math.round(newlyPackedAmount);
+
     // --- Robust Credit/Store Credit Deduction Logic ---
     let packReturnCreditUsed = 0;
     let packCreditLimitUsed = 0;
-    if (order.payment === "credit" && newlyPackedAmount > 0) {
+    if (order.payment === "credit" && newlyPackedGrandTotal > 0) {
       const customer = await Customer.findById(order.customer);
       if (customer?.billingType === "Credit limit") {
-        let remaining = newlyPackedAmount;
+        let remaining = newlyPackedGrandTotal;
 
         // 1. Use store credit (returnCreditBalance) first
         if ((customer.returnCreditBalance || 0) > 0) {
@@ -2857,7 +2951,7 @@ const packOrder = async (req, res) => {
       order.invoiceHistory.push({
         invoiceNumber: newInvoiceNumber,
         quantity: totalNewlyPackedQty,
-        amount: newlyPackedAmount,  // VAT-inclusive amount
+        amount: newlyPackedGrandTotal,  // Rounded Grand Total (matches printed invoice & credit deducted)
         createdAt: new Date(),
         items: newlyPackedItems,
         totalExclVat: newlyPackedExclVat,
@@ -2882,15 +2976,15 @@ const packOrder = async (req, res) => {
     res.json({
       success: true,
       message: allFullyPacked
-        ? `Order fully packed. Credit deducted: AED ${newlyPackedAmount.toFixed(2)} (Incl. VAT)`
-        : `Partially packed (${totalNewlyPackedQty} units). Credit deducted: AED ${newlyPackedAmount.toFixed(2)} (Incl. VAT)`,
+        ? `Order fully packed. Credit deducted: AED ${newlyPackedGrandTotal.toFixed(2)} (Incl. VAT)`
+        : `Partially packed (${totalNewlyPackedQty} units). Credit deducted: AED ${newlyPackedGrandTotal.toFixed(2)} (Incl. VAT)`,
       order,
       invoiceNumber: newInvoiceNumber,
       returnCreditUsed: packReturnCreditUsed,
       creditLimitUsed: packCreditLimitUsed,
       newlyPacked: {
         quantity: totalNewlyPackedQty,
-        amount: newlyPackedAmount,
+        amount: newlyPackedGrandTotal,
         exclVat: newlyPackedExclVat,
         vatAmount: newlyPackedVatAmount,
         items: newlyPackedItems,
@@ -3191,6 +3285,7 @@ module.exports = {
   getPendingInvoice,
   assignOrderToDeliveryMan,
   getMyAssignedOrders,
+  getMyDeliveredOrders,
   acceptAssignedOrder,
   rejectAssignedOrder,
   getDeliveredOrdersForAdmin,

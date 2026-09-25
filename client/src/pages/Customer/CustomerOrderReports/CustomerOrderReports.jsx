@@ -276,10 +276,13 @@ const CustomerOrderReports = () => {
                               0,
                             ) || 0;
                           const pendingQty = totalOrdered - totalDelivered;
-                          const grandTotal =
-                            order.orderItems
-                              ?.reduce((sum, item) => sum + item.totalAmount, 0)
-                              ?.toFixed(2) || "0.00";
+                          // Once packed, invoiceHistory holds the actual invoiced
+                          // Grand Total(s), already rounded to the nearest whole
+                          // AED (Sub Total + Round Off = Grand Total).
+                          const grandTotal = (order.invoiceHistory?.length > 0
+                            ? order.invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0)
+                            : order.orderItems?.reduce((sum, item) => sum + item.totalAmount, 0) || 0
+                          ).toFixed(2);
                           const hasDelivered = totalDelivered > 0;
 
                           return (

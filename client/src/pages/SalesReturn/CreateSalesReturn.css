@@ -64,7 +64,9 @@
   border-radius: 16px;
   box-shadow: 0 4px 20px -4px rgba(0,0,0,0.08);
   border: 1px solid #e2e8f0;
-  overflow: hidden;
+  /* No overflow:hidden here — it would clip the Select Order dropdown's
+     menu (position: absolute) to the card's bounds instead of letting it
+     float over whatever's below. */
 }
 
 .csr-card-header {

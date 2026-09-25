@@ -110,7 +110,13 @@ const CustomerOrderStatus = () => {
             <div className="info-row">
               <span className="label">Total Amount:</span>
               <span className="value">
-                ${(order.orderItems || []).reduce((s, it) => s + (it.totalAmount || 0), 0).toFixed(2)}
+                {/* Once packed, invoiceHistory holds the actual invoiced Grand
+                    Total(s), already rounded to the nearest whole AED (Sub
+                    Total + Round Off = Grand Total). */}
+                ${(order.invoiceHistory?.length > 0
+                  ? order.invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0)
+                  : (order.orderItems || []).reduce((s, it) => s + (it.totalAmount || 0), 0)
+                ).toFixed(2)}
               </span>
             </div>
             <div className="info-row">
