@@ -246,7 +246,8 @@ const getAllOrders = async (req, res) => {
           populate: { path: "salesman", select: "username" },
         })
         .populate("orderItems.product", "productName price unit CategoryName subCategoryName")
-        .populate("assignedTo", "username");
+        .populate("assignedTo", "username")
+        .populate("cancelledBy", "username role");
 
     if (!req.query.page) {
       const orders = await populateOrders(Order.find()).sort(sort);
@@ -294,7 +295,8 @@ const getSalesmanOrders = async (req, res) => {
       query
         .populate("customer", "name email phoneNumber address pincode")
         .populate("orderItems.product", "productName price unit CategoryName subCategoryName")
-        .populate("assignedTo", "username");
+        .populate("assignedTo", "username")
+        .populate("cancelledBy", "username role");
 
     if (!req.query.page) {
       const orders = await populateOrders(Order.find(filter)).sort(sort);
@@ -827,6 +829,8 @@ const cancelOrder = async (req, res) => {
     }
 
     order.status = "cancelled";
+    order.cancelledAt = new Date();
+    order.cancelledBy = req.user._id;
     await order.save();
 
     res.json({
@@ -2966,6 +2970,18 @@ const packOrder = async (req, res) => {
     order.packedStatus = allFullyPacked ? "fully_packed" : "partially_packed";
     if (allFullyPacked && order.status !== "partial_delivered") {
       order.status = "ready_to_deliver";
+    }
+
+    // A partially delivered order's remaining batch defaults back to
+    // whichever delivery partner is currently assigned (the same one who
+    // delivered the first batch, unless the storekeeper explicitly
+    // reassigned before packing). Their assignmentStatus is still
+    // "accepted" from the earlier round, so it won't show up in that
+    // partner's Order Arrived list until this flips it back to "assigned",
+    // prompting a fresh accept for this newly packed batch.
+    if (order.assignedTo && order.assignmentStatus === "accepted" && totalNewlyPackedQty > 0) {
+      order.assignmentStatus = "assigned";
+      order.assignedAt = new Date();
     }
     // ✅ Store credit usage tracking
     order.creditLimitUsed = (order.creditLimitUsed || 0) + packCreditLimitUsed;

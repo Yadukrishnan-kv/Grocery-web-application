@@ -63,12 +63,18 @@ const OrderArrivedList = () => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      // Only show orders that are assigned (not yet accepted/rejected) and
+      // Only show orders that are assigned (not yet accepted/rejected),
       // still active — if admin/salesman cancels the order before it's
       // packed, it must disappear from here even though it's still
-      // "assigned" (cancelOrder doesn't touch assignmentStatus).
+      // "assigned" (cancelOrder doesn't touch assignmentStatus) — and
+      // actually have something packed. An order can be assigned to a
+      // delivery partner before packing starts, but nothing's "arrived"
+      // for them to deliver until at least part of it is packed.
       const assignedOrders = response.data.filter(
-        (order) => order.assignmentStatus === "assigned" && order.status !== "cancelled",
+        (order) =>
+          order.assignmentStatus === "assigned" &&
+          order.status !== "cancelled" &&
+          order.packedStatus !== "not_packed",
       );
       setOrders(assignedOrders);
     } catch (error) {

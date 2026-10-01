@@ -196,6 +196,36 @@
   font-size: 0.875rem;
 }
 
+.order-list-assigned-partner-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.order-list-assigned-partner-btn:hover {
+  color: #0f3d24;
+}
+
+.order-list-partner-cancel-btn {
+  display: block;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #6b7280;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.order-list-partner-cancel-btn:hover {
+  color: #374151;
+}
+
 /* Action buttons container */
 .order-list-action-buttons {
   display: flex;

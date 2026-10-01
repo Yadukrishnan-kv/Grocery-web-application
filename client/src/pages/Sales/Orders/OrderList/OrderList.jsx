@@ -26,6 +26,10 @@ const OrderList = () => {
   const canAssignDelivery =
     user?.role === "Admin" || user?.role === "Sales Manager" || user?.role === "Sales man";
   const [deliveryPartners, setDeliveryPartners] = useState([]);
+  // Order IDs where the storekeeper/admin clicked the assigned partner's name
+  // to reassign before the delivery man has accepted — a manual override on
+  // top of the automatic pending/rejected/partial_delivered triggers below.
+  const [manualEditOrderIds, setManualEditOrderIds] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -462,49 +466,43 @@ const OrderList = () => {
 
                               <td>
                                 {(() => {
-                                  // Once a partner is assigned, just show their
-                                  // name — no need to keep the dropdown open.
-                                  // It only reappears when there's actually a
-                                  // fresh assignment decision to make: nothing
-                                  // assigned yet, the previous partner rejected,
-                                  // or the order was partially delivered and the
-                                  // remaining batch needs a (re)assignment.
-                                  const canReassignNow =
+                                  const isManualEdit =
+                                    canAssignDelivery && manualEditOrderIds.has(order._id);
+
+                                  // Dropdown reopens automatically only when
+                                  // there's genuinely nobody to fall back to:
+                                  // nothing assigned yet, or the partner
+                                  // rejected.
+                                  const autoReassign =
                                     canAssignDelivery &&
                                     (order.assignmentStatus === "pending_assignment" ||
-                                      order.assignmentStatus === "rejected" ||
+                                      order.assignmentStatus === "rejected");
+
+                                  // Otherwise, while a partner is assigned but
+                                  // hasn't (re)accepted yet — including a
+                                  // partially delivered order back for its
+                                  // remaining batch, where the same partner
+                                  // stays the default — clicking their name
+                                  // lets admin/storekeeper swap them.
+                                  const canManualReassign =
+                                    canAssignDelivery &&
+                                    (order.assignmentStatus === "assigned" ||
                                       order.status === "partial_delivered");
 
-                                  // Show every delivery partner who's actually
-                                  // touched this order — whoever delivered
-                                  // each round (deliveredInvoiceHistory[].deliveredBy)
-                                  // plus whoever's currently assigned — not just
-                                  // the current assignment, since a partially
-                                  // delivered order can involve more than one
-                                  // partner across rounds.
-                                  const deliveredIds = [...new Set(
-                                    (order.deliveredInvoiceHistory || [])
-                                      .map((h) => h.deliveredBy)
-                                      .filter(Boolean)
-                                      .map(String)
-                                  )];
-                                  const deliveredNames = deliveredIds
-                                    .map((id) => deliveryPartners.find((p) => String(p._id) === id)?.username)
-                                    .filter(Boolean);
-                                  const names = [...new Set(
-                                    order.assignedTo?.username
-                                      ? [...deliveredNames, order.assignedTo.username]
-                                      : deliveredNames
-                                  )];
+                                  const showDropdown = autoReassign || (canManualReassign && isManualEdit);
 
-                                  return (
-                                    <>
-                                      {names.length > 0 && (
-                                        <div className="order-list-assigned-partner" style={{ marginBottom: 4 }}>
-                                          {names.join(", ")}
-                                        </div>
-                                      )}
-                                      {canReassignNow ? (
+                                  const closeManualEdit = () => {
+                                    setManualEditOrderIds((prev) => {
+                                      if (!prev.has(order._id)) return prev;
+                                      const next = new Set(prev);
+                                      next.delete(order._id);
+                                      return next;
+                                    });
+                                  };
+
+                                  if (showDropdown) {
+                                    return (
+                                      <>
                                         <SearchableSelect
                                           className="order-list-delivery-partner-select"
                                           options={deliveryPartners.map((partner) => ({
@@ -514,20 +512,55 @@ const OrderList = () => {
                                           value={order.assignedTo?._id || ""}
                                           onChange={(selectedId) => {
                                             if (selectedId) {
+                                              closeManualEdit();
                                               handleAssignDeliveryPartner(
                                                 order._id,
                                                 selectedId
                                               );
                                             }
                                           }}
-                                          placeholder="Assign Delivery Partner"
+                                          placeholder={
+                                            order.assignmentStatus === "rejected" || isManualEdit
+                                              ? "Reassign Partner"
+                                              : "Assign Delivery Partner"
+                                          }
                                         />
-                                      ) : names.length === 0 ? (
-                                        <span className="order-list-not-assigned">
-                                          Not Assigned
-                                        </span>
-                                      ) : null}
-                                    </>
+                                        {!autoReassign && isManualEdit && (
+                                          <button
+                                            type="button"
+                                            className="order-list-partner-cancel-btn"
+                                            onClick={closeManualEdit}
+                                          >
+                                            Cancel
+                                          </button>
+                                        )}
+                                      </>
+                                    );
+                                  }
+
+                                  if (canManualReassign && order.assignedTo) {
+                                    return (
+                                      <button
+                                        type="button"
+                                        className="order-list-assigned-partner order-list-assigned-partner-btn"
+                                        onClick={() =>
+                                          setManualEditOrderIds((prev) => new Set(prev).add(order._id))
+                                        }
+                                        title="Click to change delivery partner before they accept"
+                                      >
+                                        {order.assignedTo.username}
+                                      </button>
+                                    );
+                                  }
+
+                                  return order.assignedTo?.username ? (
+                                    <span className="order-list-assigned-partner">
+                                      {order.assignedTo.username}
+                                    </span>
+                                  ) : (
+                                    <span className="order-list-not-assigned">
+                                      Not Assigned
+                                    </span>
                                   );
                                 })()}
                               </td>

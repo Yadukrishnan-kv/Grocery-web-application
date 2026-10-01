@@ -86,6 +86,14 @@
   overflow-y: auto;
   margin-top: 2px;
 }
+
+/* Portaled to document.body (see SearchableSelect) so it escapes clipping
+   from scrollable table containers; needs its own high z-index since it's
+   no longer nested under the table's stacking context. */
+.dropdown-menu-portal {
+  z-index: 9999;
+  margin-top: 2px;
+}
 .dropdown-item {
   padding: 0.65rem 1rem;
   cursor: pointer;

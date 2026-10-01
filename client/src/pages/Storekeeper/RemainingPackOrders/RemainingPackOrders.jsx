@@ -12,6 +12,7 @@ import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { downloadThermalSlip, downloadPDFSlip } from "../../../utils/packingSlip";
 import OrderProductsModal from "../../../components/common/OrderProductsModal";
+import DeliveryPartnerAssignCell from "../../../components/common/DeliveryPartnerAssignCell";
 
 // The slip for this page should reflect what's actually left to pack, not
 // the full ordered quantity — same rendering as the Pack Orders slip, just
@@ -35,6 +36,7 @@ const RemainingPackOrders = () => {
   const [packInputs, setPackInputs] = useState({});
   const [processing, setProcessing] = useState(false);
   const [viewProductsOrder, setViewProductsOrder] = useState(null);
+  const [deliveryPartners, setDeliveryPartners] = useState([]);
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
   const handleDownloadThermalPDF = (orderId) => {
@@ -78,12 +80,42 @@ const RemainingPackOrders = () => {
     }
   }, [backendUrl]);
 
+  const fetchDeliveryPartners = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/api/users/getAllUsers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const partners = response.data.filter((u) => u.role === "Delivery Man");
+      setDeliveryPartners(partners);
+    } catch (error) {
+      console.error("Error fetching delivery partners:", error);
+    }
+  }, [backendUrl]);
+
+  const handleAssignDeliveryPartner = async (orderId, deliveryManId) => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${backendUrl}/api/orders/assign/${orderId}`,
+        { deliveryManId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success("Delivery partner assigned successfully!");
+      fetchRemainingOrders();
+    } catch (error) {
+      console.error("Error assigning delivery partner:", error);
+      toast.error(error.response?.data?.message || "Failed to assign delivery partner. Please try again.");
+    }
+  };
+
   useEffect(() => {
     fetchCurrentUser();
     fetchRemainingOrders();
+    fetchDeliveryPartners();
     const interval = setInterval(fetchRemainingOrders, 60000);
     return () => clearInterval(interval);
-  }, [fetchCurrentUser, fetchRemainingOrders]);
+  }, [fetchCurrentUser, fetchRemainingOrders, fetchDeliveryPartners]);
 
   const openPackModal = (order) => {
     const inputs = {};
@@ -312,9 +344,11 @@ const RemainingPackOrders = () => {
                               </td>
 
                               <td>
-                                <span className="order-list-assigned-partner">
-                                  {order.assignedTo?.username || "Not Assigned"}
-                                </span>
+                                <DeliveryPartnerAssignCell
+                                  order={order}
+                                  deliveryPartners={deliveryPartners}
+                                  onAssign={handleAssignDeliveryPartner}
+                                />
                               </td>
 
                               <td className="actions-cell">
@@ -422,63 +456,142 @@ const RemainingPackOrders = () => {
         }}
       />
 
-      {/* Packing Modal */}
-      {selectedOrder && (
-        <div className="modal-overlay">
-          <div className="pack-modal">
-            <h3>Pack Remaining - Order #{selectedOrder._id.toString().slice(-8)}</h3>
-            <p>Customer: {selectedOrder.customer?.name || "N/A"}</p>
+      {/* Pack Remaining Modal */}
+      {selectedOrder && (() => {
+        const totalRemainingAcrossItems = packModalItems.reduce(
+          (sum, item) => sum + getMaxPackable(item),
+          0
+        );
+        const totalToPackNow = packModalItems.reduce(
+          (sum, item) => sum + (Number(packInputs[item._id]) || 0),
+          0
+        );
 
-            <div className="pack-items">
-              {packModalItems.length === 0 ? (
-                <p className="pack-no-remaining">No remaining products to pack</p>
-              ) : (
-                packModalItems.map((item) => {
-                  const max = getMaxPackable(item);
-                  const already = item.packedQuantity || 0;
-                  return (
-                    <div key={item._id} className="pack-item-row">
-                      <div className="item-details">
-                        <strong>{item.product?.productName || "Unknown"}</strong>
-                        <div>Ordered: {item.orderedQuantity} {item.unit}</div>
-                        <div>Already packed: {already} {item.unit}</div>
-                        <div className="remaining">Remaining to pack: {max} {item.unit}</div>
-                      </div>
+        return (
+          <div
+            className="remaining-pack-modal-overlay"
+            onClick={closeModal}
+          >
+            <div
+              className="remaining-pack-modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="remaining-pack-modal-header">
+                <div>
+                  <h3 className="remaining-pack-modal-title">Pack Remaining Quantity</h3>
+                  <p className="remaining-pack-modal-subtitle">
+                    Order #{selectedOrder.orderId || selectedOrder._id.toString().slice(-8)}
+                    {selectedOrder.customer?.name ? ` · ${selectedOrder.customer.name}` : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="remaining-pack-modal-close"
+                  onClick={closeModal}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
 
-                      <div className="pack-qty">
-                        <label>Pack Now:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max={max}
-                          step="any"
-                          value={packInputs[item._id] ?? ""}
-                          onChange={(e) => handlePackQtyChange(item._id, e.target.value)}
-                          disabled={max === 0}
-                        />
-                        <span className="max-text">/ {max}</span>
-                      </div>
-                    </div>
-                  );
-                })
+              {packModalItems.length > 0 && (
+                <div className="remaining-pack-modal-summary">
+                  <div className="remaining-pack-modal-summary-item">
+                    <span className="remaining-pack-modal-summary-value">{packModalItems.length}</span>
+                    <span className="remaining-pack-modal-summary-label">Items left</span>
+                  </div>
+                  <div className="remaining-pack-modal-summary-item">
+                    <span className="remaining-pack-modal-summary-value">{totalRemainingAcrossItems}</span>
+                    <span className="remaining-pack-modal-summary-label">Remaining qty</span>
+                  </div>
+                  <div className="remaining-pack-modal-summary-item remaining-pack-modal-summary-highlight">
+                    <span className="remaining-pack-modal-summary-value">{totalToPackNow}</span>
+                    <span className="remaining-pack-modal-summary-label">Packing now</span>
+                  </div>
+                </div>
               )}
-            </div>
 
-            <div className="modal-footer">
-              <button className="cancel" onClick={closeModal}>
-                Cancel
-              </button>
-              <button
-                className="submit"
-                onClick={submitPacking}
-                disabled={processing}
-              >
-                {processing ? "Submitting..." : "Submit Packing"}
-              </button>
+              <div className="remaining-pack-modal-items">
+                {packModalItems.length === 0 ? (
+                  <p className="remaining-pack-modal-empty">No remaining products to pack</p>
+                ) : (
+                  packModalItems.map((item) => {
+                    const max = getMaxPackable(item);
+                    const already = item.packedQuantity || 0;
+                    const currentValue = packInputs[item._id] ?? "";
+                    const isFull = max > 0 && Number(currentValue) === max;
+
+                    return (
+                      <div
+                        key={item._id}
+                        className={`remaining-pack-modal-item${isFull ? " is-full" : ""}`}
+                      >
+                        <div className="remaining-pack-modal-item-details">
+                          <strong className="remaining-pack-modal-item-name">
+                            {item.product?.productName || "Unknown"}
+                          </strong>
+                          <div className="remaining-pack-modal-item-meta">
+                            <span className="remaining-pack-modal-pill">
+                              Ordered {item.orderedQuantity} {item.unit}
+                            </span>
+                            <span className="remaining-pack-modal-pill">
+                              Packed {already} {item.unit}
+                            </span>
+                            <span className="remaining-pack-modal-pill remaining-pack-modal-pill-highlight">
+                              Remaining {max} {item.unit}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="remaining-pack-modal-qty">
+                          <label className="remaining-pack-modal-qty-label">Pack now</label>
+                          <div className="remaining-pack-modal-qty-controls">
+                            <input
+                              type="number"
+                              min="0"
+                              max={max}
+                              step="any"
+                              value={currentValue}
+                              onChange={(e) => handlePackQtyChange(item._id, e.target.value)}
+                              disabled={max === 0}
+                            />
+                            <span className="remaining-pack-modal-qty-max">/ {max} {item.unit}</span>
+                            <button
+                              type="button"
+                              className="remaining-pack-modal-qty-max-btn"
+                              onClick={() => handlePackQtyChange(item._id, String(max))}
+                              disabled={max === 0}
+                            >
+                              Max
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="remaining-pack-modal-footer">
+                <button className="remaining-pack-modal-cancel-btn" onClick={closeModal}>
+                  Cancel
+                </button>
+                <button
+                  className="remaining-pack-modal-submit-btn"
+                  onClick={submitPacking}
+                  disabled={processing || totalToPackNow === 0}
+                >
+                  {processing
+                    ? "Submitting..."
+                    : totalToPackNow > 0
+                    ? `Submit Packing (${totalToPackNow})`
+                    : "Submit Packing"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {viewProductsOrder && (
         <OrderProductsModal

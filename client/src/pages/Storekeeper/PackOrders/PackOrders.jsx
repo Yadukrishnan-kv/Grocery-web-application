@@ -11,7 +11,7 @@ import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { downloadThermalSlip, downloadPDFSlip } from "../../../utils/packingSlip";
 import OrderProductsModal from "../../../components/common/OrderProductsModal";
-import SearchableSelect from "../../../components/common/SearchableSelect";
+import DeliveryPartnerAssignCell from "../../../components/common/DeliveryPartnerAssignCell";
 
 import TableScrollSync from "../../../components/common/TableScrollSync";
 
@@ -343,33 +343,11 @@ const PackOrders = () => {
                             </td>
 
                             <td>
-                              {(order.assignmentStatus === "pending_assignment" ||
-                              order.assignmentStatus === "rejected") ? (
-                                <SearchableSelect
-                                  className="order-list-delivery-partner-select"
-                                  options={deliveryPartners.map((partner) => ({
-                                    value: partner._id,
-                                    label: partner.username,
-                                  }))}
-                                  value=""
-                                  onChange={(selectedId) => {
-                                    if (selectedId) {
-                                      handleAssignDeliveryPartner(order._id, selectedId);
-                                    }
-                                  }}
-                                  placeholder={
-                                    order.assignmentStatus === "rejected"
-                                      ? "Reassign Partner"
-                                      : "Assign Delivery Partner"
-                                  }
-                                />
-                              ) : order.assignedTo ? (
-                                <span className="order-list-assigned-partner">
-                                  {order.assignedTo.username || "Assigned"}
-                                </span>
-                              ) : (
-                                <span className="order-list-not-assigned">Not Assigned</span>
-                              )}
+                              <DeliveryPartnerAssignCell
+                                order={order}
+                                deliveryPartners={deliveryPartners}
+                                onAssign={handleAssignDeliveryPartner}
+                              />
                             </td>
 
                             <td className="actions-cell">

@@ -133,7 +133,7 @@ const getPermissions = async (req, res) => {
       } else if (permission === "menu.customers") {
         expandedPermissions.push("menu.customers.list");
       } else if (permission === "menu.sales") {
-          expandedPermissions.push("menu.sales.orders", "menu.sales.reports", "menu.createSalesReturn");
+          expandedPermissions.push("menu.sales.orders", "menu.sales.reports", "menu.sales.cancelReports", "menu.createSalesReturn");
       } else if (permission === "menu.deliveries") {
         expandedPermissions.push("menu.deliveries.arrived", "menu.deliveries.accepted", "menu.deliveries.delivered", "menu.deliveries.PendingOrdersForPacking", "menu.deliveries.cancelled", "menu.returnPickups");
       }

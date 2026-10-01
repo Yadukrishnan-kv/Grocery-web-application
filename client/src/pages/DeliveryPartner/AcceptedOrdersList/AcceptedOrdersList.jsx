@@ -568,9 +568,13 @@ const AcceptedOrdersList = () => {
               : qty * item.price * (1 + (item.vatPercentage || 5) / 100);
             return sum + itemTotal;
           }, 0);
+          // Match the printed invoice's rounding rule (Sub Total + Round Off = Grand Total)
+          // so the credit/cash collected here lines up with what the invoice actually charges.
+          const roundedGrandTotal = Math.round(grandDeliveryAmount);
+          const roundOffAmount = parseFloat((roundedGrandTotal - grandDeliveryAmount).toFixed(2));
           const returnCreditAvailable = currentOrder.customer?.returnCreditBalance || 0;
-          const returnCreditToApply = parseFloat(Math.min(returnCreditAvailable, grandDeliveryAmount).toFixed(2));
-          const cashToCollect = parseFloat(Math.max(0, grandDeliveryAmount - returnCreditToApply).toFixed(2));
+          const returnCreditToApply = parseFloat(Math.min(returnCreditAvailable, roundedGrandTotal).toFixed(2));
+          const cashToCollect = parseFloat(Math.max(0, roundedGrandTotal - returnCreditToApply).toFixed(2));
 
           return (
           <div className="delivery-modal-overlay">
@@ -587,23 +591,21 @@ const AcceptedOrdersList = () => {
               </div>
 
               <div className="delivery-modal-body">
-                {/* Return Credit Breakdown Banner */}
-                {returnCreditToApply > 0 && (
-                  <div className="return-credit-banner">
-                    <div className="rc-row">
-                      <span>Order Total (incl. VAT):</span>
-                      <span>AED {grandDeliveryAmount.toFixed(2)}</span>
-                    </div>
-                    <div className="rc-row rc-highlight">
-                      <span>Return Credit Applied:</span>
-                      <span>− AED {returnCreditToApply.toFixed(2)}</span>
-                    </div>
-                    <div className="rc-row rc-total">
-                      <strong>{cashToCollect === 0 ? "✅ No cash collection needed" : `Cash / Cheque to collect:`}</strong>
-                      {cashToCollect > 0 && <strong>AED {cashToCollect.toFixed(2)}</strong>}
-                    </div>
+                {/* Invoice-style Total Breakdown */}
+                <div className="return-credit-banner">
+                  <div className="rc-row">
+                    <span>Subtotal:</span>
+                    <span>AED {grandDeliveryAmount.toFixed(2)}</span>
                   </div>
-                )}
+                  <div className="rc-row">
+                    <span>Round Off:</span>
+                    <span>{roundOffAmount >= 0 ? "+" : "−"} AED {Math.abs(roundOffAmount).toFixed(2)}</span>
+                  </div>
+                  <div className="rc-row rc-highlight">
+                    <span>Grand Total:</span>
+                    <span>AED {roundedGrandTotal.toFixed(2)}</span>
+                  </div>
+                </div>
 
                 {/* Products List - Read-Only Display */}
                 <div className="products-delivery-list">
@@ -620,14 +622,6 @@ const AcceptedOrdersList = () => {
                             <strong className="product-delivery-name">
                               {item.product?.productName || "Unknown Product"}
                             </strong>
-                            <div className="product-delivery-meta">
-                              <span className="meta-pill">
-                                Ordered {item.orderedQuantity} {item.unit || ""}
-                              </span>
-                              <span className="meta-pill">
-                                Delivered {item.deliveredQuantity || 0} {item.unit || ""}
-                              </span>
-                            </div>
                           </div>
                           <div className="to-deliver-highlight">
                             <span className="to-deliver-value">{toDeliver}</span>

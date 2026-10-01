@@ -1,5 +1,6 @@
 import "./ProductSearchDropdown.css";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * SearchableSelect
@@ -26,6 +27,26 @@ const SearchableSelect = ({
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const inputRef = React.useRef();
+  const wrapperRef = useRef(null);
+  const [menuRect, setMenuRect] = useState(null);
+
+  // Rendered via a portal below, positioned with fixed coordinates, so the
+  // menu isn't clipped when this control sits inside a scrollable table.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const updateMenuRect = () => {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setMenuRect({ top: rect.bottom, left: rect.left, width: rect.width });
+    };
+    updateMenuRect();
+    window.addEventListener("scroll", updateMenuRect, true);
+    window.addEventListener("resize", updateMenuRect);
+    return () => {
+      window.removeEventListener("scroll", updateMenuRect, true);
+      window.removeEventListener("resize", updateMenuRect);
+    };
+  }, [open]);
 
   const normalizedOptions = useMemo(
     () => options.map((o) => ({ value: o.value, label: o.label ?? String(o.value) })),
@@ -85,6 +106,7 @@ const SearchableSelect = ({
 
   return (
     <div
+      ref={wrapperRef}
       className={`product-search-dropdown searchable-select ${className}`.trim()}
       tabIndex={0}
       onBlur={handleBlur}
@@ -113,8 +135,16 @@ const SearchableSelect = ({
           <span className="dropdown-arrow">▼</span>
         </button>
       </div>
-      {open && (
-        <div className="dropdown-menu">
+      {open && menuRect && createPortal(
+        <div
+          className="dropdown-menu dropdown-menu-portal"
+          style={{
+            position: "fixed",
+            top: menuRect.top,
+            left: menuRect.left,
+            width: menuRect.width,
+          }}
+        >
           {filteredOptions.length === 0 ? (
             <div className="dropdown-item no-match">No options found</div>
           ) : (
@@ -128,7 +158,8 @@ const SearchableSelect = ({
               </div>
             ))
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
