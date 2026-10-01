@@ -326,25 +326,25 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                 onClick={fetchCashWallet}
                 disabled={loading}
               >
-                <span className="btn-icon">⟳</span>
+                <span className="wallet-btn-icon">⟳</span>
                 {loading ? "Refreshing..." : "Refresh"}
               </button>
             </div>
 
             <div className="wallet-summary-card">
-              <div className="summary-card-content">
-                <div className="summary-card-icon">
+              <div className="wallet-summary-card-content">
+                <div className="wallet-summary-card-icon">
                   <img
                     src={DirhamSymbol}
                     alt="AED"
-                    className="dirham-icon-large"
+                    className="wallet-dirham-icon-large"
                   />
                 </div>
-                <div className="summary-card-details">
-                  <span className="summary-card-label">
+                <div className="wallet-summary-card-details">
+                  <span className="wallet-summary-card-label">
                     Total Cash Collected
                   </span>
-                  <span className="summary-card-amount">
+                  <span className="wallet-summary-card-amount">
                     AED{" "}
                     {walletData.totalAmount.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
@@ -352,15 +352,15 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                   </span>
                 </div>
               </div>
-              <div className="summary-card-glow" />
+              <div className="wallet-summary-card-glow" />
             </div>
 
             <div className="wallet-search-wrapper">
-              <div className="search-input-group">
+              <div className="wallet-search-input-group">
                 <SearchIcon />
                 <input
                   type="text"
-                  className="search-input"
+                  className="wallet-search-input"
                   placeholder="Search by customer name..."
                   value={searchCustomer}
                   onChange={(e) => setSearchCustomer(e.target.value)}
@@ -368,7 +368,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                 {searchCustomer && (
                   <button
                     onClick={() => setSearchCustomer("")}
-                    className="search-clear-btn"
+                    className="wallet-search-clear-btn"
                     title="Clear search"
                   >
                     ✕
@@ -377,7 +377,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
               </div>
 
               {searchCustomer.trim() && (
-                <div className="filtered-info">
+                <div className="wallet-filtered-info">
                   Showing {filteredTransactions.length} transaction
                   {filteredTransactions.length !== 1 ? "s" : ""} — Total:{" "}
                   <strong>AED {filteredTotal.toFixed(2)}</strong>
@@ -386,14 +386,14 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
             </div>
 
             {selectedTxIds.length > 0 && (
-              <div className="bulk-actions-bar">
+              <div className="wallet-bulk-actions-bar">
                 <span>
                   {selectedTxIds.length} selected — Total:{" "}
                   <strong>AED {selectedTotal.toFixed(2)}</strong>
                 </span>
-                <div className="bulk-actions-buttons">
+                <div className="wallet-bulk-actions-buttons">
                   <button
-                    className="btn btn-primary btn-sm"
+                    className="wallet-btn wallet-btn-primary wallet-btn-sm"
                     onClick={() => handleRequestPayToAdmin(null, true)}
                     disabled={payingTxId === "bulk"}
                   >
@@ -401,7 +401,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                     {payingTxId === "bulk" ? "Sending..." : "Send to Admin"}
                   </button>
                   <button
-                    className="btn btn-secondary btn-sm"
+                    className="wallet-btn wallet-btn-secondary wallet-btn-sm"
                     onClick={() => handlePrintReceipt(null, true)}
                     disabled={printingTxId === "bulk"}
                   >
@@ -410,7 +410,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                       ? "Generating..."
                       : "Print Receipts"}
                   </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setSelectedTxIds([])}>
+                  <button className="wallet-btn wallet-btn-ghost wallet-btn-sm" onClick={() => setSelectedTxIds([])}>
                     Clear
                   </button>
                 </div>
@@ -420,22 +420,22 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
             {loading ? (
               <div className="wallet-skeleton cash">
                 {[...Array(5)].map((_, i) => (
-                  <div key={i} className="skeleton-row">
-                    <div className="skeleton-cell skeleton-checkbox" />
-                    <div className="skeleton-cell skeleton-text short" />
-                    <div className="skeleton-cell skeleton-text" />
-                    <div className="skeleton-cell skeleton-text short" />
-                    <div className="skeleton-cell skeleton-text short" />
-                    <div className="skeleton-cell skeleton-text short" />
-                    <div className="skeleton-cell skeleton-text short" />
-                    <div className="skeleton-cell skeleton-badge" />
-                    <div className="skeleton-cell skeleton-button" />
+                  <div key={i} className="wallet-skeleton-row">
+                    <div className="wallet-skeleton-cell wallet-skeleton-checkbox" />
+                    <div className="wallet-skeleton-cell wallet-skeleton-text short" />
+                    <div className="wallet-skeleton-cell wallet-skeleton-text" />
+                    <div className="wallet-skeleton-cell wallet-skeleton-text short" />
+                    <div className="wallet-skeleton-cell wallet-skeleton-text short" />
+                    <div className="wallet-skeleton-cell wallet-skeleton-text short" />
+                    <div className="wallet-skeleton-cell wallet-skeleton-text short" />
+                    <div className="wallet-skeleton-cell wallet-skeleton-badge" />
+                    <div className="wallet-skeleton-cell wallet-skeleton-button" />
                   </div>
                 ))}
               </div>
             ) : filteredTransactions.length === 0 ? (
               <div className="wallet-empty-state">
-                <div className="empty-state-icon">💵</div>
+                <div className="wallet-empty-state-icon">💵</div>
                 <h3>No cash transactions found</h3>
                 <p>{searchCustomer ? "Try adjusting your search" : "Cash payments will appear here once received"}</p>
               </div>
@@ -445,64 +445,64 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                 <table className="wallet-data-table">
                 <thead>
                   <tr>
-                    <th className="col-checkbox">
+                    <th className="wallet-col-checkbox">
                       <input
                         type="checkbox"
                         checked={selectAll}
                         onChange={handleSelectAll}
-                        className="checkbox-custom"
+                        className="wallet-checkbox-custom"
                       />
                     </th>
-                    <th className="col-index">No</th>
-                    <th className="col-customer">Customer</th>
-                    <th className="col-order">Invoice #</th>
-                    <th className="col-amount">Amount</th>
-                    <th className="col-return-credit">Return Credit Used</th>
-                    <th className="col-date">Date</th>
-                    <th className="col-status">Status</th>
-                    <th className="col-actions">Actions</th>
+                    <th className="wallet-col-index">No</th>
+                    <th className="wallet-col-customer">Customer</th>
+                    <th className="wallet-col-order">Invoice #</th>
+                    <th className="wallet-col-amount">Amount</th>
+                    <th className="wallet-col-return-credit">Return Credit Used</th>
+                    <th className="wallet-col-date">Date</th>
+                    <th className="wallet-col-status">Status</th>
+                    <th className="wallet-col-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pagination.pageData.map((tx, idx) => (
-                    <tr key={tx._id} className={`tx-row ${selectedTxIds.includes(tx._id) ? "selected" : ""}`}>
-                      <td className="col-checkbox">
+                    <tr key={tx._id} className={`wallet-tx-row ${selectedTxIds.includes(tx._id) ? "wallet-tx-row-selected" : ""}`}>
+                      <td className="wallet-col-checkbox">
                         <input
                           type="checkbox"
                           checked={selectedTxIds.includes(tx._id)}
                           onChange={() => handleSelectTx(tx._id)}
                           disabled={tx.status !== "received"}
-                          className="checkbox-custom"
+                          className="wallet-checkbox-custom"
                         />
                       </td>
-                      <td className="col-index">{pagination.showingFrom + idx}</td>
-                      <td className="col-customer">
-                        <div className="customer-cell">
-                          <div className="customer-avatar">
+                      <td className="wallet-col-index">{pagination.showingFrom + idx}</td>
+                      <td className="wallet-col-customer">
+                        <div className="wallet-customer-cell">
+                          <div className="wallet-customer-avatar">
                             {tx.order?.customer?.name?.charAt(0)?.toUpperCase() || "?"}
                           </div>
-                          <span className="customer-name">{tx.order?.customer?.name || "N/A"}</span>
+                          <span className="wallet-customer-name">{tx.order?.customer?.name || "N/A"}</span>
                         </div>
                       </td>
-                      <td className="col-order">
+                      <td className="wallet-col-order">
   {/* ✅ Use displayInvoiceNumber from backend, fallback to order.invoiceNumber */}
-  <code className="order-id">{tx.displayInvoiceNumber || tx.order?.invoiceNumber || tx.invoiceNumber || "N/A"}</code>
+  <code className="wallet-order-id">{tx.displayInvoiceNumber || tx.order?.invoiceNumber || tx.invoiceNumber || "N/A"}</code>
 </td>
-                      <td className="col-amount">
-                        <div className="amount-cell">
-                          <img src={DirhamSymbol} alt="AED" className="dirham-icon-small" />
-                          <span className="amount-value">{tx.amount.toFixed(2)}</span>
+                      <td className="wallet-col-amount">
+                        <div className="wallet-amount-cell">
+                          <img src={DirhamSymbol} alt="AED" className="wallet-dirham-icon-small" />
+                          <span className="wallet-amount-value">{tx.amount.toFixed(2)}</span>
                         </div>
                       </td>
-                      <td className="col-return-credit">
+                      <td className="wallet-col-return-credit">
                         {tx.returnCreditUsed > 0
                           ? <span style={{ color: "#1d4ed8", fontWeight: 600 }}>AED {tx.returnCreditUsed.toFixed(2)}</span>
                           : <span style={{ color: "#9ca3af" }}>—</span>}
                       </td>
-                      <td className="col-date">{new Date(tx.date).toLocaleDateString()}</td>
-                      <td className="col-status">
-                        <span className={`status-badge status-${tx.status}`}>
-                          {tx.status === "received" && <span className="status-dot pulse" />}
+                      <td className="wallet-col-date">{new Date(tx.date).toLocaleDateString()}</td>
+                      <td className="wallet-col-status">
+                        <span className={`wallet-status-badge wallet-status-${tx.status}`}>
+                          {tx.status === "received" && <span className="wallet-status-dot pulse" />}
                           {tx.status === "received"
                             ? "Ready to Send"
                             : tx.status === "pending"
@@ -512,11 +512,11 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                             : tx.status}
                         </span>
                       </td>
-                      <td className="col-actions">
-                        <div className="action-buttons">
+                      <td className="wallet-col-actions">
+                        <div className="wallet-row-actions">
                           {tx.status === "received" && (
                             <button
-                              className="btn-action btn-send"
+                              className="wallet-btn-action wallet-btn-send"
                               onClick={() => handleRequestPayToAdmin(tx._id)}
                               title="Send to Admin"
                             >
@@ -524,7 +524,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                             </button>
                           )}
                           <button
-                            className="btn-action btn-print"
+                            className="wallet-btn-action wallet-btn-print"
                             onClick={() => downloadSingleReceipt(tx._id, tx.displayInvoiceNumber || tx.order?.invoiceNumber)}
                             title="Print Receipt"
                           >
@@ -556,18 +556,18 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
 
       {/* Confirm Modal */}
       {showConfirmModal && (
-        <div className="modal-backdrop">
-          <div className="modal-content">
-            <div className="modal-header">
-              <div className="modal-icon confirm-icon">⚠️</div>
-              <h3 className="modal-title">Confirm {isBulkRequest ? "Bulk " : ""}Request</h3>
+        <div className="wallet-modal-backdrop">
+          <div className="wallet-modal-content">
+            <div className="wallet-modal-header">
+              <div className="wallet-modal-icon wallet-confirm-icon">⚠️</div>
+              <h3 className="wallet-modal-title">Confirm {isBulkRequest ? "Bulk " : ""}Request</h3>
             </div>
-            <div className="modal-body">
-              <p className="modal-text">
+            <div className="wallet-modal-body">
+              <p className="wallet-modal-text">
                 Send{" "}
                 {isBulkRequest ? selectedTxIds.length + " items" : "this item"}
                 {" "}worth{" "}
-                <strong className="amount-highlight">
+                <strong className="wallet-amount-highlight">
                   AED{" "}
                   {(isBulkRequest
                     ? selectedTotal
@@ -578,11 +578,11 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                 to admin?
               </p>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setShowConfirmModal(false)}>
+            <div className="wallet-modal-footer">
+              <button className="wallet-btn wallet-btn-ghost" onClick={() => setShowConfirmModal(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={confirmRequestPayToAdmin} disabled={payingTxId}>
+              <button className="wallet-btn wallet-btn-primary" onClick={confirmRequestPayToAdmin} disabled={payingTxId}>
                 {payingTxId ? "Sending..." : "Confirm"}
               </button>
             </div>

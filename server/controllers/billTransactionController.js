@@ -466,19 +466,7 @@ const generateBulkReceipt = async (req, res) => {
       y = doc.y + 2;
       doc.fontSize(8.5).font("Helvetica").fillColor("#64748b")
         .text(`Generated: ${new Date().toLocaleString()}`, pageLeft, y, { width: contentWidth, align: "center" });
-      y = doc.y + 14;
-
-      // Recipient info card
-      doc.roundedRect(pageLeft, y, contentWidth, 24, 6).fill("#f1f5f9");
-      doc.fontSize(9).font("Helvetica-Bold").fillColor("#334155")
-        .text("RECEIVED BY", pageLeft + 12, y + 7, { width: 120 });
-      doc.fontSize(9).font("Helvetica").fillColor("#0f172a")
-        .text(transactions[0].recipient?.username || "N/A", pageLeft + 120, y + 7, { width: contentWidth - 260 });
-      doc.fontSize(9).font("Helvetica-Bold").fillColor("#334155")
-        .text("TRANSACTIONS", pageLeft + contentWidth - 140, y + 7, { width: 90, align: "right" });
-      doc.fontSize(9).font("Helvetica").fillColor("#0f172a")
-        .text(String(transactions.length), pageLeft + contentWidth - 40, y + 7, { width: 40, align: "right" });
-      doc.y = y + 24 + 16;
+      doc.y = y + 14 + 10;
     };
 
     const ensureSpace = (blockHeight) => {

@@ -44,6 +44,7 @@ const CreateRole = () => {
     Products: "menu.products", 
     Customers: "menu.customers",
     Sales: "menu.sales",
+    SalesReports: "menu.sales.salesReports",
     Deliveries: "menu.deliveries",
     CustomerOrders: "menu.customer.orders",
     CustomerOrderReports: "menu.customer.order.reports",

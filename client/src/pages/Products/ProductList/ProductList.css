@@ -61,12 +61,20 @@
   text-decoration: none;
   font-weight: 600;
   font-size: 0.875rem;
+  cursor: pointer;
   transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
   border: none;
   box-shadow: 0 1px 3px rgba(79, 70, 229, 0.15);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.product-list-create-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .product-list-create-button:hover {

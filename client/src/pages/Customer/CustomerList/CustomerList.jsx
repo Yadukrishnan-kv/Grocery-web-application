@@ -12,6 +12,7 @@ import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { formatCustomerId } from "../../../utils/formatCustomerId";
+import { exportToExcel } from "../../../utils/exportToExcel";
 
 const CustomerList = () => {
   // Full list — only fetched/used when a search or due-days filter is active,
@@ -172,8 +173,8 @@ const CustomerList = () => {
 
   const clearSearch = () => setSearchTerm("");
 
-  const filteredCustomers = useMemo(() => {
-    return customers.filter((customer) => {
+  const customerMatchesFilters = useCallback(
+    (customer) => {
       const matchesSearch =
         !searchTerm.trim() ||
         customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -208,8 +209,67 @@ const CustomerList = () => {
       }
 
       return matchesSearch;
-    });
-  }, [customers, searchTerm, dueDaysFilter]);
+    },
+    [searchTerm, dueDaysFilter]
+  );
+
+  const filteredCustomers = useMemo(
+    () => customers.filter(customerMatchesFilters),
+    [customers, customerMatchesFilters]
+  );
+
+  const [exporting, setExporting] = useState(false);
+
+  // Always pulls the full customer list fresh (not just the current server
+  // page shown on screen) so the export reflects every matching customer,
+  // regardless of whether a search/due-days filter is currently active.
+  const handleExportToExcel = async () => {
+    setExporting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/customers/getallcustomerswithdue`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const matching = response.data.filter(customerMatchesFilters);
+
+      const exportData = matching.map((customer, index) => {
+        const daysLeft = getDaysRemaining(customer);
+        return {
+          "No": index + 1,
+          "Customer ID": formatCustomerId(customer.customerId) || "-",
+          "Name": customer.name || "-",
+          "Email": customer.email || "-",
+          "Phone": customer.phoneNumber || "-",
+          "Contact Person": customer.contactPersonName || "-",
+          "Contact Phone": customer.contactPersonPhone || "-",
+          "Contact Address": customer.contactPersonAddress || "-",
+          "Address": customer.address || "-",
+          "TRN": customer.pincode || "-",
+          "Emirates": customer.emiratesName || "-",
+          "Emirates Code": customer.emiratesCode || "-",
+          "Credit Limit (AED)": (customer.creditLimit || 0).toFixed(2),
+          "Balance (AED)": (customer.balanceCreditLimit || 0).toFixed(2),
+          "Return Balance (AED)": (customer.returnCreditBalance || 0).toFixed(2),
+          "Opening Balance (AED)": (customer.openingBalance || 0).toFixed(2),
+          "Opening Due Days": customer.openingBalanceDueDays || "-",
+          "Billing Type": customer.billingType || "-",
+          "Statement Type": customer.statementType || "-",
+          "Salesman": customer.salesman?.username || "-",
+          "Due Days": customer.dueDays || "-",
+          "Current Bill Due": getDueStatusText(daysLeft),
+        };
+      });
+
+      exportToExcel(exportData, "Customers", "Customers");
+      toast.success("Excel file exported successfully");
+    } catch (error) {
+      console.error("Error exporting customers:", error);
+      toast.error("Failed to export customers");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const clientPagination = usePaginatedData(
     filteredCustomers,
@@ -303,6 +363,15 @@ const CustomerList = () => {
                     <option value="16+">16+ Days Left</option>
                   </select>
                 </div>
+
+                <button
+                  className="customer-list-refresh-button"
+                  onClick={handleExportToExcel}
+                  disabled={exporting}
+                  title="Export to Excel"
+                >
+                  {exporting ? "Exporting..." : "Export Excel"}
+                </button>
 
                 <Link
                   to="/customer/create"

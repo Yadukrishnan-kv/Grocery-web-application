@@ -420,32 +420,12 @@ const createInvoiceBasedBill = async (order, specificAmount = null, specificInvo
 
 const getAllPendingBills = async (req, res) => {
   try {
+    // Every pending bill for every customer is shown to every delivery
+    // partner — not just the invoices they personally delivered. A customer
+    // often settles several outstanding bills (delivered across different
+    // partners/visits) in one payment, so whoever is collecting needs to see
+    // and mark all of them as received, not only the batch they delivered.
     const query = { status: { $in: ["pending", "overdue", "partial"] } };
-
-    // A delivery partner should only see bills for the specific packing
-    // invoices THEY personally delivered — not every pending bill in the
-    // system (which could include batches another partner delivered on the
-    // same order after a reassignment, or entirely unrelated orders).
-    const deliveryRoles = ["Delivery partner", "delivery partner", "deliveryman", "Delivery Man"];
-    if (req.user && deliveryRoles.includes(req.user.role)) {
-      const myOrders = await Order.find(
-        { "deliveredInvoiceHistory.deliveredBy": req.user._id },
-        { deliveredInvoiceHistory: 1 }
-      );
-      const myInvoiceNumbers = new Set();
-      myOrders.forEach((o) => {
-        (o.deliveredInvoiceHistory || []).forEach((h) => {
-          if (h.deliveredBy && String(h.deliveredBy) === String(req.user._id) && h.invoiceNumber) {
-            myInvoiceNumbers.add(h.invoiceNumber);
-          }
-        });
-      });
-      const invoiceNumberList = [...myInvoiceNumbers];
-      query.$or = [
-        { packingInvoiceNumbers: { $in: invoiceNumberList } },
-        { invoiceNumber: { $in: invoiceNumberList } },
-      ];
-    }
 
     const bills = await Bill.find(query)
       .populate("customer", "name")

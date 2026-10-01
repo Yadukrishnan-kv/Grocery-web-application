@@ -19,6 +19,7 @@ const MENU_PERMISSIONS = {
   Sales: "menu.sales",
   Orders: "menu.sales.orders",
   OrdersReport: "menu.sales.reports",
+  SalesReports: "menu.sales.salesReports",
   CancelOrderReports: "menu.sales.cancelReports",
   Deliveries: "menu.deliveries",
   OrderArrived: "menu.deliveries.arrived",
@@ -101,20 +102,25 @@ const navItems = [
         label: "Cancel Order Reports",
         path: "/CancelOrderReports/list",
       },
+      {
+        id: "SalesPendingOrders",
+        label: "Pending Orders",
+        path: "/sales/pending-orders",
+      },
     ],
   },
 
+  {
+    id: "SalesReports",
+    label: "Sales Reports",
+    icon: "📈",
+    path: "/SalesReports/list",
+  },
   {
     id: "CreateSalesReturn",
     label: "Sales Returns",
     icon: "↩️",
     path: "/sales-returns",
-  },
-  {
-    id: "SalesPendingOrders",
-    label: "Pending Orders",
-    icon: "📈",
-    path: "/sales/pending-orders",
   },
   {
     id: "SalesOutstandingReport",
@@ -357,7 +363,6 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
           item.id !== "CreditSuggestion" &&
           item.id !== "storekeeperpacked" &&
           item.id !== "storekeeperRemainingPack" &&
-          item.id !== "SalesPendingOrders" &&
           item.id !== "SalesOutstandingReport" &&
           item.id !== "SalesReceiptReport" &&
           item.id !== "StorekeeperOrders" &&
@@ -378,39 +383,45 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
 
         // (removed ManageOrders menu)
 
-        // If no permission required, show it
-        if (!itemPermission) return true;
-
-        // Check main item permission
-        if (!hasPermission(itemPermission)) return false;
-
-        // If has subitems, filter them too
+        // A sub-item with its OWN mapped permission (e.g. "Sales Reports")
+        // is gated independently — a role can be granted just that one
+        // sub-item without the whole parent group's blanket permission, and
+        // the group still shows up with only that sub-item visible. A
+        // sub-item with NO permission mapping of its own (e.g. "View Orders"
+        // under the Customer "Orders" menu) instead falls back to the
+        // PARENT's permission — it has nothing else gating it, so skipping
+        // the parent check entirely would make it visible to every role.
         if (item.subItems) {
           const filteredSubItems = item.subItems.filter((subItem) => {
-            const subPermission = MENU_PERMISSIONS[subItem.id];
-            
             // Sales Manager cannot access "Orders" (create). Only Admin can.
             if (subItem.id === "Orders" && user?.role === "Sales Manager") {
               return false;
             }
-            
-            return !subPermission || hasPermission(subPermission);
+
+            const subPermission = MENU_PERMISSIONS[subItem.id];
+            if (subPermission) return hasPermission(subPermission);
+            return !itemPermission || hasPermission(itemPermission);
           });
 
           // Only show parent if it has visible children
           return filteredSubItems.length > 0;
         }
 
-        return true;
+        // If no permission required, show it
+        if (!itemPermission) return true;
+
+        return hasPermission(itemPermission);
       })
       .map((item) => {
         // Also filter subitems
         if (item.subItems) {
+          const itemPermission = MENU_PERMISSIONS[item.id];
           return {
             ...item,
             subItems: item.subItems.filter((subItem) => {
               const subPermission = MENU_PERMISSIONS[subItem.id];
-              return !subPermission || hasPermission(subPermission);
+              if (subPermission) return hasPermission(subPermission);
+              return !itemPermission || hasPermission(itemPermission);
             }),
           };
         }

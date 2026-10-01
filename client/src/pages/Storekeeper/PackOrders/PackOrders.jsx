@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
+import "./PackOrders.css";
 
 import toast from "../../../utils/toast";
 import axios from "axios";
@@ -420,48 +421,68 @@ const PackOrders = () => {
 
       {/* Packing Modal */}
       {selectedOrder && (
-        <div className="modal-overlay">
-          <div className="pack-modal">
-            <h3>Pack Order #{selectedOrder._id.toString().slice(-8)}</h3>
-            <p>Customer: {selectedOrder.customer?.name || "N/A"}</p>
+        <div className="pack-orders-modal-overlay" onClick={closeModal}>
+          <div className="pack-orders-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="pack-orders-modal-header">
+              <h3 className="pack-orders-modal-title">
+                Pack Order #{selectedOrder.orderId || selectedOrder._id.toString().slice(-8)}
+              </h3>
+              <p className="pack-orders-modal-subtitle">
+                Customer: <strong>{selectedOrder.customer?.name || "N/A"}</strong>
+              </p>
+            </div>
 
-            <div className="pack-items">
+            <div className="pack-orders-modal-items">
               {selectedOrder.orderItems.map((item) => {
                 const max = getMaxPackable(item);
                 const already = item.packedQuantity || 0;
+                const fullyPacked = max === 0;
                 return (
-                  <div key={item._id} className="pack-item-row">
-                    <div className="item-details">
-                      <strong>{item.product?.productName || "Unknown"}</strong>
-                      <div>Ordered: {item.orderedQuantity} {item.unit}</div>
-                      <div>Already packed: {already} {item.unit}</div>
-                      <div className="remaining">Remaining to pack: {max} {item.unit}</div>
+                  <div key={item._id} className="pack-orders-modal-item-row">
+                    <div className="pack-orders-modal-item-details">
+                      <span className="pack-orders-modal-item-name">
+                        {item.product?.productName || "Unknown"}
+                      </span>
+                      <div className="pack-orders-modal-item-meta">
+                        <span>Ordered: <strong>{item.orderedQuantity} {item.unit}</strong></span>
+                        <span>Already packed: <strong>{already} {item.unit}</strong></span>
+                        <span className="pack-orders-modal-item-remaining">
+                          Remaining: <strong>{max} {item.unit}</strong>
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="pack-qty">
-                      <label>Pack Now:</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={max}
-                        step="any"
-                        value={packInputs[item._id] ?? ""}
-                        onChange={(e) => handlePackQtyChange(item._id, e.target.value)}
-                        disabled={max === 0}
-                      />
-                      <span className="max-text">/ {max}</span>
-                    </div>
+                    {fullyPacked ? (
+                      <span className="pack-orders-modal-fully-packed-badge">Fully Packed ✓</span>
+                    ) : (
+                      <div className="pack-orders-modal-qty">
+                        <label htmlFor={`pack-qty-${item._id}`}>Pack Now</label>
+                        <div className="pack-orders-modal-qty-input-wrap">
+                          <input
+                            id={`pack-qty-${item._id}`}
+                            type="number"
+                            min="0"
+                            max={max}
+                            step="any"
+                            value={packInputs[item._id] ?? ""}
+                            onChange={(e) => handlePackQtyChange(item._id, e.target.value)}
+                            className="pack-orders-modal-qty-input"
+                          />
+                          <span className="pack-orders-modal-qty-max">/ {max}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            <div className="modal-footer">
-              <button className="cancel" onClick={closeModal}>
+            <div className="pack-orders-modal-footer">
+              <button className="pack-orders-modal-cancel-btn" onClick={closeModal}>
                 Cancel
               </button>
               <button
-                className="submit"
+                className="pack-orders-modal-submit-btn"
                 onClick={submitPacking}
                 disabled={processing}
               >

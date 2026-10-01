@@ -1,5 +1,14 @@
 /* ═══════════════════════════════════════════════════════
    🎨 Premium Wallet Design - Modern Glassmorphism Theme
+   Shared by Cash Wallet (Wallet.jsx) and Cheque Wallet
+   (ChequeWallet.jsx). Every class here is namespaced
+   `wallet-*` on purpose — this app uses plain global CSS
+   (no CSS Modules), and names like `.status-badge`,
+   `.action-buttons`, `.customer-cell`, `.amount-cell`,
+   `.search-input` and `.btn-action` are also defined
+   (differently) by several other pages' stylesheets, so an
+   unprefixed class here would silently win or lose the
+   cascade depending on unrelated import order.
    ═══════════════════════════════════════════════════════ */
 
 /* ───────────────────────────────────────────────────────
@@ -10,17 +19,17 @@
   --primary: #6366f1;
   --primary-dark: #4f46e5;
   --primary-light: #818cf8;
-  
+
   /* Success & Status */
   --success: #10b981;
   --success-light: #d1fae5;
   --success-dark: #059669;
-  
+
   /* Warning & Pending */
   --warning: #f59e0b;
   --warning-light: #fef3c7;
   --warning-dark: #d97706;
-  
+
   /* Neutral */
   --bg-primary: #f8fafc;
   --bg-card: rgba(255, 255, 255, 0.92);
@@ -29,24 +38,36 @@
   --text-primary: #1e293b;
   --text-secondary: #64748b;
   --text-muted: #94a3b8;
-  
+
   /* Shadows & Effects */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.15);
-  
+
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
-  
+
   /* Border Radius */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-full: 9999px;
+}
+
+.wallet-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+  background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 50%, #f0fdfa 100%);
 }
 
 /* ───────────────────────────────────────────────────────
@@ -86,10 +107,10 @@
   box-shadow: var(--shadow-lg), var(--shadow-glow);
   padding: 32px;
   border: 1px solid rgba(255, 255, 255, 0.5);
-  animation: slideUp 0.4s ease-out;
+  animation: walletSlideUp 0.4s ease-out;
 }
 
-@keyframes slideUp {
+@keyframes walletSlideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
@@ -122,7 +143,7 @@
   justify-content: center;
   color: white;
   box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
-  animation: pulse 2s infinite;
+  animation: walletPulse 2s infinite;
 }
 
 .wallet-header-icon.cheque {
@@ -130,7 +151,7 @@
   box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
 }
 
-@keyframes pulse {
+@keyframes walletPulse {
   0%, 100% { box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3); }
   50% { box-shadow: 0 8px 30px rgba(99, 102, 241, 0.5); }
 }
@@ -182,12 +203,12 @@
   cursor: not-allowed;
 }
 
-.btn-icon {
+.wallet-btn-icon {
   font-size: 1.1rem;
-  animation: spin 2s linear infinite;
+  animation: walletSpin 2s linear infinite;
 }
 
-@keyframes spin {
+@keyframes walletSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
@@ -210,7 +231,7 @@
   border-color: rgba(139, 92, 246, 0.2);
 }
 
-.summary-card-content {
+.wallet-summary-card-content {
   display: flex;
   align-items: center;
   gap: 20px;
@@ -218,7 +239,7 @@
   z-index: 2;
 }
 
-.summary-card-icon {
+.wallet-summary-card-icon {
   width: 64px;
   height: 64px;
   background: white;
@@ -229,31 +250,31 @@
   box-shadow: var(--shadow-md);
 }
 
-.dirham-icon-large {
+.wallet-dirham-icon-large {
   width: 36px;
   height: 36px;
 }
 
-.summary-card-details {
+.wallet-summary-card-details {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.summary-card-label {
+.wallet-summary-card-label {
   font-size: 0.9rem;
   color: var(--text-secondary);
   font-weight: 500;
 }
 
-.summary-card-amount {
+.wallet-summary-card-amount {
   font-size: 2rem;
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: -0.5px;
 }
 
-.summary-card-glow {
+.wallet-summary-card-glow {
   position: absolute;
   top: -50%;
   right: -50%;
@@ -261,10 +282,10 @@
   height: 200px;
   background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
   border-radius: 50%;
-  animation: float 6s ease-in-out infinite;
+  animation: walletFloat 6s ease-in-out infinite;
 }
 
-@keyframes float {
+@keyframes walletFloat {
   0%, 100% { transform: translate(0, 0); }
   50% { transform: translate(10px, -10px); }
 }
@@ -281,13 +302,13 @@
   gap: 16px;
 }
 
-.search-input-group {
+.wallet-search-input-group {
   position: relative;
   flex: 1;
   max-width: 400px;
 }
 
-.search-input-group svg {
+.wallet-search-input-group svg {
   position: absolute;
   left: 14px;
   top: 50%;
@@ -298,7 +319,7 @@
   pointer-events: none;
 }
 
-.search-input {
+.wallet-search-input {
   width: 100%;
   padding: 12px 16px 12px 42px;
   border: 2px solid var(--border);
@@ -308,13 +329,13 @@
   transition: all var(--transition-fast);
 }
 
-.search-input:focus {
+.wallet-search-input:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
 }
 
-.search-clear-btn {
+.wallet-search-clear-btn {
   position: absolute;
   right: 12px;
   top: 50%;
@@ -329,18 +350,18 @@
   transition: all var(--transition-fast);
 }
 
-.search-clear-btn:hover {
+.wallet-search-clear-btn:hover {
   color: var(--warning);
   background: var(--warning-light);
 }
 
-.search-results-count {
+.wallet-search-results-count {
   font-size: 0.9rem;
   color: var(--text-secondary);
   font-weight: 500;
 }
 
-.filtered-info {
+.wallet-filtered-info {
   width: 100%;
   margin-top: 8px;
   padding: 10px 16px;
@@ -351,7 +372,7 @@
   color: var(--text-secondary);
 }
 
-.filtered-info strong {
+.wallet-filtered-info strong {
   color: var(--text-primary);
   font-weight: 700;
 }
@@ -359,7 +380,7 @@
 /* ───────────────────────────────────────────────────────
    📦 Bulk Actions Bar - Floating Design
    ─────────────────────────────────────────────────────── */
-.bulk-actions-bar {
+.wallet-bulk-actions-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -368,15 +389,16 @@
   border: 2px solid var(--success);
   border-radius: var(--radius-md);
   margin-bottom: 24px;
-  animation: slideDown 0.3s ease-out;
+  flex-wrap: wrap;
+  animation: walletSlideDown 0.3s ease-out;
 }
 
-@keyframes slideDown {
+@keyframes walletSlideDown {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.bulk-selection-info {
+.wallet-bulk-selection-info {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -384,7 +406,7 @@
   color: var(--text-primary);
 }
 
-.bulk-count-badge {
+.wallet-bulk-count-badge {
   background: var(--primary);
   color: white;
   padding: 4px 12px;
@@ -393,15 +415,16 @@
   font-size: 0.85rem;
 }
 
-.bulk-actions-buttons {
+.wallet-bulk-actions-buttons {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* ───────────────────────────────────────────────────────
    🎨 Button Styles
    ─────────────────────────────────────────────────────── */
-.btn {
+.wallet-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -414,50 +437,50 @@
   transition: all var(--transition-fast);
 }
 
-.btn svg {
+.wallet-btn svg {
   width: 16px;
   height: 16px;
 }
 
-.btn-primary {
+.wallet-btn-primary {
   background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%);
   color: white;
   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
 }
 
-.btn-primary:hover:not(:disabled) {
+.wallet-btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
 }
 
-.btn-secondary {
+.wallet-btn-secondary {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
   box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
 }
 
-.btn-secondary:hover:not(:disabled) {
+.wallet-btn-secondary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
 }
 
-.btn-ghost {
+.wallet-btn-ghost {
   background: transparent;
   color: var(--text-secondary);
   border: 2px solid var(--border);
 }
 
-.btn-ghost:hover:not(:disabled) {
+.wallet-btn-ghost:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.btn-sm {
+.wallet-btn-sm {
   padding: 8px 16px;
   font-size: 0.85rem;
 }
 
-.btn:disabled {
+.wallet-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none !important;
@@ -509,19 +532,19 @@
 }
 
 /* Column Styles */
-.col-checkbox { width: 50px; text-align: center; padding: 16px 12px !important; }
-.col-index { width: 60px; color: var(--text-muted); font-weight: 500; }
-.col-customer { min-width: 180px; }
-.col-order { width: 120px; }
-.col-amount { width: 130px; text-align: right; }
-.col-return-credit { width: 150px; }
-.col-cheque { min-width: 200px; }
-.col-date { width: 110px; color: var(--text-secondary); }
-.col-status { width: 150px; }
-.col-actions { width: 120px; text-align: right; }
+.wallet-col-checkbox { width: 50px; text-align: center; padding: 16px 12px !important; }
+.wallet-col-index { width: 60px; color: var(--text-muted); font-weight: 500; }
+.wallet-col-customer { min-width: 180px; }
+.wallet-col-order { width: 120px; }
+.wallet-col-amount { width: 130px; text-align: right; }
+.wallet-col-return-credit { width: 150px; }
+.wallet-col-cheque { min-width: 200px; }
+.wallet-col-date { width: 110px; color: var(--text-secondary); }
+.wallet-col-status { width: 150px; }
+.wallet-col-actions { width: 120px; text-align: right; }
 
 /* Checkbox Custom */
-.checkbox-custom {
+.wallet-checkbox-custom {
   width: 18px;
   height: 18px;
   accent-color: var(--primary);
@@ -529,19 +552,19 @@
   border-radius: 4px;
 }
 
-.checkbox-custom:disabled {
+.wallet-checkbox-custom:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
 /* Customer Cell */
-.customer-cell {
+.wallet-customer-cell {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.customer-avatar {
+.wallet-customer-avatar {
   width: 36px;
   height: 36px;
   background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
@@ -555,13 +578,13 @@
   flex-shrink: 0;
 }
 
-.customer-name {
+.wallet-customer-name {
   font-weight: 500;
   color: var(--text-primary);
 }
 
 /* Order ID */
-.order-id {
+.wallet-order-id {
   background: var(--bg-hover);
   padding: 4px 10px;
   border-radius: var(--radius-sm);
@@ -571,51 +594,55 @@
 }
 
 /* Amount Cell */
-.amount-cell {
+.wallet-amount-cell {
   display: flex;
   align-items: center;
   gap: 6px;
   font-weight: 600;
 }
 
-.dirham-icon-small {
+.wallet-dirham-icon-small {
   width: 16px;
   height: 16px;
 }
 
-.amount-value {
+.wallet-amount-value {
   color: var(--text-primary);
 }
 
+.wallet-text-muted {
+  color: var(--text-muted);
+}
+
 /* Cheque Details Mini */
-.cheque-details-mini {
+.wallet-cheque-details-mini {
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-size: 0.85rem;
 }
 
-.cheque-detail-row {
+.wallet-cheque-detail-row {
   display: flex;
   align-items: center;
   gap: 6px;
   color: var(--text-secondary);
 }
 
-.cheque-detail-row svg {
+.wallet-cheque-detail-row svg {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
 }
 
-.cheque-detail-row span:last-child {
+.wallet-cheque-detail-row span:last-child {
   margin-left: auto;
   color: var(--text-primary);
   font-weight: 500;
 }
 
 /* Status Badge with Pulse Animation */
-.status-badge {
+.wallet-status-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -627,45 +654,45 @@
   letter-spacing: 0.3px;
 }
 
-.status-dot {
+.wallet-status-dot {
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
   background: currentColor;
 }
 
-.status-dot.pulse {
-  animation: pulseDot 2s infinite;
+.wallet-status-dot.pulse {
+  animation: walletPulseDot 2s infinite;
 }
 
-@keyframes pulseDot {
+@keyframes walletPulseDot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(0.9); }
 }
 
-.status-received {
+.wallet-status-received {
   background: var(--warning-light);
   color: var(--warning-dark);
 }
 
-.status-pending {
+.wallet-status-pending {
   background: var(--success-light);
   color: var(--success-dark);
 }
 
-.status-paid_to_admin {
+.wallet-status-paid_to_admin {
   background: #e0e7ff;
   color: var(--primary-dark);
 }
 
 /* Action Buttons */
-.action-buttons {
+.wallet-row-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.btn-action {
+.wallet-btn-action {
   width: 36px;
   height: 36px;
   border: none;
@@ -679,42 +706,42 @@
   color: var(--text-secondary);
 }
 
-.btn-action svg {
+.wallet-btn-action svg {
   width: 16px;
   height: 16px;
 }
 
-.btn-action:hover:not(:disabled) {
+.wallet-btn-action:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
-.btn-send {
+.wallet-btn-send {
   background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%);
   color: white;
 }
 
-.btn-send:hover:not(:disabled) {
+.wallet-btn-send:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--success-dark) 0%, #047857 100%);
 }
 
-.btn-print {
+.wallet-btn-print {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
 }
 
-.btn-print:hover:not(:disabled) {
+.wallet-btn-print:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--primary-dark) 0%, #4338ca 100%);
 }
 
-.btn-disabled {
+.wallet-btn-disabled {
   background: var(--bg-hover);
   color: var(--text-muted);
   cursor: not-allowed;
 }
 
 /* Selected Row */
-.tx-row.selected {
+.wallet-tx-row.wallet-tx-row-selected {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%) !important;
   border-left: 4px solid var(--primary);
 }
@@ -729,7 +756,7 @@
   padding: 8px 0;
 }
 
-.skeleton-row {
+.wallet-skeleton-row {
   display: grid;
   grid-template-columns: 50px 60px 180px 120px 130px 200px 110px 150px 120px;
   gap: 16px;
@@ -738,29 +765,29 @@
 }
 
 /* Cash Wallet has no Cheque Details column — 9 tracks instead of 10 */
-.wallet-skeleton.cash .skeleton-row {
+.wallet-skeleton.cash .wallet-skeleton-row {
   grid-template-columns: 50px 60px 180px 120px 130px 150px 110px 150px 120px;
 }
 
-.skeleton-cell {
+.wallet-skeleton-cell {
   background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: walletShimmer 1.5s infinite;
   border-radius: var(--radius-sm);
   height: 24px;
 }
 
-@keyframes shimmer {
+@keyframes walletShimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-.skeleton-checkbox { width: 18px; height: 18px; margin: 0 auto; }
-.skeleton-text { background: #e2e8f0; }
-.skeleton-text.short { width: 80px; }
-.skeleton-badge { width: 100px; border-radius: var(--radius-full); }
-.skeleton-button { width: 100px; border-radius: var(--radius-sm); }
-.skeleton-cheque { width: 150px; }
+.wallet-skeleton-checkbox { width: 18px; height: 18px; margin: 0 auto; }
+.wallet-skeleton-text { background: #e2e8f0; }
+.wallet-skeleton-text.short { width: 80px; }
+.wallet-skeleton-badge { width: 100px; border-radius: var(--radius-full); }
+.wallet-skeleton-button { width: 100px; border-radius: var(--radius-sm); }
+.wallet-skeleton-cheque { width: 150px; }
 
 /* ───────────────────────────────────────────────────────
    🪄 Empty State
@@ -771,13 +798,13 @@
   color: var(--text-secondary);
 }
 
-.empty-state-icon {
+.wallet-empty-state-icon {
   font-size: 4rem;
   margin-bottom: 16px;
-  animation: bounce 2s infinite;
+  animation: walletBounce 2s infinite;
 }
 
-@keyframes bounce {
+@keyframes walletBounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
 }
@@ -797,7 +824,7 @@
 /* ───────────────────────────────────────────────────────
    🪟 Modal - Premium Design
    ─────────────────────────────────────────────────────── */
-.modal-backdrop {
+.wallet-modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
@@ -806,30 +833,31 @@
   align-items: center;
   justify-content: center;
   z-index: 1100;
-  animation: fadeIn 0.2s ease-out;
+  padding: 16px;
+  animation: walletFadeIn 0.2s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes walletFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-.modal-content {
+.wallet-modal-content {
   background: white;
   border-radius: var(--radius-xl);
   width: 100%;
   max-width: 480px;
   padding: 32px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  animation: scaleIn 0.3s ease-out;
+  animation: walletScaleIn 0.3s ease-out;
 }
 
-@keyframes scaleIn {
+@keyframes walletScaleIn {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
 
-.modal-header {
+.wallet-modal-header {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -838,7 +866,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-.modal-icon {
+.wallet-modal-icon {
   width: 48px;
   height: 48px;
   background: linear-gradient(135deg, var(--warning-light) 0%, #fcd34d 100%);
@@ -847,32 +875,33 @@
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
-.modal-title {
+.wallet-modal-title {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.modal-body {
+.wallet-modal-body {
   margin-bottom: 24px;
 }
 
-.modal-text {
+.wallet-modal-text {
   margin: 0 0 16px;
   color: var(--text-secondary);
   line-height: 1.6;
 }
 
-.amount-highlight {
+.wallet-amount-highlight {
   color: var(--primary-dark);
   font-weight: 700;
   font-size: 1.1rem;
 }
 
-.modal-info-box {
+.wallet-modal-info-box {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -884,12 +913,12 @@
   color: var(--text-secondary);
 }
 
-.info-icon {
+.wallet-info-icon {
   font-size: 1.2rem;
   flex-shrink: 0;
 }
 
-.modal-footer {
+.wallet-modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
@@ -904,16 +933,17 @@
   .wallet-data-table {
     font-size: 0.9rem;
   }
-  .col-cheque { min-width: 160px; }
+  .wallet-col-cheque { min-width: 160px; }
 }
 
 @media (max-width: 1024px) {
   .wallet-container { padding: 24px; }
   .wallet-header { flex-direction: column; align-items: flex-start; gap: 16px; }
-  .bulk-actions-bar { flex-direction: column; align-items: stretch; gap: 12px; }
-  .bulk-selection-info { justify-content: center; }
-  .bulk-actions-buttons { justify-content: center; }
+  .wallet-bulk-actions-bar { flex-direction: column; align-items: stretch; gap: 12px; }
+  .wallet-bulk-selection-info { justify-content: center; }
+  .wallet-bulk-actions-buttons { justify-content: center; }
   .wallet-search-wrapper { flex-direction: column; align-items: stretch; }
+  .wallet-search-input-group { max-width: none; }
 }
 
 @media (max-width: 768px) {
@@ -928,47 +958,21 @@
     padding: 12px 16px;
     font-size: 0.85rem;
   }
-  .summary-card-content { flex-direction: column; text-align: center; }
-  .modal-content { margin: 16px; padding: 24px; }
+  .wallet-summary-card-content { flex-direction: column; text-align: center; }
+  .wallet-modal-content { margin: 16px; padding: 24px; }
 }
 
 @media (max-width: 480px) {
   .wallet-page-title { font-size: 1.5rem; }
-  .summary-card-amount { font-size: 1.5rem; }
-  .action-buttons { flex-direction: column; }
-  .btn-action { width: 100%; }
+  .wallet-summary-card-amount { font-size: 1.5rem; }
+  .wallet-row-actions { flex-direction: column; }
+  .wallet-btn-action { width: 100%; }
 }
 
-/* ───────────────────────────────────────────────────────
-   🎯 Utility Classes
-   ─────────────────────────────────────────────────────── */
-.text-muted { color: var(--text-muted); }
-.text-secondary { color: var(--text-secondary); }
-.font-semibold { font-weight: 600; }
-.flex { display: flex; }
-.items-center { align-items: center; }
-.gap-2 { gap: 8px; }
-.mt-2 { margin-top: 8px; }
-
-/* Animation Utilities */
-.animate-fade-in { animation: fadeIn 0.2s ease-out; }
-.animate-scale-in { animation: scaleIn 0.3s ease-out; }
-.animate-slide-down { animation: slideDown 0.3s ease-out; }
-.animate-pulse { animation: pulse 2s infinite; }
-
-/* Hover Effects */
-.hover-lift { transition: transform var(--transition-fast); }
-.hover-lift:hover { transform: translateY(-3px); }
-
-/* Focus Styles */
-*:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* Reduce Motion Preference */
+/* Reduce Motion Preference (scoped to this page's own animated elements,
+   not a blanket `*` selector, so it can't affect unrelated pages) */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  .wallet-layout, .wallet-layout *, .wallet-layout *::before, .wallet-layout *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

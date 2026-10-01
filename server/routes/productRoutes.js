@@ -6,12 +6,14 @@ const {
   getAllProducts,
   getProductById,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  downloadProductCatalog
 } = require("../controllers/productController");
 
 
 router.post("/createproduct", createProduct);
 router.get("/getallproducts", getAllProducts);
+router.get("/download-catalog", downloadProductCatalog);
 router.get("/getproductbyid/:id", getProductById);
 router.put("/updateproduct/:id", updateProduct);
 router.delete("/deleteproduct/:id", deleteProduct);

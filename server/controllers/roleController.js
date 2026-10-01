@@ -133,6 +133,10 @@ const getPermissions = async (req, res) => {
       } else if (permission === "menu.customers") {
         expandedPermissions.push("menu.customers.list");
       } else if (permission === "menu.sales") {
+          // "menu.sales.salesReports" is intentionally NOT expanded from here —
+          // Sales Reports is a separately-grantable permission (see the
+          // standalone "SalesReports" checkbox in the role editor), so a role
+          // with blanket "menu.sales" access doesn't automatically get it.
           expandedPermissions.push("menu.sales.orders", "menu.sales.reports", "menu.sales.cancelReports", "menu.createSalesReturn");
       } else if (permission === "menu.deliveries") {
         expandedPermissions.push("menu.deliveries.arrived", "menu.deliveries.accepted", "menu.deliveries.delivered", "menu.deliveries.PendingOrdersForPacking", "menu.deliveries.cancelled", "menu.returnPickups");

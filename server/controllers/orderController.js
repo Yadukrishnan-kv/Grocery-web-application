@@ -247,7 +247,8 @@ const getAllOrders = async (req, res) => {
         })
         .populate("orderItems.product", "productName price unit CategoryName subCategoryName")
         .populate("assignedTo", "username")
-        .populate("cancelledBy", "username role");
+        .populate("cancelledBy", "username role")
+        .populate("deliveredInvoiceHistory.deliveredBy", "username");
 
     if (!req.query.page) {
       const orders = await populateOrders(Order.find()).sort(sort);
@@ -296,7 +297,8 @@ const getSalesmanOrders = async (req, res) => {
         .populate("customer", "name email phoneNumber address pincode")
         .populate("orderItems.product", "productName price unit CategoryName subCategoryName")
         .populate("assignedTo", "username")
-        .populate("cancelledBy", "username role");
+        .populate("cancelledBy", "username role")
+        .populate("deliveredInvoiceHistory.deliveredBy", "username");
 
     if (!req.query.page) {
       const orders = await populateOrders(Order.find(filter)).sort(sort);
@@ -1149,7 +1151,7 @@ const generateStyledInvoicePDF = async (doc, order, invoiceType, invoiceNo) => {
   const detailRows = [
     { label: "Inv. No.", value: invoiceNo || "N/A" },
     { label: "Date", value: formattedDate },
-    { label: "D.O. No.", value: "* Not Applicable" },
+    { label: "Order ID", value: String(order.orderId || order._id || "N/A") },
     { label: "Payment", value: order.payment ? order.payment.charAt(0).toUpperCase() + order.payment.slice(1) : "" },
   ];
 
@@ -1774,11 +1776,11 @@ const generateDaddysInvoicePDF = async (doc, order, invoiceNo, invoiceType = "TA
   doc.moveTo(detailsBoxX, detailsBoxY + detailsRowH * 3).lineTo(detailsBoxX + 180, detailsBoxY + detailsRowH * 3).stroke();
   doc.moveTo(detailsBoxX + 60, detailsBoxY).lineTo(detailsBoxX + 60, detailsBoxY + detailsBoxH).stroke();
 
-  const detailsLabels = ["Inv. No.", "Date", "D.O. No.", "Payment"];
+  const detailsLabels = ["Inv. No.", "Date", "Order ID", "Payment"];
   const detailsValues = [
     invoiceNo || "N/A",
     formattedDate,
-    order.deliveryNo || "N/A",
+    String(order.orderId || order._id || "N/A"),
     order.payment ? order.payment.charAt(0).toUpperCase() + order.payment.slice(1) : "N/A"
   ];
   for (let i = 0; i < 4; i++) {
@@ -3060,27 +3062,29 @@ const getRemainingForPacking = async (req, res) => {
   }
 };
 
-// NEW: Get pending orders for a salesman's customers only
+// Get pending orders — salesmen see only their own customers' orders; Admin
+// sees pending orders across every customer.
 const getMyPendingOrders = async (req, res) => {
   try {
-    if (req.user.role !== "Sales man") {
-      return res.status(403).json({ message: "Only salesmen can access this" });
+    if (!["Sales man", "Admin"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only salesmen or admins can access this" });
     }
 
-    // Get all customers assigned to this salesman
-    const mySalesmanCustomers = await Customer.find({ salesman: req.user._id })
-      .select("_id");
-
-    const customerIds = mySalesmanCustomers.map(c => c._id);
-
-    // Get pending orders for those customers
-    const orders = await Order.find({
-      customer: { $in: customerIds },
+    const filter = {
       $or: [
         { packedStatus: { $in: ["not_packed", "partially_packed"] } },
         { status: "pending" }
       ]
-    })
+    };
+
+    if (req.user.role === "Sales man") {
+      // Get all customers assigned to this salesman
+      const mySalesmanCustomers = await Customer.find({ salesman: req.user._id })
+        .select("_id");
+      filter.customer = { $in: mySalesmanCustomers.map(c => c._id) };
+    }
+
+    const orders = await Order.find(filter)
       .populate("customer", "name email phoneNumber")
       .populate("orderItems.product", "productName unit price")
       .populate("assignedTo", "username")

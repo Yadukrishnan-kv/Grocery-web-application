@@ -24,6 +24,7 @@ import AcceptedOrdersList from "../pages/DeliveryPartner/AcceptedOrdersList/Acce
 import DeliveredOrdersList from "../pages/DeliveryPartner/DeliveredOrdersList/DeliveredOrdersList";
 import CancelledOrdersList from "../pages/DeliveryPartner/CancelledOrdersList/CancelledOrdersList";
 import OrderReports from "../pages/Sales/OrderReports/OrderReports";
+import SalesReports from "../pages/Sales/SalesReports/SalesReports";
 import CancelOrderReports from "../pages/Sales/CancelOrderReports/CancelOrderReports";
 import CustomerOrdersList from "../pages/Customer/CustomerOrdersList/CustomerOrdersList";
 import CreateCustomerOrder from "../pages/Customer/CreateCustomerOrder/CreateCustomerOrder";
@@ -97,6 +98,7 @@ function Dom() {
             <Route path="/order/list" element={<OrderList />} />
             <Route path="/order/edit/:id" element={<CreateOrder />} />
             <Route path="/OrderReports/list" element={<OrderReports />} />
+            <Route path="/SalesReports/list" element={<SalesReports />} />
             <Route path="/CancelOrderReports/list" element={<CancelOrderReports />} />
 
             <Route path="/Orderarrived/list" element={<OrderArrivedList />} />

@@ -37,6 +37,7 @@ const ProductList = () => {
   // NEW: Confirmation modal for delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [downloadingCatalog, setDownloadingCatalog] = useState(false);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -215,6 +216,37 @@ const ProductList = () => {
     setSearchQuery("");
   };
 
+  const handleDownloadCatalog = async () => {
+    setDownloadingCatalog(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${backendUrl}/api/products/download-catalog`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute(
+        "download",
+        `product-catalog-${new Date().toISOString().slice(0, 10)}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Product catalog downloaded");
+    } catch (error) {
+      console.error("Error downloading product catalog:", error);
+      toast.error("Failed to download product catalog");
+    } finally {
+      setDownloadingCatalog(false);
+    }
+  };
+
   if (!user) {
     return <div className="product-list-loading">Loading...</div>;
   }
@@ -283,6 +315,15 @@ const ProductList = () => {
                     </button>
                   )}
                 </div>
+
+                <button
+                  type="button"
+                  className="product-list-create-button"
+                  onClick={handleDownloadCatalog}
+                  disabled={downloadingCatalog}
+                >
+                  {downloadingCatalog ? "Downloading..." : "Download PDF"}
+                </button>
 
                 <Link
                   to="/product/create"
