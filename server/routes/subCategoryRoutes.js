@@ -7,7 +7,8 @@ const {
   getSubCategoryById,
   getSubCategoriesByCategory,
   updateSubCategory,
-  deleteSubCategory
+  deleteSubCategory,
+  toggleSubCategoryStatus
 } = require("../controllers/subCategoryController");
 
 
@@ -16,6 +17,7 @@ router.get("/getallsubcategories", getAllSubCategories);
 router.get("/getsubcategorybyid/:id", getSubCategoryById);
 router.get("/getsubcategoriesbycategory/:categoryName", getSubCategoriesByCategory);
 router.put("/updatesubcategory/:id", updateSubCategory);
+router.patch("/togglestatus/:id", toggleSubCategoryStatus);
 router.delete("/deletesubcategory/:id", deleteSubCategory);
 
 module.exports = router;

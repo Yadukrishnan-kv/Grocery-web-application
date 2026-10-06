@@ -138,6 +138,34 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const toggleUserStatus = async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({ message: "isActive must be a boolean" });
+    }
+
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+    if (targetUser.role === "Admin" || targetUser.role === "superadmin") {
+      return res.status(400).json({ message: `Cannot change status of protected role: ${targetUser.role}` });
+    }
+
+    if (req.user && String(req.user._id) === String(targetUser._id)) {
+      return res.status(400).json({ message: "You cannot change your own account status" });
+    }
+
+    targetUser.isActive = isActive;
+    await targetUser.save();
+
+    const filteredUser = filterUserData(targetUser);
+    res.json(filteredUser);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 
 const editProfile = async (req, res) => {
@@ -329,6 +357,7 @@ module.exports = {
   createUser,
   updateUser,
   deleteUser,
+  toggleUserStatus,
   changePassword,
   editProfile,getMyProfile,updateMyProfile,getDeliveryMen,getSalesMen,getDeliveryMen,getUserById,
   getSalesMen,

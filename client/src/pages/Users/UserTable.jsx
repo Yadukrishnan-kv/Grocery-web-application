@@ -10,6 +10,7 @@ import toast from "../../utils/toast"; // ← NEW IMPORT
 import { useAppSettings } from '../../context/AppSettingsContext';
 import { usePaginatedData } from '../../hooks/usePagination';
 import Pagination from '../../components/common/Pagination';
+import ToggleSwitch from '../../components/common/ToggleSwitch';
 
 const UserTable = () => {
   const [users, setUsers] = useState([]);
@@ -22,10 +23,12 @@ const UserTable = () => {
   const [userLoading, setUserLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // NEW: Confirmation modal for delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -91,15 +94,20 @@ const UserTable = () => {
       const matchesRole = roleFilter === 'all' ||
         (user.role && user.role.toLowerCase() === roleFilter.toLowerCase());
 
-      return matchesSearch && matchesRole;
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && user.isActive !== false) ||
+        (statusFilter === 'inactive' && user.isActive === false);
+
+      return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [users, searchTerm, roleFilter]);
+  }, [users, searchTerm, roleFilter, statusFilter]);
 
   const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(
     filteredUsers,
     entriesPerPage,
-    `${roleFilter}|${searchTerm}`
+    `${roleFilter}|${statusFilter}|${searchTerm}`
   );
 
   const handleDeleteClick = (id, username, role) => {
@@ -135,6 +143,35 @@ const UserTable = () => {
 
   const clearSearch = () => {
     setSearchTerm('');
+  };
+
+  const handleToggleStatus = async (targetUser) => {
+    if (targetUser.role === 'Admin' || targetUser.role === 'superadmin') {
+      toast.error(`Cannot change status of protected role: ${targetUser.role}`);
+      return;
+    }
+    if (currentUser?._id === targetUser._id) {
+      toast.error("You cannot change your own account status");
+      return;
+    }
+
+    const nextStatus = !targetUser.isActive;
+    setTogglingId(targetUser._id);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${backendUrl}/api/users/togglestatus/${targetUser._id}`,
+        { isActive: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(`User "${targetUser.username}" marked as ${nextStatus ? 'Active' : 'Inactive'}`);
+      fetchUsers();
+    } catch (err) {
+      console.error('Error updating user status:', err);
+      toast.error(err.response?.data?.message || "Failed to update user status");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   if (userLoading) {
@@ -185,6 +222,23 @@ const UserTable = () => {
                   </select>
                 </div>
 
+                <div className="user-table-filter-group">
+                  <label htmlFor="userStatusFilter" className="user-table-filter-label">
+                    Filter by Status:
+                  </label>
+                  <select
+                    id="userStatusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="user-table-role-filter"
+                    aria-label="Filter users by status"
+                  >
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
                 <div className="user-table-search-container">
                   <input
                     type="text"
@@ -219,6 +273,7 @@ const UserTable = () => {
               <div className="user-table-no-data">
                 No users found
                 {roleFilter !== 'all' ? ` with role "${roleFilter}"` : ''}
+                {statusFilter !== 'all' ? ` with status "${statusFilter}"` : ''}
                 {searchTerm.trim() ? ` matching "${searchTerm}"` : ''}
               </div>
             ) : (
@@ -231,6 +286,7 @@ const UserTable = () => {
                         <th>Username</th>
                         <th>Email</th>
                         <th>Role</th>
+                        <th>Status</th>
                         <th>Edit</th>
                         <th>Delete</th>
                       </tr>
@@ -245,6 +301,19 @@ const UserTable = () => {
                             <span className={`user-table-role-badge user-table-role-${user.role.toLowerCase().replace(/\s+/g, '-')}`}>
                               {user.role}
                             </span>
+                          </td>
+                          <td>
+                            <ToggleSwitch
+                              checked={user.isActive !== false}
+                              disabled={
+                                togglingId === user._id ||
+                                user.role === 'Admin' ||
+                                user.role === 'superadmin' ||
+                                currentUser?._id === user._id
+                              }
+                              onChange={() => handleToggleStatus(user)}
+                              label={`Toggle status for ${user.username}`}
+                            />
                           </td>
                           <td>
                             <Link

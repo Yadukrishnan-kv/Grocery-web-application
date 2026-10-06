@@ -173,6 +173,27 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
+    const customer = await Customer.findById(customerId).select("name isActive");
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+    if (customer.isActive === false) {
+      return res.status(400).json({ message: `Customer "${customer.name}" is inactive and cannot place orders` });
+    }
+
+    const productIds = orderItems.map((item) => item.productId);
+    const products = await Product.find({ _id: { $in: productIds } }).select("productName isActive");
+    const productById = new Map(products.map((p) => [String(p._id), p]));
+    for (const item of orderItems) {
+      const product = productById.get(String(item.productId));
+      if (!product) {
+        return res.status(404).json({ message: "One or more products were not found" });
+      }
+      if (product.isActive === false) {
+        return res.status(400).json({ message: `Product "${product.productName}" is inactive and cannot be ordered` });
+      }
+    }
+
     // ✅ Process each order item with VAT calculations
     const processedItems = orderItems.map((item) => {
       const qty = parseInt(item.orderedQuantity);
@@ -2555,6 +2576,9 @@ const createOrderRequest = async (req, res) => {
     if (!customerProfile) {
       return res.status(404).json({ message: "Customer profile not found" });
     }
+    if (customerProfile.isActive === false) {
+      return res.status(403).json({ message: "Your account is inactive. Please contact support." });
+    }
 
     // Check if this is really first order
     const existingOrderCount = await Order.countDocuments({
@@ -2593,6 +2617,11 @@ const createOrderRequest = async (req, res) => {
         return res
           .status(404)
           .json({ message: `Product not found: ${item.productId}` });
+      if (product.isActive === false) {
+        return res
+          .status(400)
+          .json({ message: `Product "${product.productName}" is inactive and cannot be ordered` });
+      }
 
       const itemTotal = product.price * item.orderedQuantity;
       grandTotal += itemTotal;
@@ -2668,7 +2697,17 @@ const approveOrderRequest = async (req, res) => {
     const customer = await Customer.findById(request.customer);
     if (!customer)
       return res.status(404).json({ message: "Customer not found" });
-    
+    if (customer.isActive === false) {
+      return res.status(400).json({ message: `Customer "${customer.name}" is inactive and cannot place orders` });
+    }
+
+    const requestedProductIds = request.orderItems.map((item) => item.product);
+    const requestedProducts = await Product.find({ _id: { $in: requestedProductIds } }).select("productName isActive");
+    const inactiveProduct = requestedProducts.find((p) => p.isActive === false);
+    if (inactiveProduct) {
+      return res.status(400).json({ message: `Product "${inactiveProduct.productName}" is inactive and cannot be ordered` });
+    }
+
     // Final credit check before deducting
     if (
       request.payment === "credit" &&

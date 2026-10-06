@@ -13,6 +13,7 @@ import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { formatCustomerId } from "../../../utils/formatCustomerId";
 import { exportToExcel } from "../../../utils/exportToExcel";
+import ToggleSwitch from "../../../components/common/ToggleSwitch";
 
 const CustomerList = () => {
   // Full list — only fetched/used when a search or due-days filter is active,
@@ -24,9 +25,11 @@ const CustomerList = () => {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dueDaysFilter, setDueDaysFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const { entriesPerPage } = useAppSettings();
-  const isFiltering = dueDaysFilter !== "all" || searchTerm.trim() !== "";
+  const isFiltering =
+    dueDaysFilter !== "all" || statusFilter !== "all" || searchTerm.trim() !== "";
 
   // Server-side pagination state (used when no filter/search is active)
   const [pageCustomers, setPageCustomers] = useState([]);
@@ -37,6 +40,7 @@ const CustomerList = () => {
   // Delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -173,6 +177,26 @@ const CustomerList = () => {
 
   const clearSearch = () => setSearchTerm("");
 
+  const handleToggleStatus = async (customer) => {
+    const nextStatus = !customer.isActive;
+    setTogglingId(customer._id);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.patch(
+        `${backendUrl}/api/customers/togglestatus/${customer._id}`,
+        { isActive: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(`Customer "${customer.name}" marked as ${nextStatus ? "Active" : "Inactive"}`);
+      refetchCurrent();
+    } catch (error) {
+      console.error("Error updating customer status:", error);
+      toast.error("Failed to update customer status");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const customerMatchesFilters = useCallback(
     (customer) => {
       const matchesSearch =
@@ -184,33 +208,29 @@ const CustomerList = () => {
           .includes(searchTerm.toLowerCase()) ||
         customer.customerId?.toLowerCase().includes(searchTerm.toLowerCase());
 
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && customer.isActive !== false) ||
+        (statusFilter === "inactive" && customer.isActive === false);
+
       const daysLeft = getDaysRemaining(customer);
 
-      if (dueDaysFilter === "all") return matchesSearch;
-
+      let matchesDue = true;
       if (dueDaysFilter === "no-pending") {
-        return matchesSearch && daysLeft === null;
-      }
-      if (dueDaysFilter === "overdue") {
-        return matchesSearch && daysLeft !== null && daysLeft < 0;
-      }
-      if (dueDaysFilter === "1-5") {
-        return (
-          matchesSearch && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5
-        );
-      }
-      if (dueDaysFilter === "6-15") {
-        return (
-          matchesSearch && daysLeft !== null && daysLeft > 5 && daysLeft <= 15
-        );
-      }
-      if (dueDaysFilter === "16+") {
-        return matchesSearch && daysLeft !== null && daysLeft > 15;
+        matchesDue = daysLeft === null;
+      } else if (dueDaysFilter === "overdue") {
+        matchesDue = daysLeft !== null && daysLeft < 0;
+      } else if (dueDaysFilter === "1-5") {
+        matchesDue = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
+      } else if (dueDaysFilter === "6-15") {
+        matchesDue = daysLeft !== null && daysLeft > 5 && daysLeft <= 15;
+      } else if (dueDaysFilter === "16+") {
+        matchesDue = daysLeft !== null && daysLeft > 15;
       }
 
-      return matchesSearch;
+      return matchesSearch && matchesStatus && matchesDue;
     },
-    [searchTerm, dueDaysFilter]
+    [searchTerm, dueDaysFilter, statusFilter]
   );
 
   const filteredCustomers = useMemo(
@@ -274,7 +294,7 @@ const CustomerList = () => {
   const clientPagination = usePaginatedData(
     filteredCustomers,
     entriesPerPage,
-    `${dueDaysFilter}|${searchTerm}`
+    `${dueDaysFilter}|${statusFilter}|${searchTerm}`
   );
   const serverPagination = {
     page: serverPage,
@@ -364,6 +384,26 @@ const CustomerList = () => {
                   </select>
                 </div>
 
+                <div className="customer-list-filter-group">
+                  <label
+                    htmlFor="customerStatusFilter"
+                    className="customer-list-filter-label"
+                  >
+                    Filter by Status:
+                  </label>
+                  <select
+                    id="customerStatusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="customer-list-filter-select"
+                    aria-label="Filter customers by status"
+                  >
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
                 <button
                   className="customer-list-refresh-button"
                   onClick={handleExportToExcel}
@@ -389,6 +429,7 @@ const CustomerList = () => {
                 No customers found
                 {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
                 {dueDaysFilter !== "all" ? ` with due filter` : ""}
+                {statusFilter !== "all" ? ` with status "${statusFilter}"` : ""}
               </div>
             ) : (
               <TableScrollSync>
@@ -420,6 +461,7 @@ const CustomerList = () => {
                         <th scope="col">Salesman</th>
                         <th scope="col">Due Days</th>
                         <th scope="col">Current Bill Due</th>
+                        <th scope="col">Status</th>
                         <th scope="col">Edit</th>
                         <th scope="col">Delete</th>
                       </tr>
@@ -559,6 +601,15 @@ const CustomerList = () => {
                             <td>{customer.dueDays || "-"}</td>
 
                             <td className={dueClass}>{dueStatusText}</td>
+
+                            <td>
+                              <ToggleSwitch
+                                checked={customer.isActive !== false}
+                                disabled={togglingId === customer._id}
+                                onChange={() => handleToggleStatus(customer)}
+                                label={`Toggle status for ${customer.name}`}
+                              />
+                            </td>
 
                             <td>
                               <Link

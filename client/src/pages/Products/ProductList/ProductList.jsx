@@ -11,6 +11,7 @@ import toast from "../../../utils/toast";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
+import ToggleSwitch from "../../../components/common/ToggleSwitch";
 
 const ProductList = () => {
   // Full list — only fetched/used when a search or category filter is active,
@@ -24,9 +25,11 @@ const ProductList = () => {
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const { entriesPerPage } = useAppSettings();
-  const isFiltering = selectedCategory !== "All" || searchQuery.trim() !== "";
+  const isFiltering =
+    selectedCategory !== "All" || searchQuery.trim() !== "" || statusFilter !== "all";
 
   // Server-side pagination state (used when no filter/search is active)
   const [pageProducts, setPageProducts] = useState([]);
@@ -38,6 +41,7 @@ const ProductList = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const [downloadingCatalog, setDownloadingCatalog] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -150,6 +154,12 @@ const ProductList = () => {
       );
     }
 
+    if (statusFilter === "active") {
+      result = result.filter((product) => product.isActive !== false);
+    } else if (statusFilter === "inactive") {
+      result = result.filter((product) => product.isActive === false);
+    }
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter((product) =>
@@ -158,12 +168,12 @@ const ProductList = () => {
     }
 
     setFilteredProducts(result);
-  }, [selectedCategory, searchQuery, products]);
+  }, [selectedCategory, statusFilter, searchQuery, products]);
 
   const clientPagination = usePaginatedData(
     filteredProducts,
     entriesPerPage,
-    `${selectedCategory}|${searchQuery}`
+    `${selectedCategory}|${statusFilter}|${searchQuery}`
   );
   const serverPagination = {
     page: serverPage,
@@ -214,6 +224,26 @@ const ProductList = () => {
 
   const clearSearch = () => {
     setSearchQuery("");
+  };
+
+  const handleToggleStatus = async (product) => {
+    const nextStatus = !product.isActive;
+    setTogglingId(product._id);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.patch(
+        `${backendUrl}/api/products/togglestatus/${product._id}`,
+        { isActive: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(`Product "${product.productName}" marked as ${nextStatus ? "Active" : "Inactive"}`);
+      refetchCurrent();
+    } catch (error) {
+      console.error("Error updating product status:", error);
+      toast.error("Failed to update product status");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const handleDownloadCatalog = async () => {
@@ -296,6 +326,26 @@ const ProductList = () => {
                   </select>
                 </div>
 
+                <div className="product-list-filter-group">
+                  <label
+                    htmlFor="productStatusFilter"
+                    className="product-list-filter-label"
+                  >
+                    Filter by Status:
+                  </label>
+                  <select
+                    id="productStatusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="product-list-category-filter"
+                    aria-label="Filter products by status"
+                  >
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
                 <div className="product-list-search-container">
                   <input
                     type="text"
@@ -340,6 +390,7 @@ const ProductList = () => {
               <div className="product-list-no-data">
                 No products found
                 {selectedCategory !== "All" ? ` in "${selectedCategory}"` : ""}
+                {statusFilter !== "all" ? ` with status "${statusFilter}"` : ""}
                 {searchQuery.trim() ? ` matching "${searchQuery}"` : ""}
               </div>
             ) : (
@@ -355,6 +406,7 @@ const ProductList = () => {
                         <th scope="col">Price (AED)</th>
                         {/* Quantity column removed */}
                         <th scope="col">Unit</th>
+                        <th scope="col">Status</th>
                         <th scope="col">Edit</th>
                         <th scope="col">Delete</th>
                       </tr>
@@ -390,6 +442,14 @@ const ProductList = () => {
                           {/* Quantity cell removed */}
 
                           <td>{product.unit || "N/A"}</td>
+                          <td>
+                            <ToggleSwitch
+                              checked={product.isActive !== false}
+                              disabled={togglingId === product._id}
+                              onChange={() => handleToggleStatus(product)}
+                              label={`Toggle status for ${product.productName}`}
+                            />
+                          </td>
                           <td>
                             <Link
                               to={`/product/create?edit=${product._id}`}

@@ -1,0 +1,80 @@
+/* src/components/common/ToggleSwitch.css */
+.toggle-switch-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 23px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-switch-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #d1d5db;
+  transition: background-color 0.2s ease;
+  border-radius: 999px;
+}
+
+.toggle-switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 17px;
+  width: 17px;
+  left: 3px;
+  top: 3px;
+  background-color: #ffffff;
+  transition: transform 0.2s ease;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch input:checked + .toggle-switch-slider {
+  background-color: #22c55e;
+}
+
+.toggle-switch input:checked + .toggle-switch-slider::before {
+  transform: translateX(19px);
+}
+
+.toggle-switch input:focus-visible + .toggle-switch-slider {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.toggle-switch-status-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.toggle-switch-status-text.is-active {
+  color: #16a34a;
+}
+
+.toggle-switch-status-text.is-inactive {
+  color: #9ca3af;
+}
+
+.toggle-switch-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.toggle-switch-disabled .toggle-switch {
+  pointer-events: none;
+}

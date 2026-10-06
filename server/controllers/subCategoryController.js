@@ -102,11 +102,35 @@ const deleteSubCategory = async (req, res) => {
   }
 };
 
+const toggleSubCategoryStatus = async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({ message: "isActive must be a boolean" });
+    }
+
+    const subCategory = await SubCategory.findByIdAndUpdate(
+      req.params.id,
+      { isActive },
+      { new: true, runValidators: true }
+    );
+
+    if (!subCategory) {
+      return res.status(404).json({ message: "Sub-category not found" });
+    }
+
+    res.json(subCategory);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   createSubCategory,
   getAllSubCategories,
   getSubCategoryById,
   getSubCategoriesByCategory,
   updateSubCategory,
-  deleteSubCategory
+  deleteSubCategory,
+  toggleSubCategoryStatus
 };

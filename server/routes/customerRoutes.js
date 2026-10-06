@@ -8,6 +8,7 @@ const {
   getSalesmanCustomers,
   updateCustomer,
   deleteCustomer,
+  toggleCustomerStatus,
   getMyCustomerProfile,
   createCustomerProfile,
   createCustomerRequest,
@@ -31,6 +32,7 @@ router.get("/getallcustomers", getAllCustomers);
 router.get("/getcustomerbyid/:id", getCustomerById);
 router.get("/salesman-customers",  getSalesmanCustomers);
 router.put("/updatecustomer/:id", updateCustomer);
+router.patch("/togglestatus/:id", toggleCustomerStatus);
 router.delete("/deletecustomer/:id", deleteCustomer);
 router.get("/my-profile", getMyCustomerProfile);
 router.post("/createprofile", createCustomerProfile);

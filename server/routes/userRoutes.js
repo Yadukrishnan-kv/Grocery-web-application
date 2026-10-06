@@ -5,6 +5,7 @@ const {
   createUser,
   updateUser,
   deleteUser,
+  toggleUserStatus,
   changePassword,
   editProfile,getMyProfile,updateMyProfile,getDeliveryMen,getSalesMen
 } = require("../controllers/userController");
@@ -18,6 +19,7 @@ router.put("/edit-profile", protect, editProfile);
 router.get("/getAllUsers", protect, getAllUsers);
 router.post("/createUser", protect, createUser);
 router.put("/updateUser/:id", protect, updateUser);
+router.patch("/togglestatus/:id", protect, toggleUserStatus);
 router.delete("/deleteUser/:id", protect, deleteUser);
 router.get("/my-profile", protect, getMyProfile);
 router.put("/my-profile", protect, updateMyProfile);

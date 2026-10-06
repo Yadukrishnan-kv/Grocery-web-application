@@ -1,5 +1,5 @@
 // src/pages/Orders/CreateOrder/CreateOrder.jsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ProductSearchDropdown from "../../../../components/common/ProductSearchDropdown";
 import SearchableSelect from "../../../../components/common/SearchableSelect";
 import Header from "../../../../components/layout/Header/Header";
@@ -459,6 +459,23 @@ const CreateOrder = () => {
     }
   }, [backendUrl]);
 
+  // Inactive customers/products are kept out of fresh selection, but an
+  // already-selected one (e.g. loaded in edit mode before it was deactivated)
+  // stays visible so the existing choice doesn't silently disappear.
+  const selectableCustomers = useMemo(
+    () => customers.filter((c) => c.isActive !== false || c._id === formData.customerId),
+    [customers, formData.customerId]
+  );
+
+  const selectedProductIds = useMemo(
+    () => new Set(formData.orderItems.map((item) => item.productId).filter(Boolean)),
+    [formData.orderItems]
+  );
+  const selectableProducts = useMemo(
+    () => products.filter((p) => p.isActive !== false || selectedProductIds.has(p._id)),
+    [products, selectedProductIds]
+  );
+
   const handleCustomerChange = (e) => {
     const selectedCustomerId = e.target.value;
     const selectedCustomer = customers.find((c) => c._id === selectedCustomerId);
@@ -566,7 +583,7 @@ const CreateOrder = () => {
             <div className="form-group">
               <label>Customer</label>
               <SearchableSelect
-                options={customers.map((c) => ({
+                options={selectableCustomers.map((c) => ({
                   value: c._id,
                   label: `${c.name}${c.customerId ? ` (${formatCustomerId(c.customerId)})` : ""} — ${c.address || "No address"}`,
                 }))}
@@ -600,7 +617,7 @@ const CreateOrder = () => {
                 <div className="item-field">
                   <label>Product</label>
                   <ProductSearchDropdown
-                    products={products}
+                    products={selectableProducts}
                     value={item.productId}
                     onChange={(productId) => handleProductSelect(index, productId)}
                     placeholder="Select Product"

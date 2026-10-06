@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Customer = require("../models/Customer");
 const jwt = require("jsonwebtoken");
 
 const generateToken = (id, role) => {
@@ -59,6 +60,17 @@ const login = async (req, res) => {
 
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ message: "Invalid username/email or password" });
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({ message: "Your account is inactive. Please contact support." });
+    }
+
+    if (user.role === "Customer") {
+      const customerProfile = await Customer.findOne({ user: user._id }).select("isActive");
+      if (customerProfile && customerProfile.isActive === false) {
+        return res.status(403).json({ message: "Your account is inactive. Please contact support." });
+      }
     }
 
     const token = generateToken(user._id, user.role);

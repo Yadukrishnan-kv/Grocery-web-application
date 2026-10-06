@@ -93,6 +93,29 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+const toggleProductStatus = async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({ message: "isActive must be a boolean" });
+    }
+
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { isActive },
+      { new: true, runValidators: true }
+    );
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json(product);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────
 // Product Catalog PDF — grouped by Category, each category rendered as a
 // navy banner followed by a table of its products (Sub-Category/Unit/Price).
@@ -276,5 +299,6 @@ module.exports = {
   getProductById,
   updateProduct,
   deleteProduct,
+  toggleProductStatus,
   downloadProductCatalog,
 };

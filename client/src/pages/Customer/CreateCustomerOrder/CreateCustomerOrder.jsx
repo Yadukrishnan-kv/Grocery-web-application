@@ -1,5 +1,5 @@
 // src/pages/Customer/Orders/CreateCustomerOrder.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import ProductSearchDropdown from "../../../components/common/ProductSearchDropdown";
@@ -204,6 +204,17 @@ const CreateCustomerOrder = () => {
     });
   };
 
+  // Inactive products are kept out of fresh selection, but an already-selected
+  // one stays visible so an existing choice doesn't silently disappear.
+  const selectedProductIds = useMemo(
+    () => new Set(formData.orderItems.map((item) => item.productId).filter(Boolean)),
+    [formData.orderItems]
+  );
+  const selectableProducts = useMemo(
+    () => products.filter((p) => p.isActive !== false || selectedProductIds.has(p._id)),
+    [products, selectedProductIds]
+  );
+
   const handleProductSelect = (index, productId) => {
     const selectedProduct = products.find((p) => p._id === productId);
     setFormData((prev) => {
@@ -363,7 +374,7 @@ const CreateCustomerOrder = () => {
                 <div className="item-field">
                   <label>Product</label>
                   <ProductSearchDropdown
-                    products={products}
+                    products={selectableProducts}
                     value={item.productId}
                     onChange={(productId) => handleProductSelect(index, productId)}
                     placeholder="Select Product"

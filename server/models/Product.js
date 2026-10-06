@@ -48,6 +48,10 @@ const productSchema = new Schema(
       required: [true, "Unit is required"],
       trim: true,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

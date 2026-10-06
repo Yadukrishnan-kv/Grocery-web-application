@@ -12,6 +12,10 @@ const subCategorySchema = new Schema(
       required: [true, "Sub-category name is required"],
       trim: true,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

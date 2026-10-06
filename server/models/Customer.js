@@ -134,6 +134,10 @@ const customerSchema = new Schema(
       default: null,
       sparse: true,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

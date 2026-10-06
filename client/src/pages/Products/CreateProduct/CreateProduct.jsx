@@ -195,8 +195,14 @@ const CreateProduct = () => {
             headers: { Authorization: `Bearer ${token}` },
           },
         );
+        // Inactive sub-categories are kept out of fresh selection, but the
+        // already-selected one (e.g. loaded in edit mode before it was
+        // deactivated) stays visible so the existing choice doesn't silently
+        // disappear.
         const filteredSubCategories = response.data.filter(
-          (sc) => sc.CategoryName === categoryName,
+          (sc) =>
+            sc.CategoryName === categoryName &&
+            (sc.isActive !== false || sc.subCategoryName === formData.subCategoryName),
         );
         setSubCategories(filteredSubCategories);
 

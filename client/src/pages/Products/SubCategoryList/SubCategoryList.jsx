@@ -10,6 +10,7 @@ import toast from "../../../utils/toast";
 import { useAppSettings } from '../../../context/AppSettingsContext';
 import { usePaginatedData } from '../../../hooks/usePagination';
 import Pagination from '../../../components/common/Pagination';
+import ToggleSwitch from '../../../components/common/ToggleSwitch';
 
 const SubCategoryList = () => {
   const [subCategories, setSubCategories] = useState([]);
@@ -21,10 +22,12 @@ const SubCategoryList = () => {
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Confirmation modal for delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [subCatToDelete, setSubCatToDelete] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -81,6 +84,12 @@ const SubCategoryList = () => {
       result = result.filter(subCat => subCat.CategoryName === selectedCategory);
     }
 
+    if (statusFilter === 'active') {
+      result = result.filter(subCat => subCat.isActive !== false);
+    } else if (statusFilter === 'inactive') {
+      result = result.filter(subCat => subCat.isActive === false);
+    }
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(subCat =>
@@ -89,7 +98,7 @@ const SubCategoryList = () => {
     }
 
     setFilteredSubCategories(result);
-  }, [selectedCategory, searchQuery, subCategories]);
+  }, [selectedCategory, statusFilter, searchQuery, subCategories]);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -127,11 +136,31 @@ const SubCategoryList = () => {
     setSearchQuery('');
   };
 
+  const handleToggleStatus = async (subCat) => {
+    const nextStatus = !subCat.isActive;
+    setTogglingId(subCat._id);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${backendUrl}/api/subcategories/togglestatus/${subCat._id}`,
+        { isActive: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(`Sub-category "${subCat.subCategoryName}" marked as ${nextStatus ? 'Active' : 'Inactive'}`);
+      fetchSubCategories();
+    } catch (error) {
+      console.error('Error updating sub-category status:', error);
+      toast.error("Failed to update sub-category status");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(
     filteredSubCategories,
     entriesPerPage,
-    `${selectedCategory}|${searchQuery}`
+    `${selectedCategory}|${statusFilter}|${searchQuery}`
   );
 
   if (!user) {
@@ -178,6 +207,23 @@ const SubCategoryList = () => {
                   </select>
                 </div>
 
+                <div className="subcategory-list-filter-group">
+                  <label htmlFor="subCategoryStatusFilter" className="subcategory-list-filter-label">
+                    Filter by Status:
+                  </label>
+                  <select
+                    id="subCategoryStatusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="subcategory-list-category-filter"
+                    aria-label="Filter sub-categories by status"
+                  >
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
                 <div className="subcategory-list-search-container">
                   <input
                     type="text"
@@ -210,6 +256,7 @@ const SubCategoryList = () => {
               <div className="subcategory-list-no-data">
                 No sub-categories found
                 {selectedCategory !== 'All' ? ` in "${selectedCategory}"` : ''}
+                {statusFilter !== 'all' ? ` with status "${statusFilter}"` : ''}
                 {searchQuery.trim() ? ` matching "${searchQuery}"` : ''}
               </div>
             ) : (
@@ -222,6 +269,7 @@ const SubCategoryList = () => {
                           <th scope="col">No</th>
                           <th scope="col">Sub-Category Name</th>
                           <th scope="col">Category</th>
+                          <th scope="col">Status</th>
                           <th scope="col">Edit</th>
                           <th scope="col">Delete</th>
                         </tr>
@@ -232,6 +280,14 @@ const SubCategoryList = () => {
                             <td>{pagination.showingFrom + index}</td>
                             <td>{subCat.subCategoryName}</td>
                             <td>{subCat.CategoryName}</td>
+                            <td>
+                              <ToggleSwitch
+                                checked={subCat.isActive !== false}
+                                disabled={togglingId === subCat._id}
+                                onChange={() => handleToggleStatus(subCat)}
+                                label={`Toggle status for ${subCat.subCategoryName}`}
+                              />
+                            </td>
                             <td>
                               <Link
                                 to={`/subcategory/create?edit=${subCat._id}`}

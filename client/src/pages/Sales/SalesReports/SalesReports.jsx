@@ -17,13 +17,30 @@ import { usePaginatedData } from "../../../hooks/usePagination";
 import Pagination from "../../../components/common/Pagination";
 import { exportToExcel, formatDateForExcel } from "../../../utils/exportToExcel";
 
-const PERIOD_OPTIONS = [
-  { value: "all", label: "All Time" },
-  { value: "today", label: "Today" },
-  { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" },
-  { value: "year", label: "This Year" },
+const STATUS_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "partial_delivered", label: "Partial Delivered" },
+  { value: "delivered", label: "Delivered" },
+  { value: "cancelled", label: "Cancelled" },
 ];
+
+// Delivery invoice numbers look like "DDFT/<sequence>/<yearSuffix>" — the
+// sequence increments globally, so sorting on it (not the raw string)
+// restores chronological/ascending order even across a year rollover.
+const parseInvoiceSortKey = (invoiceNumber) => {
+  const match = /^DDFT\/(\d+)\/(\d+)$/.exec(invoiceNumber || "");
+  if (!match) return { year: 0, sequence: 0, raw: invoiceNumber || "" };
+  return { year: parseInt(match[2], 10), sequence: parseInt(match[1], 10), raw: invoiceNumber || "" };
+};
+
+const compareInvoiceNumbers = (a, b) => {
+  const keyA = parseInvoiceSortKey(a);
+  const keyB = parseInvoiceSortKey(b);
+  if (keyA.year !== keyB.year) return keyA.year - keyB.year;
+  if (keyA.sequence !== keyB.sequence) return keyA.sequence - keyB.sequence;
+  return keyA.raw.localeCompare(keyB.raw);
+};
 
 const SalesReports = () => {
   const [allOrders, setAllOrders] = useState([]);
@@ -40,7 +57,7 @@ const SalesReports = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [period, setPeriod] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [salesmanFilter, setSalesmanFilter] = useState("all");
 
   const [salesmen, setSalesmen] = useState([]);
@@ -197,13 +214,21 @@ const SalesReports = () => {
         row.order.customer?.salesman?._id === salesmanFilter ||
         row.order.customer?.salesman === salesmanFilter;
 
-      return matchesSearch && matchesDate && matchesSalesman;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (row.order.status &&
+          row.order.status.toLowerCase() === statusFilter.toLowerCase());
+
+      return matchesSearch && matchesDate && matchesSalesman && matchesStatus;
     },
-    [searchTerm, fromDate, toDate, salesmanFilter, itemMatchesSearch]
+    [searchTerm, fromDate, toDate, salesmanFilter, statusFilter, itemMatchesSearch]
   );
 
   const filteredRows = useMemo(
-    () => invoiceRows.filter(rowMatchesFilters),
+    () =>
+      invoiceRows
+        .filter(rowMatchesFilters)
+        .sort((a, b) => compareInvoiceNumbers(a.invoiceNumber, b.invoiceNumber)),
     [invoiceRows, rowMatchesFilters]
   );
 
@@ -219,37 +244,11 @@ const SalesReports = () => {
     return sum;
   }, [filteredRows, searchTerm, itemMatchesSearch]);
 
-  const applyPeriod = (value) => {
-    setPeriod(value);
-    const today = new Date();
-    let start = null;
-    const end = new Date(today);
-
-    if (value === "today") {
-      start = new Date(today);
-    } else if (value === "week") {
-      start = new Date(today);
-      start.setDate(today.getDate() - today.getDay());
-    } else if (value === "month") {
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-    } else if (value === "year") {
-      start = new Date(today.getFullYear(), 0, 1);
-    }
-
-    if (start) {
-      setFromDate(start.toISOString().slice(0, 10));
-      setToDate(end.toISOString().slice(0, 10));
-    } else {
-      setFromDate("");
-      setToDate("");
-    }
-  };
-
   const resetFilters = () => {
     setSearchTerm("");
     setFromDate("");
     setToDate("");
-    setPeriod("all");
+    setStatusFilter("all");
     setSalesmanFilter("all");
   };
 
@@ -301,7 +300,7 @@ const SalesReports = () => {
   const pagination = usePaginatedData(
     filteredRows,
     entriesPerPage,
-    `${searchTerm}|${fromDate}|${toDate}|${period}|${salesmanFilter}`
+    `${searchTerm}|${fromDate}|${toDate}|${statusFilter}|${salesmanFilter}`
   );
 
   const formatDateTime = (dateString) => {
@@ -319,7 +318,7 @@ const SalesReports = () => {
   }
 
   const hasActiveFilters =
-    fromDate || toDate || searchTerm || period !== "all" || salesmanFilter !== "all";
+    fromDate || toDate || searchTerm || statusFilter !== "all" || salesmanFilter !== "all";
 
   return (
     <div className="sales-reports-layout">
@@ -342,7 +341,7 @@ const SalesReports = () => {
                   <input
                     type="date"
                     value={fromDate}
-                    onChange={(e) => { setFromDate(e.target.value); setPeriod("all"); }}
+                    onChange={(e) => setFromDate(e.target.value)}
                     className="sales-reports-date-input"
                   />
                 </div>
@@ -351,19 +350,23 @@ const SalesReports = () => {
                   <input
                     type="date"
                     value={toDate}
-                    onChange={(e) => { setToDate(e.target.value); setPeriod("all"); }}
+                    onChange={(e) => setToDate(e.target.value)}
                     className="sales-reports-date-input"
                   />
                 </div>
 
+                <label htmlFor="salesReportsStatusFilter" className="sales-reports-filter-label">
+                  Filter by Order Status:
+                </label>
                 <select
+                  id="salesReportsStatusFilter"
                   className="sales-reports-salesman-filter"
-                  value={period}
-                  onChange={(e) => applyPeriod(e.target.value)}
-                  aria-label="Filter by period"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  aria-label="Filter orders by status"
                 >
-                  {PERIOD_OPTIONS.map((p) => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>
 

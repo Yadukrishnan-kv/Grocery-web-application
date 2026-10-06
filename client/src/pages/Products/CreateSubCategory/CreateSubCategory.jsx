@@ -187,6 +187,13 @@ const CreateSubCategory = () => {
     return null;
   }
 
+  // Inactive categories are kept out of fresh selection, but the already-
+  // selected one (e.g. loaded in edit mode before it was deactivated) stays
+  // visible so the existing choice doesn't silently disappear.
+  const selectableCategories = categories.filter(
+    (category) => category.isActive !== false || category.CategoryName === formData.CategoryName
+  );
+
   return (
     <div className="subcategory-form-layout">
       <Header
@@ -210,7 +217,7 @@ const CreateSubCategory = () => {
               <label htmlFor="CategoryName">Category Name</label>
               <SearchableSelect
                 id="CategoryName"
-                options={categories.map(category => ({
+                options={selectableCategories.map(category => ({
                   value: category.CategoryName,
                   label: category.CategoryName,
                 }))}

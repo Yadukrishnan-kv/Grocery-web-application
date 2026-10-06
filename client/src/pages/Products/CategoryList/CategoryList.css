@@ -194,6 +194,42 @@
   margin-top: 0.5rem;
 }
 
+.category-list-filter-group {
+  display: flex;
+  align-items: center;
+}
+
+.category-list-filter-label {
+  margin-right: 0.5rem;
+  font-weight: 500;
+  color: #334155;
+  white-space: nowrap;
+  font-size: 0.875rem;
+}
+
+.category-list-status-filter {
+  padding: 0.75rem 1.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #374151;
+  background-color: white;
+  min-width: 150px;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding-right: 2.25rem;
+}
+
+.category-list-status-filter:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
 .category-list-search-container {
   position: relative;
   min-width: 240px;

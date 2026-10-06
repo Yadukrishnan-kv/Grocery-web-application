@@ -10,6 +10,7 @@ import toast from "../../../utils/toast"; // ← NEW IMPORT
 import { useAppSettings } from '../../../context/AppSettingsContext';
 import { usePaginatedData } from '../../../hooks/usePagination';
 import Pagination from '../../../components/common/Pagination';
+import ToggleSwitch from '../../../components/common/ToggleSwitch';
 
 const CategoryList = () => {
   const [categories, setCategories] = useState([]);
@@ -19,10 +20,12 @@ const CategoryList = () => {
   const [activeItem, setActiveItem] = useState('Products');
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // NEW: Confirmation modal for delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -62,17 +65,23 @@ const CategoryList = () => {
   }, [backendUrl]);
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredCategories(categories);
-      return;
+    let result = categories;
+
+    if (statusFilter === 'active') {
+      result = result.filter(category => category.isActive !== false);
+    } else if (statusFilter === 'inactive') {
+      result = result.filter(category => category.isActive === false);
     }
 
-    const query = searchQuery.toLowerCase().trim();
-    const filtered = categories.filter(category =>
-      category.CategoryName?.toLowerCase().includes(query)
-    );
-    setFilteredCategories(filtered);
-  }, [searchQuery, categories]);
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(category =>
+        category.CategoryName?.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredCategories(result);
+  }, [searchQuery, statusFilter, categories]);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -109,11 +118,31 @@ const CategoryList = () => {
     setSearchQuery('');
   };
 
+  const handleToggleStatus = async (category) => {
+    const nextStatus = !category.isActive;
+    setTogglingId(category._id);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${backendUrl}/api/categories/togglestatus/${category._id}`,
+        { isActive: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(`Category "${category.CategoryName}" marked as ${nextStatus ? 'Active' : 'Inactive'}`);
+      fetchCategories();
+    } catch (error) {
+      console.error('Error updating category status:', error);
+      toast.error("Failed to update category status");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(
     filteredCategories,
     entriesPerPage,
-    `${searchQuery}`
+    `${searchQuery}|${statusFilter}`
   );
 
   if (!user) {
@@ -141,6 +170,23 @@ const CategoryList = () => {
               <h2 className="category-list-page-title">Category Management</h2>
 
               <div className="category-list-controls-group">
+                <div className="category-list-filter-group">
+                  <label htmlFor="categoryStatusFilter" className="category-list-filter-label">
+                    Filter by Status:
+                  </label>
+                  <select
+                    id="categoryStatusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="category-list-status-filter"
+                    aria-label="Filter categories by status"
+                  >
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
                 <div className="category-list-search-container">
                   <input
                     type="text"
@@ -171,7 +217,9 @@ const CategoryList = () => {
               <div className="category-list-loading">Loading categories...</div>
             ) : filteredCategories.length === 0 ? (
               <div className="category-list-no-data">
-                No categories found {searchQuery.trim() ? `matching "${searchQuery}"` : ''}
+                No categories found
+                {statusFilter !== 'all' ? ` with status "${statusFilter}"` : ''}
+                {searchQuery.trim() ? ` matching "${searchQuery}"` : ''}
               </div>
             ) : (
               <>
@@ -182,6 +230,7 @@ const CategoryList = () => {
                         <tr>
                           <th scope="col">No</th>
                           <th scope="col">Category Name</th>
+                          <th scope="col">Status</th>
                           <th scope="col">Edit</th>
                           <th scope="col">Delete</th>
                         </tr>
@@ -191,6 +240,14 @@ const CategoryList = () => {
                           <tr key={category._id}>
                             <td>{pagination.showingFrom + index}</td>
                             <td>{category.CategoryName}</td>
+                            <td>
+                              <ToggleSwitch
+                                checked={category.isActive !== false}
+                                disabled={togglingId === category._id}
+                                onChange={() => handleToggleStatus(category)}
+                                label={`Toggle status for ${category.CategoryName}`}
+                              />
+                            </td>
                             <td>
                               <Link
                                 to={`/category/create?edit=${category._id}`}

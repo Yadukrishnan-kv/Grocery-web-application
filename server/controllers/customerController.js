@@ -317,7 +317,7 @@ const getSalesmanCustomers = async (req, res) => {
 
     // Get customers assigned to this salesman
     const customers = await Customer.find({ salesman: req.user._id })
-      .select("name email phoneNumber address customerId _id")
+      .select("name email phoneNumber address customerId isActive _id")
       .sort({ name: 1 });
 
     res.json(customers);
@@ -545,6 +545,30 @@ const deleteCustomer = async (req, res) => {
       message: "Server error while deleting customer",
       error: error.message,
     });
+  }
+};
+
+const toggleCustomerStatus = async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({ message: "isActive must be a boolean" });
+    }
+
+    const customer = await Customer.findByIdAndUpdate(
+      req.params.id,
+      { isActive },
+      { new: true, runValidators: true }
+    );
+
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    res.json(customer);
+  } catch (error) {
+    console.error("Toggle customer status error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -1395,6 +1419,7 @@ module.exports = {
   getSalesmanCustomers,
   updateCustomer,
   deleteCustomer,
+  toggleCustomerStatus,
   getMyCustomerProfile,
   createCustomerProfile,
   createCustomerRequest,
