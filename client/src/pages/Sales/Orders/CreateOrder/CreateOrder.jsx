@@ -230,6 +230,19 @@ const CreateOrder = () => {
     setGrandTotal(sumTotal.toFixed(2));
   };
 
+  // Resolve a product's unit price for the given payment method
+  // ("cash" -> cashPrice, "credit" -> price/credit price), falling back to
+  // the credit price for older products saved before cashPrice existed.
+  const getProductPrice = (product, payment) => {
+    if (!product) return undefined;
+    if (payment === "cash") {
+      return product.cashPrice !== undefined && product.cashPrice !== null
+        ? product.cashPrice
+        : product.price;
+    }
+    return product.price;
+  };
+
   // ────────────────────────────────────────────────
   // Item Management
   // ────────────────────────────────────────────────
@@ -309,7 +322,9 @@ const CreateOrder = () => {
         newItems[index].price = parseFloat(customPrice).toFixed(2);
         newItems[index].isCustomPrice = true;
       } else {
-        newItems[index].price = selectedProduct ? selectedProduct.price.toFixed(2) : "";
+        const resolvedPrice = getProductPrice(selectedProduct, prev.payment);
+        newItems[index].price =
+          resolvedPrice !== undefined ? resolvedPrice.toFixed(2) : "";
         newItems[index].isCustomPrice = false;
       }
 
@@ -357,7 +372,9 @@ const CreateOrder = () => {
 
     setFormData((prev) => {
       const newItems = [...prev.orderItems];
-      newItems[index].price = selectedProduct.price.toFixed(2);
+      const resolvedPrice = getProductPrice(selectedProduct, prev.payment);
+      newItems[index].price =
+        resolvedPrice !== undefined ? resolvedPrice.toFixed(2) : "";
       newItems[index].isCustomPrice = false;
 
       const calculated = calculateItemVAT(newItems[index]);
@@ -476,17 +493,46 @@ const CreateOrder = () => {
     [products, selectedProductIds]
   );
 
+  // Re-derive the price of every non-custom-priced row for a given payment
+  // method (credit -> product.price, cash -> product.cashPrice).
+  const recalcItemsForPayment = (items, payment) => {
+    const newItems = items.map((item) => {
+      if (item.isCustomPrice || !item.productId) return item;
+      const product = products.find((p) => p._id === item.productId);
+      const resolvedPrice = getProductPrice(product, payment);
+      if (resolvedPrice === undefined) return item;
+
+      const updatedItem = { ...item, price: resolvedPrice.toFixed(2) };
+      const calculated = calculateItemVAT(updatedItem);
+      updatedItem.exclVat = calculated.exclVat;
+      updatedItem.vatAmount = calculated.vatAmount;
+      updatedItem.total = calculated.total;
+      return updatedItem;
+    });
+    updateGrandTotal(newItems);
+    return newItems;
+  };
+
+  const handlePaymentChange = (newPayment) => {
+    setFormData((prev) => ({
+      ...prev,
+      payment: newPayment,
+      orderItems: recalcItemsForPayment(prev.orderItems, newPayment),
+    }));
+  };
+
   const handleCustomerChange = (e) => {
     const selectedCustomerId = e.target.value;
     const selectedCustomer = customers.find((c) => c._id === selectedCustomerId);
     const defaultPayment =
       selectedCustomer?.billingType === "Cash" ? "cash" : "credit";
 
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       customerId: selectedCustomerId,
       payment: defaultPayment,
-    });
+      orderItems: recalcItemsForPayment(prev.orderItems, defaultPayment),
+    }));
 
     fetchCustomPrices(selectedCustomerId);
 
@@ -605,7 +651,7 @@ const CreateOrder = () => {
                   { value: "cash", label: "Cash" },
                 ]}
                 value={formData.payment}
-                onChange={(val) => setFormData({ ...formData, payment: val })}
+                onChange={handlePaymentChange}
                 placeholder="Select Payment Method"
               />
               {errors.payment && <p className="error-text">{errors.payment}</p>}
@@ -665,12 +711,15 @@ const CreateOrder = () => {
                   )}
                   {user?.role === "Admin" && item.productId && (() => {
                     const prod = products.find((p) => p._id === item.productId);
-                    const globalPrice = prod?.price?.toFixed(2);
+                    const globalPriceValue = getProductPrice(prod, formData.payment);
+                    const globalPrice = globalPriceValue?.toFixed(2);
                     const customPrice = customPrices[item.productId];
                     if (customPrice !== undefined && customPrice.toFixed(2) !== globalPrice) {
                       return (
                         <div className="price-side-badge">
-                          <span className="global-price-label">Global: AED {globalPrice}</span>
+                          <span className="global-price-label">
+                            {formData.payment === "cash" ? "Cash" : "Credit"} Price: AED {globalPrice}
+                          </span>
                           <button
                             type="button"
                             className="reset-price-btn"

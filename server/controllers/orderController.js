@@ -704,7 +704,10 @@ const deliverOrder = async (req, res) => {
         });
       }
       // 3. Restore balanceCreditLimit for "Credit limit" billing type customers
-      if (customer && customer.billingType === "Credit limit") {
+      //    — only when this order actually drew on credit (payment === "credit").
+      //    Cash orders never deduct balanceCreditLimit at packing (see packOrder),
+      //    so restoring it here for a cash order would inflate the balance for free.
+      if (customer && customer.billingType === "Credit limit" && order.payment === "credit") {
         customer.balanceCreditLimit += grandDeliveryAmount;
       }
       if (customer) await customer.save();

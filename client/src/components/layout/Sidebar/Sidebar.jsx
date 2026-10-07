@@ -55,6 +55,7 @@ const MENU_PERMISSIONS = {
   CreateSalesReturn: "menu.createSalesReturn",
   ReturnPickups: "menu.returnPickups",
   ReturnReceived: "menu.returnReceived",
+  CashCollection: "menu.cashCollection",
 };
 
 const navItems = [
@@ -240,6 +241,12 @@ const navItems = [
     label: "Bill Wallet",
     icon: "💰",
     path: "/admin/BillWallet",
+  },
+  {
+    id: "CashCollection",
+    label: "Cash Collection",
+    icon: "💵",
+    path: "/admin/cash-collection",
   },
   {
     id: "CreateCustomerRequest",

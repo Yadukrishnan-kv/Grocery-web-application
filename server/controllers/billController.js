@@ -501,6 +501,149 @@ const markBillReceived = async (req, res) => {
   }
 };
 
+// GET /api/bills/cash-collection-list
+// Admin-only: one row per customer with any open bill balance, summed across
+// all their unpaid/partially-paid bills — the source list for the Cash
+// Collection page.
+const getCashCollectionList = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Admin access only" });
+    }
+
+    const openBills = await Bill.find({
+      status: { $in: ["pending", "partial", "overdue", "pending_payment"] },
+    })
+      .select("customer amountDue paidAmount")
+      .populate("customer", "name");
+
+    const totals = new Map();
+    for (const bill of openBills) {
+      if (!bill.customer) continue;
+      // bill.amountDue is already the live remaining balance — every payment
+      // path (see payCashCollection, markBillReceived) decrements it directly
+      // as it's paid down, so it must NOT be reduced by paidAmount again here.
+      const due = Math.max(0, bill.amountDue || 0);
+      if (due <= 0) continue;
+
+      const key = String(bill.customer._id);
+      if (!totals.has(key)) {
+        totals.set(key, {
+          customerId: bill.customer._id,
+          customerName: bill.customer.name,
+          totalDue: 0,
+        });
+      }
+      totals.get(key).totalDue += due;
+    }
+
+    const result = Array.from(totals.values())
+      .map((row) => ({ ...row, totalDue: parseFloat(row.totalDue.toFixed(2)) }))
+      .sort((a, b) => b.totalDue - a.totalDue);
+
+    res.json(result);
+  } catch (error) {
+    console.error("Get cash collection list error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// POST /api/bills/cash-collection/:customerId/pay
+// Admin-only: applies a cash amount against a customer's open bills, oldest
+// invoice first (FIFO) — fully settling one bill before spilling the
+// remainder onto the next, exactly like an aging/waterfall payment.
+const payCashCollection = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "Admin") {
+      return res.status(403).json({ message: "Admin access only" });
+    }
+
+    const { customerId } = req.params;
+    const amount = parseFloat(req.body.amount);
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: "Enter a valid amount" });
+    }
+
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    // Oldest invoice first — matches the order invoices were actually issued in.
+    const openBills = await Bill.find({
+      customer: customerId,
+      status: { $in: ["pending", "partial", "overdue", "pending_payment"] },
+    }).sort({ createdAt: 1 });
+
+    const totalDue = openBills.reduce(
+      (sum, b) => sum + Math.max(0, b.amountDue || 0),
+      0
+    );
+
+    if (totalDue <= 0) {
+      return res.status(400).json({ message: "This customer has no outstanding dues" });
+    }
+    if (amount > totalDue + 0.01) {
+      return res
+        .status(400)
+        .json({ message: `Amount exceeds total due of AED ${totalDue.toFixed(2)}` });
+    }
+
+    let remaining = amount;
+    let totalApplied = 0;
+    const transactionIds = [];
+    const breakdown = [];
+
+    for (const bill of openBills) {
+      if (remaining <= 0) break;
+      const billDue = Math.max(0, bill.amountDue || 0);
+      if (billDue <= 0) continue;
+
+      const applied = Math.min(remaining, billDue);
+      bill.paidAmount = (bill.paidAmount || 0) + applied;
+      bill.amountDue = Math.max(0, (bill.amountDue || 0) - applied);
+      bill.status = bill.amountDue <= 0 ? "paid" : "partial";
+      await bill.save();
+
+      const transaction = await BillTransaction.create({
+        bill: bill._id,
+        customer: customer._id,
+        recipient: req.user._id,
+        recipientType: "admin",
+        amount: applied,
+        method: "cash",
+        status: "paid_to_admin",
+        invoiceNumber: bill.invoiceNumber,
+      });
+      transactionIds.push(transaction._id);
+      breakdown.push({
+        invoiceNumber: bill.invoiceNumber,
+        applied: parseFloat(applied.toFixed(2)),
+        remainingOnInvoice: parseFloat(bill.amountDue.toFixed(2)),
+      });
+
+      totalApplied += applied;
+      remaining -= applied;
+    }
+
+    if (customer.billingType === "Credit limit") {
+      customer.balanceCreditLimit = (customer.balanceCreditLimit || 0) + totalApplied;
+      await customer.save();
+    }
+
+    res.json({
+      message: "Payment collected successfully",
+      totalApplied: parseFloat(totalApplied.toFixed(2)),
+      remainingDue: parseFloat(Math.max(0, totalDue - totalApplied).toFixed(2)),
+      transactionIds,
+      breakdown,
+    });
+  } catch (error) {
+    console.error("Cash collection payment error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 const getBillReceipt = async (req, res) => {
   try {
     if (!req.user) {
@@ -887,6 +1030,8 @@ module.exports = {
   createInvoiceBasedBill,
   getAllPendingBills,
   markBillReceived,
+  getCashCollectionList,
+  payCashCollection,
   getBillReceipt,
   downloadBillInvoice
 };

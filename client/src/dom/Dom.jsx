@@ -46,6 +46,7 @@ import ChequeWallet from "../pages/DeliveryPartner/Wallet/ChequeWallet";
 import PaymentRequestsDelivery from "../pages/DeliveryPartner/PaymentRequestsDelivery/PaymentRequestsDelivery";
 import PaymentRequestsSales from "../pages/Salesmanpages/PaymentRequestsSales/PaymentRequestsSales";
 import BillWallet from "../pages/BillWallet/BillWallet";
+import CashCollection from "../pages/CashCollection/CashCollection";
 import AdminOrderRequests from "../pages/Sales/Orders/OrderList/AdminOrderRequests";
 import PackOrders from "../pages/Storekeeper/PackOrders/PackOrders";
 import SalesmanCustomers from "../pages/Salesmanpages/SalesmanCustomers/SalesmanCustomers";
@@ -188,6 +189,7 @@ function Dom() {
               element={<PaymentRequestsSales />}
             />
             <Route path="/admin/BillWallet" element={<BillWallet />} />
+            <Route path="/admin/cash-collection" element={<CashCollection />} />
             <Route
               path="/admin/AdminOrderRequests"
               element={<AdminOrderRequests />}

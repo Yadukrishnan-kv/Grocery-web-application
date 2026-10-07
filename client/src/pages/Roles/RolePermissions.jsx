@@ -70,6 +70,7 @@ const RolePermissions = () => {
     "Sales Return (Create Request)": "menu.createSalesReturn",
     "Return Pickups (Delivery Man)": "menu.returnPickups",
     "Return Received (Storekeeper)": "menu.returnReceived",
+    CashCollection: "menu.cashCollection",
 
   };
 

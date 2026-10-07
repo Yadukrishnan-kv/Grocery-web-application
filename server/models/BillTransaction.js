@@ -20,7 +20,7 @@ const billTransactionSchema = new Schema(
     },
     recipientType: {
       type: String,
-      enum: ["delivery", "sales"],
+      enum: ["delivery", "sales", "admin"],
       required: true,
     },
     amount: {

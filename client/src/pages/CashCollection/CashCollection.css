@@ -1,0 +1,376 @@
+/* CashCollection.css */
+
+.cash-collection-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.cash-collection-main-content {
+  flex: 1;
+  padding: 1.5rem;
+  transition: margin-left 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  overflow-y: auto;
+  margin-top: 64px;
+}
+
+@media (min-width: 768px) {
+  .cash-collection-main-content.sidebar-open {
+    margin-left: 240px;
+  }
+}
+
+.cash-collection-container-wrapper {
+  width: 98%;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.cash-collection-container {
+  padding: 2rem;
+}
+
+.cash-collection-header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.cash-collection-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.cash-collection-controls-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cash-collection-search-container {
+  position: relative;
+  min-width: 240px;
+  flex: 1;
+  max-width: 320px;
+}
+
+.cash-collection-search-input {
+  width: 100%;
+  padding: 0.75rem 1.25rem 0.75rem 2.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #374151;
+  background-color: white;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  box-sizing: border-box;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.069.077.113.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.85rem center;
+  background-size: 1rem;
+}
+
+.cash-collection-search-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background-color: #f9fafb;
+}
+
+.cash-collection-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.125rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  line-height: 1;
+}
+
+.cash-collection-search-clear:hover {
+  color: #1e293b;
+  background-color: #f1f5f9;
+}
+
+.cash-collection-loading {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #64748b;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.cash-collection-no-data {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 1rem;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.cash-collection-table-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: white;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.cash-collection-data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 500px;
+}
+
+.cash-collection-data-table th,
+.cash-collection-data-table td {
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cash-collection-data-table th {
+  background: linear-gradient(90deg, #f8fafc, #f1f5f9);
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cash-collection-data-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.cash-collection-data-table tbody tr:hover {
+  background-color: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.cash-collection-data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.cash-collection-pay-button {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.15);
+}
+
+.cash-collection-pay-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(5, 150, 105, 0.25);
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .cash-collection-container-wrapper {
+    border-radius: 12px;
+  }
+
+  .cash-collection-container {
+    padding: 1.5rem;
+  }
+
+  .cash-collection-page-title {
+    font-size: 1.5rem;
+  }
+
+  .cash-collection-data-table th,
+  .cash-collection-data-table td {
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .cash-collection-search-container {
+    width: 100%;
+    max-width: none;
+  }
+
+  .cash-collection-search-input {
+    width: 100%;
+  }
+}
+
+/* ===== Pay Modal ===== */
+.cash-collection-pay-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  animation: cashCollectionModalPop 0.3s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@keyframes cashCollectionModalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cash-collection-form-group {
+  text-align: left;
+  margin: 20px 0 12px;
+}
+
+.cash-collection-form-group label {
+  display: block;
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.875rem;
+  margin-bottom: 6px;
+}
+
+.cash-collection-amount-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 1rem;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.cash-collection-amount-input:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.cash-collection-hint {
+  font-size: 0.8125rem;
+  color: #64748b;
+  text-align: left;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.cash-collection-confirm-pay {
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+}
+
+.cash-collection-confirm-pay:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.4);
+}
+
+.cash-collection-confirm-pay:disabled,
+.confirm-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (min-width: 768px) {
+  .cash-collection-pay-modal .confirm-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+  .cash-collection-pay-modal .confirm-cancel,
+  .cash-collection-pay-modal .cash-collection-confirm-pay {
+    width: auto;
+    min-width: 140px;
+  }
+}
+
+/* ===== Confirm modal base classes (shared pattern used across the app) ===== */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+
+.confirm-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.confirm-text {
+  font-size: 1.1rem;
+  color: #475569;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+
+.confirm-cancel {
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+}
+
+.confirm-cancel:hover:not(:disabled) {
+  background: #cbd5e1;
+}

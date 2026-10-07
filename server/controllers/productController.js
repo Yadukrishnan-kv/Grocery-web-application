@@ -5,13 +5,14 @@ const PDFDocument = require("pdfkit");
 
 const createProduct = async (req, res) => {
   try {
-    const { productName, CategoryName, subCategoryName, price, quantity, unit } = req.body;
+    const { productName, CategoryName, subCategoryName, price, cashPrice, quantity, unit } = req.body;
 
     const product = await Product.create({
       productName,
       CategoryName,
       subCategoryName,
       price,
+      cashPrice,
       quantity,
       unit
     });
@@ -57,7 +58,7 @@ const getProductById = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const updateData = {};
-    const allowedFields = ["productName", "CategoryName", "subCategoryName", "price", "quantity", "unit"];
+    const allowedFields = ["productName", "CategoryName", "subCategoryName", "price", "cashPrice", "quantity", "unit"];
     
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {

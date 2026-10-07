@@ -16,6 +16,7 @@ const CreateProduct = () => {
     subCategoryName: "",
     unit: "",
     price: "",
+    cashPrice: "",
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -54,7 +55,15 @@ const CreateProduct = () => {
       isNaN(formData.price) ||
       parseFloat(formData.price) <= 0
     ) {
-      newErrors.price = "Valid price is required";
+      newErrors.price = "Valid credit price is required";
+    }
+
+    if (
+      !formData.cashPrice ||
+      isNaN(formData.cashPrice) ||
+      parseFloat(formData.cashPrice) <= 0
+    ) {
+      newErrors.cashPrice = "Valid cash price is required";
     }
 
     setErrors(newErrors);
@@ -98,6 +107,7 @@ const CreateProduct = () => {
         subCategoryName: formData.subCategoryName,
         unit: formData.unit,
         price: parseFloat(formData.price),
+        cashPrice: parseFloat(formData.cashPrice),
         // quantity is NOT sent anymore – backend will default to 0
       };
 
@@ -153,6 +163,7 @@ const CreateProduct = () => {
             subCategoryName: productToEdit.subCategoryName || "",
             unit: productToEdit.unit || "",
             price: productToEdit.price?.toString() || "",
+            cashPrice: productToEdit.cashPrice?.toString() || "",
             // quantity is NOT loaded/used anymore
           });
           setIsEdit(true);
@@ -402,9 +413,9 @@ const CreateProduct = () => {
               )}
             </div>
 
-            {/* 5. Price (quantity field removed) */}
+            {/* 5. Credit Price (quantity field removed) */}
             <div className="product-form-group">
-              <label htmlFor="price">Price (AED)</label>
+              <label htmlFor="price">Credit Price (AED)</label>
               <input
                 id="price"
                 name="price"
@@ -420,6 +431,28 @@ const CreateProduct = () => {
               {errors.price && (
                 <p id="price-error" className="product-error-text" role="alert">
                   {errors.price}
+                </p>
+              )}
+            </div>
+
+            {/* 6. Cash Price */}
+            <div className="product-form-group">
+              <label htmlFor="cashPrice">Cash Price (AED)</label>
+              <input
+                id="cashPrice"
+                name="cashPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.cashPrice}
+                onChange={handleChange}
+                aria-invalid={!!errors.cashPrice}
+                aria-describedby={errors.cashPrice ? "cashprice-error" : undefined}
+                className="product-input"
+              />
+              {errors.cashPrice && (
+                <p id="cashprice-error" className="product-error-text" role="alert">
+                  {errors.cashPrice}
                 </p>
               )}
             </div>

@@ -10,6 +10,8 @@ const {
   getCustomerBillById,
   markBillReceived,
   getAllPendingBills,
+  getCashCollectionList,
+  payCashCollection,
   getBillReceipt,
   downloadBillInvoice
 } = require("../controllers/billController");
@@ -22,6 +24,8 @@ router.get("/customer-bills", getCustomerBills);
 router.get("/customer-bill/:id", getCustomerBillById);
 router.post("/mark-received", protect, markBillReceived); // NEW
 router.get("/all-pending", protect, getAllPendingBills); // NEW to fetch pending bills
+router.get("/cash-collection-list", protect, getCashCollectionList);
+router.post("/cash-collection/:customerId/pay", protect, payCashCollection);
 router.get("/receipt/:id", getBillReceipt);
 router.get("/invoice/download/:billId", downloadBillInvoice);
 module.exports = router;

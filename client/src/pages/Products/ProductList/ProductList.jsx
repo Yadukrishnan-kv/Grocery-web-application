@@ -403,7 +403,8 @@ const ProductList = () => {
                         <th scope="col">Product Name</th>
                         <th scope="col">Category</th>
                         <th scope="col">Sub-Category</th>
-                        <th scope="col">Price (AED)</th>
+                        <th scope="col">Credit Price (AED)</th>
+                        <th scope="col">Cash Price (AED)</th>
                         {/* Quantity column removed */}
                         <th scope="col">Unit</th>
                         <th scope="col">Status</th>
@@ -436,6 +437,30 @@ const ProductList = () => {
                                 }}
                               />
                               <span>{product.price.toFixed(2)}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <img
+                                src={DirhamSymbol}
+                                alt="Dirham Symbol"
+                                width={15}
+                                height={15}
+                                style={{
+                                  paddingTop: "3px",
+                                }}
+                              />
+                              <span>
+                                {typeof product.cashPrice === "number"
+                                  ? product.cashPrice.toFixed(2)
+                                  : "-"}
+                              </span>
                             </div>
                           </td>
 
