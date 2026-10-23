@@ -26,10 +26,15 @@ const CustomerList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dueDaysFilter, setDueDaysFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [salesmanFilter, setSalesmanFilter] = useState("all");
+  const [salesmen, setSalesmen] = useState([]);
 
   const { entriesPerPage } = useAppSettings();
   const isFiltering =
-    dueDaysFilter !== "all" || statusFilter !== "all" || searchTerm.trim() !== "";
+    dueDaysFilter !== "all" ||
+    statusFilter !== "all" ||
+    salesmanFilter !== "all" ||
+    searchTerm.trim() !== "";
 
   // Server-side pagination state (used when no filter/search is active)
   const [pageCustomers, setPageCustomers] = useState([]);
@@ -105,9 +110,25 @@ const CustomerList = () => {
     [backendUrl, entriesPerPage],
   );
 
+  const fetchSalesmen = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/api/users/getAllUsers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSalesmen(response.data.filter((u) => u.role === "Sales man"));
+    } catch (error) {
+      console.error("Error fetching salesmen:", error);
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
     fetchCurrentUser();
   }, [fetchCurrentUser]);
+
+  useEffect(() => {
+    fetchSalesmen();
+  }, [fetchSalesmen]);
 
   useEffect(() => {
     if (isFiltering) {
@@ -213,6 +234,11 @@ const CustomerList = () => {
         (statusFilter === "active" && customer.isActive !== false) ||
         (statusFilter === "inactive" && customer.isActive === false);
 
+      const matchesSalesman =
+        salesmanFilter === "all" ||
+        customer.salesman?._id === salesmanFilter ||
+        customer.salesman === salesmanFilter;
+
       const daysLeft = getDaysRemaining(customer);
 
       let matchesDue = true;
@@ -228,9 +254,9 @@ const CustomerList = () => {
         matchesDue = daysLeft !== null && daysLeft > 15;
       }
 
-      return matchesSearch && matchesStatus && matchesDue;
+      return matchesSearch && matchesStatus && matchesSalesman && matchesDue;
     },
-    [searchTerm, dueDaysFilter, statusFilter]
+    [searchTerm, dueDaysFilter, statusFilter, salesmanFilter]
   );
 
   const filteredCustomers = useMemo(
@@ -294,7 +320,7 @@ const CustomerList = () => {
   const clientPagination = usePaginatedData(
     filteredCustomers,
     entriesPerPage,
-    `${dueDaysFilter}|${statusFilter}|${searchTerm}`
+    `${dueDaysFilter}|${statusFilter}|${salesmanFilter}|${searchTerm}`
   );
   const serverPagination = {
     page: serverPage,
@@ -404,6 +430,29 @@ const CustomerList = () => {
                   </select>
                 </div>
 
+                <div className="customer-list-filter-group">
+                  <label
+                    htmlFor="customerSalesmanFilter"
+                    className="customer-list-filter-label"
+                  >
+                    Filter by Salesman:
+                  </label>
+                  <select
+                    id="customerSalesmanFilter"
+                    value={salesmanFilter}
+                    onChange={(e) => setSalesmanFilter(e.target.value)}
+                    className="customer-list-filter-select"
+                    aria-label="Filter customers by salesman"
+                  >
+                    <option value="all">All Salesmen</option>
+                    {salesmen.map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <button
                   className="customer-list-refresh-button"
                   onClick={handleExportToExcel}
@@ -430,6 +479,7 @@ const CustomerList = () => {
                 {searchTerm.trim() ? ` matching "${searchTerm}"` : ""}
                 {dueDaysFilter !== "all" ? ` with due filter` : ""}
                 {statusFilter !== "all" ? ` with status "${statusFilter}"` : ""}
+                {salesmanFilter !== "all" ? ` for selected salesman` : ""}
               </div>
             ) : (
               <TableScrollSync>

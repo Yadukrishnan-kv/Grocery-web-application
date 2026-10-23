@@ -228,7 +228,7 @@ const SalesReports = () => {
     () =>
       invoiceRows
         .filter(rowMatchesFilters)
-        .sort((a, b) => compareInvoiceNumbers(a.invoiceNumber, b.invoiceNumber)),
+        .sort((a, b) => compareInvoiceNumbers(b.invoiceNumber, a.invoiceNumber)),
     [invoiceRows, rowMatchesFilters]
   );
 
