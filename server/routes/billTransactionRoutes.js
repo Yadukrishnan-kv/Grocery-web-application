@@ -13,6 +13,7 @@ const {
   adminMarkReceived,
   generateReceipt,
   generateBulkReceipt,
+  generateCashReceipt,
 } = require("../controllers/billTransactionController");
 
 // Delivery/Sales routes
@@ -20,6 +21,7 @@ router.get("/my-transactions", protect, getMyTransactions);
 router.get("/receipt/:transactionId", protect, generateReceipt);
 router.post("/pay-to-admin/:id", protect, payToAdmin);
 router.post("/bulk-receipt", protect, generateBulkReceipt);
+router.post("/cash-receipt", protect, generateCashReceipt);
 
 // Admin routes - NOTE: parameter is :id (matches controller)
 router.get("/admin-all", protect, getAdminAll);

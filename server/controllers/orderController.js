@@ -9,6 +9,7 @@ const { createInvoiceBasedBill } = require("../controllers/billController"); // 
 const arabicReshaper = require("arabic-reshaper");
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Bill = require("../models/Bill");
+const Role = require("../models/Role");
 const { getPaginationParams, buildPaginatedResponse } = require("../utils/paginate");
 const { formatCustomerId } = require("../utils/formatCustomerId");
 
@@ -3106,10 +3107,21 @@ const getRemainingForPacking = async (req, res) => {
 
 // Get pending orders — salesmen see only their own customers' orders; Admin
 // sees pending orders across every customer.
+// Sales man always has access (scoped to their own customers below); Admin
+// always has access; any other role needs "menu.PendingOrders" granted on
+// its Role document (Role Permissions screen) — same permission that gates
+// the sidebar menu item.
+const hasPendingOrdersAccess = async (user) => {
+  if (!user) return false;
+  if (user.role === "Admin" || user.role === "Sales man") return true;
+  const roleDoc = await Role.findOne({ name: user.role });
+  return !!roleDoc && roleDoc.permissions.includes("menu.PendingOrders");
+};
+
 const getMyPendingOrders = async (req, res) => {
   try {
-    if (!["Sales man", "Admin"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Only salesmen or admins can access this" });
+    if (!(await hasPendingOrdersAccess(req.user))) {
+      return res.status(403).json({ message: "Not authorized to access this page" });
     }
 
     const filter = {
@@ -3314,10 +3326,22 @@ const generatePackedInvoicePDF = async (doc, order, invoiceType, invoiceNo, desi
   await generateDaddysInvoicePDF(doc, wrapperOrder, invoiceNo, invoiceType, designType);
 };
 
+// Storekeeper always has access (it's their core page); Admin always has
+// access (view-only on the frontend); any other role needs
+// "menu.storekeeper.all-orders" granted on its Role document (Role
+// Permissions screen) — same permission that gates the sidebar menu item.
+const hasStorekeeperAllOrdersAccess = async (user) => {
+  if (!user) return false;
+  const role = (user.role || "").trim();
+  if (role === "Admin" || role === "Store kepper") return true;
+  const roleDoc = await Role.findOne({ name: user.role });
+  return !!roleDoc && roleDoc.permissions.includes("menu.storekeeper.all-orders");
+};
+
 const getAllOrdersForStorekeeper = async (req, res) => {
   try {
-    if (req.user.role.trim() !== "Store kepper") {
-      return res.status(403).json({ message: "Only Store kepper can access this" });
+    if (!(await hasStorekeeperAllOrdersAccess(req.user))) {
+      return res.status(403).json({ message: "Not authorized to access this page" });
     }
 
     const orders = await Order.find()
@@ -3330,6 +3354,42 @@ const getAllOrdersForStorekeeper = async (req, res) => {
   } catch (error) {
     console.error("Get all orders for storekeeper error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Admin always has access; any other role needs "menu.deliveryPending"
+// granted on its Role document (Role Permissions screen).
+const hasDeliveryPendingAccess = async (user) => {
+  if (!user) return false;
+  if (user.role === "Admin") return true;
+  const roleDoc = await Role.findOne({ name: user.role });
+  return !!roleDoc && roleDoc.permissions.includes("menu.deliveryPending");
+};
+
+// GET /api/orders/delivery-pending
+// Read-only, admin-facing view of EVERY delivery partner's accepted but
+// not-yet-fully-delivered orders — same underlying data/business rule as a
+// delivery man's own "Accepted Orders" list (my-assigned-orders), just
+// across all of them at once instead of scoped to req.user.
+const getDeliveryPendingOrders = async (req, res) => {
+  try {
+    if (!(await hasDeliveryPendingAccess(req.user))) {
+      return res.status(403).json({ message: "Not authorized to access this page" });
+    }
+
+    const orders = await Order.find({
+      assignmentStatus: "accepted",
+      status: { $nin: ["delivered", "cancelled"] },
+    })
+      .populate("customer", "name phoneNumber address pincode returnCreditBalance billingType")
+      .populate("orderItems.product", "productName price unit")
+      .populate("assignedTo", "username email")
+      .sort({ assignedAt: -1 });
+
+    res.json(orders);
+  } catch (error) {
+    console.error("Get delivery pending orders error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -3373,6 +3433,7 @@ module.exports = {
   getUnifiedInvoice, // ✅ NEW unified invoice showing Ordered/Packed/Delivered
   generateUnifiedInvoicePDF, // ✅ NEW unified invoice PDF generator
   getAllOrdersForStorekeeper,
+  getDeliveryPendingOrders,
   getPendingOrdersForAssignment,
   getDeliveryInvoiceStatus
 };

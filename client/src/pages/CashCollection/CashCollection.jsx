@@ -96,14 +96,14 @@ const CashCollection = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `${backendUrl}/api/bill-transactions/bulk-receipt`,
+        `${backendUrl}/api/bill-transactions/cash-receipt`,
         { transactionIds },
         { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" }
       );
       const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.setAttribute("download", `cash-collection-receipt-${Date.now()}.pdf`);
+      link.setAttribute("download", `cash-receipt-${Date.now()}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();

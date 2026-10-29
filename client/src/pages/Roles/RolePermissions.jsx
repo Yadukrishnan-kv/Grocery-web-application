@@ -71,6 +71,7 @@ const RolePermissions = () => {
     "Return Pickups (Delivery Man)": "menu.returnPickups",
     "Return Received (Storekeeper)": "menu.returnReceived",
     CashCollection: "menu.cashCollection",
+    DeliveryPending: "menu.deliveryPending",
 
   };
 

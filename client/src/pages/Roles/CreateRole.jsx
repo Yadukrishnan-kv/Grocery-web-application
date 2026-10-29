@@ -66,7 +66,8 @@ const CreateRole = () => {
       SalesReceiptReport: "menu.ReceiptReport",
       StorekeeperOrders: "menu.storekeeper.all-orders",
       CreditSuggestion: "menu.credit.suggestion",
-    CashCollection: "menu.cashCollection"
+    CashCollection: "menu.cashCollection",
+    DeliveryPending: "menu.deliveryPending"
 
   };
 

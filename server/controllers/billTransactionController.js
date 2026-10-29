@@ -384,7 +384,10 @@ const generateReceipt = async (req, res) => {
     }
   }
 };
-// Generate bulk receipt PDF for multiple transactions
+// Generate bulk receipt PDF (A4) for multiple transactions — used by the
+// Delivery/Sales Payment Requests pages to print everything they've
+// submitted to admin in one document. NOT used by Cash Collection, which
+// has its own thermal-paper generateCashReceipt below.
 const generateBulkReceipt = async (req, res) => {
   try {
     const { transactionIds } = req.body;
@@ -559,6 +562,171 @@ const generateBulkReceipt = async (req, res) => {
   }
 };
 
+// Generate a thermal-paper (80mm) cash receipt covering one or more
+// transactions collected together in a single payment — e.g. Cash
+// Collection applying one amount across a customer's oldest unpaid
+// invoices first. Same visual style/size as generateReceipt above.
+const generateCashReceipt = async (req, res) => {
+  try {
+    const { transactionIds } = req.body;
+
+    if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
+      return res.status(400).json({ message: "Invalid transaction IDs" });
+    }
+
+    const transactions = await BillTransaction.find({ _id: { $in: transactionIds } })
+      .populate("customer", "name phoneNumber address")
+      .populate("bill", "_id amountDue paidAmount batchReceiptNumber invoiceNumber packingInvoiceNumbers")
+      .populate("recipient", "username")
+      .populate("order", "invoiceNumber")
+      .sort({ createdAt: 1 });
+
+    if (transactions.length === 0) {
+      return res.status(404).json({ message: "No transactions found" });
+    }
+
+    // Verify all transactions belong to the current user
+    const allOwned = transactions.every(tx => String(tx.recipient._id) === String(req.user._id));
+    if (!allOwned) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const customer = transactions[0].customer;
+
+    // Balance due for this customer across all their bills, after this payment
+    const allBills = await Bill.find({ customer: customer?._id });
+    const totalDue = allBills.reduce((sum, b) => {
+      const remaining = Math.max(0, (b.grandTotal || b.amountDue || 0) - (b.paidAmount || 0));
+      return sum + remaining;
+    }, 0);
+
+    const company = (await CompanySettings.findOne()) || { companyName: "Company" };
+
+    // Same comma-join trick generateReceipt already uses for a single bill's
+    // packingInvoiceNumbers — applied here across every invoice this one
+    // payment was spread across (the oldest-first waterfall can touch more
+    // than one), so a single-invoice payment renders byte-for-byte like the
+    // existing receipt.
+    const uniqueInvoices = [...new Set(transactions.map(tx =>
+      (tx.bill?.packingInvoiceNumbers && tx.bill.packingInvoiceNumbers.length > 0) ? tx.bill.packingInvoiceNumbers.join("_") :
+      (tx.bill?.invoiceNumber || tx.invoiceNumber || tx.order?.invoiceNumber || "NA")
+    ))];
+    const invoiceNo = uniqueInvoices.filter((n) => n && n !== "NA").join(", ") || "N/A";
+    const totalAmount = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+    const filename = uniqueInvoices.length === 1 && uniqueInvoices[0] !== "NA"
+      ? `cash-receipt-${uniqueInvoices[0]}.pdf`
+      : `cash-receipt-${transactions[0]._id}.pdf`;
+
+    // Same 80mm thermal paper size/style as every other receipt in the app.
+    const pageWidth = 226;
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const centerX = margin;
+    const labelW = 75;
+    const valueW = contentWidth - labelW;
+
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument({ size: [pageWidth, 800], margin, bufferPages: true });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    doc.on("error", (err) => {
+      console.error("PDF generation error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Error generating PDF" });
+      }
+    });
+    doc.pipe(res);
+
+    let y = margin;
+    const drawDashedLine = (yPos) => {
+      doc.save();
+      doc.strokeColor("#000").lineWidth(0.5);
+      const dashLen = 3, gap = 2;
+      for (let x = margin; x < pageWidth - margin; x += dashLen + gap) {
+        doc.moveTo(x, yPos).lineTo(Math.min(x + dashLen, pageWidth - margin), yPos).stroke();
+      }
+      doc.restore();
+      return yPos + 6;
+    };
+
+    const printRow = (label, value) => {
+      doc.fontSize(7).font("Helvetica-Bold").fillColor("#000").text(label, centerX, y, { width: labelW });
+      doc.fontSize(7).font("Helvetica").fillColor("#000").text(String(value), centerX + labelW, y, { width: valueW, align: "right" });
+      y += 11;
+    };
+
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#000").text((company.companyName || "COMPANY").toUpperCase(), centerX, y, { width: contentWidth, align: "center" });
+    y += 14;
+    if (company.companyAddress) {
+      doc.fontSize(6).font("Helvetica").fillColor("#000").text(company.companyAddress, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyPhone) {
+      doc.fontSize(6).font("Helvetica").fillColor("#000").text(`Mob: ${company.companyPhone}`, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyTel) {
+      doc.fontSize(6).font("Helvetica").fillColor("#000").text(`Tel.: ${company.companyTel}`, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+    if (company.companyWebsite) {
+      doc.fontSize(6).font("Helvetica").fillColor("#000").text(company.companyWebsite, centerX, y, { width: contentWidth, align: "center" });
+      y += 9;
+    }
+
+    y = drawDashedLine(y + 2);
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("CASH RECEIPT", centerX, y, { width: contentWidth, align: "center" });
+    y += 14;
+    y = drawDashedLine(y);
+
+    printRow("Invoice No:", invoiceNo);
+    printRow("Date:", new Date().toLocaleDateString("en-IN"));
+
+    y = drawDashedLine(y + 2);
+    // Name/phone/address advance y by their actual rendered height
+    // (doc.heightOfString) instead of a fixed single-line guess — a long
+    // name or multi-line address would otherwise run into the rows below.
+    doc.fontSize(7).font("Helvetica-Bold").text("CUSTOMER:", centerX, y);
+    y += 11;
+    doc.fontSize(7).font("Helvetica");
+    const customerName = customer?.name || "N/A";
+    doc.text(customerName, centerX, y, { width: contentWidth });
+    y += doc.heightOfString(customerName, { width: contentWidth }) + 2;
+    if (customer?.phoneNumber) {
+      doc.text(customer.phoneNumber, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(customer.phoneNumber, { width: contentWidth }) + 2;
+    }
+    if (customer?.address) {
+      doc.text(customer.address, centerX, y, { width: contentWidth });
+      y += doc.heightOfString(customer.address, { width: contentWidth }) + 2;
+    }
+
+    y = drawDashedLine(y + 2);
+    printRow("Amount Paid:", `AED ${totalAmount.toFixed(2)}`);
+    printRow("Method:", "Cash");
+
+    y = drawDashedLine(y + 2);
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("BALANCE DUE", centerX, y, { width: labelW + 10 });
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text(`AED ${totalDue.toFixed(2)}`, centerX + labelW + 10, y, { width: valueW - 10, align: "right" });
+    y += 14;
+
+    y = drawDashedLine(y);
+    y += 4;
+    doc.fontSize(6).font("Helvetica").fillColor("#000").text("Thank you for your payment!", centerX, y, { width: contentWidth, align: "center" });
+    y += 9;
+    doc.text("This is a computer-generated receipt.", centerX, y, { width: contentWidth, align: "center" });
+
+    doc.end();
+  } catch (error) {
+    console.error("Generate cash receipt error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Server error" });
+    }
+  }
+};
+
 module.exports = {
   getMyTransactions,
   payToAdmin,
@@ -569,4 +737,5 @@ module.exports = {
   adminMarkReceived,
   generateReceipt,
   generateBulkReceipt,
+  generateCashReceipt,
 };

@@ -47,6 +47,7 @@ import PaymentRequestsDelivery from "../pages/DeliveryPartner/PaymentRequestsDel
 import PaymentRequestsSales from "../pages/Salesmanpages/PaymentRequestsSales/PaymentRequestsSales";
 import BillWallet from "../pages/BillWallet/BillWallet";
 import CashCollection from "../pages/CashCollection/CashCollection";
+import DeliveryPending from "../pages/DeliveryPending/DeliveryPending";
 import AdminOrderRequests from "../pages/Sales/Orders/OrderList/AdminOrderRequests";
 import PackOrders from "../pages/Storekeeper/PackOrders/PackOrders";
 import SalesmanCustomers from "../pages/Salesmanpages/SalesmanCustomers/SalesmanCustomers";
@@ -190,6 +191,7 @@ function Dom() {
             />
             <Route path="/admin/BillWallet" element={<BillWallet />} />
             <Route path="/admin/cash-collection" element={<CashCollection />} />
+            <Route path="/admin/delivery-pending" element={<DeliveryPending />} />
             <Route
               path="/admin/AdminOrderRequests"
               element={<AdminOrderRequests />}

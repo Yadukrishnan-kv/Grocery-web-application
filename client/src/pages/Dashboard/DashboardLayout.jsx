@@ -36,6 +36,25 @@ const DashboardLayout = () => {
   const [packedToday, setPackedToday] = useState(0);
   const [readyToDeliver, setReadyToDeliver] = useState(0);
 
+  // Salesman stats
+  const [totalOrderValue, setTotalOrderValue] = useState(0);
+  const [totalSalesValue, setTotalSalesValue] = useState(0);
+  const [pendingOrdersValue, setPendingOrdersValue] = useState(0);
+  const [pendingDeliveryCount, setPendingDeliveryCount] = useState(0);
+  const [salesReturnValue, setSalesReturnValue] = useState(0);
+  const [cancelOrderCount, setCancelOrderCount] = useState(0);
+  const [totalCashReceiptValue, setTotalCashReceiptValue] = useState(0);
+
+  // Manager stats — same shape as Salesman's, but company-wide (not scoped
+  // to one salesman's customers).
+  const [managerTotalOrderValue, setManagerTotalOrderValue] = useState(0);
+  const [managerTotalSalesValue, setManagerTotalSalesValue] = useState(0);
+  const [managerPendingOrdersValue, setManagerPendingOrdersValue] = useState(0);
+  const [managerPendingDeliveryValue, setManagerPendingDeliveryValue] = useState(0);
+  const [managerSalesReturnValue, setManagerSalesReturnValue] = useState(0);
+  const [managerCancelOrderValue, setManagerCancelOrderValue] = useState(0);
+  const [managerCashReceiptValue, setManagerCashReceiptValue] = useState(0);
+
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
   const navigate = useNavigate();
@@ -93,6 +112,160 @@ const DashboardLayout = () => {
       setTotalProducts(productsRes.data.length || 0);
     } catch (error) {
       console.error('Admin/Salesman stats error:', error);
+      setStatsError('Failed to load statistics');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [backendUrl]);
+
+  // Salesman Stats
+  const fetchSalesmanStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      setStatsError(null);
+
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const [ordersRes, pendingRes, returnsRes, receiptsRes] = await Promise.all([
+        axios.get(`${backendUrl}/api/orders/salesman-orders`, config),
+        axios.get(`${backendUrl}/api/orders/my-pending-orders`, config),
+        axios.get(`${backendUrl}/api/sales-returns/getall`, config),
+        axios.get(`${backendUrl}/api/customers/receipts`, config),
+      ]);
+
+      const orders = ordersRes.data || [];
+      const pending = pendingRes.data || [];
+      const returns = returnsRes.data || [];
+      const receipts = receiptsRes.data || [];
+
+      // Same grand-total rule Order Report uses: the invoiced amount where
+      // one exists, else the full ordered amount for orders not yet packed.
+      const orderValue = (order) =>
+        order.invoiceHistory?.length > 0
+          ? order.invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0)
+          : order.orderItems?.reduce((sum, item) => sum + (item.totalAmount || 0), 0) || 0;
+
+      setTotalOrderValue(orders.reduce((sum, o) => sum + orderValue(o), 0));
+
+      // Sales Report only counts orders that actually have an invoice —
+      // realized/delivered sales, not everything ever placed.
+      setTotalSalesValue(
+        orders.reduce(
+          (sum, o) => sum + (o.invoiceHistory?.reduce((s, h) => s + (h.amount || 0), 0) || 0),
+          0
+        )
+      );
+
+      setPendingOrdersValue(pending.reduce((sum, o) => sum + orderValue(o), 0));
+
+      // Same "still pending" rule as the Accepted Orders / Delivery Pending
+      // lists: accepted, not cancelled/delivered, and not yet fully
+      // delivered against what's currently packed.
+      const pendingDelivery = orders.filter((order) => {
+        if (
+          order.assignmentStatus !== 'accepted' ||
+          order.status === 'delivered' ||
+          order.status === 'cancelled'
+        ) {
+          return false;
+        }
+        const totalDelivered =
+          order.orderItems?.reduce((s, i) => s + (i.deliveredQuantity || 0), 0) || 0;
+        const packedNotDelivered =
+          order.orderItems?.reduce(
+            (s, i) => s + ((i.packedQuantity || 0) - (i.deliveredQuantity || 0)),
+            0
+          ) || 0;
+        return !(totalDelivered > 0 && packedNotDelivered === 0);
+      });
+      setPendingDeliveryCount(pendingDelivery.length);
+
+      setCancelOrderCount(orders.filter((o) => o.status === 'cancelled').length);
+
+      // Same value rule the Sales Return list uses per row.
+      const returnValue = (sr) =>
+        sr.refundAmount ||
+        Math.round((sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0));
+      setSalesReturnValue(returns.reduce((sum, sr) => sum + returnValue(sr), 0));
+
+      setTotalCashReceiptValue(
+        receipts.reduce((sum, r) => sum + (r.paidAmount || r.amountDue || 0), 0)
+      );
+    } catch (error) {
+      console.error('Salesman stats error:', error);
+      setStatsError('Failed to load statistics');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [backendUrl]);
+
+  // Manager Stats — company-wide equivalents of the Salesman figures above
+  const fetchManagerStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      setStatsError(null);
+
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const [ordersRes, pendingRes, deliveryPendingRes, returnsRes, billsRes] = await Promise.all([
+        axios.get(`${backendUrl}/api/orders/getallorders`, config),
+        axios.get(`${backendUrl}/api/orders/my-pending-orders`, config),
+        axios.get(`${backendUrl}/api/orders/delivery-pending`, config),
+        axios.get(`${backendUrl}/api/sales-returns/getall`, config),
+        axios.get(`${backendUrl}/api/bills/getallbills`, config),
+      ]);
+
+      const orders = ordersRes.data || [];
+      const pending = pendingRes.data || [];
+      const deliveryPending = deliveryPendingRes.data || [];
+      const returns = returnsRes.data || [];
+      const bills = billsRes.data || [];
+
+      // Same grand-total rule Order Report uses: the invoiced amount where
+      // one exists, else the full ordered amount for orders not yet packed.
+      const orderValue = (order) =>
+        order.invoiceHistory?.length > 0
+          ? order.invoiceHistory.reduce((sum, h) => sum + (h.amount || 0), 0)
+          : order.orderItems?.reduce((sum, item) => sum + (item.totalAmount || 0), 0) || 0;
+
+      setManagerTotalOrderValue(orders.reduce((sum, o) => sum + orderValue(o), 0));
+
+      // Sales Report only counts orders that actually have an invoice —
+      // realized/delivered sales, not everything ever placed.
+      setManagerTotalSalesValue(
+        orders.reduce(
+          (sum, o) => sum + (o.invoiceHistory?.reduce((s, h) => s + (h.amount || 0), 0) || 0),
+          0
+        )
+      );
+
+      setManagerCancelOrderValue(
+        orders.filter((o) => o.status === 'cancelled').reduce((sum, o) => sum + orderValue(o), 0)
+      );
+
+      // "Pending order value" = orders still waiting to be packed.
+      setManagerPendingOrdersValue(pending.reduce((sum, o) => sum + orderValue(o), 0));
+
+      // Accepted but not yet (fully) delivered — same list the Delivery
+      // Pending admin page shows.
+      setManagerPendingDeliveryValue(deliveryPending.reduce((sum, o) => sum + orderValue(o), 0));
+
+      // Same value rule the Sales Return list uses per row.
+      const returnValue = (sr) =>
+        sr.refundAmount ||
+        Math.round((sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0));
+      setManagerSalesReturnValue(returns.reduce((sum, sr) => sum + returnValue(sr), 0));
+
+      // Total cash receipts company-wide = everything collected against a bill.
+      setManagerCashReceiptValue(bills.reduce((sum, b) => sum + (b.paidAmount || 0), 0));
+    } catch (error) {
+      console.error('Manager stats error:', error);
       setStatsError('Failed to load statistics');
     } finally {
       setStatsLoading(false);
@@ -206,7 +379,11 @@ const DashboardLayout = () => {
 
     const role = user.role.toLowerCase().trim();
 
-    if (role.includes('admin') || role.includes('sales') || role.includes('manager')) {
+    if (role === 'sales man') {
+      fetchSalesmanStats();
+    } else if (role === 'manager') {
+      fetchManagerStats();
+    } else if (role.includes('admin') || role.includes('sales') || role.includes('manager')) {
       fetchAdminSalesmanStats();
     } else if (role.includes('customer')) {
       fetchCustomerStats();
@@ -224,10 +401,12 @@ const DashboardLayout = () => {
     fetchCustomerStats,
     fetchDeliveryManStats,
     fetchStorekeeperStats,
+    fetchSalesmanStats,
+    fetchManagerStats,
   ]);
 
   const goToPackOrders = () => {
-    navigate('/pack-orders'); // ← make sure this route exists in your router
+    navigate('/storekeeper/packed-orders');
   };
 
   if (loading) {
@@ -259,6 +438,162 @@ const DashboardLayout = () => {
         <button className="quick-action-btn" onClick={goToPackOrders}>
           Go to Pack Orders →
         </button>
+      </div>
+    </div>
+  );
+
+  const formatAed = (value) =>
+    `AED ${(value || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const renderSalesmanStats = () => (
+    <div className="stats-grid">
+      <div className="stat-card">
+        <div className="stat-icon credit-limit-icon">💳</div>
+        <h3>Credit Limit</h3>
+        <p>AED {(user.salesmanCreditLimit || 0).toLocaleString()}</p>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon available-credit-icon">✅</div>
+        <h3>Available Credit</h3>
+        <p>AED {(user.salesmanBalanceCreditLimit || 0).toLocaleString()}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/OrderReports/list')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/OrderReports/list')}
+      >
+        <div className="stat-icon orders-icon">📦</div>
+        <h3>Total Order Value</h3>
+        <p>{formatAed(totalOrderValue)}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/SalesReports/list')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/SalesReports/list')}
+      >
+        <div className="stat-icon revenue-icon">💰</div>
+        <h3>Total Sales Value</h3>
+        <p>{formatAed(totalSalesValue)}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/sales/pending-orders')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/sales/pending-orders')}
+      >
+        <div className="stat-icon pending-icon">⏳</div>
+        <h3>Pending Orders Value</h3>
+        <p>{formatAed(pendingOrdersValue)}</p>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon assigned-icon">🚚</div>
+        <h3>Pending Delivery</h3>
+        <p>{pendingDeliveryCount.toLocaleString()}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/sales-returns')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/sales-returns')}
+      >
+        <div className="stat-icon used-credit-icon">↩️</div>
+        <h3>Sales Return Value</h3>
+        <p>{formatAed(salesReturnValue)}</p>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon delivered-icon">❌</div>
+        <h3>Cancel Orders</h3>
+        <p>{cancelOrderCount.toLocaleString()}</p>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon credit-limit-icon">🧾</div>
+        <h3>Total Cash Receipt Value</h3>
+        <p>{formatAed(totalCashReceiptValue)}</p>
+      </div>
+    </div>
+  );
+
+  const renderManagerStats = () => (
+    <div className="stats-grid">
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/SalesReports/list')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/SalesReports/list')}
+      >
+        <div className="stat-icon revenue-icon">💰</div>
+        <h3>Total Sales Value</h3>
+        <p>{formatAed(managerTotalSalesValue)}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/OrderReports/list')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/OrderReports/list')}
+      >
+        <div className="stat-icon orders-icon">📦</div>
+        <h3>Total Order Value</h3>
+        <p>{formatAed(managerTotalOrderValue)}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/sales/pending-orders')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/sales/pending-orders')}
+      >
+        <div className="stat-icon pending-icon">⏳</div>
+        <h3>Pending Order Value</h3>
+        <p>{formatAed(managerPendingOrdersValue)}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/admin/delivery-pending')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/delivery-pending')}
+      >
+        <div className="stat-icon assigned-icon">🚚</div>
+        <h3>Pending Delivery Value</h3>
+        <p>{formatAed(managerPendingDeliveryValue)}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/sales-returns')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/sales-returns')}
+      >
+        <div className="stat-icon used-credit-icon">↩️</div>
+        <h3>Sales Return Value</h3>
+        <p>{formatAed(managerSalesReturnValue)}</p>
+      </div>
+      <div
+        className="stat-card clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/CancelOrderReports/list')}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/CancelOrderReports/list')}
+      >
+        <div className="stat-icon delivered-icon">❌</div>
+        <h3>Cancel Order Value</h3>
+        <p>{formatAed(managerCancelOrderValue)}</p>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon credit-limit-icon">🧾</div>
+        <h3>Total Cash Receipt Value</h3>
+        <p>{formatAed(managerCashReceiptValue)}</p>
       </div>
     </div>
   );
@@ -356,14 +691,14 @@ const DashboardLayout = () => {
 
   return (
     <div className="dashboard-layout">
-      <Header 
-        sidebarOpen={sidebarOpen} 
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <Header
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        activeItem={activeItem} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem={activeItem}
         onSetActiveItem={setActiveItem}
         onClose={() => setSidebarOpen(false)}
         user={user}
@@ -385,13 +720,19 @@ const DashboardLayout = () => {
             </div>
           ) : (
             <div className="stats-container">
-              {(user.role.toLowerCase().includes('admin') || user.role.toLowerCase().includes('sales') || user.role.toLowerCase().includes('manager')) &&
-                renderAdminSalesmanStats()}
+              {user.role.toLowerCase().trim() === 'sales man' ? (
+                renderSalesmanStats()
+              ) : user.role.toLowerCase().trim() === 'manager' ? (
+                renderManagerStats()
+              ) : (
+                (user.role.toLowerCase().includes('admin') || user.role.toLowerCase().includes('sales') || user.role.toLowerCase().includes('manager')) &&
+                renderAdminSalesmanStats()
+              )}
               {user.role.toLowerCase().includes('customer') && renderCustomerStats()}
               {(user.role.toLowerCase().includes('delivery') || user.role.toLowerCase().includes('delivery man')) &&
                 renderDeliveryManStats()}
-              {(user.role.toLowerCase().includes('store') || 
-                user.role.toLowerCase() === 'store kepper' || 
+              {(user.role.toLowerCase().includes('store') ||
+                user.role.toLowerCase() === 'store kepper' ||
                 user.role.toLowerCase() === 'storekeeper') &&
                 renderStorekeeperDashboard()}
             </div>

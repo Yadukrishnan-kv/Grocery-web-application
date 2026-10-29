@@ -57,7 +57,7 @@
   border-radius: 20px;
   padding: 2rem;
   text-align: center;
-  box-shadow: 
+  box-shadow:
     0 10px 25px -5px rgba(0, 0, 0, 0.05),
     0 8px 16px -8px rgba(0, 0, 0, 0.08);
   border: 1px solid #eef2ff;
@@ -80,13 +80,22 @@
 
 .stat-card:hover {
   transform: translateY(-8px);
-  box-shadow: 
+  box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .stat-card:hover::before {
   opacity: 1;
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+}
+
+.stat-card.clickable:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 3px;
 }
 
 .stat-icon {
@@ -154,7 +163,7 @@
   background: white;
   border-radius: 20px;
   padding: 2rem;
-  box-shadow: 
+  box-shadow:
     0 10px 25px -5px rgba(0, 0, 0, 0.05),
     0 8px 16px -8px rgba(0, 0, 0, 0.08);
   border: 1px solid #eef2ff;
@@ -245,11 +254,11 @@
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .stat-card {
     padding: 1.5rem;
   }
-  
+
   .stat-card p {
     font-size: 1.75rem;
   }

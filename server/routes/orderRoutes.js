@@ -22,7 +22,7 @@ const {
   getMyOrders,getOrderInvoice,getlastorderdetails,checkFirstOrder,
   getPendingOrderRequests,approveOrderRequest,rejectOrderRequest,getCustomerOrderHistory,createOrderRequest,packOrder,getPendingForPacking,getRemainingForPacking,getMyPendingOrders,getPackedToday,
   getReadyToDeliver,getPackedInvoice,getUnifiedInvoice,getAllOrdersForStorekeeper,getPendingOrdersForAssignment,
-  getDeliveryInvoiceStatus
+  getDeliveryInvoiceStatus,getDeliveryPendingOrders
 } = require("../controllers/orderController");
 
 
@@ -74,4 +74,5 @@ router.get("/packed-invoice/:id", protect, getPackedInvoice);
 router.get("/unified-invoice/:id", protect, getUnifiedInvoice);
 router.get('/all-orders', protect, getAllOrdersForStorekeeper);
 router.get("/delivery-invoice-status", protect, getDeliveryInvoiceStatus);
+router.get("/delivery-pending", protect, getDeliveryPendingOrders);
 module.exports = router;

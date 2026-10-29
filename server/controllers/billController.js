@@ -4,8 +4,18 @@ const Order = require("../models/Order");
 const Customer = require("../models/Customer");
 const BillTransaction = require("../models/BillTransaction");
 const CompanySettings = require("../models/CompanySettings");
+const Role = require("../models/Role");
 const PDFDocument = require("pdfkit");
 const moment = require("moment");
+
+// Admin always has access; any other role needs the "menu.cashCollection"
+// permission granted on its Role document (set via Role Permissions screen).
+const hasCashCollectionAccess = async (user) => {
+  if (!user) return false;
+  if (user.role === "Admin") return true;
+  const role = await Role.findOne({ name: user.role });
+  return !!role && role.permissions.includes("menu.cashCollection");
+};
 
 const generateBill = async (req, res) => {
   try {
@@ -507,8 +517,8 @@ const markBillReceived = async (req, res) => {
 // Collection page.
 const getCashCollectionList = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "Admin") {
-      return res.status(403).json({ message: "Admin access only" });
+    if (!(await hasCashCollectionAccess(req.user))) {
+      return res.status(403).json({ message: "Not authorized to access cash collection" });
     }
 
     const openBills = await Bill.find({
@@ -554,8 +564,8 @@ const getCashCollectionList = async (req, res) => {
 // remainder onto the next, exactly like an aging/waterfall payment.
 const payCashCollection = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "Admin") {
-      return res.status(403).json({ message: "Admin access only" });
+    if (!(await hasCashCollectionAccess(req.user))) {
+      return res.status(403).json({ message: "Not authorized to access cash collection" });
     }
 
     const { customerId } = req.params;

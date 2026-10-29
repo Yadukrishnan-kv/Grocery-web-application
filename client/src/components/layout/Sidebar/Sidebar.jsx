@@ -56,6 +56,7 @@ const MENU_PERMISSIONS = {
   ReturnPickups: "menu.returnPickups",
   ReturnReceived: "menu.returnReceived",
   CashCollection: "menu.cashCollection",
+  DeliveryPending: "menu.deliveryPending",
 };
 
 const navItems = [
@@ -249,6 +250,12 @@ const navItems = [
     path: "/admin/cash-collection",
   },
   {
+    id: "DeliveryPending",
+    label: "Delivery Pending",
+    icon: "🚚",
+    path: "/admin/delivery-pending",
+  },
+  {
     id: "CreateCustomerRequest",
     label: "Create Customer ",
     icon: "📝",
@@ -369,10 +376,8 @@ const Sidebar = ({ isOpen, activeItem, onSetActiveItem, onClose, user }) => {
           item.id !== "paymentRequestssales" &&
           item.id !== "CreditSuggestion" &&
           item.id !== "storekeeperpacked" &&
-          item.id !== "storekeeperRemainingPack" &&
           item.id !== "SalesOutstandingReport" &&
           item.id !== "SalesReceiptReport" &&
-          item.id !== "StorekeeperOrders" &&
           item.id !== "ReturnPickups" &&
           item.id !== "ReturnReceived" &&
           item.id !== "CreateSalesReturn"

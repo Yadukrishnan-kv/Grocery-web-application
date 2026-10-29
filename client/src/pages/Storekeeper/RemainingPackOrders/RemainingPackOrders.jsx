@@ -239,6 +239,9 @@ const RemainingPackOrders = () => {
     ? selectedOrder.orderItems.filter(hasRemaining)
     : [];
 
+  // Admin can view this page but does not pack — only the storekeeper does.
+  const canPack = user?.role !== "Admin";
+
   if (!user) return <div className="loading">Loading user data...</div>;
 
   return (
@@ -296,7 +299,7 @@ const RemainingPackOrders = () => {
                           <th>Delivery Partner</th>
                           <th>Actions</th>
                           <th>Slip</th>
-                          <th>Remaining Pack</th>
+                          {canPack && <th>Remaining Pack</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -396,15 +399,17 @@ const RemainingPackOrders = () => {
                                 </button>
                               </td>
 
-                              <td className="pack-cell">
-                                <button
-                                  className="order-list-icon-button order-list-edit-button"
-                                  onClick={() => openPackModal(order)}
-                                  title="Pack remaining quantity"
-                                >
-                                  Pack Remaining
-                                </button>
-                              </td>
+                              {canPack && (
+                                <td className="pack-cell">
+                                  <button
+                                    className="order-list-icon-button order-list-edit-button"
+                                    onClick={() => openPackModal(order)}
+                                    title="Pack remaining quantity"
+                                  >
+                                    Pack Remaining
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           );
                         })}

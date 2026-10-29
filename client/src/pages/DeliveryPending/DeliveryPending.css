@@ -1,0 +1,297 @@
+/* DeliveryPending.css — same visual language as AcceptedOrdersList (read-only admin view) */
+
+.delivery-pending-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.delivery-pending-main-content {
+  flex: 1;
+  padding: 1.5rem;
+  transition: margin-left 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  overflow-y: auto;
+  margin-top: 64px;
+}
+
+@media (min-width: 768px) {
+  .delivery-pending-main-content.sidebar-open {
+    margin-left: 240px;
+  }
+}
+
+.delivery-pending-container-wrapper {
+  width: 98%;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.delivery-pending-container {
+  padding: 2rem;
+}
+
+.delivery-pending-header-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.delivery-pending-page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0;
+  letter-spacing: -0.02em;
+}
+
+.delivery-pending-loading {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #64748b;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.delivery-pending-no-data {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 1rem;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.delivery-pending-table-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: white;
+  border: 1px solid #e2e8f0;
+  margin-top: 1rem;
+}
+
+.delivery-pending-data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1000px;
+  table-layout: auto;
+}
+
+.delivery-pending-data-table th,
+.delivery-pending-data-table td {
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
+}
+
+.delivery-pending-data-table th {
+  background: linear-gradient(90deg, #f8fafc, #f1f5f9);
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.delivery-pending-data-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.delivery-pending-data-table tbody tr:hover {
+  background-color: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.delivery-pending-data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+@media (max-width: 767px) {
+  .delivery-pending-container-wrapper {
+    border-radius: 12px;
+  }
+
+  .delivery-pending-container {
+    padding: 1.5rem;
+  }
+
+  .delivery-pending-page-title {
+    font-size: 1.5rem;
+  }
+
+  .delivery-pending-data-table th,
+  .delivery-pending-data-table td {
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* ===== CONTROLS ===== */
+.delivery-pending-controls-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.delivery-pending-search-container {
+  position: relative;
+  min-width: 240px;
+  flex: 1;
+  max-width: 320px;
+}
+
+.delivery-pending-search-input {
+  width: 100%;
+  padding: 0.75rem 1.25rem 0.75rem 2.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #374151;
+  background-color: white;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  box-sizing: border-box;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.069.077.113.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.85rem center;
+  background-size: 1rem;
+}
+
+.delivery-pending-search-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background-color: #f9fafb;
+}
+
+.delivery-pending-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.delivery-pending-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.125rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  line-height: 1;
+}
+
+.delivery-pending-search-clear:hover {
+  color: #1e293b;
+  background-color: #f1f5f9;
+}
+
+@media (max-width: 767px) {
+  .delivery-pending-controls-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .delivery-pending-search-container {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* ===== FILTERS ===== */
+.delivery-pending-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.delivery-pending-filter-label {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.delivery-pending-filter-select {
+  padding: 0.75rem 1.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: white;
+  font-size: 0.875rem;
+  min-width: 180px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding-right: 2.25rem;
+}
+
+.delivery-pending-filter-select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+@media (max-width: 767px) {
+  .delivery-pending-filter-group {
+    width: 100%;
+  }
+  .delivery-pending-filter-select {
+    width: 100%;
+  }
+}
+
+.delivery-pending-orderid-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.delivery-pending-orderid-link:hover {
+  color: #4f46e5;
+}
+
+.delivery-pending-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  background: #eef2ff;
+  color: #4338ca;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.delivery-pending-packed-qty-cell {
+  font-weight: 600;
+  color: #059669;
+}
