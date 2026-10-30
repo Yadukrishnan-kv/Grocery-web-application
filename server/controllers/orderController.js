@@ -5,6 +5,7 @@ const Customer = require("../models/Customer");
 const User = require("../models/User");
 const CompanySettings = require("../models/CompanySettings");
 const InvoiceCounter = require("../models/InvoiceCounter");
+const LastGeneratedSequence = require("../models/LastGeneratedSequence");
 const { createInvoiceBasedBill } = require("../controllers/billController"); // ← import it
 const arabicReshaper = require("arabic-reshaper");
 const PaymentTransaction = require("../models/PaymentTransaction");
@@ -46,23 +47,48 @@ const formatDynamicArabicForPdf = (text) => {
   }
 };
 
+// Reads the actual highest "SO/#####/YYYY" sequence number already saved on
+// an Order. Used to rebuild the counter's starting point whenever its own
+// state is missing or behind reality (e.g. the InvoiceCounter document was
+// deleted), so numbering continues from where real orders left off instead
+// of restarting and colliding with an orderId that already exists.
+const getMaxExistingOrderSequence = async () => {
+  const [result] = await Order.aggregate([
+    { $match: { orderId: { $regex: /^SO\/\d+\/\d{4}$/ } } },
+    { $project: { seq: { $toInt: { $arrayElemAt: [{ $split: ["$orderId", "/"] }, 1] } } } },
+    { $sort: { seq: -1 } },
+    { $limit: 1 },
+  ]);
+  return result ? result.seq : 0;
+};
+
 const getNextOrderId = async () => {
-  // Ensure counter starts at 4000
-  let counter = await InvoiceCounter.findOneAndUpdate(
-    {},
-    { $setOnInsert: { invoiceCount: 0, returnCount: 0, orderCount: 4000 } },
-    { upsert: true, new: true }
-  );
-  
-  // If counter is below 4000, reset it to 4000
-  if (counter.orderCount < 4000) {
+  let counter = await InvoiceCounter.findOne({});
+
+  if (!counter) {
+    // Counter missing (deleted, or first run ever): seed it from the
+    // highest orderId that actually exists (cross-checked against the
+    // LastGeneratedSequence log too, in case the Order collection itself
+    // was pruned) instead of hardcoding 4000, so deleting this document
+    // can't reissue an orderId that's already taken.
+    const [maxSeq, lastLog] = await Promise.all([
+      getMaxExistingOrderSequence(),
+      LastGeneratedSequence.findOne({}),
+    ]);
+    const seed = Math.max(maxSeq, lastLog?.lastOrderSequence || 0, 4000);
+    counter = await InvoiceCounter.findOneAndUpdate(
+      {},
+      { $setOnInsert: { invoiceCount: 0, returnCount: 0, orderCount: seed } },
+      { upsert: true, new: true }
+    );
+  } else if (counter.orderCount < 4000) {
     counter = await InvoiceCounter.findOneAndUpdate(
       {},
       { $set: { orderCount: 4000 } },
       { new: true }
     );
   }
-  
+
   // Increment to get next order number
   counter = await InvoiceCounter.findOneAndUpdate(
     {},
@@ -70,9 +96,24 @@ const getNextOrderId = async () => {
     { new: true }
   );
 
-  const sequence = String(counter.orderCount).padStart(5, "0");
   const year = new Date().getFullYear();
-  return `SO/${sequence}/${year}`;
+  let orderId = `SO/${String(counter.orderCount).padStart(5, "0")}/${year}`;
+
+  // Safety net: if this exact orderId somehow already exists (e.g. a
+  // concurrent request raced the healing step above), keep advancing
+  // until we land on one that's genuinely free.
+  while (await Order.exists({ orderId })) {
+    counter = await InvoiceCounter.findOneAndUpdate({}, { $inc: { orderCount: 1 } }, { new: true });
+    orderId = `SO/${String(counter.orderCount).padStart(5, "0")}/${year}`;
+  }
+
+  await LastGeneratedSequence.findOneAndUpdate(
+    {},
+    { $set: { lastOrderId: orderId, lastOrderSequence: counter.orderCount, lastOrderYear: year } },
+    { upsert: true }
+  );
+
+  return orderId;
 };
 
 // Delivery/packing invoice number: DDFT/101001/26, DDFT/101002/26, ...
@@ -96,6 +137,65 @@ const computeDeliveryInvoiceRolloverCount = (savedYear, savedCount, currentYear)
   return (savedCount || 0) + 1;
 };
 
+// Reads the actual highest "DDFT/######/YY" sequence already saved on any
+// order (both invoiceHistory and deliveredInvoiceHistory, since either can
+// hold the most recently issued number) for the given 2-digit year suffix.
+// Returned as a deliveredInvoiceCount (i.e. already offset by -101000) so it
+// can be compared/combined directly with InvoiceCounter.deliveredInvoiceCount.
+const getMaxExistingDeliveredInvoiceCount = async (yearSuffix) => {
+  const regex = new RegExp(`^DDFT\\/(\\d+)\\/${yearSuffix}$`);
+  const [result] = await Order.aggregate([
+    {
+      $project: {
+        allNumbers: {
+          $concatArrays: [
+            { $ifNull: ["$invoiceHistory.invoiceNumber", []] },
+            { $ifNull: ["$deliveredInvoiceHistory.invoiceNumber", []] },
+          ],
+        },
+      },
+    },
+    { $unwind: "$allNumbers" },
+    { $match: { allNumbers: { $regex: regex } } },
+    { $project: { seq: { $toInt: { $arrayElemAt: [{ $split: ["$allNumbers", "/"] }, 1] } } } },
+    { $sort: { seq: -1 } },
+    { $limit: 1 },
+  ]);
+  return result ? result.seq - 101000 : 0;
+};
+
+// Counts how many delivery invoices have actually been issued this year, by
+// counting invoiceHistory rows (each row = one packing event that consumed a
+// sequence number) rather than looking at the highest number seen. This
+// catches the case the max-number check above can't: the counter document
+// still exists, but understates reality because a past bug issued the same
+// number to two different packing events — so the highest *number* looks
+// fine, yet one real event is missing from the count. (deliveredInvoiceHistory
+// is intentionally excluded: it just mirrors an invoiceHistory number when
+// the order is delivered, it doesn't consume a new sequence slot.)
+const getIssuedDeliveryInvoiceEventCount = async (yearSuffix) => {
+  const regex = new RegExp(`^DDFT\\/\\d+\\/${yearSuffix}$`);
+  const [result] = await Order.aggregate([
+    { $project: { nums: { $ifNull: ["$invoiceHistory.invoiceNumber", []] } } },
+    { $unwind: "$nums" },
+    { $match: { nums: { $regex: regex } } },
+    { $count: "total" },
+  ]);
+  return result ? result.total : 0;
+};
+
+// Checks whether a candidate invoice number is already attached to any
+// order, anywhere it could appear (current field or history).
+const deliveryInvoiceNumberInUse = async (invoiceNumber) =>
+  Order.exists({
+    $or: [
+      { invoiceNumber },
+      { deliveredInvoiceNumber: invoiceNumber },
+      { "invoiceHistory.invoiceNumber": invoiceNumber },
+      { "deliveredInvoiceHistory.invoiceNumber": invoiceNumber },
+    ],
+  });
+
 const getNextDeliveryInvoiceNumber = async () => {
   const currentYear = new Date().getFullYear();
   const yearSuffix = String(currentYear).slice(-2);
@@ -109,13 +209,27 @@ const getNextDeliveryInvoiceNumber = async () => {
 
   if (!counter) {
     // No document tracking the current year yet: first invoice ever, a
-    // legacy document with no deliveredInvoiceYear, or the year just changed.
-    const existing = await InvoiceCounter.findOne({});
-    const nextCount = computeDeliveryInvoiceRolloverCount(
+    // legacy document with no deliveredInvoiceYear, the year just changed,
+    // or the InvoiceCounter document was deleted. Rebuild the starting
+    // count from the invoice numbers that actually exist on real orders
+    // for this year, so a deleted/reset counter can never reissue a
+    // number that's already in use.
+    const [existing, maxExistingCount, lastLog] = await Promise.all([
+      InvoiceCounter.findOne({}),
+      getMaxExistingDeliveredInvoiceCount(yearSuffix),
+      LastGeneratedSequence.findOne({}),
+    ]);
+    const legacyCount = computeDeliveryInvoiceRolloverCount(
       existing?.deliveredInvoiceYear,
       existing?.deliveredInvoiceCount,
       currentYear
     );
+    // Only trust the log's sequence if it was logged for this same year —
+    // otherwise it belongs to a prior year's (correctly reset) sequence.
+    const loggedCount =
+      lastLog?.lastDeliveryInvoiceYear === currentYear ? lastLog.lastDeliveryInvoiceSequence : 0;
+    const nextCount = Math.max(maxExistingCount + 1, legacyCount, loggedCount + 1);
+
     counter = await InvoiceCounter.findOneAndUpdate(
       {},
       { $set: { deliveredInvoiceYear: currentYear, deliveredInvoiceCount: nextCount } },
@@ -123,8 +237,46 @@ const getNextDeliveryInvoiceNumber = async () => {
     );
   }
 
-  const sequence = 101000 + counter.deliveredInvoiceCount;
-  return `DDFT/${sequence}/${yearSuffix}`;
+  // Reconcile against how many delivery invoices have actually been issued
+  // this year, even when the counter document was never missing. This is
+  // what catches a historical double-issue: the counter still thinks only
+  // N invoices exist when N+1 (or more) packing events already happened.
+  const issuedEventCount = await getIssuedDeliveryInvoiceEventCount(yearSuffix);
+  if (counter.deliveredInvoiceCount <= issuedEventCount) {
+    counter = await InvoiceCounter.findOneAndUpdate(
+      { deliveredInvoiceYear: currentYear },
+      { $set: { deliveredInvoiceCount: issuedEventCount + 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+  }
+
+  let invoiceNumber = `DDFT/${101000 + counter.deliveredInvoiceCount}/${yearSuffix}`;
+
+  // Safety net: if this exact number is somehow already in use (e.g. a
+  // concurrent request raced the healing step above), keep advancing until
+  // we land on one that's genuinely free.
+  while (await deliveryInvoiceNumberInUse(invoiceNumber)) {
+    counter = await InvoiceCounter.findOneAndUpdate(
+      { deliveredInvoiceYear: currentYear },
+      { $inc: { deliveredInvoiceCount: 1 } },
+      { new: true }
+    );
+    invoiceNumber = `DDFT/${101000 + counter.deliveredInvoiceCount}/${yearSuffix}`;
+  }
+
+  await LastGeneratedSequence.findOneAndUpdate(
+    {},
+    {
+      $set: {
+        lastDeliveryInvoiceNumber: invoiceNumber,
+        lastDeliveryInvoiceSequence: counter.deliveredInvoiceCount,
+        lastDeliveryInvoiceYear: currentYear,
+      },
+    },
+    { upsert: true }
+  );
+
+  return invoiceNumber;
 };
 
 // GET /api/orders/delivery-invoice-status
@@ -136,13 +288,17 @@ const getDeliveryInvoiceStatus = async (req, res) => {
   try {
     const currentYear = new Date().getFullYear();
     const yearSuffix = String(currentYear).slice(-2);
-    const counter = await InvoiceCounter.findOne({});
+    const [counter, maxExistingCount] = await Promise.all([
+      InvoiceCounter.findOne({}),
+      getMaxExistingDeliveredInvoiceCount(yearSuffix),
+    ]);
 
-    const nextCount = computeDeliveryInvoiceRolloverCount(
+    const legacyCount = computeDeliveryInvoiceRolloverCount(
       counter?.deliveredInvoiceYear,
       counter?.deliveredInvoiceCount,
       currentYear
     );
+    const nextCount = Math.max(maxExistingCount + 1, legacyCount);
 
     res.json({
       currentYear,
@@ -745,7 +901,7 @@ const deliverOrder = async (req, res) => {
     } else {
       // Fallback: If no packing invoice was matched, keep the packing time format (DEL-xx)
       if (grandDeliveryAmount > 0) {
-        const invNo = order.invoiceNumber || "DDFT-fallback";
+        const invNo = order.invoiceNumber || (await getNextDeliveryInvoiceNumber());
         order.deliveredInvoiceHistory.push({
           invoiceNumber: invNo,
           quantity: deliveredItems.reduce((sum, item) => sum + Number(item.quantity), 0),
