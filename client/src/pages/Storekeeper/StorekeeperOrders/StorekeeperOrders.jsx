@@ -109,6 +109,8 @@ const StorekeeperOrders = () => {
     }
   };
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
   // ✅ Filter orders: Show only packed orders (like PackOrders page)
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -134,11 +136,17 @@ const StorekeeperOrders = () => {
           ? order.packedStatus !== "not_packed" // Exclude not_packed by default
           : order.packedStatus?.toLowerCase() === statusFilter.toLowerCase();
 
-      return matchesSearch && matchesInvoice && matchesStatus;
-    });
-  }, [orders, searchTerm, invoiceFilter, statusFilter]);
+      // Once InvoiceCounter is deleted, orders that already have a generated
+      // invoice are dropped entirely rather than just hiding their invoice number.
+      const hasInvoice =
+        !!order.invoiceNumber ||
+        !!order.deliveredInvoiceNumber ||
+        (order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0);
+      const matchesInvoiceVisibility = invoiceSystemActive || !hasInvoice;
 
-  const { entriesPerPage } = useAppSettings();
+      return matchesSearch && matchesInvoice && matchesStatus && matchesInvoiceVisibility;
+    });
+  }, [orders, searchTerm, invoiceFilter, statusFilter, invoiceSystemActive]);
   const pagination = usePaginatedData(
     filteredOrders,
     entriesPerPage,

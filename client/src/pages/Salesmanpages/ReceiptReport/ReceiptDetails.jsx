@@ -8,6 +8,7 @@ import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./ReceiptDetails.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
+import { useAppSettings } from "../../../context/AppSettingsContext";
 
 const ReceiptDetails = () => {
   const { receiptId } = useParams();
@@ -111,12 +112,29 @@ const ReceiptDetails = () => {
     }
   };
 
+  const { invoiceSystemActive } = useAppSettings();
+
   if (loading || !user) return <div className="order-list-loading">Loading...</div>;
 
   if (!receipt) {
     return (
       <div className="receipt-details-error">
         <h2>Receipt Not Found</h2>
+        <button className="btn-back" onClick={() => navigate(-1)}>
+          ← Back
+        </button>
+      </div>
+    );
+  }
+
+  // The whole receipt is an already-generated invoice — once InvoiceCounter
+  // is deleted it's dropped from the list page entirely, so direct-link
+  // access to its detail page is blocked the same way.
+  if (!invoiceSystemActive) {
+    return (
+      <div className="receipt-details-error">
+        <h2>Receipt Unavailable</h2>
+        <p className="text-muted">This receipt is currently unavailable.</p>
         <button className="btn-back" onClick={() => navigate(-1)}>
           ← Back
         </button>

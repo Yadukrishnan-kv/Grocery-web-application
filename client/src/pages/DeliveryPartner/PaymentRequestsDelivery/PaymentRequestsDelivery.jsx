@@ -47,6 +47,20 @@ const PaymentRequestsDelivery = () => {
     return ["N/A"];
   };
 
+  // A bill/transaction/request "has" an invoice once one's been generated
+  // for it — once InvoiceCounter is deleted those rows are dropped entirely
+  // rather than just hiding the invoice number.
+  const recordHasInvoice = (obj) => {
+    if (!obj) return false;
+    const bill = obj.bill || obj;
+    return (
+      !!obj.invoiceNumber ||
+      !!obj.order?.invoiceNumber ||
+      !!bill?.invoiceNumber ||
+      (bill?.packingInvoiceNumbers && bill.packingInvoiceNumbers.length > 0)
+    );
+  };
+
   const [requests, setRequests] = useState([]);
   const [cashRequests, setCashRequests] = useState([]);
   const [chequeRequests, setChequeRequests] = useState([]);
@@ -200,22 +214,26 @@ const PaymentRequestsDelivery = () => {
   // ────────────────────────────────────────────────
   // Filters with Search
   // ────────────────────────────────────────────────
+  const { invoiceSystemActive } = useAppSettings();
+
   const filteredPendingBills = useMemo(() => {
-    if (!pendingSearch.trim()) return pendingBills;
+    const base = invoiceSystemActive ? pendingBills : pendingBills.filter((b) => !recordHasInvoice(b));
+    if (!pendingSearch.trim()) return base;
     const term = pendingSearch.toLowerCase();
-    return pendingBills.filter(
+    return base.filter(
       (bill) =>
         bill.customer?.name?.toLowerCase().includes(term) ||
         getInvoiceNumbers(bill).join(", ").toLowerCase().includes(term) ||
         bill.invoiceNumber?.toLowerCase().includes(term) ||
         bill._id?.toLowerCase().includes(term)
     );
-  }, [pendingBills, pendingSearch]);
+  }, [pendingBills, pendingSearch, invoiceSystemActive]);
 
   const filteredWalletTx = useMemo(() => {
-    if (!walletSearch.trim()) return billTransactions;
+    const base = invoiceSystemActive ? billTransactions : billTransactions.filter((tx) => !recordHasInvoice(tx));
+    if (!walletSearch.trim()) return base;
     const term = walletSearch.toLowerCase();
-    return billTransactions.filter(
+    return base.filter(
       (tx) =>
         tx.customer?.name?.toLowerCase().includes(term) ||
         getInvoiceNumbers(tx.bill).join(", ").toLowerCase().includes(term) ||
@@ -223,33 +241,35 @@ const PaymentRequestsDelivery = () => {
         tx.invoiceNumber?.toLowerCase().includes(term) ||
         tx.bill?.invoiceNumber?.toLowerCase().includes(term)
     );
-  }, [billTransactions, walletSearch]);
+  }, [billTransactions, walletSearch, invoiceSystemActive]);
 
   // ✅ Filtered Cash Requests
   const filteredCashRequests = useMemo(() => {
-    if (!cashSearch.trim()) return cashRequests;
+    const base = invoiceSystemActive ? cashRequests : cashRequests.filter((r) => !recordHasInvoice(r));
+    if (!cashSearch.trim()) return base;
     const term = cashSearch.toLowerCase();
-    return cashRequests.filter(
+    return base.filter(
       (req) =>
         req.customer?.name?.toLowerCase().includes(term) ||
         getInvoiceNumbers(req.bill).join(", ").toLowerCase().includes(term) ||
         req.invoiceNumber?.toLowerCase().includes(term) ||
         req._id?.toLowerCase().includes(term)
     );
-  }, [cashRequests, cashSearch]);
+  }, [cashRequests, cashSearch, invoiceSystemActive]);
 
   // ✅ Filtered Cheque Requests
   const filteredChequeRequests = useMemo(() => {
-    if (!chequeSearch.trim()) return chequeRequests;
+    const base = invoiceSystemActive ? chequeRequests : chequeRequests.filter((r) => !recordHasInvoice(r));
+    if (!chequeSearch.trim()) return base;
     const term = chequeSearch.toLowerCase();
-    return chequeRequests.filter(
+    return base.filter(
       (req) =>
         req.customer?.name?.toLowerCase().includes(term) ||
         getInvoiceNumbers(req.bill).join(", ").toLowerCase().includes(term) ||
         req.invoiceNumber?.toLowerCase().includes(term) ||
         req._id?.toLowerCase().includes(term)
     );
-  }, [chequeRequests, chequeSearch]);
+  }, [chequeRequests, chequeSearch, invoiceSystemActive]);
 
   // ────────────────────────────────────────────────
   // Selection Handlers
@@ -399,8 +419,12 @@ const PaymentRequestsDelivery = () => {
   const calculateTotal = (list, statuses = ["received", "pending"]) =>
     list.filter((t) => statuses.includes(t.status)).reduce((sum, t) => sum + t.amount, 0);
 
-  const cashTotalWallet = calculateTotal(cashTx);
-  const chequeTotalWallet = calculateTotal(chequeTx);
+  const cashTotalWallet = calculateTotal(
+    invoiceSystemActive ? cashTx : cashTx.filter((t) => !recordHasInvoice(t))
+  );
+  const chequeTotalWallet = calculateTotal(
+    invoiceSystemActive ? chequeTx : chequeTx.filter((t) => !recordHasInvoice(t))
+  );
 
   // ✅ Wallet Filtered Total (Only "received" status - Ready to Pay)
   const filteredWalletTotal = useMemo(() => {

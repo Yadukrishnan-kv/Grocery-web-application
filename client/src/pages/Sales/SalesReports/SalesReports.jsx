@@ -126,8 +126,13 @@ const SalesReports = () => {
     }
   }, [user, fetchOrders, fetchSalesmen]);
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
   // ───────────────────────── Build one row per invoice ─────────────────────────
+  // Every row here IS an invoice, so once InvoiceCounter is deleted none of
+  // them can be trusted — the whole report goes empty until it's restored.
   const invoiceRows = useMemo(() => {
+    if (!invoiceSystemActive) return [];
     const rows = [];
     allOrders.forEach((order) => {
       if (!order.invoiceHistory || order.invoiceHistory.length === 0) return;
@@ -175,7 +180,7 @@ const SalesReports = () => {
       });
     });
     return rows;
-  }, [allOrders]);
+  }, [allOrders, invoiceSystemActive]);
 
   const itemMatchesSearch = useCallback(
     (item, term) =>
@@ -296,7 +301,6 @@ const SalesReports = () => {
     toast.success("Excel file exported successfully");
   };
 
-  const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(
     filteredRows,
     entriesPerPage,

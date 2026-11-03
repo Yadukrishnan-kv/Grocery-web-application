@@ -168,8 +168,15 @@ const ChequeWallet = () => {
   const handleSelectAll = (e) => setSelectedTxIds(e.target.checked ? filteredTransactions.map(tx => tx._id) : []);
   const handleSelectTx = (id) => setSelectedTxIds(prev => prev.includes(id) ? prev.filter(txId => txId !== id) : [...prev, id]);
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+  // A transaction "has" an invoice once its order carries one — once
+  // InvoiceCounter is deleted those rows are dropped entirely.
+  const txHasInvoice = (tx) =>
+    !!tx.order?.invoiceNumber || !!tx.order?.deliveredInvoiceNumber || !!tx.invoiceNumber || !!tx.displayInvoiceNumber;
+
   const filteredTransactions = walletData.transactions.filter(tx =>
-    !searchCustomer.trim() || tx.order?.customer?.name?.toLowerCase().includes(searchCustomer.toLowerCase())
+    (invoiceSystemActive || !txHasInvoice(tx)) &&
+    (!searchCustomer.trim() || tx.order?.customer?.name?.toLowerCase().includes(searchCustomer.toLowerCase()))
   );
 
   const totalSelected = selectedTxIds.reduce((sum, id) => {
@@ -177,7 +184,12 @@ const ChequeWallet = () => {
     return sum + (tx?.amount || 0);
   }, 0);
 
-  const { entriesPerPage } = useAppSettings();
+  // "Total Cheque Collected" comes straight from the backend for the whole
+  // dataset — once invoiced rows are hidden, recompute it from what's
+  // actually visible so the summary card matches the table.
+  const visibleTotalAmount = invoiceSystemActive
+    ? walletData.totalAmount
+    : walletData.transactions.filter(tx => !txHasInvoice(tx)).reduce((sum, tx) => sum + tx.amount, 0);
   const pagination = usePaginatedData(filteredTransactions, entriesPerPage, `${searchCustomer}`);
 
   const renderChequeDetails = (details) => {
@@ -227,7 +239,7 @@ const ChequeWallet = () => {
                 <div className="wallet-summary-card-details">
                   <span className="wallet-summary-card-label">Total Cheque Collected</span>
                   <span className="wallet-summary-card-amount">
-                    AED {walletData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    AED {visibleTotalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>

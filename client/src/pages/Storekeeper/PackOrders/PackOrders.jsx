@@ -182,6 +182,8 @@ const PackOrders = () => {
     setPackInputs({});
   };
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchesSearch =
@@ -194,11 +196,17 @@ const PackOrders = () => {
         (order.packedStatus &&
           order.packedStatus.toLowerCase() === statusFilter.toLowerCase());
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [orders, searchTerm, statusFilter]);
+      // Once InvoiceCounter is deleted, orders that already have a generated
+      // invoice (e.g. from an earlier partial delivery) are dropped entirely.
+      const hasInvoice =
+        !!order.invoiceNumber ||
+        !!order.deliveredInvoiceNumber ||
+        (order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0);
+      const matchesInvoiceVisibility = invoiceSystemActive || !hasInvoice;
 
-  const { entriesPerPage } = useAppSettings();
+      return matchesSearch && matchesStatus && matchesInvoiceVisibility;
+    });
+  }, [orders, searchTerm, statusFilter, invoiceSystemActive]);
   const pagination = usePaginatedData(
     filteredOrders,
     entriesPerPage,

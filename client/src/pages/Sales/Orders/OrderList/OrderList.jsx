@@ -33,8 +33,12 @@ const OrderList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const { entriesPerPage } = useAppSettings();
-  const isFiltering = statusFilter !== "all" || searchTerm.trim() !== "";
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+  // When the InvoiceCounter has been deleted, already-invoiced orders are
+  // dropped from the list entirely — that requires filtering the full
+  // dataset client-side (server-side pagination can't apply this filter),
+  // so force the "isFiltering" branch in that case too.
+  const isFiltering = statusFilter !== "all" || searchTerm.trim() !== "" || !invoiceSystemActive;
 
   // Server-side pagination state (used when no filter/search is active)
   const [pageOrders, setPageOrders] = useState([]);
@@ -162,9 +166,13 @@ const OrderList = () => {
         statusFilter === "all" ||
         (order.status &&
           order.status.toLowerCase() === statusFilter.toLowerCase());
-      return matchesSearch && matchesStatus;
+      // Once InvoiceCounter is deleted, already-invoiced orders are no
+      // longer shown at all (not just their invoice number hidden).
+      const matchesInvoice =
+        invoiceSystemActive || !(order.invoiceNumber || order.deliveredInvoiceNumber);
+      return matchesSearch && matchesStatus && matchesInvoice;
     });
-  }, [orders, searchTerm, statusFilter]);
+  }, [orders, searchTerm, statusFilter, invoiceSystemActive]);
 
   const clientPagination = usePaginatedData(
     filteredOrders,

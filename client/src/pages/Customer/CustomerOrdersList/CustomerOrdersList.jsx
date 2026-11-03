@@ -109,6 +109,18 @@ const CustomerOrdersList = () => {
     };
   };
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
+  // An order "has" an invoice once one has been generated for it — once
+  // InvoiceCounter is deleted those orders are dropped entirely rather than
+  // just hiding their invoice number. Requests never have invoices.
+  const orderHasInvoice = (item) =>
+    item.type === "order" &&
+    (!!item.invoiceNumber ||
+      !!item.deliveredInvoiceNumber ||
+      (item.invoiceHistory && item.invoiceHistory.length > 0) ||
+      (item.deliveredInvoiceHistory && item.deliveredInvoiceHistory.length > 0));
+
   // Combine real orders + pending/rejected requests into one list
   const filteredItems = useMemo(() => {
     const allItems = [
@@ -136,11 +148,11 @@ const CustomerOrdersList = () => {
           itemStatus === "rejected") ||
         (item.type === "order" && itemStatus?.toLowerCase() === statusFilter.toLowerCase());
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [realOrders, requests, searchTerm, statusFilter]);
+      const matchesInvoiceVisibility = invoiceSystemActive || !orderHasInvoice(item);
 
-  const { entriesPerPage } = useAppSettings();
+      return matchesSearch && matchesStatus && matchesInvoiceVisibility;
+    });
+  }, [realOrders, requests, searchTerm, statusFilter, invoiceSystemActive]);
   const pagination = usePaginatedData(
     filteredItems,
     entriesPerPage,

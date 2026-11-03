@@ -198,25 +198,42 @@ const PaymentRequestsSales = () => {
     fetchData();
   }, [fetchCurrentUser, fetchData]);
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
+  // A bill/transaction/request "has" an invoice if any invoice number can be
+  // found on it (directly or via its linked bill/order) — once InvoiceCounter
+  // is deleted those can't be trusted, so the whole row is dropped rather
+  // than just hiding the invoice number.
+  const hasAnyInvoice = useCallback((obj) => {
+    if (!obj) return false;
+    if (getInvoiceNumbers(obj.bill || obj).some((inv) => inv !== "N/A")) return true;
+    if (obj.invoiceNumber) return true;
+    if (obj.order?.invoiceNumber) return true;
+    if (obj.bill?.invoiceNumber) return true;
+    return false;
+  }, []);
+
   // ────────────────────────────────────────────────
   // Filters with Search
   // ────────────────────────────────────────────────
   const filteredPendingBills = useMemo(() => {
-    if (!pendingSearch.trim()) return pendingBills;
+    const base = invoiceSystemActive ? pendingBills : pendingBills.filter((b) => !hasAnyInvoice(b));
+    if (!pendingSearch.trim()) return base;
     const term = pendingSearch.toLowerCase();
-    return pendingBills.filter(
+    return base.filter(
       (bill) =>
         bill.customer?.name?.toLowerCase().includes(term) ||
         getInvoiceNumbers(bill).join(", ").toLowerCase().includes(term) ||
         bill.invoiceNumber?.toLowerCase().includes(term) ||
         bill._id?.toLowerCase().includes(term)
     );
-  }, [pendingBills, pendingSearch]);
+  }, [pendingBills, pendingSearch, invoiceSystemActive, hasAnyInvoice]);
 
   const filteredWalletTx = useMemo(() => {
-    if (!walletSearch.trim()) return billTransactions;
+    const base = invoiceSystemActive ? billTransactions : billTransactions.filter((t) => !hasAnyInvoice(t));
+    if (!walletSearch.trim()) return base;
     const term = walletSearch.toLowerCase();
-    return billTransactions.filter(
+    return base.filter(
       (tx) =>
         tx.customer?.name?.toLowerCase().includes(term) ||
         getInvoiceNumbers(tx.bill).join(", ").toLowerCase().includes(term) ||
@@ -224,35 +241,35 @@ const PaymentRequestsSales = () => {
         tx.invoiceNumber?.toLowerCase().includes(term) ||
         tx.bill?.invoiceNumber?.toLowerCase().includes(term)
     );
-  }, [billTransactions, walletSearch]);
+  }, [billTransactions, walletSearch, invoiceSystemActive, hasAnyInvoice]);
 
   // ✅ NEW: Filtered Cash Requests
   const filteredCashRequests = useMemo(() => {
-    if (!cashSearch.trim()) return cashRequests;
+    const base = invoiceSystemActive ? cashRequests : cashRequests.filter((r) => !hasAnyInvoice(r));
+    if (!cashSearch.trim()) return base;
     const term = cashSearch.toLowerCase();
-    return cashRequests.filter(
+    return base.filter(
       (req) =>
         req.customer?.name?.toLowerCase().includes(term) ||
         getInvoiceNumbers(req.bill).join(", ").toLowerCase().includes(term) ||
         req.invoiceNumber?.toLowerCase().includes(term) ||
         req._id?.toLowerCase().includes(term)
     );
-  }, [cashRequests, cashSearch]);
+  }, [cashRequests, cashSearch, invoiceSystemActive, hasAnyInvoice]);
 
   // ✅ NEW: Filtered Cheque Requests
   const filteredChequeRequests = useMemo(() => {
-    if (!chequeSearch.trim()) return chequeRequests;
+    const base = invoiceSystemActive ? chequeRequests : chequeRequests.filter((r) => !hasAnyInvoice(r));
+    if (!chequeSearch.trim()) return base;
     const term = chequeSearch.toLowerCase();
-    return chequeRequests.filter(
+    return base.filter(
       (req) =>
         req.customer?.name?.toLowerCase().includes(term) ||
         getInvoiceNumbers(req.bill).join(", ").toLowerCase().includes(term) ||
         req.invoiceNumber?.toLowerCase().includes(term) ||
         req._id?.toLowerCase().includes(term)
     );
-  }, [chequeRequests, chequeSearch]);
-
-  const { entriesPerPage } = useAppSettings();
+  }, [chequeRequests, chequeSearch, invoiceSystemActive, hasAnyInvoice]);
   const paginationWallet = usePaginatedData(filteredWalletTx, entriesPerPage, walletSearch);
   const paginationPending = usePaginatedData(filteredPendingBills, entriesPerPage, pendingSearch);
   const paginationCash = usePaginatedData(filteredCashRequests, entriesPerPage, cashSearch);

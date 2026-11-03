@@ -16,6 +16,7 @@ export const useAppSettings = () => {
 
 export const AppSettingsProvider = ({ children }) => {
   const [entriesPerPage, setEntriesPerPage] = useState(DEFAULT_ENTRIES_PER_PAGE);
+  const [invoiceSystemActive, setInvoiceSystemActive] = useState(true);
   const [loading, setLoading] = useState(true);
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
@@ -25,19 +26,30 @@ export const AppSettingsProvider = ({ children }) => {
 
     if (!token) {
       setEntriesPerPage(DEFAULT_ENTRIES_PER_PAGE);
+      setInvoiceSystemActive(true);
       setLoading(false);
       return;
     }
 
     try {
-      const response = await axios.get(`${backendUrl}/api/settings/company-settings`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [settingsRes, invoiceStatusRes] = await Promise.all([
+        axios.get(`${backendUrl}/api/settings/company-settings`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${backendUrl}/api/settings/invoice-status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch((error) => {
+          console.error('Failed to load invoice status:', error);
+          return { data: { invoiceSystemActive: true } };
+        })
+      ]);
 
-      setEntriesPerPage(response.data?.entriesPerPage || DEFAULT_ENTRIES_PER_PAGE);
+      setEntriesPerPage(settingsRes.data?.entriesPerPage || DEFAULT_ENTRIES_PER_PAGE);
+      setInvoiceSystemActive(invoiceStatusRes.data?.invoiceSystemActive !== false);
     } catch (error) {
       console.error('Failed to load app settings:', error);
       setEntriesPerPage(DEFAULT_ENTRIES_PER_PAGE);
+      setInvoiceSystemActive(true);
     } finally {
       setLoading(false);
     }
@@ -50,6 +62,7 @@ export const AppSettingsProvider = ({ children }) => {
   return (
     <AppSettingsContext.Provider value={{
       entriesPerPage,
+      invoiceSystemActive,
       loading,
       reloadSettings: loadSettings
     }}>

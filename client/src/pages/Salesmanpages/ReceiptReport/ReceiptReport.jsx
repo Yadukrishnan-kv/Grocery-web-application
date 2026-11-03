@@ -66,8 +66,14 @@ const ReceiptReport = () => {
 
   const clearSearch = () => setSearchTerm("");
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
   // Filter receipts
   const filteredReceipts = useMemo(() => {
+    // Every receipt here is already tied to a generated invoice — once
+    // InvoiceCounter is deleted none of them can be trusted, so the whole
+    // report goes empty until it's restored.
+    if (!invoiceSystemActive) return [];
     return receipts.filter((receipt) => {
       const matchesSearch =
         !searchTerm.trim() ||
@@ -87,9 +93,8 @@ const ReceiptReport = () => {
 
       return matchesSearch;
     });
-  }, [receipts, searchTerm, dateFilter]);
+  }, [receipts, searchTerm, dateFilter, invoiceSystemActive]);
 
-  const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(
     filteredReceipts,
     entriesPerPage,

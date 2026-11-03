@@ -65,6 +65,8 @@ const CustomerOrderReports = () => {
     fetchMyOrders();
   }, [fetchCurrentUser, fetchMyOrders]);
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
   // Filter orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -94,11 +96,17 @@ const CustomerOrderReports = () => {
         matchesDate = matchesDate && orderDate <= end;
       }
 
-      return matchesSearch && matchesDate;
-    });
-  }, [orders, searchTerm, fromDate, toDate]);
+      // Once InvoiceCounter is deleted, orders that already have a generated
+      // invoice are dropped entirely rather than just hiding their invoice number.
+      const hasInvoice =
+        !!order.invoiceNumber ||
+        !!order.deliveredInvoiceNumber ||
+        (order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0);
+      const matchesInvoiceVisibility = invoiceSystemActive || !hasInvoice;
 
-  const { entriesPerPage } = useAppSettings();
+      return matchesSearch && matchesDate && matchesInvoiceVisibility;
+    });
+  }, [orders, searchTerm, fromDate, toDate, invoiceSystemActive]);
   const pagination = usePaginatedData(
     filteredOrders,
     entriesPerPage,

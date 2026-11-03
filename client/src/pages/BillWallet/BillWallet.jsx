@@ -85,18 +85,29 @@ const BillWallet = () => {
     fetchCurrentUser();
     fetchData();
   }, [fetchCurrentUser, fetchData]);
+  const { invoiceSystemActive } = useAppSettings();
+  // A transaction "has" an invoice if it (or its bill/order) carries any
+  // invoice number — once InvoiceCounter is deleted those can't be trusted,
+  // so the whole row is dropped rather than just hiding the invoice number.
+  const txHasInvoice = (tx) =>
+    !!tx.invoiceNumber ||
+    !!tx.bill?.invoiceNumber ||
+    !!tx.order?.invoiceNumber ||
+    (tx.bill?.packingInvoiceNumbers && tx.bill.packingInvoiceNumbers.length > 0);
+
   // Filtered data
   const filteredTransactions = useMemo(() => {
-    if (!searchQuery.trim()) return transactions;
+    let list = invoiceSystemActive ? transactions : transactions.filter((tx) => !txHasInvoice(tx));
+    if (!searchQuery.trim()) return list;
     const term = searchQuery.toLowerCase();
-    return transactions.filter(
+    return list.filter(
       (tx) =>
         tx.customer?.name?.toLowerCase().includes(term) ||
         tx.bill?._id?.toLowerCase().includes(term) ||
         tx.recipient?.username?.toLowerCase().includes(term) ||
         tx.invoiceNumber?.toLowerCase().includes(term),
     );
-  }, [transactions, searchQuery]);
+  }, [transactions, searchQuery, invoiceSystemActive]);
   const receivedTx = useMemo(
     () => filteredTransactions.filter((t) => t.status === "received"),
     [filteredTransactions],
@@ -106,15 +117,18 @@ const BillWallet = () => {
     [filteredTransactions],
   );
   const filteredRequests = useMemo(() => {
-    if (!searchQuery.trim()) return adminRequests;
+    let list = invoiceSystemActive
+      ? adminRequests
+      : adminRequests.filter((req) => !txHasInvoice(req.transaction || {}));
+    if (!searchQuery.trim()) return list;
     const term = searchQuery.toLowerCase();
-    return adminRequests.filter(
+    return list.filter(
       (req) =>
         req.transaction?.customer?.name?.toLowerCase().includes(term) ||
         req.sender?.username?.toLowerCase().includes(term) ||
         req.transaction?.invoiceNumber?.toLowerCase().includes(term),
     );
-  }, [adminRequests, searchQuery]);
+  }, [adminRequests, searchQuery, invoiceSystemActive]);
   // Totals
   const receivedFilteredTotal = useMemo(
     () => receivedTx.reduce((sum, t) => sum + t.amount, 0),

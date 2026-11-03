@@ -159,13 +159,23 @@ const OrderReports = () => {
     [searchTerm, fromDate, toDate, salesmanFilter, itemMatchesSearch]
   );
 
-  // Orders that have any delivered quantity — this is what the table displays
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
+  // Orders that have any delivered quantity — this is what the table displays.
+  // Once InvoiceCounter is deleted, orders that already have a generated
+  // invoice are dropped entirely rather than just hiding their invoice number.
   const deliveredOrders = useMemo(
     () =>
-      allOrders.filter((order) =>
-        order.orderItems?.some((item) => (item.deliveredQuantity || 0) > 0)
-      ),
-    [allOrders]
+      allOrders.filter((order) => {
+        const hasDeliveredQty = order.orderItems?.some((item) => (item.deliveredQuantity || 0) > 0);
+        if (!hasDeliveredQty) return false;
+        const hasInvoice =
+          !!order.invoiceNumber ||
+          !!order.deliveredInvoiceNumber ||
+          (order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0);
+        return invoiceSystemActive || !hasInvoice;
+      }),
+    [allOrders, invoiceSystemActive]
   );
 
   const filteredOrders = useMemo(
@@ -258,7 +268,6 @@ const OrderReports = () => {
     toast.success("Excel file exported successfully");
   };
 
-  const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(
     filteredOrders,
     entriesPerPage,

@@ -1,4 +1,5 @@
 const CompanySettings = require("../models/CompanySettings");
+const InvoiceCounter = require("../models/InvoiceCounter");
 
 const createCompanySettings = async (req, res) => {
   try {
@@ -134,8 +135,21 @@ const updateCompanySettings = async (req, res) => {
   }
 };
 
+// Whether the InvoiceCounter document currently exists in the DB.
+// Frontend uses this to hide rows of already-invoiced records when the
+// counter has been deleted (invoice numbering is in an unreliable state).
+const getInvoiceStatus = async (req, res) => {
+  try {
+    const counter = await InvoiceCounter.findOne();
+    res.json({ invoiceSystemActive: !!counter });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   createCompanySettings,
   getCompanySettings,
   updateCompanySettings,
+  getInvoiceStatus,
 };

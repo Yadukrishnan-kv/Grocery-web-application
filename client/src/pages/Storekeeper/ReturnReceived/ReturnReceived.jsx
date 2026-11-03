@@ -111,11 +111,17 @@ const ReturnReceived = () => {
   const totalReturnAmt = (sr) =>
     sr.refundAmount || Math.round((sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0));
 
-  const pendingReturns = returns.filter((r) => r.status === "picked_up");
-  const completedReturns = returns.filter((r) => r.status === "completed");
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+  // Once InvoiceCounter is deleted, returns that already have a generated
+  // credit-note number are dropped entirely rather than just hiding that number.
+  const eligibleReturns = invoiceSystemActive
+    ? returns
+    : returns.filter((r) => !r.returnInvoiceNumber);
+
+  const pendingReturns = eligibleReturns.filter((r) => r.status === "picked_up");
+  const completedReturns = eligibleReturns.filter((r) => r.status === "completed");
   const visibleReturns = activeTab === "pending" ? pendingReturns : completedReturns;
 
-  const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(visibleReturns, entriesPerPage, `${activeTab}`);
 
   return (

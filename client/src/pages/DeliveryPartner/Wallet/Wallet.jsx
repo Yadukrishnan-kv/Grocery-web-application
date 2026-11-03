@@ -126,14 +126,23 @@ const Wallet = () => {
     fetchCashWallet();
   }, [fetchCurrentUser, fetchCashWallet]);
 
+  const { invoiceSystemActive } = useAppSettings();
+  // A transaction "has" an invoice once its order carries one — once
+  // InvoiceCounter is deleted those rows are dropped entirely.
+  const txHasInvoice = (tx) =>
+    !!tx.displayInvoiceNumber || !!tx.order?.invoiceNumber || !!tx.invoiceNumber;
+
   // Filtered + totals
   const filteredTransactions = useMemo(() => {
-    if (!searchCustomer.trim()) return walletData.transactions;
+    let list = invoiceSystemActive
+      ? walletData.transactions
+      : walletData.transactions.filter((tx) => !txHasInvoice(tx));
+    if (!searchCustomer.trim()) return list;
     const term = searchCustomer.toLowerCase();
-    return walletData.transactions.filter((tx) =>
+    return list.filter((tx) =>
       tx.order?.customer?.name?.toLowerCase().includes(term),
     );
-  }, [walletData.transactions, searchCustomer]);
+  }, [walletData.transactions, searchCustomer, invoiceSystemActive]);
 
   const filteredTotal = useMemo(
     () => filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0),
@@ -147,6 +156,15 @@ const Wallet = () => {
         .reduce((sum, tx) => sum + tx.amount, 0),
     [walletData.transactions, selectedTxIds],
   );
+
+  // "Total Cash Collected" comes straight from the backend for the whole
+  // dataset — once invoiced rows are hidden, recompute it from what's
+  // actually visible so the summary card matches the table.
+  const visibleTotalAmount = invoiceSystemActive
+    ? walletData.totalAmount
+    : walletData.transactions
+        .filter((tx) => !txHasInvoice(tx))
+        .reduce((sum, tx) => sum + tx.amount, 0);
 
   const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(filteredTransactions, entriesPerPage, `${searchCustomer}`);
@@ -346,7 +364,7 @@ const downloadSingleReceipt = async (txId, invoiceNumber) => {
                   </span>
                   <span className="wallet-summary-card-amount">
                     AED{" "}
-                    {walletData.totalAmount.toLocaleString("en-US", {
+                    {visibleTotalAmount.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                     })}
                   </span>

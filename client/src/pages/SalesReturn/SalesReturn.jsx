@@ -115,15 +115,23 @@ const SalesReturn = () => {
     { key: "rejected", label: "Rejected" },
   ];
 
+  const { invoiceSystemActive } = useAppSettings();
+  // Once InvoiceCounter is deleted, returns that already have a generated
+  // credit-note number are dropped entirely rather than just hiding that number.
+  const visibleReturns = useMemo(
+    () => (invoiceSystemActive ? returns : returns.filter((r) => !r.returnInvoiceNumber)),
+    [returns, invoiceSystemActive]
+  );
+
   const stats = useMemo(() => ({
-    pending: returns.filter((r) => r.status === "pending_admin_approval").length,
-    approved: returns.filter((r) => r.status === "approved").length,
-    inProgress: returns.filter((r) => ["pickup_assigned", "picked_up"].includes(r.status)).length,
-    completed: returns.filter((r) => r.status === "completed").length,
-  }), [returns]);
+    pending: visibleReturns.filter((r) => r.status === "pending_admin_approval").length,
+    approved: visibleReturns.filter((r) => r.status === "approved").length,
+    inProgress: visibleReturns.filter((r) => ["pickup_assigned", "picked_up"].includes(r.status)).length,
+    completed: visibleReturns.filter((r) => r.status === "completed").length,
+  }), [visibleReturns]);
 
   const filtered = useMemo(() => {
-    let list = activeTab === "all" ? returns : returns.filter((r) => r.status === activeTab);
+    let list = activeTab === "all" ? visibleReturns : visibleReturns.filter((r) => r.status === activeTab);
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
@@ -136,7 +144,7 @@ const SalesReturn = () => {
       );
     }
     return list;
-  }, [returns, activeTab, searchTerm]);
+  }, [visibleReturns, activeTab, searchTerm]);
 
   // Once completed, sr.refundAmount holds the actual (already rounded)
   // amount credited back — otherwise round the raw item sum the same way

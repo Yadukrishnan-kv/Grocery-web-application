@@ -108,11 +108,18 @@ const ReturnPickups = () => {
   const totalReturnAmt = (sr) =>
     sr.refundAmount || Math.round((sr.returnItems || []).reduce((s, i) => s + (i.totalAmount || 0), 0));
 
-  const assigned = pickups.filter((p) => p.status === "pickup_assigned");
-  const pickedUp = pickups.filter((p) => p.status === "picked_up");
-  const completed = pickups.filter((p) => p.status === "completed");
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
 
-  const { entriesPerPage } = useAppSettings();
+  // Once InvoiceCounter is deleted, returns that already have a generated
+  // credit-note number are dropped entirely rather than just hiding that number.
+  const visiblePickups = invoiceSystemActive
+    ? pickups
+    : pickups.filter((p) => !p.returnInvoiceNumber);
+
+  const assigned = visiblePickups.filter((p) => p.status === "pickup_assigned");
+  const pickedUp = visiblePickups.filter((p) => p.status === "picked_up");
+  const completed = visiblePickups.filter((p) => p.status === "completed");
+
   const assignedPagination = usePaginatedData(assigned, entriesPerPage, `${activeTab}|assigned`);
   const pickedUpPagination = usePaginatedData(pickedUp, entriesPerPage, `${activeTab}|pickedUp`);
   const completedPagination = usePaginatedData(completed, entriesPerPage, `${activeTab}|completed`);

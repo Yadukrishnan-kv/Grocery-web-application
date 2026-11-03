@@ -1,5 +1,5 @@
 // src/pages/salesman/CustomerOutstandingDetails.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
@@ -8,6 +8,7 @@ import TableScrollSync from "../../../components/common/TableScrollSync";
 import "./CustomerOutstandingDetails.css";
 import axios from "axios";
 import toast from "../../../utils/toast";
+import { useAppSettings } from "../../../context/AppSettingsContext";
 
 const CustomerOutstandingDetails = () => {
   const { customerId } = useParams();
@@ -62,6 +63,33 @@ const CustomerOutstandingDetails = () => {
     fetchCurrentUser();
     fetchOutstandingDetails();
   }, [fetchCurrentUser, fetchOutstandingDetails]);
+
+  const { invoiceSystemActive } = useAppSettings();
+  // A bill "has" an invoice once packing/delivery has generated one — once
+  // InvoiceCounter is deleted those bills are dropped entirely rather than
+  // just hiding their invoice number.
+  const billHasInvoice = (bill) =>
+    !!bill.invoiceNumber || (bill.packingInvoiceNumbers && bill.packingInvoiceNumbers.length > 0);
+
+  const visibleBills = useMemo(
+    () => (invoiceSystemActive ? bills : bills.filter((b) => !billHasInvoice(b))),
+    [bills, invoiceSystemActive]
+  );
+
+  // Recompute summary stats from only the visible bills so the cards match
+  // what's actually listed below them.
+  const visibleSummary = useMemo(() => {
+    if (!summary || invoiceSystemActive) return summary;
+    const totalOutstanding = visibleBills.reduce((s, b) => s + (b.remainingDue || 0), 0);
+    const creditLimit = (summary.availableCredit || 0) + (summary.totalOutstanding || 0);
+    return {
+      ...summary,
+      totalOutstanding,
+      availableCredit: creditLimit - totalOutstanding,
+      totalBills: visibleBills.length,
+      overdueBills: visibleBills.filter((b) => b.status === "overdue").length,
+    };
+  }, [summary, visibleBills, invoiceSystemActive]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-US", {
@@ -152,44 +180,47 @@ const CustomerOutstandingDetails = () => {
             </div>
 
             {/* Summary Cards */}
-            {summary && (
+            {visibleSummary && (
               <div className="summary-cards">
                 <div className="summary-card card-outstanding">
                   <span className="card-label">Total Outstanding</span>
                   <div className="card-value">
                     <img src={DirhamSymbol} alt="AED" width={18} height={18} />
-                    {formatCurrency(summary.totalOutstanding)}
+                    {formatCurrency(visibleSummary.totalOutstanding)}
                   </div>
                 </div>
                 <div className="summary-card card-credit">
                   <span className="card-label">Available Credit</span>
                   <div className="card-value">
                     <img src={DirhamSymbol} alt="AED" width={18} height={18} />
-                    {formatCurrency(summary.availableCredit)}
+                    {formatCurrency(visibleSummary.availableCredit)}
                   </div>
                 </div>
                 <div className="summary-card card-bills">
                   <span className="card-label">Pending Bills</span>
-                  <div className="card-value">{summary.totalBills}</div>
+                  <div className="card-value">{visibleSummary.totalBills}</div>
                 </div>
                 <div className="summary-card card-overdue">
                   <span className="card-label">Overdue Bills</span>
-                  <div className="card-value">{summary.overdueBills}</div>
+                  <div className="card-value">{visibleSummary.overdueBills}</div>
                 </div>
               </div>
             )}
 
             {/* Bills List */}
             <div className="bills-section">
-              <h3 className="section-title">Pending Bills ({bills.length})</h3>
+              <h3 className="section-title">Pending Bills ({visibleBills.length})</h3>
 
-              {bills.length === 0 ? (
+              {visibleBills.length === 0 ? (
                 <div className="no-bills">No pending bills found</div>
               ) : (
                 <div className="bills-list">
-                  {bills.map((bill) => {
+                  {visibleBills.map((bill) => {
                     const statusBadge = getStatusBadge(bill.status);
                     const daysStatus = getDaysStatus(bill.daysLeft);
+                    const visibleOrders = invoiceSystemActive
+                      ? bill.orders
+                      : (bill.orders || []).filter((o) => !o.invoiceNumber);
 
                     return (
                       <div key={bill._id} className="bill-card">
@@ -244,7 +275,7 @@ const CustomerOutstandingDetails = () => {
                           </div>
 
                           {/* Orders Table - Using original full-width table style */}
-                          {bill.orders?.length > 0 && (
+                          {visibleOrders?.length > 0 && (
                             <div className="orders-list">
                               <TableScrollSync>
                                 <div className="orders-table-wrapper-full">
@@ -260,7 +291,7 @@ const CustomerOutstandingDetails = () => {
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {bill.orders.map((order) => (
+                                      {visibleOrders.map((order) => (
                                         <tr key={order._id}>
                                           <td>{order.invoiceNumber || "-"}</td>
                                           <td>{formatDate(order.orderDate)}</td>

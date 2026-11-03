@@ -115,14 +115,22 @@ const DeliveredOrdersList = () => {
     [user]
   );
 
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
+  // Once InvoiceCounter is deleted, orders that already have a generated
+  // invoice are dropped entirely rather than just hiding their invoice number.
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      return (
+      const matchesSearch =
         !searchTerm.trim() ||
-        order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+        order.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const hasInvoice =
+        !!order.invoiceNumber ||
+        !!order.deliveredInvoiceNumber ||
+        (order.deliveredInvoiceHistory && order.deliveredInvoiceHistory.length > 0);
+      return matchesSearch && (invoiceSystemActive || !hasInvoice);
     });
-  }, [orders, searchTerm]);
+  }, [orders, searchTerm, invoiceSystemActive]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -133,7 +141,6 @@ const DeliveredOrdersList = () => {
     return `${day}/${month}/${year}`;
   };
 
-  const { entriesPerPage } = useAppSettings();
   const pagination = usePaginatedData(filteredOrders, entriesPerPage, `${searchTerm}`);
 
   if (!user) return <div className="delivered-orders-loading">Loading...</div>;

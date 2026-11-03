@@ -1,5 +1,5 @@
 // src/pages/Customer/Bills/CustomerBillStatement.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "../../../components/layout/Header/Header";
 import Sidebar from "../../../components/layout/Sidebar/Sidebar";
 import DirhamSymbol from "../../../Assets/aed-symbol.png";
@@ -101,8 +101,17 @@ const CustomerBillStatement = () => {
   const [filteredDeliveryMen, setFilteredDeliveryMen] = useState([]);
   const [filteredSalesMen, setFilteredSalesMen] = useState([]);
 
-  const { entriesPerPage } = useAppSettings();
-  const pagination = usePaginatedData(bills, entriesPerPage, "");
+  const { entriesPerPage, invoiceSystemActive } = useAppSettings();
+
+  // A bill "has" an invoice once getInvoiceNumbers resolves to a real one —
+  // once InvoiceCounter is deleted those bills are dropped entirely rather
+  // than just hiding their invoice number.
+  const visibleBills = useMemo(() => {
+    if (invoiceSystemActive) return bills;
+    return bills.filter((bill) => getInvoiceNumbers(bill)[0] === "N/A");
+  }, [bills, invoiceSystemActive]);
+
+  const pagination = usePaginatedData(visibleBills, entriesPerPage, "");
 
   const backendUrl = process.env.REACT_APP_BACKEND_IP;
 
@@ -526,7 +535,7 @@ const getSalesManForCustomer = useCallback(async () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {bills.length > 0 ? (
+                        {visibleBills.length > 0 ? (
                           pagination.pageData.map((bill, index) => {
                             const daysDisplay = getDaysRemainingDisplay(bill);
                             const isPendingPayment = bill.status === "pending_payment";

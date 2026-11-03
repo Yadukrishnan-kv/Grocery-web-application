@@ -97,9 +97,15 @@ const WalletMoney = () => {
     fetchWalletMoney();
   }, [fetchCurrentUser, fetchWalletMoney]);
 
+  const { invoiceSystemActive } = useAppSettings();
+  // A transaction's order "has" an invoice once it's been generated —
+  // once InvoiceCounter is deleted those orders' rows are dropped entirely.
+  const txOrderHasInvoice = (tx) => !!tx.order?.invoiceNumber || !!tx.order?.deliveredInvoiceNumber;
+
   // Filtered cash
   const filteredCash = useMemo(() => {
     return cashTransactions.filter(tx => {
+      if (!invoiceSystemActive && txOrderHasInvoice(tx)) return false;
       if (cashStatusFilter !== "all" && tx.status !== cashStatusFilter) return false;
       if (cashSearch.trim()) {
         const term = cashSearch.toLowerCase();
@@ -111,11 +117,12 @@ const WalletMoney = () => {
       }
       return true;
     });
-  }, [cashTransactions, cashStatusFilter, cashSearch]);
+  }, [cashTransactions, cashStatusFilter, cashSearch, invoiceSystemActive]);
 
   // Filtered cheque
   const filteredCheque = useMemo(() => {
     return chequeTransactions.filter(tx => {
+      if (!invoiceSystemActive && txOrderHasInvoice(tx)) return false;
       if (chequeStatusFilter !== "all" && tx.status !== chequeStatusFilter) return false;
       if (chequeSearch.trim()) {
         const term = chequeSearch.toLowerCase();
@@ -127,7 +134,7 @@ const WalletMoney = () => {
       }
       return true;
     });
-  }, [chequeTransactions, chequeStatusFilter, chequeSearch]);
+  }, [chequeTransactions, chequeStatusFilter, chequeSearch, invoiceSystemActive]);
 
   // Filtered totals (displayed when searching)
   const cashFilteredTotal = useMemo(() => 
