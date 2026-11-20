@@ -4,6 +4,7 @@ const BillAdminRequest = require("../models/BillAdminRequest");
 const Customer = require("../models/Customer");
 const CompanySettings = require("../models/CompanySettings");
 const Bill = require("../models/Bill");
+const { renderThermalPDF } = require("../utils/pdfAutoHeight");
 
 const getMyTransactions = async (req, res) => {
   try {
@@ -280,12 +281,9 @@ const generateReceipt = async (req, res) => {
     const labelW = 75;
     const valueW = contentWidth - labelW;
 
-    const doc = new (require("pdfkit"))({ size: [pageWidth, 800], margin, bufferPages: true });
     const filename = `receipt-${invoiceNo}.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-    doc.pipe(res);
 
+    const draw = (doc) => {
     let y = margin;
     const drawDashedLine = (yPos) => {
       doc.save();
@@ -302,7 +300,12 @@ const generateReceipt = async (req, res) => {
     const printRow = (label, value) => {
       doc.fontSize(7).font("Helvetica-Bold").fillColor("#000").text(label, centerX, y, { width: labelW });
       doc.fontSize(7).font("Helvetica").fillColor("#000").text(String(value), centerX + labelW, y, { width: valueW, align: "right" });
-      y += 11;
+      // A comma-joined list of invoice numbers can wrap to more than one
+      // line — advancing by a fixed single-line height would run the next
+      // row into it, so advance by whichever of the label/value actually
+      // rendered taller.
+      const rowHeight = Math.max(doc.heightOfString(label, { width: labelW }), doc.heightOfString(String(value), { width: valueW }));
+      y += Math.max(11, rowHeight + 2);
     };
 
     doc.fontSize(10).font("Helvetica-Bold").fillColor("#000").text((company.companyName || "COMPANY").toUpperCase(), centerX, y, { width: contentWidth, align: "center" });
@@ -376,7 +379,11 @@ const generateReceipt = async (req, res) => {
     doc.fontSize(6).font("Helvetica").fillColor("#000").text("Thank you for your payment!", centerX, y, { width: contentWidth, align: "center" });
     y += 9;
     doc.text("This is a computer-generated receipt.", centerX, y, { width: contentWidth, align: "center" });
-    doc.end();
+
+      return y;
+    };
+
+    renderThermalPDF({ res, filename, disposition: "inline", pageWidth, margin, draw });
   } catch (error) {
     console.error("Generate receipt error:", error);
     if (!res.headersSent) {
@@ -625,20 +632,7 @@ const generateCashReceipt = async (req, res) => {
     const labelW = 75;
     const valueW = contentWidth - labelW;
 
-    const PDFDocument = require("pdfkit");
-    const doc = new PDFDocument({ size: [pageWidth, 800], margin, bufferPages: true });
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
-    doc.on("error", (err) => {
-      console.error("PDF generation error:", err);
-      if (!res.headersSent) {
-        res.status(500).json({ message: "Error generating PDF" });
-      }
-    });
-    doc.pipe(res);
-
+    const draw = (doc) => {
     let y = margin;
     const drawDashedLine = (yPos) => {
       doc.save();
@@ -654,7 +648,12 @@ const generateCashReceipt = async (req, res) => {
     const printRow = (label, value) => {
       doc.fontSize(7).font("Helvetica-Bold").fillColor("#000").text(label, centerX, y, { width: labelW });
       doc.fontSize(7).font("Helvetica").fillColor("#000").text(String(value), centerX + labelW, y, { width: valueW, align: "right" });
-      y += 11;
+      // A comma-joined list of invoice numbers can wrap to more than one
+      // line — advancing by a fixed single-line height would run the next
+      // row into it, so advance by whichever of the label/value actually
+      // rendered taller.
+      const rowHeight = Math.max(doc.heightOfString(label, { width: labelW }), doc.heightOfString(String(value), { width: valueW }));
+      y += Math.max(11, rowHeight + 2);
     };
 
     doc.fontSize(10).font("Helvetica-Bold").fillColor("#000").text((company.companyName || "COMPANY").toUpperCase(), centerX, y, { width: contentWidth, align: "center" });
@@ -718,7 +717,10 @@ const generateCashReceipt = async (req, res) => {
     y += 9;
     doc.text("This is a computer-generated receipt.", centerX, y, { width: contentWidth, align: "center" });
 
-    doc.end();
+      return y;
+    };
+
+    renderThermalPDF({ res, filename, pageWidth, margin, draw });
   } catch (error) {
     console.error("Generate cash receipt error:", error);
     if (!res.headersSent) {

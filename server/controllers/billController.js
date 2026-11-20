@@ -7,6 +7,7 @@ const CompanySettings = require("../models/CompanySettings");
 const Role = require("../models/Role");
 const PDFDocument = require("pdfkit");
 const moment = require("moment");
+const { renderThermalPDF } = require("../utils/pdfAutoHeight");
 
 // Admin always has access; any other role needs the "menu.cashCollection"
 // permission granted on its Role document (set via Role Permissions screen).
@@ -702,24 +703,15 @@ const getBillReceipt = async (req, res) => {
     }, 0);
     const filename = `receipt-${displayReceiptNo}.pdf`;
 
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    
     const company = await CompanySettings.findOne() || { companyName: "Company" };
 
-    // 80mm thermal paper: ~226pt wide
+    // 80mm thermal paper: ~226pt wide, height auto-sized to content below
     const pageWidth = 226;
     const margin = 10;
     const contentWidth = pageWidth - margin * 2;
     const centerX = margin;
 
-    const doc = new PDFDocument({
-      size: [pageWidth, 800],
-      margin: margin,
-      bufferPages: true,
-    });
-    doc.pipe(res);
-
+    const draw = (doc) => {
     let y = margin;
 
     // Helper: dashed separator line
@@ -777,7 +769,12 @@ const getBillReceipt = async (req, res) => {
     const printRow = (label, value) => {
       doc.fontSize(7).font("Helvetica-Bold").text(label, centerX, y, { width: labelW });
       doc.fontSize(7).font("Helvetica").text(value, centerX + labelW, y, { width: valueW, align: "right" });
-      y += 11;
+      // A comma-joined list of invoice numbers can wrap to more than one
+      // line — advancing by a fixed single-line height would run the next
+      // row into it, so advance by whichever of the label/value actually
+      // rendered taller.
+      const rowHeight = Math.max(doc.heightOfString(label, { width: labelW }), doc.heightOfString(String(value), { width: valueW }));
+      y += Math.max(11, rowHeight + 2);
     };
 
 
@@ -848,7 +845,10 @@ const getBillReceipt = async (req, res) => {
     y += 9;
     doc.text("This is a computer-generated receipt.", centerX, y, { width: contentWidth, align: "center" });
 
-    doc.end();
+      return y;
+    };
+
+    renderThermalPDF({ res, filename, pageWidth, margin, draw });
     console.log(`Receipt generated for bill ${bill._id} (Receipt: ${displayReceiptNo})`);
   } catch (error) {
     console.error("Receipt generation error:", error);
@@ -881,22 +881,13 @@ const downloadBillInvoice = async (req, res) => {
     const company = await CompanySettings.findOne() || { companyName: "Company" };
     const filename = `bill-invoice-${bill.invoiceNumber || bill._id.toString().slice(-8)}.pdf`;
 
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
-    // 80mm thermal paper: ~226pt wide, variable height
+    // 80mm thermal paper: ~226pt wide, height auto-sized to content below
     const pageWidth = 226;
     const margin = 10;
     const contentWidth = pageWidth - margin * 2;
     const centerX = margin;
 
-    const doc = new PDFDocument({
-      size: [pageWidth, 800],
-      margin: margin,
-      bufferPages: true,
-    });
-    doc.pipe(res);
-
+    const draw = (doc) => {
     let y = margin;
 
     // Helper: dashed separator line
@@ -966,7 +957,12 @@ const downloadBillInvoice = async (req, res) => {
     const printRow = (label, value) => {
       doc.fontSize(7).font("Helvetica-Bold").text(label, centerX, y, { width: labelW });
       doc.fontSize(7).font("Helvetica").text(value, centerX + labelW, y, { width: valueW, align: "right" });
-      y += 11;
+      // A comma-joined list of invoice numbers can wrap to more than one
+      // line — advancing by a fixed single-line height would run the next
+      // row into it, so advance by whichever of the label/value actually
+      // rendered taller.
+      const rowHeight = Math.max(doc.heightOfString(label, { width: labelW }), doc.heightOfString(String(value), { width: valueW }));
+      y += Math.max(11, rowHeight + 2);
     };
 
     printRow("Invoice No:", bill.invoiceNumber || "N/A");
@@ -1022,7 +1018,10 @@ const downloadBillInvoice = async (req, res) => {
     y += 9;
     doc.text(new Date().toLocaleString(), centerX, y, { width: contentWidth, align: "center" });
 
-    doc.end();
+      return y;
+    };
+
+    renderThermalPDF({ res, filename, pageWidth, margin, draw });
   } catch (error) {
     console.error("Download bill invoice error:", error);
     if (!res.headersSent) {

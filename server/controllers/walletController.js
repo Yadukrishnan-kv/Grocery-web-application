@@ -6,6 +6,7 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const CompanySettings = require('../models/CompanySettings');
 const Bill = require('../models/Bill');
+const { renderThermalPDF, measureThermalHeight } = require('../utils/pdfAutoHeight');
 
 const getDeliveryCashWallet = async (req, res) => {
   try {
@@ -345,12 +346,9 @@ const generatePaymentReceipt = async (req, res) => {
     const labelW = 75;
     const valueW = contentWidth - labelW;
 
-    const doc = new PDFDocument({ size: [pageWidth, 800], margin, bufferPages: true });
     const filename = `receipt-${correctInvoiceNumber}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    doc.pipe(res);
 
+    const draw = (doc) => {
     let y = margin;
 
     const drawDashedLine = (yPos) => {
@@ -367,7 +365,12 @@ const generatePaymentReceipt = async (req, res) => {
     const printRow = (label, value) => {
       doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text(label, centerX, y, { width: labelW });
       doc.fontSize(7).font('Helvetica').fillColor('#000').text(String(value), centerX + labelW, y, { width: valueW, align: 'right' });
-      y += 11;
+      // A comma-joined list of invoice numbers can wrap to more than one
+      // line — advancing by a fixed single-line height would run the next
+      // row into it, so advance by whichever of the label/value actually
+      // rendered taller.
+      const rowHeight = Math.max(doc.heightOfString(label, { width: labelW }), doc.heightOfString(String(value), { width: valueW }));
+      y += Math.max(11, rowHeight + 2);
     };
 
     // ===== COMPANY HEADER =====
@@ -466,7 +469,10 @@ const generatePaymentReceipt = async (req, res) => {
     y += 9;
     doc.text('This is a computer-generated receipt.', centerX, y, { width: contentWidth, align: 'center' });
 
-    doc.end();
+      return y;
+    };
+
+    renderThermalPDF({ res, filename, disposition: 'inline', pageWidth, margin, draw });
   } catch (error) {
     console.error('Receipt generation error:', error);
     if (!res.headersSent) {
@@ -531,37 +537,40 @@ const generateBulkPaymentReceipt = async (req, res) => {
     const labelW = 75;
     const valueW = contentWidth - labelW;
 
-    const doc = new PDFDocument({ size: [pageWidth, 800], margin, bufferPages: true });
-
-    res.setHeader('Content-Type', 'application/pdf');
     const filename = useSingleReceipt
       ? `${finalReceiptNumber}.pdf`
       : transactions.length === 1
         ? `receipt-${transactions[0].invoiceNumber || transactions[0].order?.invoiceNumber || 'N/A'}.pdf`
         : `bulk-cash-receipts-${Date.now()}.pdf`;
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    doc.pipe(res);
 
-    const drawDashedLine = (yPos) => {
-      doc.save();
-      doc.strokeColor('#000').lineWidth(0.5);
-      const dashLen = 3, gap = 2;
-      for (let x = margin; x < pageWidth - margin; x += dashLen + gap) {
-        doc.moveTo(x, yPos).lineTo(Math.min(x + dashLen, pageWidth - margin), yPos).stroke();
-      }
-      doc.restore();
-      return yPos + 6;
-    };
-
-    transactions.forEach((tx, index) => {
-      if (index > 0) doc.addPage();
-
+    // Each transaction gets its own page, and each page's height is
+    // auto-sized to that transaction's own content (a long address on one
+    // receipt shouldn't force every other page in the batch to the same
+    // fixed height) — so every page is measured individually before the
+    // real multi-page document is built.
+    const drawTxPage = (doc, tx) => {
       let y = margin;
+
+      const drawDashedLine = (yPos) => {
+        doc.save();
+        doc.strokeColor('#000').lineWidth(0.5);
+        const dashLen = 3, gap = 2;
+        for (let x = margin; x < pageWidth - margin; x += dashLen + gap) {
+          doc.moveTo(x, yPos).lineTo(Math.min(x + dashLen, pageWidth - margin), yPos).stroke();
+        }
+        doc.restore();
+        return yPos + 6;
+      };
 
       const makePrintRow = (label, value) => {
         doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text(label, centerX, y, { width: labelW });
         doc.fontSize(7).font('Helvetica').fillColor('#000').text(String(value), centerX + labelW, y, { width: valueW, align: 'right' });
-        y += 11;
+        // A comma-joined list of invoice numbers can wrap to more than one
+        // line — advancing by a fixed single-line height would run the next
+        // row into it, so advance by whichever of the label/value actually
+        // rendered taller.
+        const rowHeight = Math.max(doc.heightOfString(label, { width: labelW }), doc.heightOfString(String(value), { width: valueW }));
+        y += Math.max(11, rowHeight + 2);
       };
 
       // Determine correct invoice number
@@ -685,6 +694,29 @@ const generateBulkPaymentReceipt = async (req, res) => {
         .text('Thank you for your payment!', centerX, y, { width: contentWidth, align: 'center' });
       y += 9;
       doc.text('This is a computer-generated receipt.', centerX, y, { width: contentWidth, align: 'center' });
+
+      return y;
+    };
+
+    const pageHeights = transactions.map((tx) =>
+      Math.ceil(measureThermalHeight({ pageWidth, margin, draw: (doc) => drawTxPage(doc, tx) }) + 14)
+    );
+
+    const doc = new PDFDocument({ size: [pageWidth, pageHeights[0]], margin, bufferPages: true });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    doc.on('error', (err) => {
+      console.error('PDF generation error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Error generating PDF' });
+      }
+    });
+    doc.pipe(res);
+
+    transactions.forEach((tx, index) => {
+      if (index > 0) doc.addPage({ size: [pageWidth, pageHeights[index]], margin });
+      drawTxPage(doc, tx);
     });
 
     doc.end();

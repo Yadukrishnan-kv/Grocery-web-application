@@ -55,125 +55,151 @@ export const downloadThermalSlip = (order, { getQty = defaultGetQty, filterItem 
     const orderIdMarginTop = 10 * PX_TO_PT;
     const productsMarginTop = 10 * PX_TO_PT;
 
+    // PDFKit/jsPDF both need the page size fixed at construction time, so a
+    // fixed-height page (1200pt — taller than most A4 pages) was previously
+    // used regardless of how many products the order actually had. On a real
+    // thermal roll printer that feeds out a trailing blank gap after the
+    // slip's content; on screen/PDF it looks like a near-empty A4 page.
+    //
+    // To get a page whose height matches its content ("auto height"), the
+    // layout runs once against a throwaway tall page purely to measure how
+    // far `y` advances, then runs again for real against a page sized to
+    // that measured height.
+    const draw = (pdf) => {
+      let y = margin + titleMarginTop;
+
+      // Row height for a given font size, derived from jsPDF's own line-height
+      // factor instead of a hardcoded pixel guess — so it always matches the
+      // font actually in use and never runs two lines into each other no
+      // matter how long the customer name/address turns out to be.
+      const lineAdvance = (fontSize, extra = 2) => fontSize * pdf.getLineHeightFactor() + extra;
+
+      const drawDashedLine = (yPos) => {
+        pdf.setLineDashPattern([1, 1], 0);
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, yPos, pageWidth - margin, yPos);
+        pdf.setLineDashPattern([], 0);
+        return yPos + 8;
+      };
+
+      const printRow = (label, value) => {
+        pdf.setFontSize(9).setFont(undefined, "bold");
+        pdf.text(label, margin, y, { maxWidth: labelW });
+        pdf.setFontSize(9).setFont(undefined, "normal");
+        pdf.text(String(value), pageWidth - margin, y, { align: "right" });
+        y += lineAdvance(9);
+      };
+
+      // ===== TITLE =====
+      pdf.setFontSize(13).setFont(undefined, "bold");
+      pdf.text("ORDER DETAILS", pageWidth / 2, y, { align: "center" });
+      y += lineAdvance(13, 3);
+
+      y = drawDashedLine(y) + orderIdMarginTop;
+
+      // ===== ORDER INFO =====
+      const displayedOrderId = order.orderId || order._id;
+      printRow("Order ID:", displayedOrderId);
+
+      // Customer name can be a long business name — if it doesn't fit next to
+      // the label without overlapping, drop it to the line(s) below instead.
+      const customerLabel = "Customer:";
+      const customerName = order.customer?.name || "N/A";
+      pdf.setFontSize(9).setFont(undefined, "bold");
+      const customerLabelWidth = pdf.getTextWidth(customerLabel);
+      pdf.text(customerLabel, margin, y, { maxWidth: labelW });
+      pdf.setFontSize(9).setFont(undefined, "normal");
+      const customerAvailableWidth = contentWidth - customerLabelWidth - 6;
+      if (pdf.getTextWidth(customerName) <= customerAvailableWidth) {
+        pdf.text(customerName, pageWidth - margin, y, { align: "right" });
+        y += lineAdvance(9);
+      } else {
+        // Once it wraps, this is a paragraph, not a single-line label/value
+        // row anymore — right-aligning each line individually made short
+        // trailing lines (e.g. "ANZ") float off to the right, disconnected
+        // from the rest of the name above it. Left-align the whole block
+        // instead so every line starts from the same left edge.
+        y += lineAdvance(9);
+        const customerNameLines = pdf.splitTextToSize(customerName, contentWidth);
+        customerNameLines.forEach((line) => {
+          pdf.text(line, margin, y);
+          y += lineAdvance(9);
+        });
+      }
+
+      if (order.customer?.address) {
+        pdf.setFontSize(8).setFont(undefined, "normal");
+        const addressLines = pdf.splitTextToSize(order.customer.address, contentWidth);
+        addressLines.forEach((line) => {
+          pdf.text(line, margin, y);
+          y += lineAdvance(8);
+        });
+      }
+      if (order.customer?.pincode) {
+        pdf.setFontSize(9).setFont(undefined, "normal");
+        pdf.text(String(order.customer.pincode), margin, y);
+        y += lineAdvance(9);
+      }
+      printRow("Order Date:", formatDate(order.orderDate));
+
+      y = drawDashedLine(y + 2) + productsMarginTop;
+
+      // ===== PRODUCTS =====
+      pdf.setFontSize(10).setFont(undefined, "bold");
+      pdf.text("PRODUCTS", margin, y);
+      y += lineAdvance(10, 5);
+
+      const items = (order.orderItems || []).filter((item) => !filterItem || filterItem(item));
+
+      items.forEach((item) => {
+        const productName = item.product?.productName || "Unknown";
+        const qty = getQty(item);
+        const unit = item.unit || "";
+        const qtyText = `Qty: ${qty}${unit ? ` ${unit}` : ""}`;
+
+        pdf.setFontSize(13).setFont(undefined, "normal");
+        // Reserve exactly as much width as this row's qty text actually
+        // needs (not a fixed guess) — a large quantity or long unit name
+        // (e.g. "Qty: 1000 bundle") would otherwise run into the product
+        // name wrapped on the same line.
+        const qtyTextWidth = pdf.getTextWidth(qtyText);
+        const nameLines = pdf.splitTextToSize(`• ${productName}`, contentWidth - qtyTextWidth - 10);
+
+        nameLines.forEach((line, idx) => {
+          pdf.setFont(undefined, "normal");
+          pdf.text(line, margin, y);
+          if (idx === 0) {
+            pdf.setFont(undefined, "normal");
+            pdf.text(qtyText, pageWidth - margin, y, { align: "right" });
+          }
+          y += lineAdvance(13);
+        });
+        y += 8;
+      });
+
+      y = drawDashedLine(y);
+
+      return y;
+    };
+
+    // Pass 1: measure against a throwaway tall page (large enough for even a
+    // very long product list) without ever showing it to the user.
+    const measurePdf = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: [pageWidth, 20000],
+    });
+    const measuredHeight = draw(measurePdf);
+
+    // Pass 2: the real page, sized exactly to what was measured.
+    const pageHeight = Math.ceil(measuredHeight + margin);
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "pt",
-      format: [pageWidth, 1200],
+      format: [pageWidth, pageHeight],
     });
-
-    let y = margin + titleMarginTop;
-
-    // Row height for a given font size, derived from jsPDF's own line-height
-    // factor instead of a hardcoded pixel guess — so it always matches the
-    // font actually in use and never runs two lines into each other no
-    // matter how long the customer name/address turns out to be.
-    const lineAdvance = (fontSize, extra = 2) => fontSize * pdf.getLineHeightFactor() + extra;
-
-    const drawDashedLine = (yPos) => {
-      pdf.setLineDashPattern([1, 1], 0);
-      pdf.setDrawColor(0, 0, 0);
-      pdf.setLineWidth(0.5);
-      pdf.line(margin, yPos, pageWidth - margin, yPos);
-      pdf.setLineDashPattern([], 0);
-      return yPos + 8;
-    };
-
-    const printRow = (label, value) => {
-      pdf.setFontSize(9).setFont(undefined, "bold");
-      pdf.text(label, margin, y, { maxWidth: labelW });
-      pdf.setFontSize(9).setFont(undefined, "normal");
-      pdf.text(String(value), pageWidth - margin, y, { align: "right" });
-      y += lineAdvance(9);
-    };
-
-    // ===== TITLE =====
-    pdf.setFontSize(13).setFont(undefined, "bold");
-    pdf.text("ORDER DETAILS", pageWidth / 2, y, { align: "center" });
-    y += lineAdvance(13, 3);
-
-    y = drawDashedLine(y) + orderIdMarginTop;
-
-    // ===== ORDER INFO =====
-    const displayedOrderId = order.orderId || order._id;
-    printRow("Order ID:", displayedOrderId);
-
-    // Customer name can be a long business name — if it doesn't fit next to
-    // the label without overlapping, drop it to the line(s) below instead.
-    const customerLabel = "Customer:";
-    const customerName = order.customer?.name || "N/A";
-    pdf.setFontSize(9).setFont(undefined, "bold");
-    const customerLabelWidth = pdf.getTextWidth(customerLabel);
-    pdf.text(customerLabel, margin, y, { maxWidth: labelW });
-    pdf.setFontSize(9).setFont(undefined, "normal");
-    const customerAvailableWidth = contentWidth - customerLabelWidth - 6;
-    if (pdf.getTextWidth(customerName) <= customerAvailableWidth) {
-      pdf.text(customerName, pageWidth - margin, y, { align: "right" });
-      y += lineAdvance(9);
-    } else {
-      // Once it wraps, this is a paragraph, not a single-line label/value
-      // row anymore — right-aligning each line individually made short
-      // trailing lines (e.g. "ANZ") float off to the right, disconnected
-      // from the rest of the name above it. Left-align the whole block
-      // instead so every line starts from the same left edge.
-      y += lineAdvance(9);
-      const customerNameLines = pdf.splitTextToSize(customerName, contentWidth);
-      customerNameLines.forEach((line) => {
-        pdf.text(line, margin, y);
-        y += lineAdvance(9);
-      });
-    }
-
-    if (order.customer?.address) {
-      pdf.setFontSize(8).setFont(undefined, "normal");
-      const addressLines = pdf.splitTextToSize(order.customer.address, contentWidth);
-      addressLines.forEach((line) => {
-        pdf.text(line, margin, y);
-        y += lineAdvance(8);
-      });
-    }
-    if (order.customer?.pincode) {
-      pdf.setFontSize(9).setFont(undefined, "normal");
-      pdf.text(String(order.customer.pincode), margin, y);
-      y += lineAdvance(9);
-    }
-    printRow("Order Date:", formatDate(order.orderDate));
-
-    y = drawDashedLine(y + 2) + productsMarginTop;
-
-    // ===== PRODUCTS =====
-    pdf.setFontSize(10).setFont(undefined, "bold");
-    pdf.text("PRODUCTS", margin, y);
-    y += lineAdvance(10, 5);
-
-    const items = (order.orderItems || []).filter((item) => !filterItem || filterItem(item));
-
-    items.forEach((item) => {
-      const productName = item.product?.productName || "Unknown";
-      const qty = getQty(item);
-      const unit = item.unit || "";
-      const qtyText = `Qty: ${qty}${unit ? ` ${unit}` : ""}`;
-
-      pdf.setFontSize(13).setFont(undefined, "normal");
-      // Reserve exactly as much width as this row's qty text actually
-      // needs (not a fixed guess) — a large quantity or long unit name
-      // (e.g. "Qty: 1000 bundle") would otherwise run into the product
-      // name wrapped on the same line.
-      const qtyTextWidth = pdf.getTextWidth(qtyText);
-      const nameLines = pdf.splitTextToSize(`• ${productName}`, contentWidth - qtyTextWidth - 10);
-
-      nameLines.forEach((line, idx) => {
-        pdf.setFont(undefined, "normal");
-        pdf.text(line, margin, y);
-        if (idx === 0) {
-          pdf.setFont(undefined, "normal");
-          pdf.text(qtyText, pageWidth - margin, y, { align: "right" });
-        }
-        y += lineAdvance(13);
-      });
-      y += 8;
-    });
-
-    y = drawDashedLine(y);
+    draw(pdf);
 
     openPrintDialog(pdf);
     toast.success("Opening print dialog for thermal slip");
